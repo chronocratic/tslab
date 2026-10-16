@@ -201,8 +201,7 @@ class _ApiPool:
 
     def _client(self) -> 'Api':
         if self._api is None:
-            # why: optional extra
-            import wandb  # noqa: PLC0415
+            import wandb  # noqa: PLC0415 # why: optional extra
 
             self._api = wandb.Api()
         return self._api
