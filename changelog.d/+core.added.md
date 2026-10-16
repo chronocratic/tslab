@@ -1,0 +1,1 @@
+Core: `Run`, `RunOptions`, `@stage`/`Stage`, `Json`/`Metrics`/`Tensors` artifacts with `external(...)`, fingerprints, `status.json`, safe config files (`save_config`/`load_config`/`parse_config` with presets and `no-preset`), a run lock with a heartbeat so resubmitted jobs take over their own run, failure isolation, dry run.
