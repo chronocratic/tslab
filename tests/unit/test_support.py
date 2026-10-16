@@ -47,7 +47,8 @@ def test_git_state_inside_a_repository(tmp_path: Path) -> None:
         ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'x'],
     )
     for arguments in commands:
-        subprocess.run([git, *arguments], cwd=tmp_path, check=True)  # noqa: S603 # why: fixed git arguments
+        # why: fixed git arguments
+        subprocess.run([git, *arguments], cwd=tmp_path, check=True)  # noqa: S603
     clean = collect_git_state(directory=tmp_path)
     assert isinstance(clean['commit'], str)
     assert len(clean['commit']) == 40

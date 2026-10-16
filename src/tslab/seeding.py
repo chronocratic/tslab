@@ -24,5 +24,6 @@ def seed_everything(*, seed: int) -> None:
     """
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
-    np.random.seed(seed)  # noqa: NPY002 # why: seeds the legacy global generator many libraries still use
+    # why: seeds the legacy global generator many libraries still use
+    np.random.seed(seed)  # noqa: NPY002
     torch.manual_seed(seed)

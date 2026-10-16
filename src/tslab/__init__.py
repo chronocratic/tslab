@@ -10,6 +10,7 @@ from tslab.artifact import (
     Tensors,
     UnavailableArtifact,
     UnavailableArtifactError,
+    UnavailableReason,
 )
 from tslab.config import ConfigFileError, load_config, parse_config, save_config
 from tslab.fingerprint import Fingerprintable, NotFingerprinted
@@ -45,6 +46,7 @@ __all__ = [
     'Tracker',
     'UnavailableArtifact',
     'UnavailableArtifactError',
+    'UnavailableReason',
     '__version__',
     'is_available',
     'load_config',

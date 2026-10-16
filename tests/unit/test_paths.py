@@ -58,7 +58,10 @@ def test_relative_path_validation(path: Path) -> None:
 
 def test_relative_path_rejects_str() -> None:
     with pytest.raises(TypeError):
-        validate_relative_path(path='a/b', parameter='relative_path')  # ty: ignore[invalid-argument-type]
+        validate_relative_path(
+            path='a/b',  # ty: ignore[invalid-argument-type]
+            parameter='relative_path',
+        )
 
 
 def test_atomic_write_leaves_old_file_when_rename_never_happens(

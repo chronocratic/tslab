@@ -176,17 +176,26 @@ def read_status(*, path: Path) -> RunStatusSnapshot | None:
         The snapshot, or ``None`` if the file does not exist yet.
 
     Raises:
-        ValueError: If the file has an unsupported ``format_version``.
+        TypeError: If the file is not a JSON object.
+        ValueError: If the file lacks a required key or has an unsupported
+            ``format_version``.
     """
     require_path(value=path, parameter='path')
     if not path.exists():
         return None
     document = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(document, dict):
+        message = f'{path.as_posix()} must be a JSON object, got {type(document).__name__}'
+        raise TypeError(message)
     if document.get('format_version') != STATUS_FORMAT_VERSION:
         message = (
             f'{path.as_posix()} has format_version {document.get("format_version")!r}; '
             f'this TSLab version reads only {STATUS_FORMAT_VERSION}'
         )
+        raise ValueError(message)
+    missing = [key for key in ('run_state', 'updated_at', 'instances') if key not in document]
+    if missing:
+        message = f'{path.as_posix()} is missing required keys: {missing}'
         raise ValueError(message)
     return RunStatusSnapshot(
         run_state=RunState(document['run_state']),
