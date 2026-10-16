@@ -28,7 +28,7 @@ jobs:
           enable-cache: true
       - name: Install
         # The tracker extras are needed by the tracking tests; chronocratic has its own job (M6).
-        run: uv sync --locked --extra mlflow --extra tensorboard
+        run: uv sync --locked --extra wandb --extra mlflow --extra tensorboard
       - name: Lint
         run: uv run ruff check .
       - name: Format
