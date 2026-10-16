@@ -14,6 +14,7 @@ import json
 import logging
 import math
 from pathlib import Path
+import shutil
 from typing import ClassVar, NoReturn, override, Self
 
 from safetensors import safe_open
@@ -26,6 +27,7 @@ from tslab.paths import atomic_write_text, require_path
 __all__ = [
     'Artifact',
     'ArtifactIdentity',
+    'Checkpoint',
     'Json',
     'Metrics',
     'Tensors',
@@ -320,6 +322,125 @@ class Tensors(Artifact):
         with safe_open(path, framework='pt') as handle:
             metadata = handle.metadata() or {}
         return cls(tensors=load_file(filename=path), metadata=metadata)
+
+
+class Checkpoint(Artifact):
+    """Names the best and the last training checkpoint inside a folder.
+
+    The trainer writes the checkpoint files into the folder while it trains;
+    ``save`` only writes ``checkpoint.json`` with their names, so large files
+    are never copied. A training checkpoint is a pickle, and loading a pickle
+    can execute code, so ``trusted`` says whether full unpickling is allowed:
+    checkpoints written by a stage in this run folder are trusted, files given
+    to ``external`` are not unless the caller says so.
+    """
+
+    FILE_NAME: ClassVar[str] = 'checkpoint.json'
+    FORMAT_VERSION: ClassVar[int] = 1
+
+    def __init__(self, *, directory: Path, best: str, last: str, trusted: bool = True) -> None:
+        """Create the artifact.
+
+        Args:
+            directory: Folder holding the checkpoint files.
+            best: File name of the best checkpoint.
+            last: File name of the last checkpoint.
+            trusted: Whether the files may be fully unpickled when loaded.
+
+        Raises:
+            TypeError: If ``directory`` is not a ``Path``.
+            ValueError: If a name is not a plain file name.
+        """
+        require_path(value=directory, parameter='directory')
+        for name in (best, last):
+            _require_file_name(name=name)
+        self.directory = directory
+        self.best = best
+        self.last = last
+        self.trusted = trusted
+
+    @property
+    def best_path(self) -> Path:
+        """Return the path of the best checkpoint file."""
+        return self.directory / self.best
+
+    @property
+    def last_path(self) -> Path:
+        """Return the path of the last checkpoint file."""
+        return self.directory / self.last
+
+    @override
+    def save(self, *, directory: Path) -> None:
+        """Write ``checkpoint.json``; copy the files first if ``directory`` is another folder."""
+        require_path(value=directory, parameter='directory')
+        if directory.resolve() != self.directory.resolve():
+            for name in sorted({self.best, self.last}):
+                shutil.copy2(self.directory / name, directory / name)
+        document = {'best': self.best, 'format_version': self.FORMAT_VERSION, 'last': self.last}
+        atomic_write_text(
+            path=directory / self.FILE_NAME, text=json.dumps(document, indent=2) + '\n'
+        )
+
+    @classmethod
+    @override
+    def load(cls, *, directory: Path) -> Self:
+        """Read ``checkpoint.json`` and check that both named files exist.
+
+        Raises:
+            ValueError: If ``checkpoint.json`` has another format version or bad names.
+            FileNotFoundError: If a named checkpoint file is missing.
+        """
+        require_path(value=directory, parameter='directory')
+        document = json.loads((directory / cls.FILE_NAME).read_text(encoding='utf-8'))
+        if not isinstance(document, dict) or document.get('format_version') != cls.FORMAT_VERSION:
+            message = (
+                f'{(directory / cls.FILE_NAME).as_posix()}: expected format_version '
+                f'{cls.FORMAT_VERSION}'
+            )
+            raise ValueError(message)
+        best = document.get('best')
+        last = document.get('last')
+        if not isinstance(best, str) or not isinstance(last, str):
+            message = f'{(directory / cls.FILE_NAME).as_posix()}: best and last must be strings'
+            raise ValueError(message)  # noqa: TRY004 # why: bad file content, not arguments
+        checkpoint = cls(directory=directory, best=best, last=last)
+        missing = [name for name in (best, last) if not (directory / name).is_file()]
+        if missing:
+            message = f'checkpoint files missing in {directory.as_posix()}: {missing}'
+            raise FileNotFoundError(message)
+        return checkpoint
+
+    @classmethod
+    @override
+    def external(cls, *, path: Path, trusted: bool = False) -> Self:
+        """Use a checkpoint file (or a folder with ``checkpoint.json``) from outside the run.
+
+        Args:
+            path: A ``.ckpt`` file, used as both best and last, or a folder
+                written by ``save``.
+            trusted: Allow full unpickling when the weights are loaded. Only
+                set it for files you trust: unpickling can execute code.
+
+        Returns:
+            The checkpoint, fingerprinted by the content of ``path``.
+        """
+        checkpoint = super().external(path=path)
+        checkpoint.trusted = trusted
+        return checkpoint
+
+    @classmethod
+    @override
+    def _load_external(cls, *, path: Path) -> Self:
+        if path.is_dir():
+            return cls.load(directory=path)
+        return cls(directory=path.parent, best=path.name, last=path.name)
+
+
+def _require_file_name(*, name: str) -> None:
+    """Raise ``ValueError`` unless ``name`` is a plain file name inside its folder."""
+    if name in {'', '.', '..'} or Path(name).name != name:
+        message = f'checkpoint file name must be a plain file name, got {name!r}'
+        raise ValueError(message)
 
 
 class UnavailableReason(StrEnum):
