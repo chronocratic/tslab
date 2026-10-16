@@ -87,8 +87,11 @@ def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
 
 
 def test_decorator_requires_keyword_only_and_run() -> None:
+    # why: the parameter exists only to be rejected
     with pytest.raises(TypeError, match='keyword-only'):
-        tslab.stage(name='positional', output=tslab.Json)(lambda run: tslab.Json(data={}))  # noqa: ARG005 # why: the parameter exists only to be rejected
+        tslab.stage(name='positional', output=tslab.Json)(
+            lambda run: tslab.Json(data={})  # noqa: ARG005
+        )
     with pytest.raises(TypeError, match='must take a run parameter'):
 
         @tslab.stage(name='norun', output=tslab.Json)
@@ -107,6 +110,17 @@ def test_corrupt_cached_result_is_recomputed(
         result = count(run=run, value=2)
     assert calls == ['count 2 0', 'count 2 0']
     assert 'cannot load count[default]' in caplog.text
+    assert isinstance(result, tslab.Json)
+
+
+def test_corrupt_instance_meta_is_recomputed(tmp_path: Path) -> None:
+    calls.clear()
+    with open_run(tmp_path) as run:
+        count(run=run, value=2)
+    (tmp_path / 'r' / 'count' / 'default' / 'meta.json').write_text('not json', encoding='utf-8')
+    with open_run(tmp_path) as run:
+        result = count(run=run, value=2)
+    assert calls == ['count 2 0', 'count 2 0']
     assert isinstance(result, tslab.Json)
 
 
@@ -138,7 +152,9 @@ class Doubler(tslab.Stage[tslab.Json]):
     output_type = tslab.Json
 
     @override
-    def execute(self, *, run: tslab.Run, value: int) -> tslab.Json:  # ty: ignore[invalid-method-override]
+    def execute(  # ty: ignore[invalid-method-override]
+        self, *, run: tslab.Run, value: int
+    ) -> tslab.Json:
         calls.append('double')
         return tslab.Json(data={'value': 2 * value})
 

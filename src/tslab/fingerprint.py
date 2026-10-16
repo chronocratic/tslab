@@ -110,7 +110,8 @@ def _canonicalize_dataclass(*, value: 'DataclassInstance') -> dict[str, object]:
     return canonical
 
 
-def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911 # why: one branch per supported type keeps the rules readable
+# why: one branch per supported type keeps the rules readable
+def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
     """Convert ``value`` into a JSON-compatible form with a single spelling.
 
     Rules:

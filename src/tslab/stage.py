@@ -84,7 +84,8 @@ class Stage[Out: Artifact](ABC):
     in_place: bool = False
 
     @abstractmethod
-    def execute(self, **arguments: Any) -> Out:  # noqa: ANN401 # why: each stage declares its own inputs
+    # why: each stage declares its own inputs
+    def execute(self, **arguments: Any) -> Out:  # noqa: ANN401
         """Do the work and return the artifact.
 
         Args:
@@ -95,7 +96,8 @@ class Stage[Out: Artifact](ABC):
             The result, an instance of ``output_type``.
         """
 
-    def __call__(self, **arguments: Any) -> Out:  # noqa: ANN401 # why: each stage declares its own inputs
+    # why: each stage declares its own inputs
+    def __call__(self, **arguments: Any) -> Out:  # noqa: ANN401
         """Run the stage instance, or load its cached result. Never override this.
 
         Args:
@@ -281,7 +283,8 @@ class Stage[Out: Artifact](ABC):
                     (directory / _INCOMPLETE_MARKER).unlink(missing_ok=True)
                 else:
                     replace_directory(source=work_directory, destination=directory)
-        except Exception as error:  # noqa: BLE001 # why: any stage error is recorded; fail_fast re-raises
+        # why: any stage error is recorded; fail_fast re-raises
+        except Exception as error:  # noqa: BLE001
             return self._record_failure(
                 execution=execution,
                 error=error,
@@ -404,14 +407,23 @@ def _stale_reason(
     meta_path = directory / _META_FILE
     if not meta_path.exists():
         return 'result folder missing'
-    recorded_inputs = json.loads(meta_path.read_text(encoding='utf-8')).get('inputs', {})
-    for key, value in inputs.items():
-        identity = value.tslab_identity
-        if identity is None or identity.instance_id is None:
-            continue
-        if recorded_inputs.get(key, {}).get('execution_id') != identity.execution_id:
-            return f'input {identity.instance_id} was executed again'
-    return None
+    document = _read_instance_meta(path=meta_path)
+    if document is None:
+        reason = 'cannot read result metadata'
+    elif document.get('format_version') != INSTANCE_META_FORMAT_VERSION:
+        reason = 'unsupported result metadata format'
+    else:
+        # TSLab writes ``inputs`` as a mapping of dicts; the cast names that shape.
+        recorded_inputs = cast('dict[str, dict[str, str | None]]', document.get('inputs') or {})
+        reason = None
+        for key, value in inputs.items():
+            identity = value.tslab_identity
+            if identity is None or identity.instance_id is None:
+                continue
+            if recorded_inputs.get(key, {}).get('execution_id') != identity.execution_id:
+                reason = f'input {identity.instance_id} was executed again'
+                break
+    return reason
 
 
 def _can_resume(*, record: InstanceRecord | None, fingerprint: str) -> bool:
@@ -423,12 +435,35 @@ def _can_resume(*, record: InstanceRecord | None, fingerprint: str) -> bool:
 
 
 def _identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentity:
-    document = json.loads((directory / _META_FILE).read_text(encoding='utf-8'))
+    document = _read_instance_meta(path=directory / _META_FILE)
+    fingerprint: object = None
+    execution_id: object = None
+    if document is not None and document.get('format_version') == INSTANCE_META_FORMAT_VERSION:
+        fingerprint = document.get('fingerprint')
+        execution_id = document.get('execution_id')
+    if not isinstance(fingerprint, str) or not isinstance(execution_id, str):
+        message = f'cannot read result metadata of {instance_id}'
+        raise TypeError(message)
     return ArtifactIdentity(
-        fingerprint=document['fingerprint'],
-        instance_id=instance_id,
-        execution_id=document['execution_id'],
+        fingerprint=fingerprint, instance_id=instance_id, execution_id=execution_id
     )
+
+
+def _read_instance_meta(*, path: Path) -> dict[str, object] | None:
+    """Parse one instance's ``meta.json``; unreadable or non-object files give ``None``.
+
+    A corrupt or partial file must never crash a run: the instance recomputes
+    instead (see ``_stale_reason`` and ``_identity_from_meta``).
+    """
+    try:
+        document = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        _LOGGER.warning('cannot read %s; treating the result as stale', path.as_posix())
+        return None
+    if not isinstance(document, dict):
+        _LOGGER.warning('%s is not a JSON object; treating the result as stale', path.as_posix())
+        return None
+    return cast('dict[str, object]', document)
 
 
 def _describe_inputs(*, inputs: Mapping[str, Artifact]) -> dict[str, dict[str, str | None]]:

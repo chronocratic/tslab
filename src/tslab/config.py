@@ -452,7 +452,12 @@ def parse_config[C](
 NO_PRESET = 'no-preset'
 
 
-def _preset_choice[C](*, config_class: type[C], presets: Mapping[str, tuple[str, C]]) -> Any:  # noqa: ANN401 # why: a union built at run time
+def _preset_choice[C](
+    # why: a union built at run time
+    *,
+    config_class: type[C],
+    presets: Mapping[str, tuple[str, C]],
+) -> Any:  # noqa: ANN401
     """Return the tyro union of ``no-preset`` and the presets.
 
     ``AvoidSubcommands`` on a preset turns each union field that has a default

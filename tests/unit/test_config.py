@@ -185,7 +185,10 @@ def test_save_and_load(tmp_path: Path) -> None:
     save_config(config=SAMPLE, path=tmp_path / 'config.yaml')
     assert load_config(config_class=Config, path=tmp_path / 'config.yaml') == SAMPLE
     with pytest.raises(TypeError):
-        load_config(config_class=Config, path=str(tmp_path / 'config.yaml'))  # ty: ignore[invalid-argument-type]
+        load_config(
+            config_class=Config,
+            path=str(tmp_path / 'config.yaml'),  # ty: ignore[invalid-argument-type]
+        )
 
 
 def test_parse_config_accepts_flags_after_subcommands() -> None:

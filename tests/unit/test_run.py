@@ -56,7 +56,11 @@ class BrokenTracker(RecordingTracker):
 
 def test_run_rejects_str_paths(tmp_path: Path) -> None:
     with pytest.raises(TypeError, match=r'root must be pathlib\.Path'):
-        Run(config=Config(), root=str(tmp_path), relative_path=Path('a'))  # ty: ignore[invalid-argument-type]
+        Run(
+            config=Config(),
+            root=str(tmp_path),  # ty: ignore[invalid-argument-type]
+            relative_path=Path('a'),
+        )
     with pytest.raises(TypeError, match=r'relative_path must be pathlib\.Path'):
         Run(config=Config(), root=tmp_path, relative_path='a')  # ty: ignore[invalid-argument-type]
 
