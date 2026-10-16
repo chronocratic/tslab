@@ -1,0 +1,48 @@
+# ruff.toml: strict on purpose. Every rule is on; each exception below says why.
+
+line-length = 100
+target-version = "py312"
+# Typing case files contain deliberate errors and are checked by tests/typing/test_typing.py.
+extend-exclude = ["planning", "tests/typing/cases"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # Conflicts with the formatter (ruff docs: "incompatible with the formatter").
+    "CPY001", # The BSD-3-Clause license lives in LICENSE, not in a header in every file.
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # pytest checks with plain assert.
+    "PLR2004", # Tests compare against literal expected values.
+    "D100",    # Test modules, classes and functions are named after what they check;
+    "D101",    # docstrings would repeat the name.
+    "D102",
+    "D103",
+    "D107",
+    "INP001",  # tests/ is not a package: pytest imports test helpers from the test's folder.
+    "ARG001",  # Stage functions and test doubles keep the signature their interface requires,
+    "ARG002",  # even when a test does not use every argument.
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[lint.isort]
+# The formatter drops magic trailing commas, so isort must not rely on them.
+split-on-trailing-comma = false
+combine-as-imports = true
+force-sort-within-sections = true
+order-by-type = false
+
+[format]
+quote-style = "single"
+indent-style = "space"
+skip-magic-trailing-comma = true
+line-ending = "auto"

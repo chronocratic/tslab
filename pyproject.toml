@@ -1,0 +1,120 @@
+[build-system]
+requires = ["hatchling>=1.25", "hatch-vcs>=0.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tslab"
+dynamic = ["version"]
+description = "Resumable, cached research pipelines for time-series representation learning."
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "Wadie Skaf" }]
+keywords = ["time series", "representation learning", "pytorch", "lightning", "experiments"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "lightning>=2.5,<3",
+    "numpy>=2.1,<3",
+    "pyyaml>=6.0",
+    "safetensors>=0.4",
+    "scikit-learn>=1.6,<2",
+    "torch>=2.4,<3",
+    "torchmetrics>=1.6,<2",
+    "tyro>=1.0,<2",
+]
+
+[project.urls]
+Repository = "https://github.com/skafai/tslab"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "pytest-cov>=5.0",
+    "ruff>=0.17",
+    "towncrier>=24.8",
+    "torchdata>=0.11",
+    "ty>=0.0.88",
+    "types-pyyaml>=6.0",
+]
+
+[tool.hatch.version]
+# The version comes from the git tag (v0.1.0a1 gives 0.1.0a1); between tags it
+# is a development version such as 0.1.0a2.dev3.
+source = "vcs"
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tslab"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "slow: long-running tests (subprocess kills, template creation); still run in CI",
+    "chronocratic: needs the chronocratic-models and chronocratic-datasets extras",
+]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.rules]
+# Strict: every rule is an error, including the ones ty leaves off by default
+# (for example missing @override decorators and unsound returns of Any).
+all = "error"
+
+[tool.ty.terminal]
+error-on-warning = true
+
+[tool.ty.src]
+# Case files contain deliberate type errors; tests/typing/test_typing.py checks them one by one.
+exclude = ["tests/typing/cases"]
+
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## v{version} ({project_date})"
+issue_format = "[#{issue}](https://github.com/skafai/tslab/issues/{issue})"
+underlines = ["", "", ""]
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
