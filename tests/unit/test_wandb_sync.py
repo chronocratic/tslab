@@ -105,9 +105,8 @@ def test_environment_fills_gaps_but_never_filters(
         queried.append(path)
         return SimpleNamespace(state='finished')
 
-    # why: replaces the network boundary
     monkeypatch.setattr(
-        wandb_sync._ApiPool,  # noqa: SLF001
+        wandb_sync._ApiPool,  # noqa: SLF001 # why: replaces the network boundary
         'run',
         fake_run,
     )
