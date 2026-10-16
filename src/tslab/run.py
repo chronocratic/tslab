@@ -125,6 +125,7 @@ class Run:
             relative_path: Relative folder of this run under ``root``; several
                 parts create hierarchy, for example ``Path('ts2vec/Coffee/seed_42')``.
             trackers: Experiment trackers; started on enter, finished on exit.
+                A ``CSVTracker`` is always added in front of them.
             options: Run behaviour; defaults to ``config.run`` if it is a
                 ``RunOptions``, otherwise to ``RunOptions()``.
             seed: Seed for every random generator; defaults to ``config.seed``,
@@ -142,7 +143,11 @@ class Run:
         self._config = config
         self._relative_path = relative_path
         self._directory = root / relative_path
-        self._trackers = tuple(trackers)
+        # why: keeps `import tslab.run` free of Lightning
+        from tslab.tracking.csv_tracker import CSVTracker  # noqa: PLC0415
+
+        # The CSV tracker is always on: it is the local record when remote trackers fail.
+        self._trackers = (CSVTracker(), *trackers)
         self._options = options if options is not None else _options_from_config(config=config)
         if self._options.rerun_from is not None:
             validate_stage_name(name=self._options.rerun_from)
