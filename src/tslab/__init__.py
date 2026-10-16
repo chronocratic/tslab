@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from tslab.artifact import (
     Artifact,
+    Checkpoint,
     is_available,
     Json,
     Metrics,
@@ -29,6 +30,7 @@ except (
 
 __all__ = [
     'Artifact',
+    'Checkpoint',
     'ConfigFileError',
     'Fingerprintable',
     'InstanceName',
