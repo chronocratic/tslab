@@ -122,6 +122,11 @@ def test_corrupt_instance_meta_is_recomputed(tmp_path: Path) -> None:
         result = count(run=run, value=2)
     assert calls == ['count 2 0', 'count 2 0']
     assert isinstance(result, tslab.Json)
+    (tmp_path / 'r' / 'count' / 'default' / 'meta.json').write_bytes(b'\xff\xfe\x00\x01')
+    with open_run(tmp_path) as run:
+        result = count(run=run, value=2)
+    assert calls == ['count 2 0', 'count 2 0', 'count 2 0']
+    assert isinstance(result, tslab.Json)
 
 
 def test_external_input_is_recorded_and_content_sensitive(tmp_path: Path) -> None:

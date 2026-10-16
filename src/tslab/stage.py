@@ -457,7 +457,7 @@ def _read_instance_meta(*, path: Path) -> dict[str, object] | None:
     """
     try:
         document = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         _LOGGER.warning('cannot read %s; treating the result as stale', path.as_posix())
         return None
     if not isinstance(document, dict):
