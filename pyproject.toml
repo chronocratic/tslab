@@ -32,6 +32,10 @@ dependencies = [
     "tyro>=1.0,<2",
 ]
 
+[project.optional-dependencies]
+mlflow = ["mlflow>=3.0,<4"]
+tensorboard = ["tensorboard>=2.18"]
+
 [project.urls]
 Repository = "https://github.com/skafai/tslab"
 
