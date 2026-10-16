@@ -27,7 +27,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install
-        run: uv sync --locked
+        # The tracker extras are needed by the tracking tests; chronocratic has its own job (M6).
+        run: uv sync --locked --extra mlflow --extra tensorboard
       - name: Lint
         run: uv run ruff check .
       - name: Format
