@@ -19,6 +19,12 @@ non-``None`` value of an unsupported type raises ``TypeError`` when saving.
 
 Parsing the command line is delegated to tyro; ``parse_config`` only adds
 the defaults of TSLab.
+
+``REQUIRED`` marks a preset value its author cannot know (a dataset path, a
+cluster folder). A preset that carries it must be given the value on the
+command line, or tyro stops with ``Missing ... --<flag>``. A parsed config
+never holds the marker, and ``save_config`` raises ``TypeError`` for an
+unparsed preset that still holds it.
 """
 
 from collections.abc import Mapping, Sequence
@@ -49,6 +55,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'CONFIG_FORMAT_VERSION',
+    'REQUIRED',
     'ConfigFileError',
     'config_from_yaml',
     'config_to_data',
@@ -60,6 +67,10 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 CONFIG_FORMAT_VERSION = 1
+
+# An optional marker for a preset value the preset author cannot know; the
+# user must give it on the command line (tyro stops with "Missing ...").
+REQUIRED: Any = tyro.MISSING
 _TYPE_KEY = '__type__'
 _SCALARS = (bool, int, float, str)
 _MAPPING_ARGUMENT_COUNT = 2
