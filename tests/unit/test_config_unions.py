@@ -7,18 +7,18 @@ import tyro
 import tslab
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Small:
     size: int = 1
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Large:
     size: int = 9
     depth: int = 2
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class NamedChoices:
     choice: (
         Annotated[Small, tyro.conf.subcommand(name='small')]

@@ -14,7 +14,7 @@ from tslab.interfaces import Batch, Split, Trainer
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
     run: RunOptions = field(default_factory=RunOptions)

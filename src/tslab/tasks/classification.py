@@ -7,7 +7,7 @@ from tslab.tasks.data import TSDataInfo
 __all__ = ['TSClassificationDataInfo']
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TSClassificationDataInfo(TSDataInfo):
     """Facts about a classification dataset.
 

@@ -14,7 +14,7 @@ import torch
 import tslab
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ToyConfig:
     root: Path = Path('runs')
     relative_path: Path = Path('toy')

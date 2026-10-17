@@ -34,7 +34,7 @@ from {{package_name}}.augmentations import JitterThenScaleRecipe
 Models = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ForecastConfig:
     """One forecasting run. Every field is a command-line flag.
 

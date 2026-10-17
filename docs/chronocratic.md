@@ -34,7 +34,7 @@ A recipe is a frozen dataclass whose `__call__` builds a chronocratic
 augmentation producer; its return annotation names the view type:
 
 ```python
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class JitterThenScaleRecipe:
     sigma: float = 0.8
     ratio: float = 1.1

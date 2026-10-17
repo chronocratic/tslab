@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TSForecastingDataInfo(TSDataInfo):
     """Facts about a forecasting dataset.
 

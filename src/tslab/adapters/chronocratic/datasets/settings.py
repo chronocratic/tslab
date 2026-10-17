@@ -36,7 +36,7 @@ _DATAMODULE_ATTRIBUTE = 'tslab_datamodule'
 _VARIADIC = (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class DataModuleEntry:
     """One chronocratic datamodule found in ``chronocratic.datasets``.
 

@@ -25,7 +25,7 @@ _NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9-]*')
 _SKIPPED_PARTS = frozenset({'__pycache__'})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class New:
     """Create a project from the TSLab template.
 

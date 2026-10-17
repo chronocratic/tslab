@@ -21,7 +21,7 @@ import torch
 import tslab
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class MinimalConfig:
     """Settings of the minimal pipeline; every field is a command-line flag.
 

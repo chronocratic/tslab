@@ -9,7 +9,7 @@ import torch
 import tslab
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
 

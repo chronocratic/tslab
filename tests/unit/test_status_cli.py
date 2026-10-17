@@ -12,7 +12,7 @@ from tslab.cli import main
 from tslab.cli.status import Status
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
     run: tslab.RunOptions = field(default_factory=tslab.RunOptions)

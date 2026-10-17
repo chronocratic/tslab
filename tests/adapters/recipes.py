@@ -17,7 +17,7 @@ from chronocratic.models.convolutional.dilated.ts2vec.augmentation import CropSh
 RECIPE_CALLS: list[object] = []
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class JitterThenScaleRecipe:
     """Jitter one view, scale the other."""
 
@@ -32,7 +32,7 @@ class JitterThenScaleRecipe:
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CropShiftRecipe:
     """TS2Vec's crop and shift, as a recipe."""
 

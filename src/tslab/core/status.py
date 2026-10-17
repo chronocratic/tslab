@@ -52,7 +52,7 @@ class RunState(StrEnum):
     CRASHED = 'crashed'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class InstanceRecord:
     """What ``status.json`` stores about one stage instance.
 
@@ -123,7 +123,7 @@ def _optional_str(*, document: Mapping[str, object], key: str) -> str | None:
     raise ValueError(message)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RunStatusSnapshot:
     """An immutable view of ``status.json``.
 

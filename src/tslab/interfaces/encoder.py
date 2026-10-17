@@ -52,7 +52,7 @@ def resolve_device(*, device: str) -> torch.device:
     return torch.device(device)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ModelAsEncoder:
     """Encoder factory for models that already have ``encode(*, inputs)``.
 

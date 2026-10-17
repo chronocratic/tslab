@@ -27,7 +27,7 @@ ModelChoice = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe, Cr
 VIEW_PAIR_MODELS = {'tstcc', 'mhccl', 'simclr', 'cost'}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     model: ModelChoice
 
@@ -148,13 +148,13 @@ def test_recipe_subcommand_names() -> None:
     assert recipe_subcommand(recipe=CropShiftRecipe) == 'crop-shift'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class UnannotatedRecipe:
     def __call__(self):  # noqa: ANN204 # why: the missing annotation is what this test checks
         return None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class NoModelRecipe:
     def __call__(self) -> AugmentationProducer[str]:
         raise NotImplementedError
@@ -165,7 +165,7 @@ class NotADataclassRecipe:
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class DefaultRecipe:
     def __call__(self) -> AugmentationProducer[str]:
         raise NotImplementedError
