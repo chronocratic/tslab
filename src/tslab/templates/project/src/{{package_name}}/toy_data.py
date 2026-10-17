@@ -67,15 +67,17 @@ def write_forecasting(*, directory: Path) -> Path:
         for _ in _COLUMNS
     ]
     dates = _START + hours.astype('timedelta64[h]')
-    lines = [','.join(['date', *_COLUMNS])]
-    lines += [
-        ','.join(
-            [
-                np.datetime_as_string(dates[row], unit='s').replace('T', ' '),
-                *(f'{column[row]:.3f}' for column in columns),
-            ]
-        )
-        for row in range(_HOURS)
+    lines = [
+        ','.join(['date', *_COLUMNS]),
+        *(
+            ','.join(
+                [
+                    np.datetime_as_string(dates[row], unit='s').replace('T', ' '),
+                    *(f'{column[row]:.3f}' for column in columns),
+                ]
+            )
+            for row in range(_HOURS)
+        ),
     ]
     path = directory / FORECASTING_FILE
     directory.mkdir(parents=True, exist_ok=True)
