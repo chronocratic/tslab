@@ -17,6 +17,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
+from tslab.study.expansion import expand_placeholders, expand_setting, expand_variables
 from tslab.study.loading import load_study
 from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
 
@@ -28,7 +29,10 @@ __all__ = [
     'Study',
     'StudyRun',
     'check_paths',
+    'expand_placeholders',
     'expand_runs',
+    'expand_setting',
+    'expand_variables',
     'from_presets',
     'load_study',
     'match_problems',
