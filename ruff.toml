@@ -22,7 +22,7 @@ ignore = [
     "D102",
     "D103",
     "D107",
-    "INP001",  # tests/ is not a package: pytest imports test helpers from the folder of the test.
+    "INP001",  # tests/ is not a package: pytest imports helpers from the test's folder, or from tests/unit (pythonpath).
     "ARG001",  # Stage functions and test doubles keep the signature their interface requires,
     "ARG002",  # even when a test does not use every argument.
 ]
