@@ -80,6 +80,7 @@ packages = ["src/tslab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["tests/unit"]
 # Slow tests are skipped by default; `pytest -m ""` runs everything.
 addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
@@ -89,6 +90,7 @@ markers = [
 
 [tool.ty.environment]
 python-version = "3.12"
+extra-paths = ["tests/unit"]
 
 [tool.ty.rules]
 # Strict: every rule is an error, including the ones ty leaves off by default
