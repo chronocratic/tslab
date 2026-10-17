@@ -24,7 +24,7 @@ with tslab.Run(config=config, root=Path('runs'), relative_path=Path('minimal')) 
 
 It also ships:
 
-- ready stages for time-series representation learning: train, encode, and
+- ready stages for time series representation learning: train, encode, and
   evaluate with linear probes;
 - Lightning training with safe resume and SLURM time limits;
 - experiment trackers (CSV always; Weights & Biases, MLflow and TensorBoard as extras);

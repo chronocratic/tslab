@@ -10,8 +10,8 @@ and the recipe is offered only on models that take that view type:
 
 Pass recipes to ``chronocratic_model_choice(augmentations=(...))``; then
 ``model.augmentation:jitter-then-scale --model.augmentation.sigma 0.5`` selects
-and sets one, and ``model.augmentation:default`` keeps the model's own. The
-recipe's settings are part of the training fingerprint.
+and sets one, and ``model.augmentation:default`` keeps the built-in
+augmentation of the model. The settings of the recipe are part of the training fingerprint.
 """
 
 from dataclasses import dataclass

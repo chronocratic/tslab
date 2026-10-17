@@ -31,7 +31,7 @@ class MinimalConfig:
         noise: Standard deviation of the added noise.
         windows: Moving-average window lengths, one ``smooth`` instance each.
         root: Folder holding all runs.
-        relative_path: This run's folder under ``root``.
+        relative_path: The folder of this run under ``root``.
         seed: Seeds Python, NumPy and torch.
         run: Resume and rerun options.
     """

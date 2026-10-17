@@ -15,7 +15,7 @@ def attack(
 ) -> tslab.Tensors: ...
 ```
 
-Arguments are keyword-only. Artifacts among them are the stage's inputs; the
+Arguments are keyword-only. Artifacts among them are the inputs of the stage; the
 rest are settings and must be fingerprintable. Omit `name` for a stage that
 runs once per run. `in_place=True` lets a long stage write into its final
 folder while running and resume from what it wrote.
@@ -55,8 +55,8 @@ For the ready stages, classification data also implements
 `encode` takes an `encoder` argument: a callable that turns the trained model
 into an object with `encode(*, inputs)` (`tslab.interfaces.Encoder`), and optionally
 `encode_sequence(*, inputs)` (`tslab.interfaces.SequenceEncoder`) for the
-encode-once forecasting path. `tslab.ModelAsEncoder()` uses the model's own
-methods of those names.
+encode-once forecasting path. `tslab.ModelAsEncoder()` uses the methods
+of the model under those names.
 
 ## A probe or downstream model
 

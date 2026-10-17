@@ -22,7 +22,7 @@ With `presets=`, the first word picks where to start:
 - `no-preset`: the config class itself; choose every model and dataset with
   subcommands and flags;
 - a preset name: a finished config. A preset **fixes its model and dataset**
-  (`my-preset model:cost` is an error, so a preset's model settings are never
+  (`my-preset model:cost` is an error, so the model settings of a preset are never
   silently dropped), while flags still change any value
   (`my-preset --trainer.max-epochs 10`).
 

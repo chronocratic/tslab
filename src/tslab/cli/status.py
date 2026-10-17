@@ -40,7 +40,7 @@ _COUNTED_STATES = (
 
 @dataclass(frozen=True)
 class Status:
-    """Show a run's instances, or one line per run below a folder.
+    """Show the instances of a run, or one line per run below a folder.
 
     Attributes:
         path: A run folder, or any folder above runs (for example ``runs/``).

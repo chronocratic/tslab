@@ -13,7 +13,7 @@ What it shows:
   Fix it and run again: only the fixed attack and its dependants run.
 - **A changed series as a stage input.** The attack returns a whole series;
   ``forecasting_representations(..., series=...)`` encodes it instead of the
-  data's own series, so the encoding depends on the attack like on any input.
+  series of the data itself, so the encoding depends on the attack like on any input.
 - **Frozen channels.** Covariate channels (time features) are known in advance,
   so the attack only changes ``data.info.target_channels``.
 - **Nested instance names**: ``evaluate[forecasting/fgsm-small/h24]`` is
@@ -84,7 +84,7 @@ class AdvancedConfig:
         trainer: Lightning training settings.
         encoder: How representations are computed.
         root: Folder holding all runs.
-        relative_path: This run's folder under ``root``.
+        relative_path: The folder of this run under ``root``.
         seed: Seeds Python, NumPy and torch.
         run: Resume and rerun options.
     """
@@ -118,7 +118,7 @@ class AdvancedConfig:
 
 @runtime_checkable
 class BatchEncoding(Protocol):
-    """chronocratic's differentiable encoding of one batch."""
+    """The differentiable encoding of one batch by chronocratic."""
 
     def encode_batch(self, batch_x: torch.Tensor, *, output: EncodingOutputShape) -> torch.Tensor:
         """Encode ``batch_x`` with gradients."""

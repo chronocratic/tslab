@@ -1,4 +1,4 @@
-"""``tslab new``: start a research project from TSLab's template.
+"""``tslab new``: start a research project from the TSLab template.
 
 The template is a set of plain files shipped inside the package
 (``tslab/templates/project``). They are copied with the standard library, and
@@ -27,7 +27,7 @@ _SKIPPED_PARTS = frozenset({'__pycache__'})
 
 @dataclass(frozen=True)
 class New:
-    """Create a project from TSLab's template.
+    """Create a project from the TSLab template.
 
     Attributes:
         path: Folder to create; it must not exist or must be empty.

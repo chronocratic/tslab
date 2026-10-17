@@ -21,10 +21,10 @@ Models = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
   `model:tstcc`, `model:cost`, ... Its settings are generated from its
   parameter class, so `--model.<field>` flags and `--help` follow chronocratic.
 - `input_dim` always comes from the data. `sequence_length`, where a model has
-  it, is the flag's value, otherwise the data's length; forecasting data has no
+  it, is the value of the flag, otherwise the length of the data; forecasting data has no
   single length, so CoST, TimeVAE and TST then need `--model.sequence-length`.
 - `build_chronocratic_model(config=..., data_info=data.info)` builds the model;
-  chronocratic's own checks run there.
+  the checks of chronocratic itself run there.
 - `model_settings(choice=Models, name='ts2vec', max_train_length=128)` builds
   settings in code, for presets.
 
@@ -49,14 +49,14 @@ class JitterThenScaleRecipe:
 A recipe appears only on models with that view type (`ViewPair`: TSTCC, MHCCL,
 SimCLR, CoST; `AlignedPair`: TS2Vec; `SingleView`: AutoTCL):
 `model:tstcc model.augmentation:jitter-then-scale --model.augmentation.sigma 0.5`.
-`model.augmentation:default` keeps the model's built-in augmentation. A
+`model.augmentation:default` keeps the built-in augmentation of the model. A
 recipe given to a model of another view type is rejected when the command
-line is parsed. The recipe's settings are part of the training fingerprint.
+line is parsed. The settings of the recipe are part of the training fingerprint.
 
 ### Encoding
 
 `ChronocraticEncoder` (the `encoder` argument of the encode stages) calls
-chronocratic's encoding. `--encoder.batch-size` and
+the encoding of chronocratic. `--encoder.batch-size` and
 `--encoder.sliding-padding` are fingerprinted; `--encoder.device` (default
 `auto`) and `--encoder.num-workers` are not. TS2Vec, AutoTCL and CoST also
 encode whole series step by step, which the forecasting stages use to encode
@@ -77,7 +77,7 @@ from tslab.adapters.chronocratic_datasets import (
   constructor arguments as flags.
 - `build_chronocratic_data_source(config=...)` returns a
   `ChronocraticClassificationData` or a `ChronocraticForecastingData`; check
-  which with `isinstance` before passing it to a task's stages.
+  which with `isinstance` before passing it to the stages of a task.
 - In forecasting data, the time features chronocratic adds come first and are
   covariates (`data.info.covariate_channels`); the rest are targets.
 - Dataset files are fingerprinted by **path, not content**: replacing a file in
@@ -85,7 +85,7 @@ from tslab.adapters.chronocratic_datasets import (
 
 ## Evaluation recipes
 
-The defaults are chronocratic's. These commands give other common protocols;
+The defaults are those of chronocratic. These commands give other common protocols;
 add the usual `--data.*` path flags.
 
 ### Classification
@@ -120,9 +120,9 @@ TS2Vec paper.
 ## Known limitations
 
 - chronocratic-models 0.1.0a20 draws part of the training randomness of
-  TS2Vec, AutoTCL and CoST (training crops, encoder masks, TS2Vec's
-  crop-and-shift views) from NumPy generators that no seed controls. Two
+  TS2Vec, AutoTCL and CoST (training crops, encoder masks, the crop-and-shift
+  views of TS2Vec) from NumPy generators that no seed controls. Two
   trainings of these models with the same seed can therefore differ.
-- A model's built-in augmentation (`default`) is not part of the fingerprint
-  beyond the model's settings; its constants change only with the
+- The built-in augmentation of a model (`default`) is not part of the fingerprint
+  beyond the settings of the model; its constants change only with the
   chronocratic-models version.
