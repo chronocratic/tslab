@@ -20,6 +20,7 @@ from tslab.adapters.chronocratic.datasets.settings import (
     EXCLUDED_PARAMETERS,
     NOT_FINGERPRINTED_PARAMETERS,
 )
+from tslab.adapters.chronocratic.datasets.study import ucr_datasets, uea_datasets
 
 __all__ = [
     'DATAMODULES',
@@ -33,4 +34,6 @@ __all__ = [
     'check_label_range',
     'data_settings',
     'datamodule_class_of',
+    'ucr_datasets',
+    'uea_datasets',
 ]
