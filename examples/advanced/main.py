@@ -58,7 +58,7 @@ TOY_HOURLY = Path(__file__).parents[2] / 'tests' / 'adapters' / 'data' / 'toy_ho
 TASK = 'forecasting'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FgsmAttack:
     """One FGSM attack.
 
@@ -71,7 +71,7 @@ class FgsmAttack:
     epsilon: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AdvancedConfig:
     """Settings of the example; every field is a command-line flag.
 

@@ -29,28 +29,28 @@ class MaskMode(StrEnum):  # chronocratic's enums are StrEnums: str subclasses
     CONTINUOUS = 'continuous'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TS2VecLike:
     hidden: int = 64
     lr: float = 1e-3
     augmentation: Callable[[int], int] | None = None  # like chronocratic's augmentation fields
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TSTCCLike:  # the same fields as TS2VecLike on purpose: the union member must not be guessed
     hidden: int = 64
     lr: float = 1e-3
     augmentation: Callable[[int], int] | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RunOptions:  # a stand-in with the shapes of tslab.RunOptions (a tuple and a Literal)
     force_all: bool = False
     rerun: tuple[str, ...] = ()
     log_level: Literal['DEBUG', 'INFO'] = 'INFO'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     model: TS2VecLike | TSTCCLike = field(default_factory=TS2VecLike)
     optional_model: TS2VecLike | TSTCCLike | None = None
@@ -167,11 +167,11 @@ def test_not_a_config_file() -> None:
 
 
 def test_other_config_type_warns(caplog: pytest.LogCaptureFixture) -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, kw_only=True)
     class Old:
         seed: int = 0
 
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, kw_only=True)
     class Renamed:
         seed: int = 0
 

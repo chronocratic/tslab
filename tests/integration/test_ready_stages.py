@@ -18,7 +18,7 @@ from tslab.tasks import forecasting_representations
 ENCODER = tslab.ModelAsEncoder(device='cpu')
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
     run: tslab.RunOptions = field(default_factory=tslab.RunOptions)

@@ -16,7 +16,7 @@ from tslab.core.run import _acquire_lock, is_run_active, Run, RunLockedError, Ru
 from tslab.interfaces.tracker import RunStatus, Tracker
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 7
     run: RunOptions = field(default_factory=RunOptions)
@@ -229,7 +229,7 @@ def test_non_zero_rank_writes_nothing(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 def test_seed_defaults(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    @dataclass(frozen=True)
+    @dataclass(frozen=True, kw_only=True)
     class NoSeed:
         value: int = 1
 

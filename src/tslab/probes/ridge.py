@@ -33,7 +33,7 @@ def _rmse_plus_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.sqrt((error**2).mean()) + np.abs(error).mean())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RidgeProbeSettings:
     """The settings of ``RidgeProbe`` that change its results."""
 

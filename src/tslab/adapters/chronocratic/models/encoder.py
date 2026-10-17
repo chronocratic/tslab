@@ -18,7 +18,7 @@ from tslab.interfaces.encoder import resolve_device
 __all__ = ['ChronocraticEncoder']
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ChronocraticEncoder:
     """Encoder factory for chronocratic models; pass it as ``encoder=`` to the encode stages.
 

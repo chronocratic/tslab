@@ -13,7 +13,7 @@ from tslab.interfaces.tracker import Tracker
 __all__ = ['TrackingOptions', 'build_trackers']
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TrackingOptions:
     """Which trackers a run uses (``--tracking.*`` flags via tyro).
 

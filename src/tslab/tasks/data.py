@@ -7,7 +7,7 @@ from tslab.interfaces import DataSource
 __all__ = ['TSDataInfo', 'TSDataSource']
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TSDataInfo:
     """Facts true for every time series dataset.
 

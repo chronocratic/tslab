@@ -57,7 +57,7 @@ _LOG_FILE = Path('logs') / 'run.log'
 _LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RunOptions:
     """Command-line controllable behaviour of a run (``--run.*`` flags via tyro).
 
@@ -521,7 +521,7 @@ def _flatten(*, value: object, prefix: str) -> dict[str, object]:
     return {prefix: value}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class _LockOwner:
     """Contents of the ``.lock`` file."""
 

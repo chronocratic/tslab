@@ -8,7 +8,7 @@ from tslab.core.fingerprint import NotFingerprinted
 __all__ = ['LightningTrainerConfig']
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LightningTrainerConfig:
     """Settings for ``LightningTrainer`` (``--trainer.*`` flags via tyro).
 

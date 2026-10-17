@@ -42,7 +42,7 @@ FORECASTING_ARGS = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     data: ChronocraticDataChoice
 

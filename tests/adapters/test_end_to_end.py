@@ -53,7 +53,7 @@ FEW_EPOCHS = LightningTrainerConfig(
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     data: ChronocraticDataChoice
     model: ChronocraticModelChoice

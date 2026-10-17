@@ -125,7 +125,7 @@ def test_evaluate_fits_the_probe_and_logs_its_metrics(tmp_path: Path) -> None:
     assert 'evaluate/default/accuracy' in logged
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Agreement:
     name: str = 'agreement'
 

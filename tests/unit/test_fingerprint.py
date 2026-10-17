@@ -22,20 +22,20 @@ class Mask(StrEnum):
     BINOMIAL = 'binomial'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ModelConfig:
     hidden: int = 8
     dropout: float = 0.1
     workers: Annotated[int, NotFingerprinted] = 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OtherConfig:
     hidden: int = 8
     dropout: float = 0.1
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Nested:
     model: ModelConfig = field(default_factory=ModelConfig)
     tags: tuple[str, ...] = ('a',)

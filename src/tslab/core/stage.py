@@ -52,7 +52,7 @@ _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class _Execution:
     """What ``_invoke`` knows about one instance before executing it."""
 

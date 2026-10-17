@@ -9,7 +9,7 @@ from tslab.tracking.csv_tracker import CSVTracker
 from tslab.tracking.lightning_bridge import lightning_loggers
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 1
     learning_rate: float = 0.1

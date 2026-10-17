@@ -41,7 +41,7 @@ __all__ = [
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ArtifactIdentity:
     """Where an artifact came from.
 

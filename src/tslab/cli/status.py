@@ -44,7 +44,7 @@ _COUNTED_STATES = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Status:
     """Show the instances of a run, or one line per run below a folder.
 

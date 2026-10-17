@@ -34,7 +34,7 @@ from {{package_name}}.stages import add_noise
 Models = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ClassifyConfig:
     """One classification run. Every field is a command-line flag.
 

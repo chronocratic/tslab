@@ -20,7 +20,7 @@ FAST = LightningTrainerConfig(
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ToyInfo:
     num_features: int
 

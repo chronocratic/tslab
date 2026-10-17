@@ -9,7 +9,7 @@ from tslab.tracking.mlflow_tracker import MLflowTracker
 from tslab.tracking.tensorboard_tracker import TensorBoardTracker
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 1
     learning_rate: float = 0.1

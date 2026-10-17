@@ -27,7 +27,7 @@ from chronocratic.models.augmentation import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class JitterThenScaleRecipe:
     """Jitter one view and scale the other.
 

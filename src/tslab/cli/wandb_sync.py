@@ -88,7 +88,7 @@ class Action(StrEnum):
     FAILED = 'FAILED'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LocalRun:
     """A local W&B run folder and the server coordinates parsed from its logs.
 
@@ -244,7 +244,7 @@ def resolve_run_path(*, run: LocalRun, entity: str | None, project: str | None) 
     return f'{resolved_entity}/{resolved_project}/{run.run_id}'
 
 
-@dataclass
+@dataclass(frozen=True, kw_only=True)
 class _ServerQuery:
     """Looks up server states, with fallback coordinates for runs that crashed early."""
 
@@ -362,7 +362,7 @@ def _resync_verified(
     return False, f' still {after}'
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class WandbSync:
     """Resync local W&B runs that the server shows as crashed or failed.
 

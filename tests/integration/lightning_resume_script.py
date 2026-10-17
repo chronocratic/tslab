@@ -17,7 +17,7 @@ from tslab.core.run import Run
 from tslab.lightning import LightningTrainer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ScriptConfig:
     seed: int = 0
 

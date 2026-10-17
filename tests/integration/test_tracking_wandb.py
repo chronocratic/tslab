@@ -14,7 +14,7 @@ from tslab.tracking.wandb_log import read_exit_codes, read_records
 from tslab.tracking.wandb_tracker import WandbTracker
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 1
     learning_rate: float = 0.1

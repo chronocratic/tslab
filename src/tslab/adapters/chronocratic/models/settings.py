@@ -44,7 +44,7 @@ DEFAULT_AUGMENTATION = 'default'
 _MODEL_ATTRIBUTE = 'tslab_model'
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class ModelEntry:
     """One chronocratic model found in ``chronocratic.models``.
 
