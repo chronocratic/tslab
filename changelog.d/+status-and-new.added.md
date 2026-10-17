@@ -1,0 +1,1 @@
+`tslab status` shows one run (instances and per-stage counts) or every run below a folder, and shows a crashed run as `interrupted`; `tslab new` creates a project with classification and forecasting scripts, presets, an example stage and augmentation, synthetic toy data and a smoke test.
