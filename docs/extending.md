@@ -28,7 +28,7 @@ Only artifacts passed **directly** as arguments count as inputs. An artifact
 wrapped inside another object is invisible to TSLab: a failure upstream would
 not skip the stage. Pass it as its own argument instead. For a stage that
 changes the series (an transform, a corruption), return a `Tensors` with the key
-`series` and pass it to `tslab.ts.forecasting_representations(..., series=...)`;
+`series` and pass it to `tslab.tasks.forecasting_representations(..., series=...)`;
 `examples/advanced` does this.
 
 ## An artifact
@@ -48,7 +48,7 @@ ready one.
 loaders. `tslab.lightning.LightningDataSource` wraps a `LightningDataModule`.
 For the ready stages, classification data also implements
 `labeled_split(*, split)` (`tslab.interfaces.LabeledSplits`), and forecasting data
-`full_series()` and `split_slices()` (`tslab.ts.ForecastingSeries`).
+`full_series()` and `split_slices()` (`tslab.tasks.ForecastingSeries`).
 
 ## An encoder
 

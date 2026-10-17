@@ -14,7 +14,7 @@ from tslab.adapters.chronocratic_models import (
     MODELS,
 )
 from tslab.core.fingerprint import canonicalize
-from tslab.ts import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 pytestmark = pytest.mark.chronocratic
 

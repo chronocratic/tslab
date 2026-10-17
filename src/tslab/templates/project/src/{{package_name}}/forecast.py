@@ -26,8 +26,8 @@ from tslab.adapters.chronocratic_models import (
 )
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe
+from tslab.tasks import forecasting_representations
 from tslab.tracking import build_trackers, TrackingOptions
-from tslab.ts import forecasting_representations
 
 from {{package_name}}.augmentations import JitterThenScaleRecipe
 

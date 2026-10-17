@@ -21,7 +21,7 @@ from tslab.adapters.chronocratic_models import (
 )
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe, SVMProbe
-from tslab.ts import forecasting_representations
+from tslab.tasks import forecasting_representations
 
 pytestmark = pytest.mark.chronocratic
 

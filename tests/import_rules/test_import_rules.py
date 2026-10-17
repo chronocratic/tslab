@@ -35,7 +35,7 @@ FORBIDDEN_IN_CORE = (
     'chronocratic',
     'tslab.adapters',
     'tslab.lightning',
-    'tslab.ts',
+    'tslab.tasks',
 )
 FORBIDDEN_IN_LIGHTNING = (
     'sklearn',
@@ -43,7 +43,7 @@ FORBIDDEN_IN_LIGHTNING = (
     'mlflow',
     'chronocratic',
     'tslab.adapters',
-    'tslab.ts',
+    'tslab.tasks',
 )
 FORBIDDEN_IN_PROBES = (
     'lightning',
@@ -54,9 +54,9 @@ FORBIDDEN_IN_PROBES = (
     'chronocratic',
     'tslab.adapters',
     'tslab.lightning',
-    'tslab.ts',
+    'tslab.tasks',
 )
-FORBIDDEN_IN_TS = (
+FORBIDDEN_IN_TASKS = (
     'lightning',
     'pytorch_lightning',
     'sklearn',
@@ -118,7 +118,7 @@ def test_probes_load_scikit_learn_and_nothing_else_optional() -> None:
 
 @pytest.mark.slow
 def test_time_series_layer_loads_neither_lightning_nor_scikit_learn() -> None:
-    assert offending(loaded=loaded_by(module='tslab.ts'), forbidden=FORBIDDEN_IN_TS) == []
+    assert offending(loaded=loaded_by(module='tslab.tasks'), forbidden=FORBIDDEN_IN_TASKS) == []
 
 
 @pytest.mark.slow
