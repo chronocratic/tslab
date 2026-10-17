@@ -91,7 +91,7 @@ add the usual `--data.*` path flags.
 ### Classification
 
 ```bash
-# the archive's own train/test split (the default)
+# the train/test split of the archive (the default)
 python -m my_paper.classify no-preset model:ts2vec data:ucr
 
 # train and test merged and re-split 50/50, stratified, batch size 16
