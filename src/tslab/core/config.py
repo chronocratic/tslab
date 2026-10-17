@@ -63,6 +63,7 @@ __all__ = [
     'load_config',
     'parse_config',
     'save_config',
+    'union_choices',
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -82,6 +83,68 @@ class ConfigFileError(ValueError):
 
 def _type_name(*, cls: type) -> str:
     return f'{cls.__module__}.{cls.__qualname__}'
+
+
+# The type of a ``tyro.conf.subcommand(name=...)`` metadata item, computed from
+# the public API so the private ``_confstruct`` module is never imported.
+_SUBCOMMAND_TYPE = type(tyro.conf.subcommand(name='x'))
+
+
+def union_choices(*, annotation: object) -> dict[str, type] | None:
+    """The tyro subcommand names of a choice union, or ``None`` for other types.
+
+    A *choice union* is a ``Union`` (or ``|``) with at least one dataclass
+    member, optionally wrapped in ``Annotated``: the field that picks a model
+    or a dataset. Every member must be named with
+    ``tyro.conf.subcommand(name=...)``; a member's name is the ``name`` of the
+    first such metadata item on it.
+
+    Args:
+        annotation: A type annotation.
+
+    Returns:
+        ``{subcommand name: member class}`` (a named ``None`` member maps to
+        ``type(None)``), or ``None`` when the annotation is not a choice union.
+
+    Raises:
+        ValueError: If a dataclass member carries no ``tyro.conf.subcommand``
+            name, naming the member.
+    """
+    annotation = _strip_annotated(annotation=annotation)
+    if get_origin(annotation) not in {Union, types.UnionType}:
+        return None
+    members = get_args(annotation)
+    has_dataclass = any(
+        isinstance(member, type) and dataclasses.is_dataclass(member)
+        for member in (_strip_annotated(annotation=member) for member in members)
+    )
+    if not has_dataclass:
+        return None
+    choices: dict[str, type] = {}
+    for member in members:
+        if get_origin(member) is not Annotated:
+            stripped: object = member
+            name = None
+        else:
+            stripped = _strip_annotated(annotation=member)
+            name = next(
+                (meta.name for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE), None
+            )
+        if stripped is None:
+            if name is None:
+                continue  # a bare None carries no name
+            choices[name] = type(None)
+            continue
+        if not isinstance(stripped, type) or not dataclasses.is_dataclass(stripped):
+            continue
+        if name is None:
+            message = (
+                f'union member {stripped.__qualname__} is unnamed; name it with '
+                f'tyro.conf.subcommand(name=...)'
+            )
+            raise ValueError(message)
+        choices[name] = stripped
+    return choices
 
 
 def _union_members(*, annotation: object) -> tuple[object, ...] | None:
