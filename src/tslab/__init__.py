@@ -15,6 +15,7 @@ from tslab.artifact import (
 )
 from tslab.config import ConfigFileError, load_config, parse_config, save_config
 from tslab.fingerprint import Fingerprintable, NotFingerprinted
+from tslab.interfaces.encoder import ModelAsEncoder
 from tslab.interfaces.tracker import RunStatus, Tracker
 from tslab.paths import InstanceName
 from tslab.run import Run, RunLockedError, RunOptions
@@ -37,6 +38,7 @@ __all__ = [
     'InstanceState',
     'Json',
     'Metrics',
+    'ModelAsEncoder',
     'NotFingerprinted',
     'Run',
     'RunLockedError',
