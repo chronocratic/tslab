@@ -19,13 +19,27 @@ from tslab.study.definition import (
 )
 from tslab.study.expansion import expand_placeholders, expand_setting, expand_variables
 from tslab.study.loading import load_study
+from tslab.study.machine import (
+    flatten_settings,
+    FollowupSettings,
+    load_machine,
+    MachineOverride,
+    MachineProfile,
+    MachineProfileError,
+    SlurmSettings,
+)
 from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
+    'FollowupSettings',
     'Grid',
+    'MachineOverride',
+    'MachineProfile',
+    'MachineProfileError',
     'Override',
     'Settings',
+    'SlurmSettings',
     'Study',
     'StudyRun',
     'check_paths',
@@ -33,7 +47,9 @@ __all__ = [
     'expand_runs',
     'expand_setting',
     'expand_variables',
+    'flatten_settings',
     'from_presets',
+    'load_machine',
     'load_study',
     'match_problems',
     'merge_overrides',
