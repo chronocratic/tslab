@@ -14,7 +14,17 @@ from types import MappingProxyType
 
 from tslab.study.settings import Settings, SettingValue
 
-__all__ = ['DEFAULT_RUN_SETTINGS', 'Grid', 'Match', 'Override', 'Study', 'setting_axis']
+__all__ = [
+    'DEFAULT_RUN_SETTINGS',
+    'Grid',
+    'Match',
+    'Override',
+    'Study',
+    'match_problems',
+    'normalize_match',
+    'run_matches',
+    'setting_axis',
+]
 
 type Match = Mapping[str, str | Sequence[str]]
 
@@ -137,6 +147,14 @@ class Study:
         short_names: dict[str, str] = {}
         for grid_name, grid in self.grids.items():
             validate_name(name=grid_name, kind='grid')
+            problems = [
+                problem
+                for match in (*grid.exclude, *(override.match for override in grid.overrides))
+                for problem in match_problems(grids={grid_name: grid}, match=match)
+            ]
+            if problems:
+                message = f'grid {grid_name!r}: ' + '; '.join(problems)
+                raise ValueError(message)
             if grid.short_name in short_names:
                 message = (
                     f'grid {grid_name!r} reuses short_name {grid.short_name!r} '
@@ -144,3 +162,85 @@ class Study:
                 )
                 raise ValueError(message)
             short_names[grid.short_name] = grid_name
+
+
+def normalize_match(*, match: Match) -> dict[str, tuple[str, ...]]:
+    """A match with every value as a tuple of value names.
+
+    Args:
+        match: Axis name to value name, or list of value names; a ``grid``
+            key names a grid.
+
+    Returns:
+        The same match with every value a tuple.
+
+    Raises:
+        ValueError: If a value list is empty.
+        TypeError: If a value list holds a non-string.
+    """
+    normalized: dict[str, tuple[str, ...]] = {}
+    for key, value in match.items():
+        values = (value,) if isinstance(value, str) else tuple(value)
+        if not values:
+            message = f'match key {key!r} has no values'
+            raise ValueError(message)
+        for item in values:
+            if not isinstance(item, str):
+                message = f'match key {key!r} holds a non-string value {item!r}'
+                raise TypeError(message)
+        normalized[key] = values
+    return normalized
+
+
+def match_problems(*, grids: Mapping[str, Grid], match: Match) -> list[str]:
+    """The human-readable problems a match has against the given grids.
+
+    A key other than ``grid`` must be an axis of at least one grid, and its
+    value names must be value names of that axis in at least one grid; a
+    ``grid`` value must name one of the grids.
+
+    Args:
+        grids: The grids the match is checked against.
+        match: The match to check.
+
+    Returns:
+        The problems, one line each; empty when the match is fine.
+    """
+    problems: list[str] = []
+    for key, value in normalize_match(match=match).items():
+        if key == 'grid':
+            unknown = [name for name in value if name not in grids]
+            if unknown:
+                problems.append(f'grid {", ".join(unknown)!r} is not a grid of this study')
+            continue
+        axis_grids = [grid for grid in grids.values() if key in grid.axes]
+        if not axis_grids:
+            problems.append(f'{key} is not an axis of any grid')
+            continue
+        known = {name for grid in axis_grids for name in grid.axes[key]}
+        unknown = [name for name in value if name not in known]
+        if unknown:
+            problems.append(f'{key} has no value {", ".join(unknown)!r}')
+    return problems
+
+
+def run_matches(*, grid_name: str, values: Mapping[str, str], match: Match) -> bool:
+    """Whether a run of one grid matches: every key must hold.
+
+    A key the run's grid has no axis for makes the run not match.
+
+    Args:
+        grid_name: The grid the run belongs to.
+        values: The run's axis name to value name.
+        match: The match to test.
+
+    Returns:
+        True when every key of the match holds for the run.
+    """
+    normalized = normalize_match(match=match)
+    if grid_name not in normalized.get('grid', (grid_name,)):
+        return False
+    for key, value_names in normalized.items():
+        if key != 'grid' and values.get(key) not in value_names:
+            return False
+    return True
