@@ -4,6 +4,12 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+  workflow_dispatch:
+
+# Slow tests (real training, example and template runs) only run on PRs into
+# main and on manual runs; dev pushes and other PRs run the fast suite.
+env:
+  RUN_SLOW: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
 
 # Cancel an older run of the same branch when a new commit arrives.
 concurrency:
@@ -36,7 +42,9 @@ jobs:
       - name: Types
         run: uv run ty check
       - name: Tests
-        run: uv run pytest -m "not chronocratic"
+        run: |
+          if [ "$RUN_SLOW" = true ]; then skip=""; else skip=" and not slow"; fi
+          uv run pytest -m "not chronocratic$skip"
 
   chronocratic:
     # Adapter tests, examples/advanced and the generated-project test.
@@ -57,7 +65,9 @@ jobs:
       - name: Install
         run: uv sync --locked --all-extras
       - name: Tests
-        run: uv run pytest -m chronocratic
+        run: |
+          if [ "$RUN_SLOW" = true ]; then skip=""; else skip=" and not slow"; fi
+          uv run pytest -m "chronocratic$skip"
 
   docs:
     # Same build as Read the Docs; warnings fail it.

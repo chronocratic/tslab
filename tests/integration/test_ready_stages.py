@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from lightning_toy import FAST
+import pytest
 import torch
 from ts_toy import SineClassification, SineForecasting, ToySequenceModel, ToyVectorModel
 
@@ -27,6 +28,9 @@ class Config:
 def run_in(*, root: Path) -> Generator[tslab.Run]:
     with tslab.Run(config=Config(), root=root, relative_path=Path('r')) as run:
         yield run
+
+
+pytestmark = pytest.mark.slow
 
 
 def test_classification_runs_end_to_end_and_reloads(tmp_path: Path) -> None:

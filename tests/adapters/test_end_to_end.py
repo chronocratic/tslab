@@ -23,7 +23,7 @@ from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe, SVMProbe
 from tslab.tasks import forecasting_representations
 
-pytestmark = pytest.mark.chronocratic
+pytestmark = [pytest.mark.chronocratic, pytest.mark.slow]
 
 ENCODER = ChronocraticEncoder(device='cpu', batch_size=64)
 CLASSIFICATION_ARGS = (
