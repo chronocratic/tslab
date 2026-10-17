@@ -28,7 +28,13 @@ from tslab.study.machine import (
     MachineProfileError,
     SlurmSettings,
 )
-from tslab.study.plan import resolve_runs, ResolvedRun
+from tslab.study.plan import (
+    expansion_env,
+    resolve_runs,
+    ResolvedRun,
+    run_arguments,
+    validate_arguments,
+)
 from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
 
 __all__ = [
@@ -49,6 +55,7 @@ __all__ = [
     'expand_runs',
     'expand_setting',
     'expand_variables',
+    'expansion_env',
     'flatten_settings',
     'from_presets',
     'load_machine',
@@ -56,8 +63,10 @@ __all__ = [
     'match_problems',
     'merge_overrides',
     'resolve_runs',
+    'run_arguments',
     'run_matches',
     'select_runs',
     'setting_axis',
     'settings_to_args',
+    'validate_arguments',
 ]
