@@ -11,6 +11,7 @@ from typing import Protocol
 
 import tyro
 
+from tslab.cli.new import New
 from tslab.cli.status import Status
 from tslab.cli.wandb_sync import WandbSync
 
@@ -36,6 +37,6 @@ def main(args: Sequence[str] | None = None) -> None:
     """
     logging.basicConfig(format='%(message)s', level=logging.INFO, stream=sys.stdout)
     command: Command = tyro.extras.subcommand_cli_from_dict(
-        {'status': Status, 'wandb-sync': WandbSync}, prog='tslab', args=args
+        {'new': New, 'status': Status, 'wandb-sync': WandbSync}, prog='tslab', args=args
     )
     raise SystemExit(command.run())
