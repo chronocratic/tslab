@@ -48,7 +48,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([ab]|rc)?[0-9]*$'; then
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([ab][0-9]+|rc[0-9]+)?$'; then
             echo "::error::'$VERSION' is not a valid PEP 440 version (expected e.g. 0.1.0 or 0.1.0a2)."
             exit 1
           fi
