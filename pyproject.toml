@@ -60,6 +60,11 @@ dev = [
     "ty>=0.0.88",
     "types-pyyaml>=6.0",
 ]
+docs = [
+    "myst-parser>=4.0",
+    "pydata-sphinx-theme>=0.16",
+    "sphinx>=8.2",
+]
 
 [tool.hatch.version]
 # The version comes from the git tag (v0.1.0a1 gives 0.1.0a1); between tags it

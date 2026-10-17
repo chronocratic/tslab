@@ -30,6 +30,7 @@ ignore = [
     "INP001", # Examples are scripts run by path, not packages.
     "T201",   # They print their results.
 ]
+"docs/conf.py" = ["INP001"]  # Sphinx reads it by path.
 
 [lint.pydocstyle]
 convention = "google"
