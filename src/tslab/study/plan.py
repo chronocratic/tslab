@@ -1,10 +1,14 @@
 """Resolving runs on a machine: settings and resources, merged per run."""
 
 from collections.abc import Mapping, Sequence
+from contextlib import redirect_stderr, redirect_stdout
 import dataclasses
 from dataclasses import dataclass
+from io import StringIO
 import logging
+import os
 
+import tslab
 from tslab.study.definition import (
     Grid,
     match_problems,
@@ -13,10 +17,11 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
+from tslab.study.expansion import expand_setting
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.settings import check_paths, SettingValue
+from tslab.study.settings import check_paths, settings_to_args, SettingValue
 
-__all__ = ['ResolvedRun', 'resolve_runs']
+__all__ = ['ResolvedRun', 'expansion_env', 'resolve_runs', 'run_arguments', 'validate_arguments']
 
 _LOGGER = logging.getLogger('tslab.study')
 
@@ -148,3 +153,57 @@ def _slurm_for(
         merged.update(override.slurm)
     # ty: ignore[invalid-argument-type] — merged holds SlurmSettings fields by name
     return SlurmSettings(**merged) if merged else None
+
+
+def run_arguments(
+    *,
+    grid: Grid,
+    settings: Mapping[str, SettingValue],
+    env: Mapping[str, str],
+    placeholders: Mapping[str, str],
+) -> list[str]:
+    """The flags of one run: every setting expanded, then turned to tyro flags.
+
+    Args:
+        grid: The grid of the run; its ``config`` class the flags are read into.
+        settings: The run's resolved settings, not yet expanded.
+        env: The variable names to values for expansion.
+        placeholders: The placeholder names to values for this run.
+
+    Returns:
+        The flags, in the order of ``settings_to_args``.
+
+    Raises:
+        ValueError: If a value names an unset variable or an unknown
+            placeholder.
+        ValueError: If a setting path is not a field of the grid's config.
+    """
+    expanded = {
+        path: expand_setting(value=value, env=env, values=placeholders)
+        for path, value in settings.items()
+    }
+    return settings_to_args(config_class=grid.config, settings=expanded)
+
+
+def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str | None:
+    """Whether tyro reads the arguments back into the config class.
+
+    Args:
+        config_class: The config dataclass the arguments are for.
+        arguments: The flags plus any pass-through arguments.
+
+    Returns:
+        ``None`` when the arguments parse, else tyro's error text.
+    """
+    buffer = StringIO()
+    try:
+        with redirect_stdout(buffer), redirect_stderr(buffer):
+            tslab.parse_config(config_class=config_class, args=list(arguments))
+    except SystemExit:
+        return buffer.getvalue()
+    return None
+
+
+def expansion_env(*, machine: MachineProfile) -> dict[str, str]:
+    """The variables a run expands: the process environment, profile wins."""
+    return {**os.environ, **machine.env}
