@@ -1,4 +1,4 @@
-"""The ridge-regression forecasting probe of TS2Vec (Yue et al., AAAI 2022)."""
+"""The ridge-regression forecasting probe of TS2Vec."""
 
 from dataclasses import dataclass
 from typing import override

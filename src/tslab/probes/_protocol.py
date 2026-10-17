@@ -1,4 +1,4 @@
-"""Pieces shared by the TS2Vec evaluation protocols (Yue et al., AAAI 2022)."""
+"""Pieces shared by the TS2Vec evaluation protocols."""
 
 import logging
 

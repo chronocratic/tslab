@@ -27,7 +27,7 @@ __all__ = [
     'datamodule_class_of',
 ]
 
-# TSLab picks the loader per use; only chronocratic's sliding-window loaders read the rest.
+# TSLab picks the loader per use; only the sliding-window loaders of chronocratic read the rest.
 EXCLUDED_PARAMETERS = frozenset(
     {'loader_mode', 'loader_strict_batch_size', 'seq_len', 'forecast_horizon', 'step'}
 )
@@ -147,10 +147,10 @@ def datamodule_class_of(*, settings: object) -> Any:  # noqa: ANN401 # why: a th
 
 # why: the settings classes are generated at run time
 def data_settings(*, name: str, **values: object) -> Any:  # noqa: ANN401
-    """Return one dataset's settings, for writing presets in code.
+    """Return the settings of one dataset, for writing presets in code.
 
     Args:
-        name: The dataset's subcommand name, for example ``'ucr'`` or ``'ett'``.
+        name: The subcommand name of the dataset, for example ``'ucr'`` or ``'ett'``.
         **values: Settings that differ from the defaults; required ones (such
             as the dataset path) must be given.
 

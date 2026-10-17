@@ -236,7 +236,7 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
     Raises:
         TypeError: If the encoder has no ``encode_sequence``.
         ValueError: If the representations do not have one row per timestep, or
-            ``series`` does not have the data's shape.
+            ``series`` does not have the shape of the data.
     """
     del run, name
     slices = checked_split_slices(data=data)

@@ -41,7 +41,7 @@ class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API na
 
 
 class LightningTrainer(Trainer[LightningModule]):
-    """Trains ``LightningModule`` models with resume, time limits and the run's trackers.
+    """Trains ``LightningModule`` models with resume, time limits and the trackers of the run.
 
     Example:
         trainer = LightningTrainer(config=LightningTrainerConfig(max_epochs=50))
@@ -180,7 +180,7 @@ class LightningTrainer(Trainer[LightningModule]):
             'logger': loggers,
             'default_root_dir': checkpoint_directory,
         }
-        # Applied last, so that the escape hatch can override TSLab's own arguments.
+        # Applied last, so that the escape hatch can override the arguments TSLab adds.
         arguments.update(config.extra_trainer_kwargs)
         return lightning.Trainer(**arguments)
 

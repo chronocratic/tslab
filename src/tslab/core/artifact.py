@@ -74,7 +74,7 @@ class Artifact(ABC):
 
     @abstractmethod
     def save(self, *, directory: Path) -> None:
-        """Write the artifact's files into ``directory`` (which already exists).
+        """Write the files of the artifact into ``directory`` (which already exists).
 
         Args:
             directory: An empty folder owned by this artifact.
@@ -513,8 +513,8 @@ class UnavailableArtifact(Artifact):
 def is_available(*, artifact: Artifact) -> bool:
     """Return ``False`` if ``artifact`` is a placeholder for a missing result.
 
-    Use it in user code between stages, for example to skip plotting a failed
-    transform's result.
+    Use it in user code between stages, for example to skip plotting the result
+    of a failed transform.
 
     Args:
         artifact: Any value returned by a stage.

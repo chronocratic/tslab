@@ -25,7 +25,7 @@ class LightningTrainerConfig:
         check_val_every_n_epoch: Validation interval in epochs.
         log_every_n_steps: Logging interval in optimizer steps; 200 keeps W&B
             traffic under the per-project rate limit.
-        enable_progress_bar: Show Lightning's progress bar.
+        enable_progress_bar: Show the progress bar of Lightning.
         monitor: Metric used to pick the best checkpoint and for early stopping
             (lower is better).
         checkpoint_save_top_k: Number of best checkpoints kept besides the last one.

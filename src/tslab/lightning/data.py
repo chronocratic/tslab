@@ -49,7 +49,7 @@ class LightningDataSource[I]:
     def train_loader(self) -> Iterable[Batch]:
         """Return the training loader."""
         self._set_up(stage='fit')
-        # Lightning types loaders as Any; a datamodule's loaders yield batches.
+        # Lightning types loaders as Any; the loaders of a datamodule yield batches.
         return cast('Iterable[Batch]', self._datamodule.train_dataloader())
 
     def val_loader(self) -> Iterable[Batch] | None:

@@ -4,21 +4,21 @@ Configs are plain frozen dataclasses. This module writes them as plain YAML
 and reads them back, strictly and safely:
 
 - **Safe:** files are read with ``yaml.safe_load``, and only types reachable
-  from the config class's annotations are ever constructed. A config file can
-  never execute code (unlike pickle or PyYAML's full loader).
+  from the annotations of the config class are ever constructed. A config file can
+  never execute code (unlike pickle or the full loader of PyYAML).
 - **Strict:** unknown keys, wrong value types and unknown union members raise
   ``ConfigFileError`` naming the exact field, so a typo in a hand-edited file
   is never silently ignored.
 - **Union members are explicit:** a dataclass stored in a union-typed field
   carries a ``__type__`` key with its class name, because two members can have
-  identical fields (for example two models' parameter classes).
+  identical fields (for example the parameter classes of two models).
 
 Encoding is driven by *values*, decoding by *annotations*. A field typed
 ``SomeObject | None`` therefore saves fine while its value is ``None``; a
 non-``None`` value of an unsupported type raises ``TypeError`` when saving.
 
 Parsing the command line is delegated to tyro; ``parse_config`` only adds
-TSLab's defaults.
+the defaults of TSLab.
 """
 
 from collections.abc import Mapping, Sequence
@@ -412,14 +412,14 @@ def parse_config[C](
     """Build a config from the command line with tyro.
 
     Flags may appear before or after union subcommands such as ``model:ts2vec``
-    (tyro's ``CascadeSubcommandArgs``), so ``model:ts2vec --seed 3`` and
+    (``CascadeSubcommandArgs`` of tyro), so ``model:ts2vec --seed 3`` and
     ``--seed 3 model:ts2vec`` both work.
 
     Args:
         config_class: The config dataclass.
         presets: Named presets ``{name: (description, config)}``, the
             experiment registry. The first argument then selects a preset or
-            ``no-preset``. A preset's union choices (its model, its dataset)
+            ``no-preset``. The union choices of a preset (its model, its dataset)
             are fixed, while flags still override its values; ``no-preset``
             starts from ``config_class`` with every choice open.
         default: Starting values, for example a config loaded with ``load_config``.
@@ -442,7 +442,7 @@ def parse_config[C](
         parsed = tyro.cli(choice, args=args, config=cascade)
         if not isinstance(
             parsed, config_class
-        ):  # narrows tyro's Any; presets are config_class instances
+        ):  # narrows the Any of tyro; presets are config_class instances
             message = f'a preset is not a {config_class.__qualname__}: {type(parsed).__qualname__}'
             raise TypeError(message)
         return parsed
@@ -463,8 +463,8 @@ def _preset_choice[C](
     """Return the tyro union of ``no-preset`` and the presets.
 
     ``AvoidSubcommands`` on a preset turns each union field that has a default
-    into that default's type, so ``model:other`` is rejected instead of
-    silently dropping the preset's model settings.
+    into the type of that default, so ``model:other`` is rejected instead of
+    silently dropping the model settings of the preset.
     """
     if NO_PRESET in presets:
         message = f'{NO_PRESET!r} is reserved for starting without a preset'

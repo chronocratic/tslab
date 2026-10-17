@@ -24,7 +24,7 @@ class Mode(Enum):
     SLOW = 'slow'
 
 
-class MaskMode(StrEnum):  # chronocratic's enums are StrEnums: str subclasses
+class MaskMode(StrEnum):  # the enums of chronocratic are StrEnums: str subclasses
     BINOMIAL = 'binomial'
     CONTINUOUS = 'continuous'
 
@@ -33,7 +33,7 @@ class MaskMode(StrEnum):  # chronocratic's enums are StrEnums: str subclasses
 class TS2VecLike:
     hidden: int = 64
     lr: float = 1e-3
-    augmentation: Callable[[int], int] | None = None  # like chronocratic's augmentation fields
+    augmentation: Callable[[int], int] | None = None  # like the augmentation fields of chronocratic
 
 
 @dataclass(frozen=True, kw_only=True)

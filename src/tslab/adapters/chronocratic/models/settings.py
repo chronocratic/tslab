@@ -3,13 +3,13 @@
 Every ``X`` in ``chronocratic.models.__all__`` that has a dataclass
 ``XModelParameters`` gets a frozen settings class ``XSettings``: the same fields
 and defaults, minus ``input_dim``, which is taken from the data when the model
-is built. ``sequence_length`` is optional; ``None`` takes the data's length.
+is built. ``sequence_length`` is optional; ``None`` takes the length of the data.
 
 Augmentations are given as *recipes*: dataclasses whose ``__call__`` builds an
 augmentation producer and is annotated with the view type it produces, for
 example ``-> AugmentationProducer[ViewPair]``. A recipe becomes a choice of the
 ``augmentation`` field of every model that takes that view type, next to
-``default``, which keeps the model's own augmentation.
+``default``, which keeps the augmentation of the model itself.
 """
 
 from collections.abc import Mapping, Sequence
@@ -85,7 +85,7 @@ def _view_type(*, annotation: object) -> object | None:
 
 
 def recipe_view_type(*, recipe: type) -> object:
-    """Return the view type a recipe's producer yields.
+    """Return the view type the producer of a recipe yields.
 
     Args:
         recipe: A dataclass whose ``__call__`` is annotated
@@ -115,7 +115,7 @@ def recipe_view_type(*, recipe: type) -> object:
 
 
 def recipe_subcommand(*, recipe: type) -> str:
-    """Return a recipe's subcommand name: ``JitterThenScaleRecipe`` gives ``jitter-then-scale``."""
+    """Return the subcommand name: ``JitterThenScaleRecipe`` gives ``jitter-then-scale``."""
     name = recipe.__name__.removesuffix('Recipe')
     # ty types re.findall as list[Any]; cast the well-known shape.
     words = typing.cast('list[str]', re.findall(r'[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+', name))
@@ -252,14 +252,14 @@ def entry_of(*, settings: object) -> ModelEntry:
 
 # why: the settings classes are generated at run time
 def model_settings(*, choice: Any, name: str, **values: object) -> Any:  # noqa: ANN401
-    """Return one model's settings, for writing presets in code.
+    """Return the settings of one model, for writing presets in code.
 
     The settings classes are generated, so they cannot be imported; this
     function finds the one behind a subcommand name in ``choice``.
 
     Args:
         choice: A union returned by ``chronocratic_model_choice``.
-        name: The model's subcommand name, for example ``'ts2vec'``.
+        name: The subcommand name of the model, for example ``'ts2vec'``.
         **values: Settings that differ from the defaults.
 
     Raises:

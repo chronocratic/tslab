@@ -53,7 +53,7 @@ def collect_git_state(*, directory: Path) -> dict[str, object]:
     instead of raising: metadata must never stop a run.
 
     Args:
-        directory: Any folder inside the user's project, usually the working directory.
+        directory: Any folder inside the project of the user, usually the working directory.
 
     Returns:
         Mapping with keys ``commit`` (``str | None``) and ``dirty`` (``bool | None``).
@@ -81,5 +81,5 @@ def _run_git(*, git: str, directory: Path, arguments: tuple[str, ...]) -> str:
 
 
 def hostname() -> str:
-    """Return this machine's host name."""
+    """Return the host name of this machine."""
     return socket.gethostname()
