@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from tslab import stages
 from tslab.artifact import (
     Artifact,
     Checkpoint,
@@ -57,4 +58,5 @@ __all__ = [
     'parse_config',
     'save_config',
     'stage',
+    'stages',
 ]
