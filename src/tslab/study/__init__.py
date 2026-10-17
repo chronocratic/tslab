@@ -28,6 +28,7 @@ from tslab.study.machine import (
     MachineProfileError,
     SlurmSettings,
 )
+from tslab.study.plan import resolve_runs, ResolvedRun
 from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
 
 __all__ = [
@@ -38,6 +39,7 @@ __all__ = [
     'MachineProfile',
     'MachineProfileError',
     'Override',
+    'ResolvedRun',
     'Settings',
     'SlurmSettings',
     'Study',
@@ -53,6 +55,7 @@ __all__ = [
     'load_study',
     'match_problems',
     'merge_overrides',
+    'resolve_runs',
     'run_matches',
     'select_runs',
     'setting_axis',
