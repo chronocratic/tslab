@@ -17,6 +17,8 @@ OLD_MODULES = (
     'tslab.stage',
     'tslab.status',
     'tslab.ts',
+    'tslab.adapters.chronocratic_models',
+    'tslab.adapters.chronocratic_datasets',
 )
 
 TS_NAMES = {

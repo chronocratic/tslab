@@ -63,11 +63,11 @@ The names below are importable from `tslab`. The interfaces it re-exports
 ## chronocratic adapters
 
 ```{eval-rst}
-.. automodule:: tslab.adapters.chronocratic_models
+.. automodule:: tslab.adapters.chronocratic.models
    :members:
    :imported-members:
 
-.. automodule:: tslab.adapters.chronocratic_datasets
+.. automodule:: tslab.adapters.chronocratic.datasets
    :members:
    :imported-members:
 ```

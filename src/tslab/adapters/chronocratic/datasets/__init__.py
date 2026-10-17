@@ -5,13 +5,13 @@ generated from its constructor. ``build_chronocratic_data_source`` wraps it as a
 data source; Lightning still receives the datamodule itself for training.
 """
 
-from tslab.adapters.chronocratic_datasets.data import (
+from tslab.adapters.chronocratic.datasets.data import (
     build_chronocratic_data_source,
     check_label_range,
     ChronocraticClassificationData,
     ChronocraticForecastingData,
 )
-from tslab.adapters.chronocratic_datasets.settings import (
+from tslab.adapters.chronocratic.datasets.settings import (
     ChronocraticDataChoice,
     data_settings,
     datamodule_class_of,

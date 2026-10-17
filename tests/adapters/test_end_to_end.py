@@ -7,13 +7,13 @@ import pytest
 from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
 
 import tslab
-from tslab.adapters.chronocratic_datasets import (
+from tslab.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
     ChronocraticForecastingData,
 )
-from tslab.adapters.chronocratic_models import (
+from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,

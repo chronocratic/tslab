@@ -11,7 +11,7 @@ import pytest
 from recipes import CropShiftRecipe, JitterThenScaleRecipe
 
 import tslab
-from tslab.adapters.chronocratic_models import (
+from tslab.adapters.chronocratic.models import (
     chronocratic_model_choice,
     ChronocraticModelChoice,
     entry_of,
@@ -129,7 +129,7 @@ def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None
 
 def test_generated_classes_live_in_the_adapter_module() -> None:
     for settings_class in settings_classes(choice=ModelChoice).values():
-        assert settings_class.__module__ == 'tslab.adapters.chronocratic_models.settings'
+        assert settings_class.__module__ == 'tslab.adapters.chronocratic.models.settings'
         assert settings_class.__name__.endswith('Settings')
 
 
