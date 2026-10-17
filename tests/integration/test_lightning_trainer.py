@@ -44,7 +44,7 @@ def test_fit_returns_a_checkpoint_naming_best_and_last(tmp_path: Path) -> None:
     assert checkpoint.best_path.is_file()
     checkpoint.save(directory=directory)
     assert Checkpoint.load(directory=directory).best == checkpoint.best
-    # the metrics of Lightning reached the always-on CSV tracker of the run.
+    # The Lightning metrics reached the always-on CSV tracker of the run.
     metrics = (tmp_path / 'r' / 'trackers' / 'csv' / 'version_0' / 'metrics.csv').read_text()
     assert 'train_loss_epoch' in metrics
 
