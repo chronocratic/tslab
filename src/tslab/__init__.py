@@ -14,7 +14,7 @@ from tslab.core.artifact import (
     UnavailableArtifactError,
     UnavailableReason,
 )
-from tslab.core.config import ConfigFileError, load_config, parse_config, save_config
+from tslab.core.config import ConfigFileError, load_config, parse_config, REQUIRED, save_config
 from tslab.core.fingerprint import Fingerprintable, NotFingerprinted
 from tslab.core.paths import InstanceName
 from tslab.core.run import Run, RunLockedError, RunOptions
@@ -31,6 +31,7 @@ except (
     __version__ = '0.0.0'
 
 __all__ = [
+    'REQUIRED',
     'Artifact',
     'Checkpoint',
     'ConfigFileError',
