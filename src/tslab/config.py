@@ -74,9 +74,11 @@ def _type_name(*, cls: type) -> str:
 
 
 def _union_members(*, annotation: object) -> tuple[object, ...] | None:
-    if get_origin(annotation) in {Union, types.UnionType}:
-        return get_args(annotation)
-    return None
+    if get_origin(annotation) not in {Union, types.UnionType}:
+        return None
+    # Subcommand names wrap members in Annotated; a bare None member means NoneType.
+    members = (_strip_annotated(annotation=member) for member in get_args(annotation))
+    return tuple(type(None) if member is None else member for member in members)
 
 
 def _strip_annotated(*, annotation: object) -> object:
