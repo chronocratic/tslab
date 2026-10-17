@@ -250,6 +250,24 @@ def test_dry_run_never_syncs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert server.commands == []
 
 
+def test_offline_finished_run_syncs_without_a_server_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # An offline run has no server state to flip; a clean resync is the whole outcome.
+    run_directory = make_run(
+        root=tmp_path,
+        name='offline-run-20261015_120000-off1',
+        log='finishing run\ngot exitcode: 0\n',
+    )
+    server = FakeServer(states=['offline'] * 4)
+    install(monkeypatch=monkeypatch, server=server, exit_codes=[0])
+    with caplog.at_level(logging.INFO):
+        assert WandbSync(root=tmp_path, include_offline=True).run(sleep=no_sleep) == 0
+    (command,) = server.commands
+    assert command[-1] == str(run_directory)
+    assert 'synced' in caplog.text
+
+
 def test_command_line_entry_point(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as raised:
         main(args=['wandb-sync', str(tmp_path), '--dry-run'])

@@ -348,6 +348,9 @@ def _resync_verified(
         note = f' data-only exit={"none" if last_code is None else last_code}'
     if not _resync(run=run):
         return False, note
+    # why: an offline run has no server state to flip, so the upload is the outcome
+    if resolve_run_path(run=run, entity=query.entity, project=query.project) is None:
+        return True, note
     if not repairable:
         return True, note
     after = 'unknown'
