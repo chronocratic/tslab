@@ -1,4 +1,4 @@
-"""``ChronocraticEncoder``: the TSLab encode calls, mapped to the ``encode`` of chronocratic."""
+"""``ChronocraticEncoder``: the TSLab encode calls, mapped to the chronocratic ``encode``."""
 
 from dataclasses import dataclass
 from typing import Annotated
@@ -31,7 +31,7 @@ class ChronocraticEncoder:
         device: ``'auto'`` (CUDA when available, else the CPU) or a device
             name. It does not affect the fingerprint; ``'cpu'`` reproduces
             representations computed on the CPU bit for bit.
-        num_workers: Data-loading workers inside the ``encode`` of chronocratic.
+        num_workers: Data-loading workers inside the chronocratic ``encode``.
             Not fingerprinted.
         batch_size: Samples per forward pass.
         sliding_padding: Past timesteps each timestep sees when a dilated
@@ -65,7 +65,7 @@ type _DilatedEncoding = PoolingEncodingMixin | DecompositionEncodingMixin
 
 
 class _VectorEncoder:
-    """One vector per sample through the ``encode`` of chronocratic.
+    """One vector per sample through the chronocratic ``encode``.
 
     The model is held twice, under two types: as its encoding mixin, whose
     ``encode`` signature ty checks, and as a ``torch.nn.Module``, for moving it.

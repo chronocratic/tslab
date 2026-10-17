@@ -1,7 +1,7 @@
 """Seeding of every random number generator TSLab knows about.
 
 This module deliberately does not import Lightning, so the core stays free of
-it. the ``seed_everything`` of Lightning does the same work for training code.
+it. The Lightning ``seed_everything`` does the same work for training code.
 """
 
 import os

@@ -96,7 +96,7 @@ class ModelAsEncoder:
 
 
 class _DeviceEncoder:
-    """Runs the ``encode`` of a model on a device, in chunks, and returns CPU tensors."""
+    """Runs a model ``encode`` on a device, in chunks, and returns CPU tensors."""
 
     def __init__(self, *, model: Encoder, device: torch.device, batch_size: int | None) -> None:
         self._model = model
@@ -118,7 +118,7 @@ class _DeviceEncoder:
         return cast('tuple[torch.Tensor, ...]', inputs.split(split_size=max(size, 1)))
 
     def encode(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        """Encode ``inputs`` with the ``encode`` of the model."""
+        """Encode ``inputs`` with the model ``encode``."""
         return torch.cat(
             tensors=[
                 self._model.encode(inputs=chunk.to(device=self._device)).cpu()
