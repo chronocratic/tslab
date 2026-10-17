@@ -1,9 +1,9 @@
-"""TSLab: resumable, cached research pipelines for time-series representation learning."""
+"""TSLab: resumable, cached research pipelines for time series representation learning."""
 
 from importlib.metadata import PackageNotFoundError, version
 
 from tslab import stages
-from tslab.artifact import (
+from tslab.core.artifact import (
     Artifact,
     Checkpoint,
     is_available,
@@ -14,14 +14,14 @@ from tslab.artifact import (
     UnavailableArtifactError,
     UnavailableReason,
 )
-from tslab.config import ConfigFileError, load_config, parse_config, save_config
-from tslab.fingerprint import Fingerprintable, NotFingerprinted
+from tslab.core.config import ConfigFileError, load_config, parse_config, save_config
+from tslab.core.fingerprint import Fingerprintable, NotFingerprinted
+from tslab.core.paths import InstanceName
+from tslab.core.run import Run, RunLockedError, RunOptions
+from tslab.core.stage import Stage, stage
+from tslab.core.status import InstanceState, RunState
 from tslab.interfaces.encoder import ModelAsEncoder
 from tslab.interfaces.tracker import RunStatus, Tracker
-from tslab.paths import InstanceName
-from tslab.run import Run, RunLockedError, RunOptions
-from tslab.stage import Stage, stage
-from tslab.status import InstanceState, RunState
 
 try:
     __version__ = version('tslab')

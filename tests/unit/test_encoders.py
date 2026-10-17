@@ -3,7 +3,7 @@ from typing import override
 import pytest
 import torch
 
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import DownstreamModel, Encoder, SequenceEncoder
 from tslab.interfaces.encoder import ModelAsEncoder, resolve_device
 

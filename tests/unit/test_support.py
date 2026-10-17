@@ -6,8 +6,8 @@ import subprocess
 import numpy as np
 import torch
 
-from tslab.meta import collect_git_state, collect_versions, package_version
-from tslab.seeding import seed_everything
+from tslab.core.meta import collect_git_state, collect_versions, package_version
+from tslab.core.seeding import seed_everything
 
 
 def draw() -> tuple[float, float, float]:

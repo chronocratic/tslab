@@ -4,7 +4,7 @@ from pathlib import Path
 from mlflow.tracking.client import MlflowClient
 import pytest
 
-from tslab.run import Run
+from tslab.core.run import Run
 from tslab.tracking.mlflow_tracker import MLflowTracker
 from tslab.tracking.tensorboard_tracker import TensorBoardTracker
 

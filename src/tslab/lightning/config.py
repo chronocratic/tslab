@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Annotated
 
-from tslab.fingerprint import NotFingerprinted
+from tslab.core.fingerprint import NotFingerprinted
 
 __all__ = ['LightningTrainerConfig']
 

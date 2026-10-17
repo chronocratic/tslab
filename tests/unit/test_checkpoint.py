@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.artifact import Checkpoint
+from tslab.core.artifact import Checkpoint
 
 BEST = 'epoch=3-val_loss_epoch=0.10.ckpt'
 

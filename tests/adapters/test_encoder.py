@@ -9,7 +9,7 @@ from tslab.adapters.chronocratic_models import (
     ChronocraticEncoder,
     ChronocraticModelChoice,
 )
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import Encoder, SequenceEncoder
 from tslab.ts import TSClassificationDataInfo
 

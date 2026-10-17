@@ -15,7 +15,7 @@ import chronocratic.datasets
 from lightning import LightningDataModule
 import tyro
 
-from tslab.fingerprint import NotFingerprinted
+from tslab.core.fingerprint import NotFingerprinted
 
 __all__ = [
     'DATAMODULES',

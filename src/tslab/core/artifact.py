@@ -21,8 +21,8 @@ from safetensors import safe_open
 from safetensors.torch import load_file, save_file
 import torch
 
-from tslab.fingerprint import compute_fingerprint, hash_path_contents
-from tslab.paths import atomic_write_text, require_path
+from tslab.core.fingerprint import compute_fingerprint, hash_path_contents
+from tslab.core.paths import atomic_write_text, require_path
 
 __all__ = [
     'Artifact',

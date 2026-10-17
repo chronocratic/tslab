@@ -13,7 +13,7 @@ from enum import StrEnum
 import json
 from pathlib import Path
 
-from tslab.paths import atomic_write_text, require_path
+from tslab.core.paths import atomic_write_text, require_path
 
 __all__ = [
     'STATUS_FORMAT_VERSION',

@@ -1,7 +1,7 @@
 import dataclasses
 
-from tslab.config import config_from_yaml, config_to_yaml
-from tslab.fingerprint import canonicalize, compute_fingerprint
+from tslab.core.config import config_from_yaml, config_to_yaml
+from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.lightning.config import LightningTrainerConfig
 
 

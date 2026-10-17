@@ -11,9 +11,9 @@ from typing import override
 
 import pytest
 
+from tslab.core.meta import hostname
+from tslab.core.run import _acquire_lock, is_run_active, Run, RunLockedError, RunOptions
 from tslab.interfaces.tracker import RunStatus, Tracker
-from tslab.meta import hostname
-from tslab.run import _acquire_lock, is_run_active, Run, RunLockedError, RunOptions
 
 
 @dataclass(frozen=True)
@@ -199,7 +199,7 @@ def test_lock_without_heartbeat_from_other_host_is_replaced(
 
 
 def test_heartbeat_refreshes_the_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr('tslab.run._HEARTBEAT_SECONDS', 0.01)
+    monkeypatch.setattr('tslab.core.run._HEARTBEAT_SECONDS', 0.01)
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         lock = tmp_path / 'a' / '.lock'
         _age_file(path=lock, seconds=500)

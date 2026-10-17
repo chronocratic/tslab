@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import pytest
 import yaml
 
-from tslab.config import (
+from tslab.core.config import (
     config_from_yaml,
     config_to_yaml,
     ConfigFileError,
@@ -16,7 +16,7 @@ from tslab.config import (
     parse_config,
     save_config,
 )
-from tslab.fingerprint import NotFingerprinted
+from tslab.core.fingerprint import NotFingerprinted
 
 
 class Mode(Enum):

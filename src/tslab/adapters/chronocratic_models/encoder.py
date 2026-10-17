@@ -11,7 +11,7 @@ from chronocratic.models.convolutional.dilated._mixin.encoding import (
 from chronocratic.models.enums import EncodingOutputShape
 import torch
 
-from tslab.fingerprint import NotFingerprinted
+from tslab.core.fingerprint import NotFingerprinted
 from tslab.interfaces import Encoder
 from tslab.interfaces.encoder import resolve_device
 
@@ -24,7 +24,7 @@ class ChronocraticEncoder:
 
     Dilated models (TS2Vec, AutoTCL, CoST) also offer ``encode_sequence``: one
     causal representation per timestep, computed with a sliding window, as in
-    the TS2Vec forecasting protocol (Yue et al., AAAI 2022). Other chronocratic
+    the TS2Vec forecasting protocol. Other chronocratic
     models offer one vector per sample.
 
     Attributes:

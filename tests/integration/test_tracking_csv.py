@@ -4,7 +4,7 @@ from pathlib import Path
 
 from lightning.pytorch.loggers import CSVLogger, Logger
 
-from tslab.run import Run
+from tslab.core.run import Run
 from tslab.tracking.csv_tracker import CSVTracker
 from tslab.tracking.lightning_bridge import lightning_loggers
 

@@ -20,27 +20,27 @@ import traceback
 from typing import Any, cast, get_type_hints, override
 import uuid
 
-from tslab.artifact import (
+from tslab.core.artifact import (
     Artifact,
     ArtifactIdentity,
     bind_identity,
     UnavailableArtifact,
     UnavailableReason,
 )
-from tslab.fingerprint import (
+from tslab.core.fingerprint import (
     canonicalize,
     compute_fingerprint,
     FINGERPRINT_FORMAT_VERSION,
     is_not_fingerprinted,
 )
-from tslab.paths import (
+from tslab.core.paths import (
     atomic_write_text,
     normalize_instance_name,
     replace_directory,
     validate_stage_name,
 )
-from tslab.run import Run
-from tslab.status import format_instance_id, InstanceRecord, InstanceState, utc_now_iso
+from tslab.core.run import Run
+from tslab.core.status import format_instance_id, InstanceRecord, InstanceState, utc_now_iso
 
 __all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'Stage', 'stage']
 
