@@ -1,4 +1,4 @@
-"""The TS2Vec forecasting protocol (Yue et al., AAAI 2022) as stages.
+"""TS2Vec forecasting protocol as stages.
 
 Encoders with per-timestep output (``SequenceEncoder``) encode each full
 series once; every horizon is then cut out of that encoding. Other encoders
@@ -11,11 +11,11 @@ from collections.abc import Callable, Sequence
 
 import torch
 
-from tslab.artifact import Checkpoint, Tensors
+from tslab.core.artifact import Checkpoint, Tensors
+from tslab.core.paths import InstanceName, normalize_instance_name
+from tslab.core.run import Run
+from tslab.core.stage import stage
 from tslab.interfaces import Encoder, SequenceEncoder, SPLITS, Trainer
-from tslab.paths import InstanceName, normalize_instance_name
-from tslab.run import Run
-from tslab.stage import stage
 from tslab.stages import check_representations
 from tslab.ts.info import checked_split_slices, ForecastingSeries
 

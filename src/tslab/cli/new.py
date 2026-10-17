@@ -16,7 +16,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.paths import require_path
+from tslab.core.paths import require_path
 
 __all__ = ['New', 'create_project']
 

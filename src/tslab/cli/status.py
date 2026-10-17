@@ -19,8 +19,14 @@ from typing import Annotated
 
 import tyro
 
-from tslab.run import is_run_active
-from tslab.status import InstanceRecord, InstanceState, read_status, RunState, RunStatusSnapshot
+from tslab.core.run import is_run_active
+from tslab.core.status import (
+    InstanceRecord,
+    InstanceState,
+    read_status,
+    RunState,
+    RunStatusSnapshot,
+)
 
 __all__ = ['Status']
 

@@ -4,11 +4,11 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from tslab.artifact import Metrics, Tensors
+from tslab.core.artifact import Metrics, Tensors
+from tslab.core.paths import InstanceName, normalize_instance_name
+from tslab.core.run import Run
+from tslab.core.stage import stage
 from tslab.interfaces import DownstreamModel, Metric
-from tslab.paths import InstanceName, normalize_instance_name
-from tslab.run import Run
-from tslab.stage import stage
 
 __all__ = ['evaluate']
 

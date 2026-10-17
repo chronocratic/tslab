@@ -20,7 +20,7 @@ from tslab.adapters.chronocratic_datasets import (
     DATAMODULES,
     EXCLUDED_PARAMETERS,
 )
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import SPLITS
 from tslab.lightning import LightningDataSource
 

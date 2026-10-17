@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tslab.artifact import Checkpoint
+from tslab.core.artifact import Checkpoint
 from tslab.interfaces.data import DataSource
 
 if TYPE_CHECKING:
-    # tslab.run imports this package, so a runtime import here would be circular.
-    from tslab.run import Run
+    # tslab.core.run imports this package, so a runtime import here would be circular.
+    from tslab.core.run import Run
 
 __all__ = ['Trainer']
 

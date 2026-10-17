@@ -19,7 +19,7 @@ from tslab.adapters.chronocratic_models import (
     MODELS,
     recipe_subcommand,
 )
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 
 pytestmark = pytest.mark.chronocratic
 

@@ -5,7 +5,7 @@ from typing import Annotated, cast, Protocol, runtime_checkable
 
 import torch
 
-from tslab.fingerprint import NotFingerprinted
+from tslab.core.fingerprint import NotFingerprinted
 
 __all__ = ['Encoder', 'ModelAsEncoder', 'SequenceEncoder', 'resolve_device']
 
@@ -24,7 +24,7 @@ class SequenceEncoder(Protocol):
     """Turns series into one representation per timestep, causally.
 
     The representation at step ``t`` may only depend on steps ``<= t``. The
-    TS2Vec forecasting protocol (Yue et al., AAAI 2022) relies on this to
+    TS2Vec forecasting protocol relies on this to
     encode a whole series once and read off every forecast position.
     """
 

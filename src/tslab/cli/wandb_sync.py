@@ -37,7 +37,7 @@ from typing import Annotated, TYPE_CHECKING
 
 import tyro
 
-from tslab.paths import require_path
+from tslab.core.paths import require_path
 from tslab.tracking.wandb_log import read_exit_codes, read_run_coordinates
 
 if TYPE_CHECKING:

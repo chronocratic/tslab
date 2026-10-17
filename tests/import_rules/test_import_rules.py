@@ -11,17 +11,18 @@ import pytest
 
 CORE_MODULES = (
     'tslab',
-    'tslab.artifact',
-    'tslab.config',
-    'tslab.fingerprint',
+    'tslab.core',
+    'tslab.core.artifact',
+    'tslab.core.config',
+    'tslab.core.fingerprint',
+    'tslab.core.meta',
+    'tslab.core.paths',
+    'tslab.core.run',
+    'tslab.core.seeding',
+    'tslab.core.stage',
+    'tslab.core.status',
     'tslab.interfaces',
-    'tslab.meta',
-    'tslab.paths',
-    'tslab.run',
-    'tslab.seeding',
-    'tslab.stage',
     'tslab.stages',
-    'tslab.status',
     'tslab.tracking',
 )
 FORBIDDEN_IN_CORE = (

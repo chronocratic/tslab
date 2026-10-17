@@ -5,7 +5,7 @@ import pytest
 from sklearn.metrics import f1_score, precision_score
 import torch
 
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 from tslab.probes import classification_metrics, forecasting_metrics, RidgeProbe, SVMProbe
 
 

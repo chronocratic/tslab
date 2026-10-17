@@ -10,10 +10,10 @@ from mlflow.tracking.client import MlflowClient
 import pytest
 import torch
 
-from tslab.artifact import Checkpoint
+from tslab.core.artifact import Checkpoint
+from tslab.core.run import Run
 from tslab.interfaces.tracker import Tracker
 from tslab.lightning import LightningDataSource, LightningTrainer, TrainingTimeLimitReached
-from tslab.run import Run
 from tslab.tracking.mlflow_tracker import MLflowTracker
 
 

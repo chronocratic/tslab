@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.paths import (
+from tslab.core.paths import (
     atomic_write_text,
     normalize_instance_name,
     replace_directory,

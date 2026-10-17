@@ -42,7 +42,7 @@ from typing import (
 import tyro
 import yaml
 
-from tslab.paths import atomic_write_text, require_path
+from tslab.core.paths import atomic_write_text, require_path
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance

@@ -13,8 +13,8 @@ from lightning_toy import FAST, ToyData, ToyRegressor
 from safetensors.torch import save_file
 import torch
 
+from tslab.core.run import Run
 from tslab.lightning import LightningTrainer
-from tslab.run import Run
 
 
 @dataclass(frozen=True)

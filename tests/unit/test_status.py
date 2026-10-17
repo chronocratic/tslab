@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.status import (
+from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
     InstanceState,

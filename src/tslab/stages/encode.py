@@ -4,11 +4,11 @@ from collections.abc import Callable
 
 import torch
 
-from tslab.artifact import Checkpoint, Tensors
+from tslab.core.artifact import Checkpoint, Tensors
+from tslab.core.paths import InstanceName
+from tslab.core.run import Run
+from tslab.core.stage import stage
 from tslab.interfaces import Encoder, LabeledSplits, SPLITS, Trainer
-from tslab.paths import InstanceName
-from tslab.run import Run
-from tslab.stage import stage
 
 __all__ = ['check_representations', 'encode']
 

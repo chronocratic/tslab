@@ -9,9 +9,9 @@ import torch
 from ts_toy import SineClassification, SineForecasting, ToySequenceModel, ToyVectorModel
 
 import tslab
+from tslab.core.status import InstanceState
 from tslab.lightning import LightningTrainer
 from tslab.probes import RidgeProbe, SVMProbe
-from tslab.status import InstanceState
 from tslab.ts import forecasting_representations
 
 ENCODER = tslab.ModelAsEncoder(device='cpu')

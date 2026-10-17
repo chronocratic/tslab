@@ -20,11 +20,10 @@ import time
 from types import TracebackType
 from typing import Literal, Self
 
-from tslab.config import config_to_data, config_to_yaml, save_config
-from tslab.fingerprint import canonicalize, compute_fingerprint
-from tslab.interfaces.tracker import RunStatus, Tracker
-from tslab.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
-from tslab.paths import (
+from tslab.core.config import config_to_data, config_to_yaml, save_config
+from tslab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
+from tslab.core.paths import (
     atomic_write_text,
     InstanceName,
     normalize_instance_name,
@@ -32,8 +31,8 @@ from tslab.paths import (
     validate_relative_path,
     validate_stage_name,
 )
-from tslab.seeding import seed_everything
-from tslab.status import (
+from tslab.core.seeding import seed_everything
+from tslab.core.status import (
     InstanceRecord,
     InstanceState,
     read_status,
@@ -42,6 +41,7 @@ from tslab.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.interfaces.tracker import RunStatus, Tracker
 
 __all__ = ['Run', 'RunLockedError', 'RunOptions', 'is_run_active', 'is_writer_process']
 
@@ -143,7 +143,7 @@ class Run:
         self._config = config
         self._relative_path = relative_path
         self._directory = root / relative_path
-        # why: keeps `import tslab.run` free of Lightning
+        # why: keeps `import tslab.core.run` free of Lightning
         from tslab.tracking.csv_tracker import CSVTracker  # noqa: PLC0415
 
         # The CSV tracker is always on: it is the local record when remote trackers fail.

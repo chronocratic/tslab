@@ -6,7 +6,7 @@ from typing import Annotated
 import pytest
 import torch
 
-from tslab.fingerprint import (
+from tslab.core.fingerprint import (
     canonicalize,
     compute_fingerprint,
     hash_path_contents,

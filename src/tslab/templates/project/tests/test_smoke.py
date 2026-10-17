@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 import tslab
 from tslab.adapters.chronocratic_models import ChronocraticEncoder
+from tslab.core.status import read_status
 from tslab.lightning import LightningTrainerConfig
-from tslab.status import read_status
 
 from {{package_name}} import classify, forecast, toy_data
 

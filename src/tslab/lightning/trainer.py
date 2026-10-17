@@ -13,7 +13,8 @@ from lightning import LightningModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Timer
 import torch
 
-from tslab.artifact import Checkpoint
+from tslab.core.artifact import Checkpoint
+from tslab.core.paths import require_path
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
 from tslab.lightning.callbacks import build_callbacks
@@ -21,11 +22,10 @@ from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
 from tslab.lightning.resume import choose_resume_checkpoint
 from tslab.lightning.slurm import resolve_training_time
-from tslab.paths import require_path
 from tslab.tracking.lightning_bridge import lightning_loggers
 
 if TYPE_CHECKING:
-    from tslab.run import Run
+    from tslab.core.run import Run
 
 __all__ = ['LightningTrainer', 'TrainingTimeLimitReached']
 

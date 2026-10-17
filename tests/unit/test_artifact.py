@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from tslab.artifact import (
+from tslab.core.artifact import (
     is_available,
     Json,
     Metrics,
@@ -14,7 +14,7 @@ from tslab.artifact import (
     UnavailableArtifactError,
     UnavailableReason,
 )
-from tslab.fingerprint import canonicalize
+from tslab.core.fingerprint import canonicalize
 
 
 def test_json_round_trip(tmp_path: Path) -> None:
