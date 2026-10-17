@@ -8,11 +8,12 @@ preset registry, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import tyro
 
 import tslab
+from tslab.study import from_presets, Grid, setting_axis
 
 
 class SplitMode(Enum):
@@ -143,3 +144,20 @@ PRESETS = {
         ),
     ),
 }
+
+
+def grid(**changes: Any) -> Grid:  # noqa: ANN401
+    """The study tests' default grid: two recipes, one dataset, two seeds."""
+    values: dict[str, Any] = {
+        'short_name': 'cls',
+        'command': ('python', '-m', 'p.classify', 'no-preset'),
+        'config': ClassifyConfig,
+        'axes': {
+            'recipe': from_presets(
+                PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
+            ),
+            'dataset': {'Coffee': {'data': 'ucr', 'data.dataset_folder_path': '/d/Coffee'}},
+            'seed': setting_axis(path='seed', values=(42, 7)),
+        },
+    }
+    return Grid(**{**values, **changes})
