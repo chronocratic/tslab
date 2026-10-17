@@ -6,7 +6,7 @@ Running the same command again is always safe:
 
 - finished instances with matching fingerprints are **loaded**;
 - `train` resumes from its last checkpoint, mid-epoch when the data loader is
-  stateful (`torchdata`'s `StatefulDataLoader`); a resumed training reaches the
+  stateful (the `StatefulDataLoader` of `torchdata`); a resumed training reaches the
   same weights as an uninterrupted one;
 - instances that failed or were skipped **run again**.
 
@@ -15,7 +15,7 @@ Running the same command again is always safe:
 An exception inside a stage does not stop the run:
 
 - the instance is recorded as `failed`, with the first line of the error in
-  `status.json` and the full traceback in its folder's `error.txt`;
+  `status.json` and the full traceback in the `error.txt` of the folder;
 - every instance that receives its result is `skipped`;
 - the other instances run normally;
 - at the end, the run prints a summary of failed and skipped instances, and

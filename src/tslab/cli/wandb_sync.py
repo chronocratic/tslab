@@ -13,7 +13,7 @@ nothing.
 
 Output, one line per run: ``index/total action [server=... local=...] note path``.
 Actions are ``skip``, ``WOULD`` (dry run), ``synced`` and ``FAILED``. Local
-states are what the run's own files say happened:
+states are what the files of the run say happened:
 
 - ``finished``: an exit record with code 0 was written, so a resync can turn the run green.
 - ``exit-err``: the exit record has a non-zero code. The run really failed and stays failed.
@@ -70,7 +70,7 @@ _RUNNING_WINDOW_SECONDS = 30 * 60
 
 
 class LocalState(StrEnum):
-    """What a run's own files say happened (see the module docstring)."""
+    """What the files of a run say happened (see the module docstring)."""
 
     FINISHED = 'finished'
     EXIT_ERROR = 'exit-err'
@@ -105,7 +105,7 @@ class LocalRun:
     run_id: str | None
 
     def local_state(self, *, now: float | None = None) -> LocalState:
-        """Infer the local state from the run's logs and file times.
+        """Infer the local state from the logs and file times of the run.
 
         Args:
             now: Reference time for the liveness window; ``None`` means now.
@@ -130,7 +130,7 @@ class LocalRun:
         return LocalState.NO_EXIT
 
     def transaction_log(self) -> Path | None:
-        """Return the run's ``.wandb`` transaction log, if present."""
+        """Return the ``.wandb`` transaction log of the run, if present."""
         logs = sorted(self.run_directory.glob('*.wandb'))
         return logs[0] if logs else None
 
@@ -219,9 +219,9 @@ class _ApiPool:
 
 
 def resolve_run_path(*, run: LocalRun, entity: str | None, project: str | None) -> str | None:
-    """Return the run's ``entity/project/run_id`` path on the server.
+    """Return the ``entity/project/run_id`` path of the run on the server.
 
-    The run's own coordinates win; ``entity`` and ``project`` fill only the
+    The coordinates of the run win; ``entity`` and ``project`` fill only the
     gaps (runs that crashed before their logs showed them).
 
     Args:
@@ -270,8 +270,8 @@ def plan_action(
     """Decide what to do with one run.
 
     Args:
-        local: The run's local state.
-        state: The run's server state.
+        local: The local state of the run.
+        state: The server state of the run.
         target_states: Server states to repair.
         dry_run: Report instead of syncing.
 
@@ -297,7 +297,7 @@ def sync_command(*, run: LocalRun) -> list[str]:
         run: The run to upload.
 
     Returns:
-        The argument vector, run through this Python's ``wandb`` module.
+        The argument vector, run through the ``wandb`` module of this Python.
     """
     return [
         sys.executable,

@@ -5,7 +5,7 @@ You keep writing a normal Python `main()`; TSLab gives each step a
 fingerprint, stores its result, and on the next run loads finished results,
 resumes unfinished training, and reruns only what changed or failed.
 
-It ships ready stages for time-series representation learning (train, encode,
+It ships ready stages for time series representation learning (train, encode,
 evaluate with linear probes), Lightning training with safe resume and SLURM
 time limits, experiment trackers, and adapters for the chronocratic model and
 dataset libraries.

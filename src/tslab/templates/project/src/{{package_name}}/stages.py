@@ -2,7 +2,7 @@
 
 ``@tslab.stage`` turns a function into a cached, resumable step:
 
-- ``name`` is the stage's folder name under the run folder;
+- ``name`` is the folder name of the stage under the run folder;
 - ``output`` is the artifact type the function returns;
 - ``version`` is part of the fingerprint: bump it after changing the code,
   so results cached by the old code are computed again.

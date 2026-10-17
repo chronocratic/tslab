@@ -20,7 +20,7 @@
 Every instance has a fingerprint: 16 hexadecimal characters of a SHA-256 over
 
 - the stage name and its `version`,
-- the run's seed,
+- the seed of the run,
 - the settings it was called with (numbers, strings, paths, enums,
   dataclasses, and objects that offer `fingerprint_settings()`),
 - the fingerprints of the artifacts it received.
@@ -34,8 +34,8 @@ workers, logging intervals) never change a fingerprint: they cannot change the
 result. Paths are fingerprinted as paths, not by content; use
 `Artifact.external(path=...)` for a file whose content must count.
 
-Bump a stage's `version` after changing its code, so results of the old code
-are not reused.
+Bump the `version` of a stage after changing its code, so results of the old
+code are not reused.
 
 ## Artifacts
 

@@ -68,7 +68,7 @@ TOY_SPECTRA = Path('data') / 'ToySpectra'
 
 PRESETS = {
     'ts2vec-archive-split': (
-        "TS2Vec on the toy spectra, the archive's own train/test split",
+        "TS2Vec on the toy spectra, the train/test split of the archive",
         ClassifyConfig(
             model=model_settings(choice=Models, name='ts2vec'),
             data=data_settings(

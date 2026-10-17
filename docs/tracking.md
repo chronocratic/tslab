@@ -12,7 +12,7 @@ the run folder, one `version` per execution. Others are opt-in through
 | TensorBoard | `tslab[tensorboard]` | `--tracking.tensorboard` |
 
 Each tracker receives the config (flattened with `/`), every `Metrics`
-result, and Lightning's training metrics. The run's final state (`finished`
+result, and the training metrics of Lightning. The final state of the run (`finished`
 or `failed`) is sent at the end. A tracker that fails never fails the run: it
 is logged and skipped.
 
@@ -21,7 +21,7 @@ is logged and skipped.
 W&B can mark a run `crashed` when the network drops or a job is killed. TSLab
 starts W&B with generous timeouts, falls back to offline mode and then to no
 W&B when the server is unreachable, and records the real exit status. Repair
-the server's view afterwards:
+the view of the server afterwards:
 
 ```bash
 uv run tslab wandb-sync runs/ --dry-run     # what would be resynced

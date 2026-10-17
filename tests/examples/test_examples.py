@@ -1,4 +1,4 @@
-"""The examples run as their docstrings say, with nothing but TSLab's public API."""
+"""The examples run as their docstrings say, with nothing but the public API of TSLab."""
 
 from pathlib import Path
 import subprocess
@@ -10,7 +10,7 @@ EXAMPLES = Path(__file__).parents[2] / 'examples'
 
 
 def run_example(*args: str, example: str, cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603 # why: runs this repository's own example
+    return subprocess.run(  # noqa: S603 # why: runs the example of this repository
         [sys.executable, str(EXAMPLES / example / 'main.py'), *args],
         cwd=cwd,
         capture_output=True,

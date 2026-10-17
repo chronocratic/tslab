@@ -33,7 +33,7 @@ def main(args: Sequence[str] | None = None) -> None:
         args: Arguments to parse; ``None`` means ``sys.argv[1:]``.
 
     Raises:
-        SystemExit: Always, with the subcommand's exit code.
+        SystemExit: Always, with the exit code of the subcommand.
     """
     logging.basicConfig(format='%(message)s', level=logging.INFO, stream=sys.stdout)
     command: Command = tyro.extras.subcommand_cli_from_dict(
