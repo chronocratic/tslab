@@ -163,6 +163,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
             continue
         run_state = run_state_shown(directory=directory, snapshot=snapshot)
         totals[run_state] += 1
+        # Raw instance states: a dead run still shows its in-flight instances.
         counts = Counter(record.state for _, record in _selected(snapshot=snapshot, stage=stage))
         rows.append(
             (

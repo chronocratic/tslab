@@ -2,14 +2,15 @@ name: Changelog fragment
 
 # Single source of truth for changelog fragments on PRs targeting `dev`:
 #   1. Same-repo PR with no fragment  -> create one from the PR title and push it.
-#   2. Always (incl. fork PRs)         -> `towncrier check` so every PR has a fragment.
+#   2. Same-repo PR                   -> `towncrier check` so the PR has a fragment.
 #
 # Both happen in one job so the check sees the freshly-created fragment in the
 # same run. A push made with GITHUB_TOKEN does NOT re-trigger workflows, so the
 # check must not live in a separate workflow that never re-runs after the push.
 #
-# Fork PRs cannot be pushed to, so they are only checked — the contributor must
-# add a fragment by hand (or a maintainer pushes one to the PR branch).
+# Fork PRs cannot be pushed to, and the check does not apply to them (a fork
+# checkout has no base branch to compare against) — the contributor must add a
+# fragment by hand (or a maintainer pushes one to the PR branch).
 #
 # Label convention for fragment type (defaults to `changed`):
 #   changelog:added | changelog:fixed | changelog:changed
@@ -141,4 +142,5 @@ jobs:
           fi
 
       - name: Verify a fragment is present
+        if: github.event.pull_request.head.repo.full_name == github.repository
         run: uv run towncrier check --compare-with origin/${{ github.base_ref }}
