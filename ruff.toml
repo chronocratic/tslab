@@ -26,6 +26,10 @@ ignore = [
     "ARG001",  # Stage functions and test doubles keep the signature their interface requires,
     "ARG002",  # even when a test does not use every argument.
 ]
+"examples/**/*.py" = [
+    "INP001", # Examples are scripts run by path, not packages.
+    "T201",   # They print their results.
+]
 
 [lint.pydocstyle]
 convention = "google"
