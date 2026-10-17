@@ -34,7 +34,7 @@ class JitterThenScaleRecipe:
 
 @dataclass(frozen=True, kw_only=True)
 class CropShiftRecipe:
-    """TS2Vec's crop and shift, as a recipe."""
+    """the crop and shift of TS2Vec, as a recipe."""
 
     def __call__(self) -> AugmentationProducer[AlignedPair]:
         return CropShiftProducer()

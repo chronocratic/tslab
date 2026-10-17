@@ -1,4 +1,4 @@
-"""Ready probes: the TS2Vec evaluation protocols (Yue et al., AAAI 2022).
+"""Ready probes: the TS2Vec evaluation protocols.
 
 This is the only TSLab package that imports scikit-learn.
 """

@@ -96,7 +96,7 @@ class ModelAsEncoder:
 
 
 class _DeviceEncoder:
-    """Runs a model's ``encode`` on a device, in chunks, and returns CPU tensors."""
+    """Runs the ``encode`` of a model on a device, in chunks, and returns CPU tensors."""
 
     def __init__(self, *, model: Encoder, device: torch.device, batch_size: int | None) -> None:
         self._model = model
@@ -118,7 +118,7 @@ class _DeviceEncoder:
         return cast('tuple[torch.Tensor, ...]', inputs.split(split_size=max(size, 1)))
 
     def encode(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        """Encode ``inputs`` with the model's ``encode``."""
+        """Encode ``inputs`` with the ``encode`` of the model."""
         return torch.cat(
             tensors=[
                 self._model.encode(inputs=chunk.to(device=self._device)).cpu()
@@ -128,7 +128,7 @@ class _DeviceEncoder:
 
 
 class _DeviceSequenceEncoder(_DeviceEncoder):
-    """``_DeviceEncoder`` that also runs the model's ``encode_sequence``."""
+    """``_DeviceEncoder`` that also runs the ``encode_sequence`` of the model."""
 
     def __init__(
         self, *, model: _EncoderWithSequence, device: torch.device, batch_size: int | None
@@ -137,7 +137,7 @@ class _DeviceSequenceEncoder(_DeviceEncoder):
         self._sequence_model = model
 
     def encode_sequence(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        """Encode ``inputs`` with the model's ``encode_sequence``."""
+        """Encode ``inputs`` with the ``encode_sequence`` of the model."""
         return torch.cat(
             tensors=[
                 self._sequence_model.encode_sequence(inputs=chunk.to(device=self._device)).cpu()

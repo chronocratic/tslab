@@ -200,10 +200,10 @@ _content_hash_cache: dict[tuple[str, int, int], str] = {}
 
 
 def hash_path_contents(*, path: Path) -> str:
-    """Return the SHA-256 hex digest of a file or a directory tree's contents.
+    """Return the SHA-256 hex digest of a file or the contents of a directory tree.
 
-    For a directory, the digest covers each file's POSIX path relative to the
-    directory plus that file's content hash, in sorted order. Results are
+    For a directory, the digest covers the POSIX path of each file relative to the
+    directory plus the content hash of that file, in sorted order. Results are
     memoised per process, keyed by resolved path, size and modification time,
     so hashing a large checkpoint twice in one run costs nothing.
 

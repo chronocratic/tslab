@@ -106,8 +106,8 @@ def test_forecasting_runs_end_to_end_on_both_paths(tmp_path: Path) -> None:
 
 def test_a_time_limit_fails_train_and_the_rerun_resumes(tmp_path: Path) -> None:
     def pipeline(*, time_limit: str | None) -> tuple[tslab.Metrics, dict[str, InstanceState]]:
-        # One second, the limit's minimum granularity: a zero limit fires before the
-        # first epoch's validation, so Lightning writes no checkpoint to resume from.
+        # One second, the minimum granularity of the limit: a zero limit fires before the
+        # validation of the first epoch, so Lightning writes no checkpoint to resume from.
         # The large epoch budget plus patience keeps the 1 s cut before early stopping.
         trainer = LightningTrainer(
             config=dataclasses.replace(

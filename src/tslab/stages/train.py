@@ -22,7 +22,7 @@ def train[M](
 ) -> Checkpoint:
     """Train ``model`` and return its best and last checkpoints.
 
-    The trainer writes checkpoints straight into this instance's folder. A
+    The trainer writes checkpoints straight into the folder of this instance. A
     training interrupted by a crash, a kill or a time limit therefore resumes
     from its last checkpoint the next time the script runs with the same
     settings.

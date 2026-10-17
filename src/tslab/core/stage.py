@@ -69,7 +69,7 @@ class Stage[Out: Artifact](ABC):
 
     Attributes:
         name: Stage name; becomes the folder name. Must match ``[A-Za-z0-9._-]+``.
-        version: Bump it when the stage's code changes in a way that changes
+        version: Bump it when the code of the stage changes in a way that changes
             results. Old cached results are then invalidated.
         output_type: The ``Artifact`` subclass ``execute`` returns.
         in_place: If ``True``, ``execute`` writes directly into the final
@@ -450,7 +450,7 @@ def _identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentit
 
 
 def _read_instance_meta(*, path: Path) -> dict[str, object] | None:
-    """Parse one instance's ``meta.json``; unreadable or non-object files give ``None``.
+    """Parse the ``meta.json`` of one instance; unreadable or non-object files give ``None``.
 
     A corrupt or partial file must never crash a run: the instance recomputes
     instead (see ``_stale_reason`` and ``_identity_from_meta``).
@@ -504,7 +504,7 @@ def _write_instance_meta(*, directory: Path, document: Mapping[str, object]) -> 
 class FunctionStage[**P, Out: Artifact](Stage[Out]):
     """A ``Stage`` built from a plain function by ``@stage``.
 
-    Calls are type-checked against the wrapped function's own signature.
+    Calls are type-checked against the signature of the wrapped function itself.
     """
 
     def __init__(
@@ -568,7 +568,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
 
     @override
     def setting_annotations(self) -> Mapping[str, object]:
-        """Return the wrapped function's annotations."""
+        """Return the annotations of the wrapped function."""
         return get_type_hints(self._function, include_extras=True)
 
 

@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# wandb's private x_* settings are version-unstable; the range is pinned to the version the
+# the private x_* settings of wandb are version-unstable; the range is pinned to the version the
 # settings were verified against (see tslab/tracking/wandb_tracker.py).
 wandb = ["wandb>=0.30,<0.31"]
 mlflow = ["mlflow>=3.0,<4"]

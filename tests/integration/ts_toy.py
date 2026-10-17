@@ -81,7 +81,7 @@ class ToySequenceModel(ToyVectorModel):
 
 
 def _loader(*, tensors: tuple[torch.Tensor, ...], shuffle: bool) -> Iterable[Batch]:
-    # torch types a TensorDataset's batches as Any, so the loader is cast to Batch.
+    # torch types the batches of a TensorDataset as Any, so the loader is cast.
     return cast(
         'Iterable[Batch]',
         DataLoader(

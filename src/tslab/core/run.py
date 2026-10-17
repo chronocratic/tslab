@@ -3,7 +3,7 @@
 ``Run`` is a context manager (Unit of Work pattern). Entering it prepares the
 folder, the lock, logging, seeding, metadata and trackers. Leaving it always
 records the final state, finishes the trackers and releases the lock, even
-when the user's code raised an exception.
+when the code of the user raised an exception.
 """
 
 from collections import Counter
@@ -68,7 +68,7 @@ class RunOptions:
         rerun: Instance ids to run again, for example attack[pgd] or attack[h24/pgd].
         fail_fast: Re-raise the first stage error instead of continuing.
         dry_run: Print the plan (load, run, skip) without executing or writing anything.
-        log_level: Level of TSLab's log output.
+        log_level: Level of the log output of TSLab.
     """
 
     force_all: bool = False
@@ -119,7 +119,7 @@ class Run:
         """Validate arguments. Nothing is written until the ``with`` block is entered.
 
         Args:
-            config: The run's configuration, a dataclass instance. Saved as
+            config: The configuration of the run, a dataclass instance. Saved as
                 ``config.yaml`` and hashed into ``meta.json``.
             root: Folder that holds all runs.
             relative_path: Relative folder of this run under ``root``; several
@@ -172,7 +172,7 @@ class Run:
 
     @property
     def trackers(self) -> tuple[Tracker, ...]:
-        """Return the run's trackers."""
+        """Return the trackers of the run."""
         return self._trackers
 
     @property
@@ -228,9 +228,9 @@ class Run:
     def claim_instance(self, *, stage_name: str, name_parts: tuple[str, ...]) -> None:
         """Reserve an instance name for this process; reject duplicates and nesting conflicts.
 
-        Two names conflict if one is a prefix of the other, because the shorter
-        name's folder would contain the longer name's folder, and replacing it
-        would delete the other result.
+        Two names conflict if one is a prefix of the other, because the folder
+        of the shorter name would contain the folder of the longer name, and
+        replacing it would delete the other result.
 
         Args:
             stage_name: The stage name.
@@ -532,7 +532,7 @@ class _LockOwner:
 class _Heartbeat:
     """Touch the lock file every ``_HEARTBEAT_SECONDS`` from a daemon thread.
 
-    The lock's modification time then tells any host whether its owner is
+    The modification time of the lock then tells any host whether its owner is
     still alive: a job killed by SLURM stops touching it.
     """
 
@@ -559,7 +559,7 @@ def is_run_active(*, directory: Path) -> bool:
     """Return whether a live process holds the lock of a run folder.
 
     A lock is live when its heartbeat is recent and, on this host, its process
-    still exists. Another host's process cannot be checked, so there only the
+    still exists. A process of another host cannot be checked, so there only the
     heartbeat counts.
 
     Args:

@@ -1,4 +1,4 @@
-"""The SVM classification probe of TS2Vec (Yue et al., AAAI 2022)."""
+"""The SVM classification probe of TS2Vec."""
 
 from dataclasses import dataclass
 from typing import override
@@ -26,7 +26,7 @@ __all__ = ['SVMProbe', 'SVMProbeSettings']
 # Below these sizes the C search is skipped (see SVMProbe).
 _MIN_SAMPLES_PER_CLASS = 5
 _MIN_SAMPLES = 50
-# Near hard margin. libsvm's dual coefficients diverge at C=inf when classes
+# Near hard margin. the dual coefficients of libsvm diverge at C=inf when classes
 # overlap; a finite C keeps them bounded.
 _HARD_MARGIN_C = 1e6
 _C_GRID: list[float] = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, _HARD_MARGIN_C]
