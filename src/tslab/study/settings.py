@@ -16,7 +16,14 @@ from typing import Annotated, Any, cast, get_args, get_origin, get_type_hints, U
 
 from tslab.core.config import REQUIRED, union_choices
 
-__all__ = ['SettingValue', 'Settings', 'field_annotation', 'from_presets', 'settings_to_args']
+__all__ = [
+    'SettingValue',
+    'Settings',
+    'check_paths',
+    'field_annotation',
+    'from_presets',
+    'settings_to_args',
+]
 
 type SettingValue = (
     str
@@ -326,3 +333,69 @@ def _preset_settings(
                 _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
             continue
         _preset_leaf(item=item, path=path, preset_name=preset_name, default=default, out=out)
+
+
+def check_paths(*, config_class: type, settings: Settings) -> list[str]:
+    """The paths of ``settings`` that exist on no reading of ``config_class``.
+
+    Walks like ``field_annotation`` without raising: at a choice union that
+    is not chosen in the same mapping, the path is accepted when it exists
+    in any member (the choice may come from another axis); a chosen union
+    walks only the chosen member. A choice value that is not a member name
+    is a bad path, so the path of the union field itself is reported.
+
+    Args:
+        config_class: The config dataclass the paths are relative to.
+        settings: The settings mapping whose paths are checked.
+
+    Returns:
+        The bad paths in the order of ``settings``; empty when all are fine.
+    """
+    return [
+        path
+        for path in settings
+        if not _path_exists(path=path, config_class=config_class, settings=settings)
+    ]
+
+
+def _path_exists(*, path: str, config_class: type, settings: Settings) -> bool:
+    parts = path.split('.')
+    holders: list[type] = [config_class]
+    for position, part in enumerate(parts):
+        name = settings.get('.'.join(parts[: position + 1]))
+        if position == len(parts) - 1:
+            return any(_final_exists(holder=holder, part=part, name=name) for holder in holders)
+        next_holders: list[type] = []
+        for holder in holders:
+            next_holders.extend(_steps_into(holder=holder, part=part, name=name))
+        holders = next_holders
+        if not holders:
+            return False
+    return True
+
+
+def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
+    """The dataclass holders below a field, all members of an unchosen union."""
+    hints = get_type_hints(holder, include_extras=True)
+    if part not in hints:
+        return []
+    annotation = hints[part]
+    choices = union_choices(annotation=annotation)
+    if choices is None:
+        member = _strip(annotation=annotation)
+        if isinstance(member, type) and dataclasses.is_dataclass(member):
+            return [member]
+        return [holder]
+    if isinstance(name, str) and name in choices:
+        return [choices[name]]
+    return list(choices.values())
+
+
+def _final_exists(*, holder: type, part: str, name: object) -> bool:
+    hints = get_type_hints(holder, include_extras=True)
+    if part not in hints:
+        return False
+    choices = union_choices(annotation=hints[part])
+    if choices is None:
+        return True
+    return not (isinstance(name, str) and name not in choices)
