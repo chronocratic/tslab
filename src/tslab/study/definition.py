@@ -24,6 +24,7 @@ __all__ = [
     'match_problems',
     'normalize_match',
     'run_matches',
+    'select_runs',
     'setting_axis',
 ]
 
@@ -336,6 +337,71 @@ def expand_runs(*, study: Study) -> list[StudyRun]:
                 )
             )
     return runs
+
+
+def select_runs(
+    *, study: Study, runs: Sequence[StudyRun], grids: Sequence[str] = (), only: Sequence[str] = ()
+) -> list[StudyRun]:
+    """The runs that pass the grid names and axis filters.
+
+    An empty ``grids`` keeps every grid; a name that is not a grid raises.
+    Each ``only`` item is ``AXIS=V1,V2``: it keeps the runs of the grids that
+    have ``AXIS`` whose value for it is named; a malformed item, an axis no
+    grid has or a value no grid's axis has raises. Filtering never changes
+    run paths.
+
+    Args:
+        study: The study the runs came from.
+        runs: The runs to filter, e.g. ``expand_runs``' output.
+        grids: The grid names to keep; empty keeps them all.
+        only: ``AXIS=V1,V2`` items, every one of which must hold.
+
+    Returns:
+        The runs that pass every filter, in the order of ``runs``.
+
+    Raises:
+        ValueError: If a grid name is unknown, an ``only`` item is malformed,
+            an axis belongs to no grid or a value belongs to no grid's axis.
+    """
+    unknown_grids = [name for name in grids if name not in study.grids]
+    if unknown_grids:
+        message = (
+            f'unknown grid {", ".join(unknown_grids)!r}; '
+            f'this study has {", ".join(repr(name) for name in study.grids)}'
+        )
+        raise ValueError(message)
+    parsed = [_parse_only(item=item, study=study) for item in only]
+    return [
+        run
+        for run in runs
+        if (not grids or run.grid in grids)
+        and all(
+            axis not in run.values or run.values[axis] in value_names
+            for axis, value_names in parsed
+        )
+    ]
+
+
+def _parse_only(*, item: str, study: Study) -> tuple[str, tuple[str, ...]]:
+    """One ``AXIS=V1,V2`` item, checked against the study's grids."""
+    axis, separator, values = item.partition('=')
+    if not separator or not axis or not values:
+        message = (
+            f'only item {item!r} is malformed; items are an axis name as AXIS=V1,V2, '
+            'where every V names a value of that axis'
+        )
+        raise ValueError(message)
+    value_names = tuple(values.split(','))
+    axis_grids = [grid for grid in study.grids.values() if axis in grid.axes]
+    if not axis_grids:
+        message = f'axis {axis!r} is not an axis of any grid of this study'
+        raise ValueError(message)
+    known = {name for grid in axis_grids for name in grid.axes[axis]}
+    unknown = [name for name in value_names if name not in known]
+    if unknown:
+        message = f'axis {axis!r} has no value {", ".join(unknown)!r} in any grid'
+        raise ValueError(message)
+    return axis, value_names
 
 
 def _grid_settings_problems(*, grid_name: str, grid: Grid) -> None:
