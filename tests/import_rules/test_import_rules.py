@@ -66,6 +66,17 @@ FORBIDDEN_IN_TS = (
     'tslab.adapters',
     'tslab.lightning',
 )
+TRACKER_SDKS = ('wandb', 'mlflow', 'tensorboard')
+FORBIDDEN_IN_MODELS_ADAPTER = (
+    'chronocratic.datasets',
+    'tslab.adapters.chronocratic_datasets',
+    *TRACKER_SDKS,
+)
+FORBIDDEN_IN_DATASETS_ADAPTER = (
+    'chronocratic.models',
+    'tslab.adapters.chronocratic_models',
+    *TRACKER_SDKS,
+)
 
 
 def loaded_by(*, module: str) -> set[str]:
@@ -107,3 +118,19 @@ def test_probes_load_scikit_learn_and_nothing_else_optional() -> None:
 @pytest.mark.slow
 def test_time_series_layer_loads_neither_lightning_nor_scikit_learn() -> None:
     assert offending(loaded=loaded_by(module='tslab.ts'), forbidden=FORBIDDEN_IN_TS) == []
+
+
+@pytest.mark.slow
+@pytest.mark.chronocratic
+def test_models_adapter_loads_no_dataset_code() -> None:
+    loaded = loaded_by(module='tslab.adapters.chronocratic_models')
+    assert 'chronocratic.models' in loaded
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_MODELS_ADAPTER) == []
+
+
+@pytest.mark.slow
+@pytest.mark.chronocratic
+def test_datasets_adapter_loads_no_model_code() -> None:
+    loaded = loaded_by(module='tslab.adapters.chronocratic_datasets')
+    assert 'chronocratic.datasets' in loaded
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_DATASETS_ADAPTER) == []
