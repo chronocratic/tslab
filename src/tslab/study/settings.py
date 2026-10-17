@@ -6,17 +6,17 @@ into the flags tyro reads back into the same config; the round trip
 settings to flags to ``tslab.parse_config`` is pinned by tests.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import dataclasses
-from dataclasses import MISSING
+from dataclasses import Field, fields, MISSING
 from enum import Enum
 from pathlib import Path
 import types
 from typing import Annotated, Any, cast, get_args, get_origin, get_type_hints, Union
 
-from tslab.core.config import union_choices
+from tslab.core.config import REQUIRED, union_choices
 
-__all__ = ['SettingValue', 'Settings', 'field_annotation', 'settings_to_args']
+__all__ = ['SettingValue', 'Settings', 'field_annotation', 'from_presets', 'settings_to_args']
 
 type SettingValue = (
     str
@@ -200,3 +200,129 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
             flags += _value_args(value=value, path=path)
     words.sort(key=lambda word: word.count('.'))
     return words + flags
+
+
+def from_presets(
+    presets: Mapping[str, tuple[str, object]],
+    *,
+    names: Sequence[str] | None = None,
+    without: Sequence[str],
+) -> dict[str, dict[str, SettingValue]]:
+    """Turn presets of the script into settings, one mapping per preset.
+
+    A preset gives, for every choice union field, its chosen member's name,
+    and for every other field, its value only where it differs from the
+    field's default in the chosen class, plus every field that has no
+    default. Fields holding ``tslab.REQUIRED`` are skipped: the study must
+    supply them on an axis. Every path under a path named in ``without`` is
+    dropped too.
+
+    Args:
+        presets: The script's preset registry, ``{name: (description, config)}``.
+        names: Which presets to read, in this order; ``None`` reads all of
+            them in registry order.
+        without: Field paths to drop, e.g. ``('data',)``: the path and every
+            path below it. Required, with no default.
+
+    Returns:
+        ``{preset name: settings}`` in the order of ``names``.
+
+    Raises:
+        ValueError: If a name in ``names`` is not in ``presets``.
+        TypeError: If a preset holds a leaf value settings cannot hold, or a
+            choice union field holds a non-member.
+    """
+    if names is None:
+        selected = list(presets)
+    else:
+        unknown = [name for name in names if name not in presets]
+        if unknown:
+            message = f'unknown preset names {unknown}; known: {sorted(presets)}'
+            raise ValueError(message)
+        selected = list(names)
+    result: dict[str, dict[str, SettingValue]] = {}
+    for name in selected:
+        _, config = presets[name]
+        settings: dict[str, SettingValue] = {}
+        _preset_settings(config=config, prefix='', preset_name=name, out=settings)
+        result[name] = {
+            path: value
+            for path, value in settings.items()
+            if not any(path == drop or path.startswith(f'{drop}.') for drop in without)
+        }
+    return result
+
+
+_NO_DEFAULT = object()
+
+
+def _field_default(*, field: Field[Any]) -> object:
+    if field.default is not MISSING:
+        return field.default
+    if field.default_factory is not MISSING:
+        return field.default_factory()
+    return _NO_DEFAULT
+
+
+def _is_setting_value(*, value: object) -> bool:
+    if value is None or isinstance(value, str | int | float | bool | Path | Enum):
+        return True
+    if isinstance(value, tuple | list):
+        return all(_is_setting_value(value=item) for item in value)
+    return False
+
+
+def _preset_leaf(
+    *, item: object, path: str, preset_name: str, default: object, out: dict[str, SettingValue]
+) -> None:
+    if item is REQUIRED:
+        return
+    if default is not _NO_DEFAULT and item == default:
+        return
+    if not _is_setting_value(value=item):
+        message = (
+            f'preset {preset_name}: {path} holds a value of type '
+            f'{type(item).__qualname__} that settings cannot hold'
+        )
+        raise TypeError(message)
+    out[path] = cast('SettingValue', item)
+
+
+def _preset_settings(
+    *, config: object, prefix: str, preset_name: str, out: dict[str, SettingValue]
+) -> None:
+    if not dataclasses.is_dataclass(config) or isinstance(config, type):
+        message = f'preset {preset_name} holds a non-dataclass at {prefix or "the top level"}'
+        raise TypeError(message)
+    cls = type(config)
+    hints = get_type_hints(cls, include_extras=True)
+    for field in fields(cls):
+        if not field.init:
+            continue
+        path = f'{prefix}.{field.name}' if prefix else field.name
+        item = getattr(config, field.name)
+        choices = union_choices(annotation=hints[field.name])
+        if choices is not None:
+            choice_name = next(
+                (
+                    member_name
+                    for member_name, member_cls in choices.items()
+                    if type(item) is member_cls
+                ),
+                None,
+            )
+            if choice_name is None:
+                message = (
+                    f'preset {preset_name}: {path} holds {type(item).__qualname__}, '
+                    f'which is not a member of the choice'
+                )
+                raise TypeError(message)
+            out[path] = choice_name
+            _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
+            continue
+        default = _field_default(field=field)
+        if dataclasses.is_dataclass(item) and not isinstance(item, type):
+            if default is _NO_DEFAULT or item != default:
+                _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
+            continue
+        _preset_leaf(item=item, path=path, preset_name=preset_name, default=default, out=out)
