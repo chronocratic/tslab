@@ -18,6 +18,7 @@ import functools
 import inspect
 import operator
 import re
+import sys
 import typing
 from typing import Annotated, Any
 
@@ -187,7 +188,7 @@ def _settings_class(*, entry: ModelEntry, recipes: Sequence[type]) -> type:
             fields.append(('sequence_length', int | None, dataclasses.field(default=None)))
             continue
         fields.append((field.name, hints[field.name], _copied_default(field=field)))
-    return dataclasses.make_dataclass(
+    settings_class = dataclasses.make_dataclass(
         cls_name=f'{entry.model_class.__name__}Settings',
         fields=fields,
         namespace={_MODEL_ATTRIBUTE: entry.name, '__doc__': entry.parameters_class.__doc__},
@@ -195,6 +196,9 @@ def _settings_class(*, entry: ModelEntry, recipes: Sequence[type]) -> type:
         kw_only=True,
         module=__name__,
     )
+    # Pickle finds classes by module and name.
+    setattr(sys.modules[__name__], settings_class.__name__, settings_class)
+    return settings_class
 
 
 # why: the union is built at run time; Any lets it serve as a field annotation

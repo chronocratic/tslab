@@ -1,6 +1,7 @@
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
+import pickle
 import typing
 from typing import Any
 
@@ -130,6 +131,16 @@ def test_generated_classes_live_in_the_adapter_module() -> None:
     for settings_class in settings_classes(choice=ModelChoice).values():
         assert settings_class.__module__ == 'tslab.adapters.chronocratic_models.settings'
         assert settings_class.__name__.endswith('Settings')
+
+
+def test_settings_classes_pickle_round_trip() -> None:
+    # why: pickle checks the class against the module attribute, so pickling the
+    # latest generation (each call regenerates the classes) is what round-trips
+    for settings_class in settings_classes(choice=chronocratic_model_choice()).values():
+        instance = settings_class()
+        reloaded = pickle.loads(pickle.dumps(instance))  # noqa: S301
+        assert type(reloaded) is settings_class
+        assert dataclasses.asdict(reloaded) == dataclasses.asdict(instance), settings_class.__name__
 
 
 def test_recipe_subcommand_names() -> None:
