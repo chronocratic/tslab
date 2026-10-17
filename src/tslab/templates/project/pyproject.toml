@@ -1,0 +1,61 @@
+[project]
+name = "{{project_name}}"
+version = "0.1.0"
+description = "Experiments built with TSLab."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["tslab[chronocratic-models,chronocratic-datasets]>=0.1.0a1,<0.2"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/{{package_name}}"]
+
+[dependency-groups]
+dev = ["pytest>=8.2", "ruff>=0.17", "ty>=0.0.88"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # Conflicts with the formatter.
+    "CPY001", # No license header in every file.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",    # pytest checks with plain assert.
+    "D100",    # Test names say what they check.
+    "D103",
+    "INP001",  # tests/ is not a package.
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+combine-as-imports = true
+force-sort-within-sections = true
+order-by-type = false
+
+[tool.ruff.format]
+quote-style = "single"
+skip-magic-trailing-comma = true
+
+[tool.ty.environment]
+python-version = "3.12"

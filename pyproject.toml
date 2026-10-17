@@ -94,7 +94,8 @@ error-on-warning = true
 
 [tool.ty.src]
 # Case files contain deliberate type errors; tests/typing/test_typing.py checks them one by one.
-exclude = ["tests/typing/cases"]
+# Template files hold {{placeholders}}; tests/template checks a generated project instead.
+exclude = ["tests/typing/cases", "src/tslab/templates"]
 
 [tool.towncrier]
 directory = "changelog.d"

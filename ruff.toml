@@ -3,7 +3,8 @@
 line-length = 100
 target-version = "py312"
 # Typing case files contain deliberate errors and are checked by tests/typing/test_typing.py.
-extend-exclude = ["planning", "tests/typing/cases"]
+# Template files hold {{placeholders}}; tests/template checks a generated project instead.
+extend-exclude = ["planning", "tests/typing/cases", "src/tslab/templates"]
 
 [lint]
 select = ["ALL"]
