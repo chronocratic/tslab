@@ -46,7 +46,7 @@ def test_killed_training_resumes_deterministically(tmp_path: Path) -> None:
     # from an uninterrupted run. Weights and optimizer state ARE restored bit-identically
     # at the resume point; what this test pins is that two identical kill+resume cycles
     # end bit-identical. If bit-identical resume is required, seed the per-epoch shuffle
-    # from the epoch number instead (see the M4 carry-forward in the plan ledger).
+    # from the epoch number instead.
     first = killed_resume_cycle(root=tmp_path / 'a')
     second = killed_resume_cycle(root=tmp_path / 'b')
     assert first.keys() == second.keys()
