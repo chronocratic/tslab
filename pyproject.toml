@@ -80,9 +80,10 @@ packages = ["src/tslab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+# Slow tests are skipped by default; `pytest -m ""` runs everything.
+addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
-    "slow: long-running tests (subprocess kills, template creation); still run in CI",
+    "slow: long-running tests (real training, subprocess kills, template creation); skipped by default, run in CI on PRs into main",
     "chronocratic: needs the chronocratic-models and chronocratic-datasets extras",
 ]
 

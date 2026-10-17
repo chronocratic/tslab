@@ -28,7 +28,9 @@ uv run sphinx-build -W --keep-going docs docs/_build/html
 
 Test markers:
 
-- `slow`: long-running tests (subprocess kills, template creation). They run in CI.
+- `slow`: long-running tests (real training, subprocess kills, template creation).
+  Skipped by default; `uv run pytest -m ""` runs everything. CI runs them only on PRs into `main`
+  and on manual runs (`workflow_dispatch`).
 - `chronocratic`: tests that need the `chronocratic-models` and
   `chronocratic-datasets` extras. `uv run pytest -m "not chronocratic"` skips them.
 
