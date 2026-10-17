@@ -9,10 +9,11 @@ import fails at once, with the problem named.
 from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
+from itertools import product
 import re
 from types import MappingProxyType
 
-from tslab.study.settings import Settings, SettingValue
+from tslab.study.settings import check_paths, Settings, SettingValue
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
@@ -162,6 +163,10 @@ class Study:
                 )
                 raise ValueError(message)
             short_names[grid.short_name] = grid_name
+            _grid_settings_problems(grid_name=grid_name, grid=grid)
+        if not any(_grid_has_runs(grid_name=name, grid=grid) for name, grid in self.grids.items()):
+            message = 'study has no runs; every run is excluded'
+            raise ValueError(message)
 
 
 def normalize_match(*, match: Match) -> dict[str, tuple[str, ...]]:
@@ -244,3 +249,129 @@ def run_matches(*, grid_name: str, values: Mapping[str, str], match: Match) -> b
         if key != 'grid' and values.get(key) not in value_names:
             return False
     return True
+
+
+@dataclass(frozen=True, kw_only=True)
+class StudyRun:
+    """One run of a grid: its axis values, run path and merged settings."""
+
+    grid: str
+    values: Mapping[str, str]
+    run_path: str
+    settings: Mapping[str, SettingValue]
+
+
+def merge_overrides(
+    *,
+    base: Mapping[str, SettingValue],
+    overrides: Sequence[tuple[Match, Settings]],
+    grid_name: str,
+    values: Mapping[str, str],
+) -> dict[str, SettingValue]:
+    """Apply every matching override to ``base``, in precedence order.
+
+    Overrides are applied by number of match keys, then position: an override
+    with more match keys wins over one with fewer, and between equal ones the
+    later is applied last.
+
+    Args:
+        base: The settings to apply the overrides to.
+        overrides: Pairs of match and settings.
+        grid_name: The grid the run belongs to.
+        values: The run's axis name to value name.
+
+    Returns:
+        The base settings with the matching overrides applied in order.
+    """
+    result = dict(base)
+    matching = [
+        position
+        for position, (match, _) in enumerate(overrides)
+        if run_matches(grid_name=grid_name, values=values, match=match)
+    ]
+    matching.sort(key=lambda position: len(overrides[position][0]))
+    for position in matching:
+        result.update(overrides[position][1])
+    return result
+
+
+def expand_runs(*, study: Study) -> list[StudyRun]:
+    """Expand a study into its runs, grids in order and axes in order.
+
+    Per grid the runs are the product of its axes; excluded runs are dropped.
+
+    Args:
+        study: The study to expand.
+
+    Returns:
+        The runs, one per point of every grid's axis product that is not
+        excluded, in grid order and then axis order.
+    """
+    runs: list[StudyRun] = []
+    for grid_name, grid in study.grids.items():
+        axis_names = list(grid.axes)
+        for combo in product(*(grid.axes[name] for name in axis_names)):
+            values = dict(zip(axis_names, combo, strict=True))
+            if any(
+                run_matches(grid_name=grid_name, values=values, match=match)
+                for match in grid.exclude
+            ):
+                continue
+            settings: dict[str, SettingValue] = {}
+            for name in axis_names:
+                settings.update(grid.axes[name][values[name]])
+            settings.update(grid.run_settings)
+            settings = merge_overrides(
+                base=settings,
+                overrides=[(override.match, override.settings) for override in grid.overrides],
+                grid_name=grid_name,
+                values=values,
+            )
+            runs.append(
+                StudyRun(
+                    grid=grid_name,
+                    values=values,
+                    run_path='/'.join([grid_name, *values.values()]),
+                    settings=settings,
+                )
+            )
+    return runs
+
+
+def _grid_settings_problems(*, grid_name: str, grid: Grid) -> None:
+    """Name the grid, the axis and value, or run_settings or override N, for each bad path."""
+    for axis_name, values in grid.axes.items():
+        for value_name, settings in values.items():
+            bad = check_paths(config_class=grid.config, settings=settings)
+            if bad:
+                message = (
+                    f'grid {grid_name!r}: axis {axis_name!r} value {value_name!r} '
+                    f'sets paths that are not fields of {grid.config.__name__}: {", ".join(bad)}'
+                )
+                raise ValueError(message)
+    bad = check_paths(config_class=grid.config, settings=grid.run_settings)
+    if bad:
+        message = (
+            f'grid {grid_name!r}: run_settings set paths that are not fields '
+            f'of {grid.config.__name__}: {", ".join(bad)}'
+        )
+        raise ValueError(message)
+    for position, override in enumerate(grid.overrides):
+        bad = check_paths(config_class=grid.config, settings=override.settings)
+        if bad:
+            message = (
+                f'grid {grid_name!r}: override {position} sets paths that are not fields '
+                f'of {grid.config.__name__}: {", ".join(bad)}'
+            )
+            raise ValueError(message)
+
+
+def _grid_has_runs(*, grid_name: str, grid: Grid) -> bool:
+    for combo in product(*(grid.axes[name] for name in grid.axes)):
+        values = dict(zip(grid.axes, combo, strict=True))
+        excluded = any(
+            run_matches(grid_name=grid_name, values=values, match=match) for match in grid.exclude
+        )
+        if not excluded:
+            return True
+    return False
