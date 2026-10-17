@@ -27,8 +27,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - name: Install
-        # ty needs every optional library to resolve the adapters' imports.
-        run: uv sync --locked --all-extras
+        # The tracker extras are needed by the tracking tests; chronocratic has its own job.
+        run: uv sync --locked --extra wandb --extra mlflow --extra tensorboard
       - name: Lint
         run: uv run ruff check .
       - name: Format
@@ -39,6 +39,7 @@ jobs:
         run: uv run pytest -m "not chronocratic"
 
   chronocratic:
+    # Adapter tests, examples/advanced and the generated-project test.
     name: chronocratic adapters (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
@@ -47,6 +48,8 @@ jobs:
         python-version: ['3.12', '3.13']
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v10
         with:
           python-version: ${{ matrix.python-version }}
@@ -55,3 +58,20 @@ jobs:
         run: uv sync --locked --all-extras
       - name: Tests
         run: uv run pytest -m chronocratic
+
+  docs:
+    # Same build as Read the Docs; warnings fail it.
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install
+        run: uv sync --locked --all-extras --group docs
+      - name: Build
+        run: uv run sphinx-build -W --keep-going docs docs/_build/html

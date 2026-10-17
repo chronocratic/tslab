@@ -1,0 +1,61 @@
+name: Protected Files Check
+
+# Comments on pull requests that change project-wide configuration, so that a
+# maintainer reviews those changes on purpose. One comment per file, kept in
+# sync with the current diff. No code from the pull request is checked out.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+    paths:
+      - pyproject.toml
+      - ruff.toml
+      - uv.lock
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment on protected files
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const protectedFiles = {
+              'pyproject.toml': 'dependencies, build settings and project metadata',
+              'ruff.toml': 'lint and format rules',
+              'uv.lock': 'the exact dependency versions CI and contributors install',
+            };
+            const request = { owner: context.repo.owner, repo: context.repo.repo };
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              ...request, pull_number: context.issue.number,
+            });
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...request, issue_number: context.issue.number,
+            });
+            const policy = `https://github.com/${context.repo.owner}/${context.repo.repo}` +
+              `/blob/${context.payload.pull_request.base.ref}/CONTRIBUTING.md#protected-files`;
+
+            for (const [name, purpose] of Object.entries(protectedFiles)) {
+              const marker = `<!-- protected-files-check:${name} -->`;
+              const changed = files.find(f => f.filename === name);
+              const existing = comments.find(c => c.body.includes(marker));
+              let body;
+              if (changed) {
+                body = `${marker}\n⚠️ This pull request changes \`${name}\` (${changed.status}), ` +
+                  `which holds ${purpose} for everyone. A maintainer should review it on ` +
+                  `purpose; see [Protected files](${policy}).`;
+              } else if (existing) {
+                body = `${marker}\n✅ \`${name}\` is no longer changed by this pull request.`;
+              } else {
+                continue;
+              }
+              if (existing) {
+                await github.rest.issues.updateComment({ ...request, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment({
+                  ...request, issue_number: context.issue.number, body,
+                });
+              }
+            }
