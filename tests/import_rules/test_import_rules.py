@@ -20,6 +20,7 @@ CORE_MODULES = (
     'tslab.run',
     'tslab.seeding',
     'tslab.stage',
+    'tslab.stages',
     'tslab.status',
     'tslab.tracking',
 )
@@ -42,6 +43,28 @@ FORBIDDEN_IN_LIGHTNING = (
     'chronocratic',
     'tslab.adapters',
     'tslab.ts',
+)
+FORBIDDEN_IN_PROBES = (
+    'lightning',
+    'pytorch_lightning',
+    'wandb',
+    'mlflow',
+    'tensorboard',
+    'chronocratic',
+    'tslab.adapters',
+    'tslab.lightning',
+    'tslab.ts',
+)
+FORBIDDEN_IN_TS = (
+    'lightning',
+    'pytorch_lightning',
+    'sklearn',
+    'wandb',
+    'mlflow',
+    'tensorboard',
+    'chronocratic',
+    'tslab.adapters',
+    'tslab.lightning',
 )
 
 
@@ -72,3 +95,15 @@ def test_lightning_package_loads_no_tracker_sdk_or_time_series_layer() -> None:
     loaded = loaded_by(module='tslab.lightning')
     assert 'lightning' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_LIGHTNING) == []
+
+
+@pytest.mark.slow
+def test_probes_load_scikit_learn_and_nothing_else_optional() -> None:
+    loaded = loaded_by(module='tslab.probes')
+    assert 'sklearn' in loaded
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_PROBES) == []
+
+
+@pytest.mark.slow
+def test_time_series_layer_loads_neither_lightning_nor_scikit_learn() -> None:
+    assert offending(loaded=loaded_by(module='tslab.ts'), forbidden=FORBIDDEN_IN_TS) == []
