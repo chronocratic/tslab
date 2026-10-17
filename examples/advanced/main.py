@@ -52,7 +52,7 @@ from tslab.adapters.chronocratic_models import (
 )
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe
-from tslab.ts import forecasting_representations
+from tslab.tasks import forecasting_representations
 
 TOY_HOURLY = Path(__file__).parents[2] / 'tests' / 'adapters' / 'data' / 'toy_hourly.csv.gz'
 TASK = 'forecasting'

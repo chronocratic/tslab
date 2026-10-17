@@ -24,7 +24,7 @@ class LightningDataSource[I]:
 
         Args:
             datamodule: The datamodule providing the loaders.
-            info: Facts about the dataset (for example ``tslab.ts.TSDataInfo``).
+            info: Facts about the dataset (for example ``tslab.tasks.TSDataInfo``).
         """
         self._datamodule = datamodule
         self._info = info

@@ -11,7 +11,7 @@ from stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEnc
 import torch
 
 import tslab
-from tslab.ts import forecasting_representations, horizon_targets, window_samples
+from tslab.tasks import forecasting_representations, horizon_targets, window_samples
 
 SLICES = {'train': slice(0, 24), 'val': slice(24, 32), 'test': slice(32, 40)}
 

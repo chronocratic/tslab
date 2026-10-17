@@ -11,7 +11,7 @@ import torch
 from tslab.core.artifact import Checkpoint
 from tslab.core.run import Run, RunOptions
 from tslab.interfaces import Batch, Split, Trainer
-from tslab.ts import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
 @dataclass(frozen=True)

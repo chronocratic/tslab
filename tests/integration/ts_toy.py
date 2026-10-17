@@ -1,4 +1,4 @@
-"""Tiny time-series models and datasets for the end-to-end tests (CPU, seconds)."""
+"""Tiny time series models and datasets for the end-to-end tests (CPU, seconds)."""
 
 from collections.abc import Iterable, Mapping
 import math
@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from tslab.interfaces import Batch, Split
-from tslab.ts import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
 class ToyVectorModel(LightningModule):

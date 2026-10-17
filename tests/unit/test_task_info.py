@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from tslab.interfaces import Split
-from tslab.ts import (
+from tslab.tasks import (
     checked_split_slices,
     TSClassificationDataInfo,
     TSDataInfo,

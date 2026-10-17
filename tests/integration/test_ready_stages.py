@@ -12,7 +12,7 @@ import tslab
 from tslab.core.status import InstanceState
 from tslab.lightning import LightningTrainer
 from tslab.probes import RidgeProbe, SVMProbe
-from tslab.ts import forecasting_representations
+from tslab.tasks import forecasting_representations
 
 ENCODER = tslab.ModelAsEncoder(device='cpu')
 

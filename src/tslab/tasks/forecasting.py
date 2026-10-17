@@ -1,4 +1,4 @@
-"""TS2Vec forecasting protocol as stages.
+"""The forecasting task: dataset facts and the TS2Vec protocol as stages.
 
 Encoders with per-timestep output (``SequenceEncoder``) encode each full
 series once; every horizon is then cut out of that encoding. Other encoders
@@ -7,7 +7,9 @@ encode sliding windows, once per horizon. Both paths produce the keys of
 ``tslab.probes.RidgeProbe`` evaluates the result.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Protocol
 
 import torch
 
@@ -15,11 +17,14 @@ from tslab.core.artifact import Checkpoint, Tensors
 from tslab.core.paths import InstanceName, normalize_instance_name
 from tslab.core.run import Run
 from tslab.core.stage import stage
-from tslab.interfaces import Encoder, SequenceEncoder, SPLITS, Trainer
+from tslab.interfaces import Encoder, SequenceEncoder, Split, SPLITS, Trainer
 from tslab.stages import check_representations
-from tslab.ts.info import checked_split_slices, ForecastingSeries
+from tslab.tasks.data import TSDataInfo
 
 __all__ = [
+    'ForecastingSeries',
+    'TSForecastingDataInfo',
+    'checked_split_slices',
     'encode_series',
     'encode_windows',
     'forecasting_representations',
@@ -27,6 +32,92 @@ __all__ = [
     'horizon_targets',
     'window_samples',
 ]
+
+
+@dataclass(frozen=True)
+class TSForecastingDataInfo(TSDataInfo):
+    """Facts about a forecasting dataset.
+
+    Attributes:
+        target_channels: Channels to forecast.
+        covariate_channels: Channels that are known inputs but never targets,
+            such as time features.
+    """
+
+    target_channels: tuple[int, ...]
+    covariate_channels: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Check the channel lists against each other and ``num_channels``.
+
+        Raises:
+            ValueError: If there is no target channel, an index is out of range
+                or repeated, or a channel is both target and covariate.
+        """
+        if not self.target_channels:
+            message = 'a forecasting dataset needs at least one target channel'
+            raise ValueError(message)
+        channels = (*self.target_channels, *self.covariate_channels)
+        outside = [channel for channel in channels if not 0 <= channel < self.num_channels]
+        if outside:
+            message = f'channels {outside} are outside range({self.num_channels})'
+            raise ValueError(message)
+        if len(set(self.target_channels)) != len(self.target_channels) or len(
+            set(self.covariate_channels)
+        ) != len(self.covariate_channels):
+            message = 'target_channels and covariate_channels must not contain duplicates'
+            raise ValueError(message)
+        both = sorted(set(self.target_channels) & set(self.covariate_channels))
+        if both:
+            message = f'channels {both} are both target and covariate'
+            raise ValueError(message)
+
+
+class ForecastingSeries(Protocol):
+    """A forecasting dataset as one long series plus the split boundaries.
+
+    The TS2Vec forecasting protocol encodes the whole series once, so later
+    splits see earlier steps as context; it then cuts each split out of the
+    result.
+    """
+
+    @property
+    def info(self) -> TSForecastingDataInfo:
+        """Return facts about the dataset."""
+        ...
+
+    def full_series(self) -> torch.Tensor:
+        """Return every series in full, shape ``(N, T, C)``, covariates included."""
+        ...
+
+    def split_slices(self) -> Mapping[Split, slice]:
+        """Return the timestep range of each split, keyed ``train``, ``val``, ``test``."""
+        ...
+
+
+def checked_split_slices(*, data: ForecastingSeries) -> dict[Split, slice]:
+    """Return the split slices of ``data`` after checking them.
+
+    Args:
+        data: The forecasting data source.
+
+    Returns:
+        The slices, keyed ``train``, ``val`` and ``test``.
+
+    Raises:
+        ValueError: If a split is missing or extra, or a slice has a step
+            other than 1.
+    """
+    slices = dict(data.split_slices())
+    if sorted(slices) != sorted(SPLITS):
+        message = f'split_slices() must have the keys {list(SPLITS)}, got {sorted(slices)}'
+        raise ValueError(message)
+    for split, window in slices.items():
+        if window.step not in {None, 1}:
+            message = f'the {split!r} slice has step {window.step}; only contiguous splits work'
+            raise ValueError(message)
+    return slices
+
 
 _SEQUENCE_DIMENSIONS = 3
 

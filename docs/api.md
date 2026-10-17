@@ -31,7 +31,7 @@ The names below are importable from `tslab`. The interfaces it re-exports
 ## Time series
 
 ```{eval-rst}
-.. automodule:: tslab.ts
+.. automodule:: tslab.tasks
    :members:
    :imported-members:
 ```

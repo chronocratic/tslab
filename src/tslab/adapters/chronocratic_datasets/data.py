@@ -15,7 +15,7 @@ import torch
 from tslab.adapters.chronocratic_datasets.settings import datamodule_class_of
 from tslab.interfaces import Split
 from tslab.lightning import LightningDataSource
-from tslab.ts import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 __all__ = [
     'ChronocraticClassificationData',

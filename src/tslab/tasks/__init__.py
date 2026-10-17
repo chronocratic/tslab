@@ -1,23 +1,20 @@
-"""The time-series layer: dataset facts and the forecasting protocol.
+"""The tasks package: dataset facts and the forecasting protocol.
 
 The core never imports this package.
 """
 
-from tslab.ts.forecasting import (
+from tslab.tasks.classification import TSClassificationDataInfo
+from tslab.tasks.data import TSDataInfo, TSDataSource
+from tslab.tasks.forecasting import (
+    checked_split_slices,
     encode_series,
     encode_windows,
     forecasting_representations,
+    ForecastingSeries,
     horizon_samples,
     horizon_targets,
-    window_samples,
-)
-from tslab.ts.info import (
-    checked_split_slices,
-    ForecastingSeries,
-    TSClassificationDataInfo,
-    TSDataInfo,
-    TSDataSource,
     TSForecastingDataInfo,
+    window_samples,
 )
 
 __all__ = [
