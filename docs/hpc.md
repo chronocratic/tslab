@@ -1,0 +1,37 @@
+# HPC and SLURM
+
+## Time limits
+
+`LightningTrainer` stops training in time to save a checkpoint:
+
+- `--trainer.max-training-time 23:30:00` caps training (sbatch formats:
+  `HH:MM`, `HH:MM:SS`, `D-HH:MM:SS`);
+- under SLURM, the remaining job time (`SLURM_JOB_END_TIME`) caps it as well:
+  training gets `--trainer.slurm-time-fraction` (default 0.5) of the time left,
+  so the stages after training can still run.
+
+Training stopped by the time limit is unfinished: submit the same command
+again and it resumes from its last checkpoint.
+
+## Resubmitting
+
+A job killed at its time limit leaves its lock behind. The lock carries a
+heartbeat refreshed every minute, so after ten minutes without one the next
+job takes the run over, on any node. `tslab status runs/` lists such runs as
+`interrupted`.
+
+## Many runs
+
+Give each run its own folder (`--run-path ts2vec/Coffee/seed_0`) and submit
+one job per run, for example as a SLURM array whose task index picks the model,
+dataset and seed. After the array:
+
+```bash
+uv run tslab status runs/            # one line per run: state and instance counts
+uv run tslab status runs/ --stage transform
+```
+
+## Distributed training
+
+Only rank 0 writes TSLab files; the other ranks read. Stages other than
+`train` run in one process.
