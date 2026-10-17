@@ -12,13 +12,13 @@ from pathlib import Path
 
 from chronocratic.datasets import ClassificationSplitMode
 import tslab
-from tslab.adapters.chronocratic_datasets import (
+from tslab.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
     data_settings,
 )
-from tslab.adapters.chronocratic_models import (
+from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
     chronocratic_model_choice,
     ChronocraticEncoder,

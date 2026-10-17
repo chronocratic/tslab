@@ -9,9 +9,9 @@ crop-and-shift views) from NumPy generators that no seed controls, so two
 trainings with the same seed can differ.
 """
 
-from tslab.adapters.chronocratic_models.build import build_chronocratic_model, FingerprintedModel
-from tslab.adapters.chronocratic_models.encoder import ChronocraticEncoder
-from tslab.adapters.chronocratic_models.settings import (
+from tslab.adapters.chronocratic.models.build import build_chronocratic_model, FingerprintedModel
+from tslab.adapters.chronocratic.models.encoder import ChronocraticEncoder
+from tslab.adapters.chronocratic.models.settings import (
     chronocratic_model_choice,
     ChronocraticModelChoice,
     DEFAULT_AUGMENTATION,

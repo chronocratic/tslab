@@ -12,7 +12,7 @@ from chronocratic.datasets import (
 import numpy as np
 import torch
 
-from tslab.adapters.chronocratic_datasets.settings import datamodule_class_of
+from tslab.adapters.chronocratic.datasets.settings import datamodule_class_of
 from tslab.interfaces import Split
 from tslab.lightning import LightningDataSource
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo

@@ -7,7 +7,7 @@ from typing import Any
 
 from lightning import LightningModule
 
-from tslab.adapters.chronocratic_models.settings import entry_of, ModelEntry, MODELS
+from tslab.adapters.chronocratic.models.settings import entry_of, ModelEntry, MODELS
 from tslab.tasks import TSDataInfo
 
 __all__ = ['FingerprintedModel', 'build_chronocratic_model']
@@ -89,9 +89,10 @@ def build_chronocratic_model(
 ) -> FingerprintedModel:
     """Build the chronocratic model that ``config`` describes.
 
-    ``input_dim`` is the data's channel count; an unset ``sequence_length``
-    is the data's length. chronocratic's parameter class is built first, so
-    its own checks run here. An augmentation recipe is called and its producer
+    ``input_dim`` comes from the channel count of the data; an unset
+    ``sequence_length`` takes the length of the data. The parameter class of
+    chronocratic is built first, so its own checks run here. An augmentation
+    recipe is called and its producer
     passed to the model.
 
     Args:

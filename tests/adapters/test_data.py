@@ -10,7 +10,7 @@ from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
 import torch
 
 import tslab
-from tslab.adapters.chronocratic_datasets import (
+from tslab.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     check_label_range,
     ChronocraticClassificationData,

@@ -7,7 +7,7 @@ import chronocratic.models
 import pytest
 from recipes import JitterThenScaleRecipe, RECIPE_CALLS
 
-from tslab.adapters.chronocratic_models import (
+from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
     chronocratic_model_choice,
     FingerprintedModel,
@@ -41,7 +41,7 @@ def test_every_model_builds_as_its_chronocratic_class(name: str) -> None:
     assert isinstance(model, chronocratic_class)
     assert isinstance(model, FingerprintedModel)
     assert type(model).__name__ == chronocratic_class.__name__
-    assert type(model).__module__ == 'tslab.adapters.chronocratic_models.build'
+    assert type(model).__module__ == 'tslab.adapters.chronocratic.models.build'
 
 
 def test_runtime_fields_come_from_the_data() -> None:

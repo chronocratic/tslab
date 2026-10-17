@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 import torch
 
-from tslab.adapters.chronocratic_models import (
+from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,
