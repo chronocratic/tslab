@@ -1,10 +1,29 @@
 """``from_presets``: presets to settings, pinned by round trips."""
 
+from dataclasses import dataclass
+from typing import Annotated
+
 import pytest
+import tyro
 
 from study.configs import ClassifyConfig, PRESETS, UEASettings
 import tslab
+from tslab.core.config import union_choices
 from tslab.study import from_presets, settings_to_args
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Small:
+    size: int = 1
+
+
+@dataclass(frozen=True, kw_only=True)
+class _Optional:
+    choice: (
+        Annotated[_Small, tyro.conf.subcommand(name='small')]
+        | Annotated[None, tyro.conf.subcommand(name='default')]
+    ) = None
+    seed: int = 0
 
 
 def test_only_non_default_values() -> None:
@@ -60,3 +79,19 @@ def test_forgotten_required_field_fails_at_parse() -> None:
             config_class=ClassifyConfig,
             args=settings_to_args(config_class=ClassifyConfig, settings=recipe),
         )
+
+
+def test_union_choices_names_a_none_member() -> None:
+    choices = union_choices(annotation=_Optional.__dataclass_fields__['choice'].type)
+    assert choices == {'small': _Small, 'default': type(None)}
+
+
+def test_from_presets_keeps_a_none_choice_as_its_name() -> None:
+    presets = {
+        'kept': ('A model with the default augmentation', _Optional(choice=None, seed=3)),
+        'picked': ('A model with a recipe', _Optional(choice=_Small(size=2), seed=4)),
+    }
+    assert from_presets(presets, names=('kept', 'picked'), without=()) == {
+        'kept': {'choice': 'default', 'seed': 3},
+        'picked': {'choice': 'small', 'choice.size': 2, 'seed': 4},
+    }

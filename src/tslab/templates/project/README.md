@@ -38,6 +38,26 @@ uv run python -m {{package_name}}.classify no-preset model:tstcc data:ucr --help
 Add your own presets to `PRESETS`; `model_settings(...)` and `data_settings(...)`
 build the settings by name.
 
+## Run a study
+
+A study runs one command of a script over a product of axes (see
+`src/{{package_name}}/studies.py` for the example), on a machine profile in
+`machines/`:
+
+```bash
+uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml --dry-run
+uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml
+uv run tslab study status {{package_name}}.studies:example --machine machines/local.toml
+uv run tslab study resubmit {{package_name}}.studies:example --machine machines/local.toml
+uv run tslab study results {{package_name}}.studies:example --machine machines/local.toml --out results.csv
+```
+
+`--grid classification --only seed=0` keeps a slice of the runs; arguments
+after `--` go to every run. Slurm: copy `machines/slurm.example.toml` to
+`machines/cluster.toml` and fill in your cluster's values. The full guide:
+the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
+TSLab docs.
+
 ## Rerun and check
 
 ```bash

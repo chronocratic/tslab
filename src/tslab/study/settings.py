@@ -325,7 +325,8 @@ def _preset_settings(
                 )
                 raise TypeError(message)
             out[path] = choice_name
-            _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
+            if item is not None:
+                _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
             continue
         default = _field_default(field=field)
         if dataclasses.is_dataclass(item) and not isinstance(item, type):

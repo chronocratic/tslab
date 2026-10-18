@@ -1,11 +1,13 @@
 """Run both scripts on the toy data with one training batch, so a broken setup shows in a minute."""
 
 import dataclasses
+import json
 from pathlib import Path
 
 import pytest
 import tslab
 from tslab.adapters.chronocratic.models import ChronocraticEncoder
+from tslab.cli import main as tslab_main
 from tslab.core.status import read_status
 from tslab.lightning import LightningTrainerConfig
 
@@ -58,6 +60,63 @@ def test_classify(project: Path, args: tuple[str, ...]) -> None:
     assert snapshot is not None
     states = {record.state for record in snapshot.instances.values()}
     assert states == {tslab.InstanceState.DONE}
+
+
+def test_example_study_runs_one_run_locally() -> None:
+    """The example study submits and runs one slice locally, through the CLI.
+
+    Runs from the project root (where ``uv run pytest`` is meant to run), so
+    the study's ``uv run`` command finds the venv; ``machines/local.toml`` and
+    ``data/`` come from the project, as in the README flow.
+    """
+    root = Path.cwd()
+    toy_data.main(directory=root / 'data')
+    # one epoch of the toy data is a single batch, so a CPU run stays short
+    extra = [
+        '--trainer.max-epochs',
+        '1',
+        '--trainer.min-epochs',
+        '0',
+        '--trainer.accelerator',
+        'cpu',
+        '--trainer.devices',
+        '1',
+        '--encoder.device',
+        'cpu',
+    ]
+    with pytest.raises(SystemExit) as raised:
+        tslab_main(
+            args=[
+                'study',
+                'submit',
+                '{{package_name}}.studies:example',
+                '--machine',
+                'machines/local.toml',
+                '--grid',
+                'classification',
+                '--only',
+                'seed=0',
+                '--',
+                *extra,
+            ]
+        )
+    assert raised.value.code == 0
+    with pytest.raises(SystemExit) as raised:
+        tslab_main(
+            args=['study', 'status', '{{package_name}}.studies:example', '--machine', 'machines/local.toml']
+        )
+    assert raised.value.code == 0
+    status_file = (
+        root
+        / 'runs'
+        / 'example'
+        / 'classification'
+        / 'ts2vec-archive-split'
+        / 'ToySpectra'
+        / '0'
+        / 'status.json'
+    )
+    assert json.loads(status_file.read_text(encoding='utf-8'))['run_state'] == 'finished'
 
 
 @pytest.mark.parametrize('args', [*([name] for name in forecast.PRESETS), FORECAST_NO_PRESET])

@@ -1,0 +1,47 @@
+# Example SLURM machine profile.
+#
+# Copy this file to machines/cluster.toml, fill in the cluster's values
+# (partition, limits, paths) and commit that file. Nothing here is
+# cluster-specific except what says CHANGE_ME.
+launcher = "slurm"
+output_root = "${SCRATCH}/runs"
+tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
+
+[settings] # the same settings as the study's grids, for every run on this machine
+# "tracking.wandb_mode" = "offline"
+# "tracking.shell_log_path" = "{log_file}"
+
+[env] # exported in every job; ${VAR} in other strings resolves against these
+SCRATCH = "/scratch/CHANGE_ME"
+# UCR_ROOT = "${SCRATCH}/data/UCR"
+
+[slurm]
+partition = "CHANGE_ME"
+qos = "normal"
+time = "2-00:00:00"
+cpus_per_task = 2
+mem_per_cpu = "16G"
+gpus = 0
+max_concurrent = 100 # the %N of --array
+max_array_size = 1000 # array indices stay below the cluster's MaxArraySize
+sbatch_extra = [] # raw lines, e.g. ["--exclude=login02"]
+node_local_tmp = true # put TMPDIR and the W&B folders on node-local scratch
+submit_pause_seconds = 0.5
+
+[followup] # the small helper jobs TSLab submits for a study
+auto_retry = false
+max_attempts = 3
+wandb_sync = false
+time = "00:30:00"
+
+[[overrides]] # the crop-128 recipe trains slower: give it more time
+match = { recipe = "cost-crop-128" }
+slurm = { time = "5-00:00:00" }
+
+[[overrides]] # both recipes of the classification grid get the long time
+match = { grid = "classification" }
+slurm = { time = "4-00:00:00" }
+
+[[overrides]] # the forecasting grid trains on the whole series: more memory
+match = { grid = "forecasting" }
+slurm = { time = "5-00:00:00", mem_per_cpu = "32G" }

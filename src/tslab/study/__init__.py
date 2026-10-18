@@ -73,7 +73,7 @@ from tslab.study.records import (
     TaskRecord,
 )
 from tslab.study.results import collect_results, METRICS_TYPE, ResultRow, write_results_csv
-from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
+from tslab.study.settings import check_paths, from_presets, SettingValue, Settings, settings_to_args
 from tslab.study.slurm import (
     array_spec,
     job_script,
@@ -122,6 +122,7 @@ __all__ = [
     'ResultRow',
     'RunReport',
     'Selection',
+    'SettingValue',
     'Settings',
     'SlurmError',
     'SlurmLauncher',
