@@ -4,8 +4,9 @@ A study turns every run into the flags of the user's own ``no-preset``
 command and hands them to a launcher; TSLab never runs experiment code.
 """
 
-from tslab.study.commands import (
+from tslab.study.commands import (  # noqa: I001
     Context,
+    context_for,
     load_context,
     parse_states,
     queue_followups,
@@ -71,6 +72,7 @@ from tslab.study.records import (
     take_progress,
     TaskRecord,
 )
+from tslab.study.results import collect_results, METRICS_TYPE, ResultRow, write_results_csv
 from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args
 from tslab.study.slurm import (
     array_spec,
@@ -92,8 +94,13 @@ from tslab.study.state import (
     StudyState,
 )
 
+# why: importing the results submodule sets ``tslab.study.results`` to the module,
+# so the function must be bound again, last
+from tslab.study.commands import results
+
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
+    'METRICS_TYPE',
     'QOS_LIMIT_MARKERS',
     'SUBMISSIONS_FORMAT_VERSION',
     'Context',
@@ -112,6 +119,7 @@ __all__ = [
     'PlannedTask',
     'ProgressSnapshot',
     'ResolvedRun',
+    'ResultRow',
     'RunReport',
     'Selection',
     'Settings',
@@ -126,7 +134,9 @@ __all__ = [
     'array_spec',
     'assign_indices',
     'check_paths',
+    'collect_results',
     'collect_states',
+    'context_for',
     'expand_placeholders',
     'expand_runs',
     'expand_setting',
@@ -151,6 +161,7 @@ __all__ = [
     'read_jobs',
     'resolve_runs',
     'resubmit',
+    'results',
     'run_arguments',
     'run_matches',
     'sbatch',
@@ -169,4 +180,5 @@ __all__ = [
     'validate_arguments',
     'validate_jobs',
     'write_job_files',
+    'write_results_csv',
 ]

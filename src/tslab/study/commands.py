@@ -32,6 +32,7 @@ from tslab.study.plan import (
     validate_jobs,
 )
 from tslab.study.records import append_job, JobRecord, latest_tasks, read_jobs, take_progress
+from tslab.study.results import collect_results, write_results_csv
 from tslab.study.slurm import (
     array_spec,
     job_script,
@@ -53,10 +54,12 @@ from tslab.study.state import (
 __all__ = [
     'Context',
     'Selection',
+    'context_for',
     'load_context',
     'parse_states',
     'queue_followups',
     'resubmit',
+    'results',
     'status',
     'submit',
     'submit_runs',
@@ -109,27 +112,31 @@ class Context:
     job_states_known: bool
 
 
-def load_context(
-    *, reference: str, machine_path: Path, selection: Selection, project_root: Path
+def context_for(
+    *,
+    study: Study,
+    machine_path: Path,
+    selection: Selection,
+    project_root: Path,
+    reference: str = '',
 ) -> Context:
-    """The study, machine, runs, job records and states of one command.
+    """The machine, runs, job records and states of one study.
 
     Args:
-        reference: The ``module:attribute`` reference of the study.
+        study: The study the context is for.
         machine_path: The machine profile file to load.
         selection: The grids and ``only`` matches to keep.
         project_root: The folder the command was called from; the jobs
             ``cd`` into it.
+        reference: The study reference, for messages and follow-up jobs;
+            ``''`` when the study was not loaded from one.
 
     Returns:
-        The context of the command.
+        The context of the study.
 
     Raises:
-        ValueError: If the reference is malformed or names no study, or a
-            grid or ``only`` match is unknown to the study.
         MachineProfileError: If the machine file does not hold a profile.
     """
-    study = load_study(reference=reference)
     machine = load_machine(path=machine_path)
     runs = select_runs(
         study=study, runs=expand_runs(study=study), grids=selection.grids, only=selection.only
@@ -161,6 +168,35 @@ def load_context(
         jobs=jobs,
         reports=reports,
         job_states_known=job_states_known,
+    )
+
+
+def load_context(
+    *, reference: str, machine_path: Path, selection: Selection, project_root: Path
+) -> Context:
+    """The context of a study loaded from a ``module:attribute`` reference.
+
+    Args:
+        reference: The ``module:attribute`` reference of the study.
+        machine_path: The machine profile file to load.
+        selection: The grids and ``only`` matches to keep.
+        project_root: The folder the command was called from; the jobs
+            ``cd`` into it.
+
+    Returns:
+        The context of the command.
+
+    Raises:
+        ValueError: If the reference is malformed or names no study.
+        MachineProfileError: If the machine file does not hold a profile.
+    """
+    study = load_study(reference=reference)
+    return context_for(
+        study=study,
+        machine_path=machine_path,
+        selection=selection,
+        project_root=project_root,
+        reference=reference,
     )
 
 
@@ -383,6 +419,25 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     )
     queue_followups(context=context, job_ids=[record.job_id for record in submitted], sleep=sleep)
     return code
+
+
+def results(*, context: Context, out: Path) -> int:
+    """Write the results table of the context's runs to ``out`` as CSV.
+
+    Args:
+        context: The context of the command.
+        out: The CSV file to write.
+
+    Returns:
+        ``0``.
+    """
+    rows = collect_results(
+        study=context.study,
+        study_directory=context.machine.output_root / context.study.name,
+        reports=context.reports,
+    )
+    write_results_csv(rows=rows, path=out)
+    return 0
 
 
 def _study_directory(context: Context) -> Path:
