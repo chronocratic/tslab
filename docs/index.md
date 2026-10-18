@@ -24,6 +24,7 @@ concepts
 resume-and-failures
 run-options
 configs-and-presets
+studies
 tracking
 hpc
 extending

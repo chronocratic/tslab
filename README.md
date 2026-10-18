@@ -66,7 +66,8 @@ The generated `README.md` explains the rest.
 ## Documentation
 
 [tslab.readthedocs.io](https://tslab.readthedocs.io): concepts, resuming and
-failures, configs and presets, tracking, HPC, extending TSLab, and the API.
+failures, configs and presets, studies and HPC, tracking, HPC, extending
+TSLab, and the API.
 
 ## Contributing
 

@@ -34,8 +34,8 @@ max_attempts = 3
 wandb_sync = false
 time = "00:30:00"
 
-[[overrides]] # the crop-128 recipe trains slower: give it more time
-match = { recipe = "cost-crop-128" }
+[[overrides]] # the cropped recipe trains slower: give it more time
+match = { recipe = "cost-cropped" }
 slurm = { time = "5-00:00:00" }
 
 [[overrides]] # both recipes of the classification grid get the long time
