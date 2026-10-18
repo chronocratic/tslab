@@ -4,7 +4,15 @@ A study turns every run into the flags of the user's own ``no-preset``
 command and hands them to a launcher; TSLab never runs experiment code.
 """
 
-from tslab.study.commands import Context, load_context, Selection, submit, submit_runs
+from tslab.study.commands import (
+    Context,
+    load_context,
+    parse_states,
+    Selection,
+    status,
+    submit,
+    submit_runs,
+)
 from tslab.study.definition import (
     DEFAULT_RUN_SETTINGS,
     expand_runs,
@@ -133,6 +141,7 @@ __all__ = [
     'match_problems',
     'merge_overrides',
     'next_job_file',
+    'parse_states',
     'plan_jobs',
     'query_job_states',
     'read_folder',
@@ -147,6 +156,7 @@ __all__ = [
     'settings_to_args',
     'slurm_available',
     'slurm_task_ids',
+    'status',
     'study_folder',
     'study_state',
     'submit',

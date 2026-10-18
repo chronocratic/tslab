@@ -6,6 +6,7 @@ dataclasses in ``tslab.cli.study`` parse the arguments and call these
 functions, so the behavior is testable without the command line.
 """
 
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
@@ -30,7 +31,18 @@ from tslab.study.records import JobRecord, read_jobs
 from tslab.study.slurm import array_spec, query_job_states, slurm_available
 from tslab.study.state import collect_states, RunReport, slurm_task_ids, StudyState
 
-__all__ = ['Context', 'Selection', 'load_context', 'submit', 'submit_runs']
+__all__ = [
+    'Context',
+    'Selection',
+    'load_context',
+    'parse_states',
+    'status',
+    'submit',
+    'submit_runs',
+]
+
+# the table columns, in display order
+_TABLE_STATES: tuple[StudyState, ...] = tuple(StudyState)
 
 _LOGGER = logging.getLogger(__name__)
 _PROBLEMS_SHOWN = 20
@@ -197,6 +209,87 @@ def submit(
         sleep=sleep,
     )
     return code
+
+
+def parse_states(*, values: Sequence[str]) -> tuple[StudyState, ...]:
+    """The state names of the ``--state`` flags, comma separated per flag.
+
+    Args:
+        values: The flag values, one per ``--state``.
+
+    Returns:
+        The states in the order the names were given.
+
+    Raises:
+        ValueError: If a name is not a state name; the six names are named.
+    """
+    states: list[StudyState] = []
+    for value in values:
+        for name in value.split(','):
+            try:
+                states.append(StudyState(name))
+            except ValueError:
+                allowed = ', '.join(state.value for state in StudyState)
+                message = f'unknown state {name!r}; use one of: {allowed}'
+                raise ValueError(message) from None
+    return tuple(states)
+
+
+def status(*, context: Context, states: tuple[StudyState, ...] = ()) -> int:
+    """Print the state table of the study and one line per run not done.
+
+    Args:
+        context: The context to report on.
+        states: When given, the listed lines are limited to these states.
+
+    Returns:
+        ``0``; the command only reads (spec §7).
+    """
+    if context.machine.launcher == 'slurm' and not context.job_states_known:
+        _LOGGER.info(
+            'SLURM commands not found: job states unknown; states come from run folders only'
+        )
+    counts: dict[str, Counter[StudyState]] = {}
+    for report in context.reports:
+        grid = counts.setdefault(report.run.grid, Counter())
+        grid[report.state] += 1
+    _LOGGER.info('  '.join(('grid', *(state.value for state in _TABLE_STATES), 'total')))
+    for grid_name in sorted(counts):
+        _LOGGER.info(_table_line(name=grid_name, grid=counts[grid_name]))
+    total = sum(counts.values(), Counter[StudyState]())
+    _LOGGER.info(_table_line(name='all', grid=total))
+    for report in context.reports:
+        if report.state is StudyState.DONE or (states and report.state not in states):
+            continue
+        job = report.job_id or '-'
+        reason = report.reason or ''
+        _LOGGER.info('%s %s %s %s', report.run.run_path, report.state.value, job, reason)
+    limited = sum(
+        1
+        for report in context.reports
+        if report.state is StudyState.INTERRUPTED
+        and (
+            report.job_state == 'TIMEOUT'
+            or (report.reason or '').startswith('TrainingTimeLimitReached')
+        )
+    )
+    if limited:
+        _LOGGER.info(
+            '%d runs stopped at a time limit: raise time in a machine override, '
+            'or cap training with --trainer.max-training-time',
+            limited,
+        )
+    return 0
+
+
+def _table_line(*, name: str, grid: Counter[StudyState]) -> str:
+    cells = [name, *(str(grid[state]) for state in _TABLE_STATES)]
+    cells.append(str(sum(grid.values())))
+    widths = [
+        max(len(column), len(cell))
+        for column, cell in zip(('grid', *(_TABLE_STATES), 'total'), cells, strict=True)
+    ]
+    return '  '.join(cell.rjust(width) for cell, width in zip(cells, widths, strict=True))
 
 
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
