@@ -5,8 +5,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
-from tslab.core.status import read_status, RunState, RunStatusSnapshot
+from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
@@ -19,6 +20,8 @@ __all__ = [
     'RunReport',
     'StudyState',
     'collect_states',
+    'first_line',
+    'job_ended',
     'read_folder',
     'slurm_task_ids',
     'study_state',
@@ -75,7 +78,7 @@ def read_folder(*, run_directory: Path) -> FolderFacts:
         The snapshot, read error, and lock state of the folder.
     """
     try:
-        snapshot = read_status(path=run_directory / 'status.json')
+        snapshot = read_status(path=run_directory / STATUS_FILE)
         read_error = None
     except (TypeError, ValueError, OSError) as error:
         snapshot = None
@@ -111,7 +114,16 @@ class RunReport:
     folder: FolderFacts
 
 
-def _ended(job_state: str | None) -> bool:
+def first_line(value: str | None) -> str | None:
+    """The first line of a text; ``None`` for ``None``, ``''`` for an empty text."""
+    if value is None:
+        return None
+    lines = value.splitlines()
+    return lines[0] if lines else ''
+
+
+def job_ended(job_state: str | None) -> bool:
+    """Whether a SLURM state says the job is over; ``None`` (unknown) is not."""
     return (
         job_state is not None
         and job_state not in QUEUED_JOB_STATES
@@ -123,8 +135,8 @@ def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
     snapshot = folder.snapshot
     if snapshot is not None:
         for record in snapshot.instances.values():
-            if record.state.value == 'failed' and record.error is not None:
-                return record.error.splitlines()[0]
+            if record.state is InstanceState.FAILED and record.error is not None:
+                return first_line(record.error)
     if folder.read_error is not None:
         return folder.read_error
     if job_state is not None:
@@ -146,29 +158,30 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
     snapshot = folder.snapshot
     if job_state in QUEUED_JOB_STATES:
         return StudyState.QUEUED, None
-    live = folder.lock_live and (job_state is None or not _ended(job_state))
+    live = folder.lock_live and (job_state is None or not job_ended(job_state))
     if job_state in RUNNING_JOB_STATES or live:
         return StudyState.RUNNING, None
     if (
         snapshot is not None
         and snapshot.run_state is RunState.FINISHED
-        and all(record.state.value == 'done' for record in snapshot.instances.values())
+        and all(record.state is InstanceState.DONE for record in snapshot.instances.values())
     ):
         return StudyState.DONE, None
     # if the lock is live, the function already returned RUNNING
-    interrupted = snapshot is not None and snapshot.run_state in (
+    time_limited = snapshot is not None and any(
+        record.state is InstanceState.FAILED
+        and (record.error or '').startswith('TrainingTimeLimitReached:')
+        for record in snapshot.instances.values()
+    )
+    stale_running = snapshot is not None and snapshot.run_state in (
         RunState.RUNNING,
         RunState.CRASHED,
     )
-    interrupted = interrupted or job_state in INTERRUPTING_JOB_STATES
-    interrupted = interrupted or (
-        snapshot is not None
-        and any(
-            record.state.value == 'failed'
-            and (record.error or '').startswith('TrainingTimeLimitReached:')
-            for record in snapshot.instances.values()
-        )
-    )
+    # why: a job that ended out of memory or cancelled left a stale ``running`` file;
+    # it failed, so the automatic retry must not restart it (spec section 8)
+    killed = stale_running and job_state in FAILING_JOB_STATES and not time_limited
+    interrupted = (stale_running and not killed) or job_state in INTERRUPTING_JOB_STATES
+    interrupted = interrupted or time_limited
     if interrupted:
         return StudyState.INTERRUPTED, _reason(folder=folder, job_state=job_state)
     failed = snapshot is not None and (
@@ -176,12 +189,12 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
         or (
             snapshot.run_state is RunState.FINISHED
             and any(
-                record.state.value in ('failed', 'skipped')
+                record.state in (InstanceState.FAILED, InstanceState.SKIPPED)
                 for record in snapshot.instances.values()
             )
         )
     )
-    failed = failed or folder.read_error is not None
+    failed = failed or killed or folder.read_error is not None
     failed = failed or (snapshot is None and job_state in FAILING_JOB_STATES)
     if failed:
         return StudyState.FAILED, _reason(folder=folder, job_state=job_state)

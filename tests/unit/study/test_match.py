@@ -3,7 +3,8 @@
 import pytest
 
 from study.configs import grid
-from tslab.study import match_problems, Override, run_matches, Study
+from tslab.study import Override, Study
+from tslab.study.definition import match_problems, run_matches
 
 
 def test_run_matches_lists_and_grid_key() -> None:

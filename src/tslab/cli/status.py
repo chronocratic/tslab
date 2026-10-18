@@ -26,6 +26,7 @@ from tslab.core.status import (
     read_status,
     RunState,
     RunStatusSnapshot,
+    StatusFileError,
 )
 
 __all__ = ['Status']
@@ -60,13 +61,18 @@ class Status:
         """Print the status.
 
         Returns:
-            ``0`` when something was shown, ``1`` when no run was found, ``2``
-            when ``path`` is not a folder.
+            ``0`` when something was shown, ``1`` when no run was found or the
+            status file of the given run is unreadable, ``2`` when ``path`` is
+            not a folder.
         """
         if not self.path.is_dir():
             _LOGGER.error('%s is not a folder', self.path.as_posix())
             return 2
-        snapshot = read_status(path=self.path / _STATUS_FILE)
+        try:
+            snapshot = read_status(path=self.path / _STATUS_FILE)
+        except StatusFileError as error:
+            _LOGGER.error('%s', error)  # noqa: TRY400 # why: a traceback adds nothing
+            return 1
         if snapshot is not None:
             _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
             return 0
@@ -164,7 +170,11 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     rows: list[tuple[str, ...]] = []
     totals: Counter[str] = Counter()
     for directory in runs:
-        snapshot = read_status(path=directory / _STATUS_FILE)
+        try:
+            snapshot = read_status(path=directory / _STATUS_FILE)
+        except StatusFileError as error:
+            _LOGGER.warning('skipping an unreadable run: %s', error)
+            continue
         if snapshot is None:  # removed while scanning
             continue
         run_state = run_state_shown(directory=directory, snapshot=snapshot)

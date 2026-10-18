@@ -6,14 +6,11 @@ import sys
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
-from study.project import write_toy_project
-from tslab.study import Context, JobRecord, load_context, read_jobs, Selection, StudyState, submit
-
-
-def no_sleep(_seconds: float) -> None:
-    """Skip the submission pause."""
-
+from study.fake_slurm import FakeSlurm
+from study.helpers import context, jobs_of, no_sleep
+from tslab.study.commands import submit
+from tslab.study.context import load_context, Selection
+from tslab.study.state import StudyState
 
 # why: the small model has no ``depth`` field, so a study that sets
 # ``model.depth`` for it does not load; the parse-bad study leaves the
@@ -68,28 +65,6 @@ study = Study(
 """
 
 
-@pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    folder = write_toy_project(project=tmp_path / 'proj')
-    # why: load_study imports from the current directory, like a user in a project
-    monkeypatch.chdir(folder)
-    return folder
-
-
-@pytest.fixture
-def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
-    return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
-
-
-def context(*, project: Path, machine_file: str) -> Context:
-    return load_context(
-        reference='toy_studies:study',
-        machine_path=project / machine_file,
-        selection=Selection(),
-        project_root=Path.cwd(),
-    )
-
-
 def run_toy(*, project: Path, model: str, seed: int) -> None:
     """Run one toy run for real, so its status.json is a real one."""
     subprocess.run(  # noqa: S603 # why: the toy script of the project, not external input
@@ -111,10 +86,6 @@ def run_toy(*, project: Path, model: str, seed: int) -> None:
         check=True,
         capture_output=True,
     )
-
-
-def jobs_of(*, project: Path) -> list[JobRecord]:
-    return read_jobs(path=project / 'runs' / 's' / '.study' / 'submissions.jsonl')
 
 
 def test_submit_on_slurm_writes_arrays_and_records(project: Path, fake: FakeSlurm) -> None:
@@ -274,6 +245,7 @@ def test_dry_run_prints_plan_and_records_nothing(
     assert 'toy_script.py model:small --seed 1' in text
 
 
+@pytest.mark.slow
 def test_local_submit_runs_everything(project: Path, caplog: pytest.LogCaptureFixture) -> None:
     first = submit(
         context=context(project=project, machine_file='local.toml'),

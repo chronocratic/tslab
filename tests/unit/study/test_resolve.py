@@ -6,7 +6,10 @@ from pathlib import Path
 import pytest
 
 from study.configs import grid
-from tslab.study import expand_runs, load_machine, MachineProfile, resolve_runs, Study
+from tslab.study import Study
+from tslab.study.definition import expand_runs
+from tslab.study.machine import load_machine, MachineProfile
+from tslab.study.plan import resolve_runs
 
 BASE_TOML = (
     'launcher = "slurm"\noutput_root = "runs"\n[slurm]\npartition = "p"\ntime = "1-00:00:00"\n'

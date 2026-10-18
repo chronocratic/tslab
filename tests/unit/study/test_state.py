@@ -12,17 +12,17 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.study import (
+from tslab.study import StudyRun
+from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.state import (
     collect_states,
+    first_line,
     FolderFacts,
-    JobRecord,
-    ProgressSnapshot,
+    job_ended,
     read_folder,
     slurm_task_ids,
     study_state,
-    StudyRun,
     StudyState,
-    TaskRecord,
 )
 
 
@@ -197,3 +197,25 @@ def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
     )[0]
     assert report.job_id == 'local-1-0'
     assert report.attempt == 1
+
+
+@pytest.mark.parametrize('job_state', ['OUT_OF_MEMORY', 'CANCELLED', 'FAILED'])
+def test_failing_job_state_beats_a_stale_running_file(job_state: str) -> None:
+    folder = facts(run_state='running', instances={'train': 'running'})
+    assert study_state(job_state=job_state, folder=folder)[0] is StudyState.FAILED
+
+
+def test_time_limit_beats_a_failing_job_state() -> None:
+    folder = facts(
+        run_state='running', instances={'train': ('failed', 'TrainingTimeLimitReached: 1h')}
+    )
+    assert study_state(job_state='CANCELLED', folder=folder)[0] is StudyState.INTERRUPTED
+
+
+def test_first_line_handles_empty_and_none() -> None:
+    assert first_line(None) is None
+    assert first_line('') == ''
+    assert first_line('a\nb') == 'a'
+    assert job_ended('FAILED')
+    assert not job_ended(None)
+    assert not job_ended('RUNNING')

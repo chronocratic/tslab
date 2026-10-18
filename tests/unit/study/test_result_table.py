@@ -8,6 +8,14 @@ import pytest
 from study.helpers import no_sleep
 import tslab
 from tslab.core.artifact import Metrics
+from tslab.core.status import (
+    InstanceRecord,
+    InstanceState,
+    RunState,
+    RunStatusSnapshot,
+    utc_now_iso,
+    write_status,
+)
 from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
@@ -171,3 +179,60 @@ def test_study_results_method(project: Path) -> None:
     assert all(row['instance'] is None for row in rows)
     assert {row['study_state'] for row in rows} == {'done'}
     assert {row['run_path'] for row in rows} == {'g/small/1', 'g/small/2', 'g/large/1', 'g/large/2'}
+
+
+def test_csv_repeats_no_metric_column_for_many_rows(tmp_path: Path) -> None:
+    make_run(root=tmp_path, run_path='g/small/1', with_metrics=True)
+    make_run(root=tmp_path, run_path='g/small/2', with_metrics=True)
+    rows = collect_results(
+        study=study(), study_directory=tmp_path, reports=reports_of(study_directory=tmp_path)
+    )
+    assert len(rows) > 2
+    write_results_csv(rows=rows, path=tmp_path / 'r.csv')
+    header = (tmp_path / 'r.csv').read_text().splitlines()[0].split(',')
+    assert len(header) == len(set(header))
+    assert header[-2:] == ['metric/accuracy', 'metric/f1']
+
+
+def test_failed_and_running_instances_show_their_own_state(tmp_path: Path) -> None:
+    folder = tmp_path / 'g/small/1'
+    folder.mkdir(parents=True)
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FAILED,
+            updated_at=utc_now_iso(),
+            instances={
+                'train[default]': InstanceRecord(
+                    state=InstanceState.FAILED, error='ValueError: bad\nTraceback'
+                ),
+                'evaluate[default]': InstanceRecord(state=InstanceState.RUNNING),
+            },
+        ),
+    )
+    rows = collect_results(
+        study=study(), study_directory=tmp_path, reports=reports_of(study_directory=tmp_path)
+    )
+    by_instance = {row['instance']: row for row in rows if row['instance'] is not None}
+    assert by_instance['train[default]']['instance_state'] == 'failed'
+    assert by_instance['train[default]']['error'] == 'ValueError: bad'
+    assert by_instance['evaluate[default]']['instance_state'] == 'running'
+    assert by_instance['evaluate[default]']['error'] is None
+
+
+def test_unreadable_status_file_is_an_unreadable_row(tmp_path: Path) -> None:
+    folder = tmp_path / 'g/small/1'
+    folder.mkdir(parents=True)
+    (folder / 'status.json').write_text('{')
+    rows = collect_results(
+        study=study(), study_directory=tmp_path, reports=reports_of(study_directory=tmp_path)
+    )
+    row = next(row for row in rows if row['run_path'] == 'g/small/1')
+    assert row['instance_state'] == 'unreadable'
+    assert row['error'] is not None
+
+
+def test_study_results_without_runs_lists_missing_rows(project: Path) -> None:
+    rows = load_study(reference='toy_studies:study').results(machine=Path('local.toml'))
+    assert len(rows) == 4
+    assert {row['study_state'] for row in rows} == {'missing'}

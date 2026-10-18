@@ -49,10 +49,14 @@ def test_cli_parses_filters_and_pass_through(
     assert seen[0].extra_args == ('--run.rerun-from', 'evaluate')
 
 
-def test_pass_through_needs_a_command_that_takes_it() -> None:
+def test_pass_through_needs_a_command_that_takes_it(
+    caplog: pytest.LogCaptureFixture, tmp_path: Path
+) -> None:
+    # why: the arguments before `--` are valid, so only the guard can reject the call
     with pytest.raises(SystemExit) as exit_info:
-        main(args=['status', 'runs', 's', '--', '--x'])
+        main(args=['status', str(tmp_path), '--', '--x'])
     assert exit_info.value.code == 2
+    assert 'does not take arguments after --' in caplog.text
 
 
 def test_help_lists_study_actions(capsys: pytest.CaptureFixture[str]) -> None:

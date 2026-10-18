@@ -96,6 +96,27 @@ def test_folder_of_runs_gives_one_line_per_run(
     assert '3 runs: 2 finished, 1 interrupted' in text
 
 
+def test_one_malformed_status_file_does_not_abort_the_scan(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('good'), factors=(1,))
+    make_run(root=tmp_path, relative_path=Path('bad'), factors=(1,))
+    (tmp_path / 'bad' / 'status.json').write_text('{"run_state": ', encoding='utf-8')
+    code, text = shown(caplog=caplog, path=tmp_path)
+    assert code == 0
+    assert 'good' in text
+    assert 'bad/status.json' in text
+    assert '1 runs: 1 finished' in text
+
+
+def test_a_malformed_run_folder_exits_1(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    (tmp_path / 'a' / 'status.json').write_text('[]', encoding='utf-8')
+    code, text = shown(caplog=caplog, path=tmp_path / 'a')
+    assert code == 1
+    assert 'status.json' in text
+
+
 def test_live_run_is_running(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     with tslab.Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         _, text = shown(caplog=caplog, path=tmp_path)

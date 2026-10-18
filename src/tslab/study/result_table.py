@@ -75,7 +75,11 @@ def study_results(*, study: Study, machine: Path) -> list[ResultRow]:
         instances; the runs of every grid, in expansion order.
     """
     context = context_for(
-        study=study, machine_path=machine, selection=Selection(), project_root=Path.cwd()
+        study=study,
+        machine_path=machine,
+        selection=Selection(),
+        project_root=Path.cwd(),
+        read_only=True,
     )
     return collect_results(
         study=study, study_directory=context.study_directory, reports=context.reports
