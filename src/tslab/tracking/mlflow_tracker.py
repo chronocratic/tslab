@@ -39,6 +39,8 @@ class MLflowTracker(LightningLoggerTracker):
         mlflow_directory = (run_directory / 'trackers' / 'mlflow').resolve()
         mlflow_directory.mkdir(parents=True, exist_ok=True)
         tracking_uri = self._tracking_uri or f'sqlite:///{mlflow_directory.as_posix()}/mlflow.db'
+        if self._tracking_uri is not None:
+            self._ensure_experiment(tracking_uri=tracking_uri)
         return MLFlowLogger(
             experiment_name=self._experiment,
             run_name=run_name,
@@ -46,6 +48,25 @@ class MLflowTracker(LightningLoggerTracker):
             artifact_location=(mlflow_directory / 'artifacts').as_uri(),
             synchronous=True,
         )
+
+    def _ensure_experiment(self, *, tracking_uri: str) -> None:
+        """Create the experiment on a shared URI, tolerating a concurrent creation.
+
+        Why: concurrent runs against one tracking URI lose the
+        get-then-create race; the second lookup recovers the experiment the
+        first run created.
+        """
+        # why: mlflow is an optional extra, imported only when a tracking URI is used
+        from mlflow.exceptions import MlflowException  # noqa: PLC0415
+        from mlflow.tracking.client import MlflowClient  # noqa: PLC0415
+
+        client = MlflowClient(tracking_uri=tracking_uri)
+        try:
+            if client.get_experiment_by_name(self._experiment) is None:
+                client.create_experiment(self._experiment)
+        except MlflowException:
+            if client.get_experiment_by_name(self._experiment) is None:
+                raise
 
     @override
     def log_params(self, *, params: Mapping[str, object]) -> None:
