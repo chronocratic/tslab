@@ -5,6 +5,7 @@ import pickle
 import typing
 from typing import Any
 
+from adapter_helpers import parse
 import chronocratic.models
 from chronocratic.models.augmentation import AugmentationProducer
 import pytest
@@ -14,11 +15,10 @@ import tslab
 from tslab.adapters.chronocratic.models import (
     chronocratic_model_choice,
     ChronocraticModelChoice,
-    entry_of,
     model_settings,
     MODELS,
-    recipe_subcommand,
 )
+from tslab.adapters.chronocratic.models.settings import entry_of, recipe_subcommand
 from tslab.core.fingerprint import canonicalize
 
 pytestmark = pytest.mark.chronocratic
@@ -45,10 +45,6 @@ def settings_classes(*, choice: Any) -> dict[str, Any]:  # noqa: ANN401
 # why: generated classes have no static type
 def field_names(*, cls: Any) -> set[str]:  # noqa: ANN401
     return {field.name for field in dataclasses.fields(cls)}
-
-
-def parse(*args: str) -> Config:
-    return tslab.parse_config(config_class=Config, args=list(args))
 
 
 def test_every_parameter_class_is_discovered() -> None:
@@ -95,21 +91,25 @@ def test_recipes_land_only_in_models_of_their_view_type() -> None:
 
 
 def test_default_keeps_the_models_own_augmentation() -> None:
-    assert parse('model:tstcc').model.augmentation is None
+    assert parse(Config, 'model:tstcc').model.augmentation is None
 
 
 def test_recipe_settings_come_from_the_command_line() -> None:
     config = parse(
-        'model:tstcc', 'model.augmentation:jitter-then-scale', '--model.augmentation.sigma', '0.5'
+        Config,
+        'model:tstcc',
+        'model.augmentation:jitter-then-scale',
+        '--model.augmentation.sigma',
+        '0.5',
     )
     assert config.model.augmentation == JitterThenScaleRecipe(sigma=0.5)
 
 
 def test_recipe_of_another_view_type_is_rejected_by_the_parser() -> None:
     with pytest.raises(SystemExit):
-        parse('model:ts2vec', 'model.augmentation:jitter-then-scale')
+        parse(Config, 'model:ts2vec', 'model.augmentation:jitter-then-scale')
     with pytest.raises(SystemExit):
-        parse('model:mcl', 'model.augmentation:jitter-then-scale')
+        parse(Config, 'model:mcl', 'model.augmentation:jitter-then-scale')
 
 
 def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None:
@@ -120,7 +120,7 @@ def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None
         ('model:cost', '--model.sequence-length', '100'),
         ('model:timenet',),
     ):
-        config = parse(*args)
+        config = parse(Config, *args)
         tslab.save_config(config=config, path=path)
         loaded = tslab.load_config(config_class=Config, path=path)
         assert loaded == config, args
@@ -130,17 +130,20 @@ def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None
 def test_generated_classes_live_in_the_adapter_module() -> None:
     for settings_class in settings_classes(choice=ModelChoice).values():
         assert settings_class.__module__ == 'tslab.adapters.chronocratic.models.settings'
-        assert settings_class.__name__.endswith('Settings')
+        assert 'Settings' in settings_class.__name__
 
 
 def test_settings_classes_pickle_round_trip() -> None:
-    # why: pickle checks the class against the module attribute, so pickling the
-    # latest generation (each call regenerates the classes) is what round-trips
-    for settings_class in settings_classes(choice=chronocratic_model_choice()).values():
-        instance = settings_class()
-        reloaded = pickle.loads(pickle.dumps(instance))  # noqa: S301
-        assert type(reloaded) is settings_class
-        assert dataclasses.asdict(reloaded) == dataclasses.asdict(instance), settings_class.__name__
+    # why: pickle checks the class against the module attribute; every choice, with
+    # or without recipes, keeps classes of its own there
+    for choice in (ModelChoice, chronocratic_model_choice()):
+        for settings_class in settings_classes(choice=choice).values():
+            instance = settings_class()
+            reloaded = pickle.loads(pickle.dumps(instance))  # noqa: S301
+            assert type(reloaded) is settings_class
+            assert dataclasses.asdict(reloaded) == dataclasses.asdict(instance), (
+                settings_class.__name__
+            )
 
 
 def test_recipe_subcommand_names() -> None:
@@ -219,3 +222,13 @@ def test_model_settings_rejects_unknown_names_and_settings() -> None:
         model_settings(choice=ModelChoice, name='tstcc', max_train_length=128)
     with pytest.raises(TypeError, match='chronocratic_model_choice'):
         model_settings(choice=int | str, name='ts2vec')
+
+
+def test_choice_called_twice_keeps_earlier_instances_picklable() -> None:
+    # why: a second call used to regenerate the classes under the same names, so
+    # instances of the first call no longer matched the module attribute
+    first = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
+    instances = [cls() for cls in settings_classes(choice=first).values()]
+    chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
+    for instance in instances:
+        assert pickle.loads(pickle.dumps(instance)) == instance  # noqa: S301

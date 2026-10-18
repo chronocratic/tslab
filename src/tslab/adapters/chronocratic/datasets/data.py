@@ -89,6 +89,8 @@ class ChronocraticClassificationData(LightningDataSource[TSClassificationDataInf
     def labeled_split(self, *, split: Split) -> tuple[torch.Tensor, torch.Tensor]:
         """Return the samples ``(N, T, C)`` and labels ``(N,)`` of ``split``, each sample once.
 
+        An empty validation split gives empty tensors.
+
         Raises:
             ValueError: If a label lies outside ``0 .. num_classes - 1``.
         """
@@ -99,12 +101,14 @@ class ChronocraticClassificationData(LightningDataSource[TSClassificationDataInf
             'test': self._classification.test_dataloader,
         }
         # Strict batches repeat tail samples to fill the last batch; collection must be exact.
-        loader = _known(
-            value=loaders[split](
-                loader_mode=ClassificationLoaderMode.SAMPLE_LABEL, loader_strict_batch_size=False
-            ),
-            name=f'{split}_dataloader',
+        loader = loaders[split](
+            loader_mode=ClassificationLoaderMode.SAMPLE_LABEL, loader_strict_batch_size=False
         )
+        if loader is None and split == 'val':
+            # A validation size of 0 leaves no validation loader: the split is empty.
+            samples = torch.empty(0, self.info.length or 0, self.info.num_channels)
+            return samples, torch.empty(0, dtype=torch.long)
+        loader = _known(value=loader, name=f'{split}_dataloader')
         batches = list(loader)
         samples = torch.cat([batch_samples for batch_samples, _ in batches])
         labels = torch.cat([batch_labels for _, batch_labels in batches]).long()

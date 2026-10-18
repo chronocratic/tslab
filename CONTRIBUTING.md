@@ -60,7 +60,8 @@ pull request title for you:
 
 - the type comes from a `changelog:<type>` label, or from the Conventional
   Commits prefix of the title (`feat` gives `added`, `fix` gives `fixed`,
-  anything else gives `changed`);
+  `revert` and `remove` give `removed`, `deprecate` gives `deprecated`,
+  `security` gives `security`, anything else gives `changed`);
 - a `## Summary` section in the pull request description is appended to the entry;
 - the `skip-changelog` label opts out (for changes users never see).
 

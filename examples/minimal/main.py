@@ -61,7 +61,7 @@ def make_series(*, run: tslab.Run, series: int, length: int, noise: float) -> ts
 def smooth(
     *, run: tslab.Run, name: tslab.InstanceName | None = None, data: tslab.Tensors, window: int
 ) -> tslab.Tensors:
-    """Smooth the noisy series with a centred moving average of ``window`` steps."""
+    """Smooth the noisy series with a centered moving average of ``window`` steps."""
     del run, name
     kernel = torch.full((1, 1, window), 1.0 / window)
     noisy = data.tensors['noisy'].unsqueeze(1)

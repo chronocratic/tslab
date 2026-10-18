@@ -49,8 +49,6 @@ jobs:
         uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.12"
-      - name: Install dependencies
-        run: uv sync --no-install-project
 
 
       # A `changelog:<type>` label wins; otherwise infer from the Conventional
@@ -143,4 +141,6 @@ jobs:
 
       - name: Verify a fragment is present
         if: github.event.pull_request.head.repo.full_name == github.repository
-        run: uv run towncrier check --compare-with origin/${{ github.base_ref }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: uvx --from towncrier==26.9.0 towncrier check --compare-with "origin/$BASE_REF"

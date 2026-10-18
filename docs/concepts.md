@@ -2,7 +2,8 @@
 
 ## Run, stage, instance
 
-- A **run** is one execution context: `with tslab.Run(config=..., root=..., relative_path=...) as run:`.
+- A **run** is one execution context:
+  `with tslab.Run(config=..., root=..., relative_path=...) as run:`.
   It owns a folder `root / relative_path`, takes a lock on it, seeds Python,
   NumPy and torch, writes `config.yaml`, `meta.json` and `status.json`, and
   starts the trackers. Leaving the `with` block always records the final state.
@@ -26,8 +27,8 @@ Every instance has a fingerprint: 16 hexadecimal characters of a SHA-256 over
 - the fingerprints of the artifacts it received.
 
 When the stored fingerprint matches, the result is loaded. Anything else runs
-the instance again, and everything downstream follows because its inputs'
-fingerprints changed.
+the instance again, and everything downstream follows because the
+fingerprints of its inputs changed.
 
 Fields annotated `Annotated[..., tslab.NotFingerprinted]` (device, number of
 workers, logging intervals) never change a fingerprint: they cannot change the

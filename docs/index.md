@@ -12,7 +12,7 @@ dataset libraries.
 
 ```bash
 uv add "tslab[chronocratic-models,chronocratic-datasets]"
-uv run tslab new my-paper
+uvx tslab new my-paper
 ```
 
 ```{toctree}

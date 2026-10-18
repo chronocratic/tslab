@@ -49,7 +49,8 @@ uv run tslab study submit {{package_name}}.studies:example --machine machines/lo
 uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml
 uv run tslab study status {{package_name}}.studies:example --machine machines/local.toml
 uv run tslab study resubmit {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study results {{package_name}}.studies:example --machine machines/local.toml --out results.csv
+uv run tslab study results {{package_name}}.studies:example \
+    --machine machines/local.toml --out results.csv
 ```
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
@@ -61,10 +62,14 @@ TSLab docs.
 ## Rerun and check
 
 ```bash
-uv run python -m {{package_name}}.classify ... --run.rerun-from encode   # redo encode and everything after it
-uv run python -m {{package_name}}.classify ... --run.dry-run              # show what would run
-uv run tslab status runs/                                                # one line per run
-uv run tslab status runs/ts2vec/ToySpectra/archive-split                 # one line per instance
+# redo encode and everything after it
+uv run python -m {{package_name}}.classify ... --run.rerun-from encode
+# show what would run
+uv run python -m {{package_name}}.classify ... --run.dry-run
+# one line per run
+uv run tslab status runs/
+# one line per instance
+uv run tslab status runs/ts2vec/ToySpectra/archive-split
 ```
 
 A run killed by a time limit shows as `interrupted`; the same command resumes it.

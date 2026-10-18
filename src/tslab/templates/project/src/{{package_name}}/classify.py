@@ -20,7 +20,6 @@ from tslab.adapters.chronocratic.datasets import (
 )
 from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
-    chronocratic_model_choice,
     ChronocraticEncoder,
     model_settings,
 )
@@ -28,10 +27,8 @@ from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import SVMProbe
 from tslab.tracking import build_trackers, TrackingOptions
 
-from {{package_name}}.augmentations import JitterThenScaleRecipe
+from {{package_name}}.models import Models
 from {{package_name}}.stages import add_noise
-
-Models = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
 
 
 @dataclass(frozen=True, kw_only=True)

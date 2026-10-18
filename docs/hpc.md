@@ -4,8 +4,8 @@
 
 `LightningTrainer` stops training in time to save a checkpoint:
 
-- `--trainer.max-training-time 23:30:00` caps training (sbatch formats:
-  `HH:MM`, `HH:MM:SS`, `D-HH:MM:SS`);
+- `--trainer.max-training-time 23:30:00` caps training (any sbatch `--time`
+  format: `M`, `M:S`, `H:M:S`, `D-H`, `D-H:M`, `D-H:M:S`);
 - under SLURM, the remaining job time (`SLURM_JOB_END_TIME`) caps it as well:
   training gets `--trainer.slurm-time-fraction` (default 0.5) of the time left,
   so the stages after training can still run.

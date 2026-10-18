@@ -24,8 +24,8 @@ class ChronocraticEncoder:
 
     Dilated models (TS2Vec, AutoTCL, CoST) also offer ``encode_sequence``: one
     causal representation per timestep, computed with a sliding window, as in
-    the TS2Vec forecasting protocol. Other chronocratic
-    models offer one vector per sample.
+    the TS2Vec forecasting protocol. Other chronocratic models offer one vector
+    per sample.
 
     Attributes:
         device: ``'auto'`` (CUDA when available, else the CPU) or a device

@@ -1,8 +1,7 @@
-from collections.abc import Generator
-import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from adapter_helpers import parse, run_in
 import pytest
 from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
 
@@ -61,19 +60,9 @@ class Config:
     run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
 
 
-def parse(*args: str) -> Config:
-    return tslab.parse_config(config_class=Config, args=list(args))
-
-
-@contextlib.contextmanager
-def run_in(*, root: Path, config: Config, name: str = 'r') -> Generator[tslab.Run]:
-    with tslab.Run(config=config, root=root, relative_path=Path(name)) as run:
-        yield run
-
-
 @pytest.mark.parametrize('name', sorted(MODELS))
 def test_every_model_trains_and_encodes(tmp_path: Path, name: str) -> None:
-    config = parse(*CLASSIFICATION_ARGS, f'model:{name}')
+    config = parse(Config, *CLASSIFICATION_ARGS, f'model:{name}')
     data = build_chronocratic_data_source(config=config.data)
     assert isinstance(data, ChronocraticClassificationData)
     trainer = LightningTrainer(config=ONE_BATCH)
@@ -89,7 +78,7 @@ def test_every_model_trains_and_encodes(tmp_path: Path, name: str) -> None:
 
 
 def classify(*, root: Path) -> tslab.Metrics:
-    config = parse(*CLASSIFICATION_ARGS, 'model:ts2vec')
+    config = parse(Config, *CLASSIFICATION_ARGS, 'model:ts2vec')
     data = build_chronocratic_data_source(config=config.data)
     assert isinstance(data, ChronocraticClassificationData)
     trainer = LightningTrainer(config=FEW_EPOCHS)
@@ -115,7 +104,7 @@ def test_ts2vec_classifies_end_to_end_and_reloads(tmp_path: Path) -> None:
 
 
 def test_ts2vec_forecasts_end_to_end(tmp_path: Path) -> None:
-    config = parse(*FORECASTING_ARGS, 'model:ts2vec', '--model.max-train-length', '512')
+    config = parse(Config, *FORECASTING_ARGS, 'model:ts2vec', '--model.max-train-length', '512')
     data = build_chronocratic_data_source(config=config.data)
     assert isinstance(data, ChronocraticForecastingData)
     trainer = LightningTrainer(config=FEW_EPOCHS)

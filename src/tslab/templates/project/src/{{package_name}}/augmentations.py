@@ -33,15 +33,15 @@ class JitterThenScaleRecipe:
 
     Attributes:
         sigma: Standard deviation of the jitter noise.
-        ratio: Standard deviation of the scaling factor.
+        scale_sigma: Standard deviation of the scaling factor.
     """
 
     sigma: float = 0.8
-    ratio: float = 1.1
+    scale_sigma: float = 1.1
 
     def __call__(self) -> AugmentationProducer[ViewPair]:
         """Build the producer."""
         return RolePairProducer(
             first=Jitter(params=JitterParameters(sigma=self.sigma)),
-            second=Scaling(params=ScalingParameters(sigma=self.ratio)),
+            second=Scaling(params=ScalingParameters(sigma=self.scale_sigma)),
         )

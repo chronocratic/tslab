@@ -73,8 +73,8 @@ A preset may put `tslab.REQUIRED` on a field its author cannot or does not
 want to know — a dataset path that lives in a different folder on each
 machine. The marker is **optional**; presets without it are unaffected.
 
-- **By hand:** `classify ts2vec-any` without the value exits with tyro's
-  error box — `Missing value for --data.dataset-folder-path` (exit code 2);
+- **By hand:** `classify ts2vec-any` without the value exits with the
+  tyro error box — `Missing value for --data.dataset-folder-path` (exit code 2);
   with `--data.dataset-folder-path …` it runs.
 - **In a study:** `from_presets` skips marked fields, so the study must
   supply that field on one of its axes (usually the dataset axis); otherwise

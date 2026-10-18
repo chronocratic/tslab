@@ -15,7 +15,7 @@ The extras add the chronocratic adapters. Trackers are extras too:
 ## Start a project
 
 ```bash
-uv run tslab new my-paper
+uvx tslab new my-paper
 cd my-paper
 uv sync
 uv run python -m my_paper.toy_data data
@@ -29,6 +29,9 @@ uv run python -m my_paper.toy_data data
 | `src/my_paper/forecast.py` | train, encode the series, evaluate a ridge probe per horizon |
 | `src/my_paper/stages.py` | an example custom stage, `add_noise` |
 | `src/my_paper/augmentations.py` | an example augmentation recipe |
+| `src/my_paper/models.py` | the model choice shared by the scripts |
+| `src/my_paper/studies.py` | an example study over both scripts (see {doc}`studies`) |
+| `machines/` | a local and an example SLURM machine profile |
 | `src/my_paper/toy_data.py` | writes small synthetic datasets, so everything runs before you have real data |
 | `tests/test_smoke.py` | runs both scripts on the toy data with one training batch |
 

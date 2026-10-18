@@ -7,33 +7,23 @@ data source; Lightning still receives the datamodule itself for training.
 
 from tslab.adapters.chronocratic.datasets.data import (
     build_chronocratic_data_source,
-    check_label_range,
     ChronocraticClassificationData,
     ChronocraticForecastingData,
 )
 from tslab.adapters.chronocratic.datasets.settings import (
     ChronocraticDataChoice,
     data_settings,
-    datamodule_class_of,
-    DataModuleEntry,
     DATAMODULES,
-    EXCLUDED_PARAMETERS,
-    NOT_FINGERPRINTED_PARAMETERS,
 )
 from tslab.adapters.chronocratic.datasets.study import ucr_datasets, uea_datasets
 
 __all__ = [
     'DATAMODULES',
-    'EXCLUDED_PARAMETERS',
-    'NOT_FINGERPRINTED_PARAMETERS',
     'ChronocraticClassificationData',
     'ChronocraticDataChoice',
     'ChronocraticForecastingData',
-    'DataModuleEntry',
     'build_chronocratic_data_source',
-    'check_label_range',
     'data_settings',
-    'datamodule_class_of',
     'ucr_datasets',
     'uea_datasets',
 ]

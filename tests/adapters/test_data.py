@@ -4,6 +4,7 @@ import inspect
 from pathlib import Path
 from typing import Any
 
+from adapter_helpers import parse
 import chronocratic.datasets
 import pytest
 from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
@@ -12,14 +13,14 @@ import torch
 import tslab
 from tslab.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
-    check_label_range,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
     ChronocraticForecastingData,
     data_settings,
     DATAMODULES,
-    EXCLUDED_PARAMETERS,
 )
+from tslab.adapters.chronocratic.datasets.data import check_label_range
+from tslab.adapters.chronocratic.datasets.settings import EXCLUDED_PARAMETERS
 from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import SPLITS
 from tslab.lightning import LightningDataSource
@@ -47,18 +48,14 @@ class Config:
     data: ChronocraticDataChoice
 
 
-def parse(*args: str) -> Config:
-    return tslab.parse_config(config_class=Config, args=list(args))
-
-
 def classification() -> ChronocraticClassificationData:
-    data = build_chronocratic_data_source(config=parse(*CLASSIFICATION_ARGS).data)
+    data = build_chronocratic_data_source(config=parse(Config, *CLASSIFICATION_ARGS).data)
     assert isinstance(data, ChronocraticClassificationData)
     return data
 
 
 def forecasting() -> ChronocraticForecastingData:
-    data = build_chronocratic_data_source(config=parse(*FORECASTING_ARGS).data)
+    data = build_chronocratic_data_source(config=parse(Config, *FORECASTING_ARGS).data)
     assert isinstance(data, ChronocraticForecastingData)
     return data
 
@@ -77,7 +74,7 @@ def test_settings_are_the_constructor_without_loader_parameters() -> None:
 
 
 def test_only_result_changing_settings_are_fingerprinted() -> None:
-    settings: Any = parse(*CLASSIFICATION_ARGS).data
+    settings: Any = parse(Config, *CLASSIFICATION_ARGS).data
     base = canonicalize(value=settings)
     assert canonicalize(value=dataclasses.replace(settings, num_workers=4)) == base
     assert canonicalize(value=dataclasses.replace(settings, batch_size=8)) != base
@@ -90,7 +87,7 @@ def test_only_result_changing_settings_are_fingerprinted() -> None:
 def test_data_settings_round_trip_through_a_config_file(tmp_path: Path) -> None:
     path = tmp_path / 'config.yaml'
     for args in (CLASSIFICATION_ARGS, FORECASTING_ARGS):
-        config = parse(*args, '--data.batch-size', '16')
+        config = parse(Config, *args, '--data.batch-size', '16')
         tslab.save_config(config=config, path=path)
         assert tslab.load_config(config_class=Config, path=path) == config
 
@@ -168,3 +165,12 @@ def test_data_settings_builds_a_member_of_the_choice() -> None:
         data_settings(name='etth')
     with pytest.raises(ValueError, match="has no settings \\['seq_len'\\]"):
         data_settings(name='ett', dataset_file_path=path, variant='ETTh1', seq_len=128)
+
+
+def test_empty_validation_split_encodes_as_empty_tensors() -> None:
+    config = parse(Config, *CLASSIFICATION_ARGS, '--data.valid-size', '0').data
+    data = build_chronocratic_data_source(config=config)
+    assert isinstance(data, ChronocraticClassificationData)
+    samples, labels = data.labeled_split(split='val')
+    assert samples.shape[0] == 0
+    assert labels.shape == (0,)

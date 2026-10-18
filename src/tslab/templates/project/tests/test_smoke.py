@@ -13,6 +13,7 @@ from tslab.lightning import LightningTrainerConfig
 
 from {{package_name}} import classify, forecast, toy_data
 
+STUDY = '{{package_name}}.studies:example'
 ONE_BATCH = LightningTrainerConfig(
     max_epochs=1,
     min_epochs=0,
@@ -62,15 +63,15 @@ def test_classify(project: Path, args: tuple[str, ...]) -> None:
     assert states == {tslab.InstanceState.DONE}
 
 
-def test_example_study_runs_one_run_locally() -> None:
+def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The example study submits and runs one slice locally, through the CLI.
 
-    Runs from the project root (where ``uv run pytest`` is meant to run), so
-    the ``uv run`` command of the study finds the venv; ``machines/local.toml`` and
-    ``data/`` come from the project, as in the README flow.
+    Runs in a temporary folder with the toy data; ``UV_PROJECT`` lets the
+    ``uv run`` command of the study find the venv of the project from there.
     """
-    root = Path.cwd()
-    toy_data.main(directory=root / 'data')
+    root = Path(__file__).parents[1]
+    monkeypatch.setenv('UV_PROJECT', str(root))
+    machine = str(root / 'machines' / 'local.toml')
     # one epoch of the toy data is a single batch, so a CPU run stays short
     extra = [
         '--trainer.max-epochs',
@@ -84,30 +85,15 @@ def test_example_study_runs_one_run_locally() -> None:
         '--encoder.device',
         'cpu',
     ]
+    submit = ['study', 'submit', STUDY, '--machine', machine, '--grid', 'classification']
     with pytest.raises(SystemExit) as raised:
-        tslab_main(
-            args=[
-                'study',
-                'submit',
-                '{{package_name}}.studies:example',
-                '--machine',
-                'machines/local.toml',
-                '--grid',
-                'classification',
-                '--only',
-                'seed=0',
-                '--',
-                *extra,
-            ]
-        )
+        tslab_main(args=[*submit, '--only', 'seed=0', '--', *extra])
     assert raised.value.code == 0
     with pytest.raises(SystemExit) as raised:
-        tslab_main(
-            args=['study', 'status', '{{package_name}}.studies:example', '--machine', 'machines/local.toml']
-        )
+        tslab_main(args=['study', 'status', STUDY, '--machine', machine])
     assert raised.value.code == 0
     status_file = (
-        root
+        project
         / 'runs'
         / 'example'
         / 'classification'

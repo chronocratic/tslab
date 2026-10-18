@@ -22,7 +22,8 @@ What it shows:
   encoder) is separate from encoding and evaluation, so changing how its
   result is evaluated never recomputes it.
 
-Run it from any folder; results go to ``runs/advanced``::
+Run it from the root of a TSLab checkout (it reads the toy series in
+``tests/adapters/data``); results go to ``runs/advanced``::
 
     uv run python examples/advanced/main.py
     uv run python examples/advanced/main.py --fix-broken-attack

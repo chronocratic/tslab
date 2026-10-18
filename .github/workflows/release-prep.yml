@@ -41,8 +41,6 @@ jobs:
         uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.12"
-      - name: Install dependencies
-        run: uv sync --no-install-project
 
       - name: Validate version
         env:
@@ -60,7 +58,7 @@ jobs:
       - name: Build changelog
         env:
           VERSION: ${{ inputs.version }}
-        run: uv run towncrier build --yes --version "$VERSION"
+        run: uvx --from towncrier==26.9.0 towncrier build --yes --version "$VERSION"
 
       - name: Open release-prep PR
         env:
