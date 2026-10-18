@@ -5,17 +5,21 @@ and the tool only offers helpers around runs.
 """
 
 from collections.abc import Sequence
+import dataclasses
 import logging
 import sys
-from typing import Protocol
+from typing import Any, cast, Protocol
 
 import tyro
 
 from tslab.cli.new import New
 from tslab.cli.status import Status
+from tslab.cli.study import STUDY_COMMANDS
 from tslab.cli.wandb_sync import WandbSync
 
 __all__ = ['main']
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Command(Protocol):
@@ -29,6 +33,10 @@ class Command(Protocol):
 def main(args: Sequence[str] | None = None) -> None:
     """Entry point of the ``tslab`` console script.
 
+    Arguments after the first ``--`` are pass-through: tslab does not parse
+    them and hands them to the command's ``extra_args`` field. A ``--`` on a
+    command without that field exits 2.
+
     Args:
         args: Arguments to parse; ``None`` means ``sys.argv[1:]``.
 
@@ -36,7 +44,38 @@ def main(args: Sequence[str] | None = None) -> None:
         SystemExit: Always, with the exit code of the subcommand.
     """
     logging.basicConfig(format='%(message)s', level=logging.INFO, stream=sys.stdout)
-    command: Command = tyro.extras.subcommand_cli_from_dict(
-        {'new': New, 'status': Status, 'wandb-sync': WandbSync}, prog='tslab', args=args
-    )
+    argv = list(sys.argv[1:]) if args is None else list(args)
+    head, extra_args = _split_pass_through(argv=argv)
+    command: Command = _parse(argv=head)
+    if extra_args and not _takes_pass_through(command=command):
+        _LOGGER.error('this command does not take arguments after --')
+        raise SystemExit(2)
+    if extra_args:
+        # ty: ignore[unsound-assignment]
+        # — the check above guarantees a dataclass with the extra_args field
+        command = dataclasses.replace(cast('Any', command), extra_args=extra_args)
     raise SystemExit(command.run())
+
+
+def _split_pass_through(*, argv: Sequence[str]) -> tuple[list[str], tuple[str, ...]]:
+    """The arguments before the first ``--``, and the rest."""
+    if '--' in argv:
+        position = argv.index('--')
+        return list(argv[:position]), tuple(argv[position + 1 :])
+    return list(argv), ()
+
+
+def _takes_pass_through(*, command: object) -> bool:
+    return dataclasses.is_dataclass(command) and hasattr(command, 'extra_args')
+
+
+def _parse(*, argv: Sequence[str]) -> Command:
+    if argv and argv[0] == 'study':
+        # ty: ignore[no-matching-overload, unsound-return-statement]
+        # — ty sees the dict of dataclass types as no Callable overload match
+        return tyro.extras.subcommand_cli_from_dict(
+            STUDY_COMMANDS, prog='tslab study', args=list(argv[1:])
+        )
+    return tyro.extras.subcommand_cli_from_dict(
+        {'new': New, 'status': Status, 'wandb-sync': WandbSync}, prog='tslab', args=list(argv)
+    )
