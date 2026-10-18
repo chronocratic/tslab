@@ -11,9 +11,9 @@ from typing import Annotated
 
 import tyro
 
-from tslab.study import load_context, parse_states, Selection, status, submit
+from tslab.study import load_context, parse_states, resubmit, Selection, status, submit
 
-__all__ = ['STUDY_COMMANDS', 'Status', 'Submit']
+__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Status', 'Submit']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,4 +96,54 @@ class Status:
         return 2
 
 
-STUDY_COMMANDS = {'submit': Submit, 'status': Status}
+@dataclass(frozen=True, kw_only=True)
+class Resubmit:
+    """Submit the interrupted, missing or failed runs of a study again.
+
+    Attributes:
+        study: The study reference, ``module:attribute``.
+        machine: The machine profile the runs run on.
+        grid: Keep only this grid; repeatable.
+        only: Keep only the runs that match ``axis=value``; repeatable,
+            comma separated for several values of one axis.
+        states: The states to resubmit; repeatable, comma separated.
+            Interrupted and missing when omitted.
+        cancel_live: Cancel the queued and running runs first and
+            resubmit them a little later.
+        dry_run: Write the job files and print the plan, submit nothing.
+        auto: Follow-up mode, used by TSLab itself.
+        extra_args: The arguments after ``--``; the run's last submission's
+            when omitted.
+    """
+
+    study: Annotated[str, tyro.conf.Positional]
+    machine: Path
+    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    cancel_live: bool = False
+    dry_run: bool = False
+    auto: bool = False
+    extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
+
+    def run(self) -> int:
+        """Resubmit and return the exit code."""
+        states = ()
+        if self.states:
+            states = parse_states(values=self.states)
+        return resubmit(
+            context=load_context(
+                reference=self.study,
+                machine_path=self.machine,
+                selection=Selection(grids=self.grid, only=self.only),
+                project_root=Path.cwd(),
+            ),
+            states=states,
+            cancel_live=self.cancel_live,
+            dry_run=self.dry_run,
+            extra_args=self.extra_args or None,
+            auto=self.auto,
+        )
+
+
+STUDY_COMMANDS = {'submit': Submit, 'status': Status, 'resubmit': Resubmit}
