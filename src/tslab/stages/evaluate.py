@@ -12,6 +12,8 @@ from tslab.interfaces import DownstreamModel, Metric
 
 __all__ = ['evaluate']
 
+STAGE_NAME = 'evaluate'
+
 
 def _tensor(*, tensors: Mapping[str, torch.Tensor], key: str) -> torch.Tensor:
     if key not in tensors:
@@ -32,7 +34,7 @@ def _scores(
     return values
 
 
-@stage(name='evaluate', output=Metrics)
+@stage(name=STAGE_NAME, output=Metrics)
 def evaluate(
     *,
     run: Run,
@@ -72,6 +74,6 @@ def evaluate(
         if metrics is None
         else _scores(metrics=metrics, predictions=predictions, targets=targets)
     )
-    prefix = '/'.join(('evaluate', *normalize_instance_name(name=name)))
+    prefix = '/'.join((STAGE_NAME, *normalize_instance_name(name=name)))
     run.log_metrics(metrics={f'{prefix}/{key}': value for key, value in values.items()})
     return Metrics(data=values)

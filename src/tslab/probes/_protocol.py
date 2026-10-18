@@ -108,7 +108,7 @@ def cap_samples(
     )
     # A class with a single member cannot be split proportionally.
     if stratify:
-        stratify = np.unique(labels, return_counts=True)[1].min() >= _MIN_STRATUM
+        stratify = bool(np.unique(labels, return_counts=True)[1].min() >= _MIN_STRATUM)
     kept_features, _, kept_labels, _ = train_test_split(
         features,
         labels,

@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 __all__ = ['LightningTrainer', 'TrainingTimeLimitReached']
 
 _LOGGER = logging.getLogger(__name__)
+# Arguments that TSLab owns: replacing them would break the trackers, the time limit or resume.
+_RESERVED_TRAINER_KWARGS = frozenset({'callbacks', 'logger', 'max_time', 'default_root_dir'})
 
 
 class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API name from the spec
@@ -53,7 +55,19 @@ class LightningTrainer(Trainer[LightningModule]):
 
         Args:
             config: The trainer settings; defaults to ``LightningTrainerConfig()``.
+
+        Raises:
+            ValueError: If ``extra_trainer_kwargs`` holds an argument that TSLab sets itself.
         """
+        reserved = (
+            sorted(_RESERVED_TRAINER_KWARGS & set(config.extra_trainer_kwargs)) if config else []
+        )
+        if reserved:
+            message = (
+                f'extra_trainer_kwargs must not set {reserved}: TSLab builds these itself '
+                '(use the trainer settings, such as max_training_time, instead)'
+            )
+            raise ValueError(message)
         self._config = config if config is not None else LightningTrainerConfig()
 
     @property
@@ -90,7 +104,7 @@ class LightningTrainer(Trainer[LightningModule]):
         )
         if max_time is not None and config.min_epochs > 0:
             _LOGGER.warning(
-                'a training time limit (%s) is active, but Lightning honours it only after '
+                'a training time limit (%s) is active, but Lightning honors it only after '
                 'min_epochs=%d epochs; if one epoch can exceed the limit, pass '
                 '--trainer.min-epochs 0',
                 max_time,
@@ -150,6 +164,12 @@ class LightningTrainer(Trainer[LightningModule]):
                 'if you trust this file, use Checkpoint.external(path=..., trusted=True)'
             )
             raise ValueError(message) from error
+        if not isinstance(state, dict) or 'state_dict' not in state:
+            message = (
+                f'{checkpoint.best_path.as_posix()} is not a Lightning checkpoint: '
+                "it has no 'state_dict' entry"
+            )
+            raise ValueError(message)
         model.load_state_dict(state_dict=state['state_dict'])
 
     def _build_trainer(
@@ -180,7 +200,7 @@ class LightningTrainer(Trainer[LightningModule]):
             'logger': loggers,
             'default_root_dir': checkpoint_directory,
         }
-        # Applied last, so that the escape hatch can override the arguments TSLab adds.
+        # Applied last, so that the escape hatch can override the other arguments.
         arguments.update(config.extra_trainer_kwargs)
         return lightning.Trainer(**arguments)
 

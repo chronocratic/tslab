@@ -22,7 +22,8 @@ def check_representations(
 ) -> None:
     """Fail loudly on representations that cannot be right.
 
-    A few non-finite rows pass (the probes impute them); when 99 % or more of
+    A few non-finite rows pass here, but the probes impute only NaN, so an
+    ``inf`` value still fails when the probe is fitted. When 99 % or more of
     the rows are entirely non-finite, the encoder has diverged and evaluating
     would silently report garbage.
 

@@ -20,6 +20,8 @@ import re
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 import torch
 
+from tslab.lightning.callbacks import file_safe_name
+
 __all__ = ['CHECKPOINT_LOAD_ERRORS', 'choose_resume_checkpoint', 'resume_candidates']
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,7 +54,7 @@ def resume_candidates(*, directory: Path, monitor: str) -> list[Path]:
         ``last*.ckpt`` newest first, then files named with ``<monitor>=<value>``
         lowest value first, then all other ``.ckpt`` files newest first.
     """
-    pattern = re.compile(rf'{re.escape(monitor)}=(-?\d+(?:\.\d+)?)')
+    pattern = re.compile(rf'{re.escape(file_safe_name(name=monitor))}=(-?\d+(?:\.\d+)?)')
     last: list[Path] = []
     ranked: list[tuple[float, Path]] = []
     rest: list[Path] = []
@@ -76,7 +78,7 @@ def resume_candidates(*, directory: Path, monitor: str) -> list[Path]:
 def _unusable_reason(*, path: Path) -> str | None:
     """Return why ``path`` cannot be resumed from, or ``None`` if it can."""
     try:
-        # The run's own checkpoint folder: full unpickling is trusted here.
+        # The checkpoint folder of this run: full unpickling is trusted here.
         state = torch.load(f=path, map_location='cpu', weights_only=False)
     except CHECKPOINT_LOAD_ERRORS as error:
         return f'{type(error).__name__}: {error}'

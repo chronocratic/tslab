@@ -55,14 +55,12 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
     Returns:
         Unstarted trackers; ``Run`` starts and finishes them.
     """
-    # why: imported here so that `import tslab.tracking` never imports Lightning
-    # or any tracker SDK; the bare module must stay cheap to import.
-    from tslab.tracking.mlflow_tracker import MLflowTracker  # noqa: PLC0415
-    from tslab.tracking.tensorboard_tracker import TensorBoardTracker  # noqa: PLC0415
-    from tslab.tracking.wandb_tracker import WandbTracker  # noqa: PLC0415
-
     trackers: list[Tracker] = []
+    # why: imported inside each branch so that `import tslab.tracking` never imports
+    # Lightning or a tracker SDK, and a tracker nobody enabled is never imported.
     if options.wandb_mode != 'disabled':
+        from tslab.tracking.wandb_tracker import WandbTracker  # noqa: PLC0415
+
         trackers.append(
             WandbTracker(
                 project=options.wandb_project,
@@ -73,6 +71,8 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
             )
         )
     if options.mlflow:
+        from tslab.tracking.mlflow_tracker import MLflowTracker  # noqa: PLC0415
+
         trackers.append(
             MLflowTracker(
                 experiment=options.mlflow_experiment or options.wandb_project,
@@ -80,5 +80,7 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
             )
         )
     if options.tensorboard:
+        from tslab.tracking.tensorboard_tracker import TensorBoardTracker  # noqa: PLC0415
+
         trackers.append(TensorBoardTracker())
     return tuple(trackers)

@@ -66,3 +66,14 @@ def test_split_slices_are_checked() -> None:
         checked_split_slices(data=Series(slices={'train': slice(0, 6), 'test': slice(6, 10)}))
     with pytest.raises(ValueError, match='step'):
         checked_split_slices(data=Series(slices={**good, 'test': slice(8, 10, 2)}))
+
+
+def test_dataset_facts_are_validated() -> None:
+    with pytest.raises(ValueError, match='num_channels'):
+        TSDataInfo(num_channels=0, length=10)
+    with pytest.raises(ValueError, match='length'):
+        TSDataInfo(num_channels=1, length=0)
+    with pytest.raises(ValueError, match='num_classes'):
+        TSClassificationDataInfo(num_channels=1, length=None, num_classes=1)
+    with pytest.raises(ValueError, match='num_channels'):
+        TSForecastingDataInfo(num_channels=0, length=None, target_channels=(0,))

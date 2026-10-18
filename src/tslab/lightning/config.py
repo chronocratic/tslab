@@ -17,7 +17,7 @@ class LightningTrainerConfig:
 
     Attributes:
         max_epochs: Upper bound on training epochs.
-        min_epochs: Epochs trained before any stop signal is honoured, including
+        min_epochs: Epochs trained before any stop signal is honored, including
             early stopping and the time limit.
         accelerator: Lightning accelerator (``'auto'``, ``'cpu'``, ``'gpu'``, ...).
         devices: Number of devices, or ``'auto'``.
