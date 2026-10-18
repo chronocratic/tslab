@@ -18,6 +18,14 @@ from tslab.study.definition import (
     StudyRun,
 )
 from tslab.study.expansion import expand_placeholders, expand_setting, expand_variables
+from tslab.study.launch import (
+    launch,
+    Launcher,
+    LaunchReport,
+    LocalLauncher,
+    SlurmLauncher,
+    write_job_files,
+)
 from tslab.study.loading import load_study
 from tslab.study.machine import (
     flatten_settings,
@@ -82,6 +90,9 @@ __all__ = [
     'Grid',
     'JobGroup',
     'JobRecord',
+    'LaunchReport',
+    'Launcher',
+    'LocalLauncher',
     'MachineOverride',
     'MachineProfile',
     'MachineProfileError',
@@ -92,6 +103,7 @@ __all__ = [
     'RunReport',
     'Settings',
     'SlurmError',
+    'SlurmLauncher',
     'SlurmSettings',
     'Study',
     'StudyRun',
@@ -111,6 +123,7 @@ __all__ = [
     'from_presets',
     'job_script',
     'latest_tasks',
+    'launch',
     'load_machine',
     'load_study',
     'match_problems',
@@ -135,4 +148,5 @@ __all__ = [
     'take_progress',
     'validate_arguments',
     'validate_jobs',
+    'write_job_files',
 ]
