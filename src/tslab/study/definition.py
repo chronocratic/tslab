@@ -10,10 +10,15 @@ from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from itertools import product
+from pathlib import Path
 import re
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
 from tslab.study.settings import check_paths, Settings, SettingValue
+
+if TYPE_CHECKING:
+    from tslab.study.results import ResultRow
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
@@ -168,6 +173,29 @@ class Study:
         if not any(_grid_has_runs(grid_name=name, grid=grid) for name, grid in self.grids.items()):
             message = 'study has no runs; every run is excluded'
             raise ValueError(message)
+
+    def results(self, *, machine: Path) -> 'list[ResultRow]':
+        """The rows of the results table of every run of the study.
+
+        Args:
+            machine: The machine profile the runs run on.
+
+        Returns:
+            One row per (run, instance), and one row per run without
+            instances; the runs of every grid, in expansion order.
+        """
+        # why: imported here, not at the top, because the commands import this module
+        from tslab.study.commands import context_for, Selection  # noqa: PLC0415
+        from tslab.study.results import collect_results  # noqa: PLC0415
+
+        context = context_for(
+            study=self, machine_path=machine, selection=Selection(), project_root=Path.cwd()
+        )
+        return collect_results(
+            study=self,
+            study_directory=context.machine.output_root / self.name,
+            reports=context.reports,
+        )
 
 
 def normalize_match(*, match: Match) -> dict[str, tuple[str, ...]]:

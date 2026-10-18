@@ -11,9 +11,9 @@ from typing import Annotated
 
 import tyro
 
-from tslab.study import load_context, parse_states, resubmit, Selection, status, submit
+from tslab.study import load_context, parse_states, resubmit, results, Selection, status, submit
 
-__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Status', 'Submit']
+__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,4 +146,36 @@ class Resubmit:
         )
 
 
-STUDY_COMMANDS = {'submit': Submit, 'status': Status, 'resubmit': Resubmit}
+@dataclass(frozen=True, kw_only=True)
+class Results:
+    """The metrics of every run of a study, as one CSV table.
+
+    Attributes:
+        study: The study reference, ``module:attribute``.
+        machine: The machine profile the runs run on.
+        grid: Keep only this grid; repeatable.
+        only: Keep only the runs that match ``axis=value``; repeatable,
+            comma separated for several values of one axis.
+        out: The CSV file to write; required.
+    """
+
+    study: Annotated[str, tyro.conf.Positional]
+    machine: Path
+    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    out: Path
+
+    def run(self) -> int:
+        """Write the table and return the exit code."""
+        return results(
+            context=load_context(
+                reference=self.study,
+                machine_path=self.machine,
+                selection=Selection(grids=self.grid, only=self.only),
+                project_root=Path.cwd(),
+            ),
+            out=self.out,
+        )
+
+
+STUDY_COMMANDS = {'submit': Submit, 'status': Status, 'resubmit': Resubmit, 'results': Results}
