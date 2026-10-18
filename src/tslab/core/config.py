@@ -130,7 +130,7 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
             name = next(
                 (meta.name for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE), None
             )
-        if stripped is None:
+        if stripped is None or stripped is type(None):  # Annotated[None, ...] normalizes
             if name is None:
                 continue  # a bare None carries no name
             choices[name] = type(None)

@@ -7,6 +7,8 @@ fields, so one axis can hold both, ``ucr_datasets(...) | uea_datasets(...)``.
 
 from collections.abc import Mapping, Sequence
 
+from tslab.study import SettingValue
+
 __all__ = ['ucr_datasets', 'uea_datasets']
 
 
@@ -15,8 +17,8 @@ def ucr_datasets(
     root: str,
     names: Sequence[str],
     target_column_name: str = 'target',
-    settings: Mapping[str, object] | None = None,
-) -> dict[str, dict[str, object]]:
+    settings: Mapping[str, SettingValue] | None = None,
+) -> dict[str, dict[str, SettingValue]]:
     """Axis values that point at the UCR archives under ``root``.
 
     Args:
@@ -46,8 +48,8 @@ def uea_datasets(
     root: str,
     names: Sequence[str],
     target_column_name: str = 'target',
-    settings: Mapping[str, object] | None = None,
-) -> dict[str, dict[str, object]]:
+    settings: Mapping[str, SettingValue] | None = None,
+) -> dict[str, dict[str, SettingValue]]:
     """Axis values that point at the UEA archives under ``root``.
 
     Args:
@@ -78,8 +80,8 @@ def _datasets(
     root: str,
     names: Sequence[str],
     target_column_name: str,
-    settings: Mapping[str, object] | None,
-) -> dict[str, dict[str, object]]:
+    settings: Mapping[str, SettingValue] | None,
+) -> dict[str, dict[str, SettingValue]]:
     if not names:
         message = f'{archive}_datasets needs at least one dataset name'
         raise ValueError(message)

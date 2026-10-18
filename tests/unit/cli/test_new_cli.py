@@ -8,8 +8,11 @@ from tslab.cli.new import create_project
 EXPECTED_FILES = {
     '.gitignore',
     'README.md',
+    'machines/local.toml',
+    'machines/slurm.example.toml',
     'pyproject.toml',
     'src/my_paper/__init__.py',
+    'src/my_paper/studies.py',
     'src/my_paper/augmentations.py',
     'src/my_paper/classify.py',
     'src/my_paper/forecast.py',
