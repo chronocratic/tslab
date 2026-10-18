@@ -2,8 +2,10 @@
 
 ## Core
 
-The names below are importable from `tslab`. The interfaces it re-exports
-(`ModelAsEncoder`, `RunStatus`, `Tracker`) are listed under Interfaces.
+The names below are importable from `tslab` (including `tslab.REQUIRED`, the
+optional marker for preset values the preset cannot know). The interfaces it
+re-exports (`ModelAsEncoder`, `RunStatus`, `Tracker`) are listed under
+Interfaces.
 
 ```{eval-rst}
 .. automodule:: tslab
@@ -26,6 +28,23 @@ The names below are importable from `tslab`. The interfaces it re-exports
 .. automodule:: tslab.stages
    :members:
    :imported-members:
+```
+
+## Studies
+
+The study layer; user study modules import only from `tslab.study`, and that
+import never pulls in heavy code. The commands (`submit`, `status`,
+`resubmit`, `results`) are the `tslab study` CLI; see
+[Studies and HPC](studies.md).
+
+```{eval-rst}
+.. autoclass:: tslab.study.Study
+.. autoclass:: tslab.study.Grid
+.. autoclass:: tslab.study.Override
+.. autoclass:: tslab.study.StudyRun
+.. autofunction:: tslab.study.setting_axis
+.. autofunction:: tslab.study.from_presets
+.. autodata:: tslab.study.DEFAULT_RUN_SETTINGS
 ```
 
 ## Time series

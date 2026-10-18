@@ -76,7 +76,7 @@ PRESETS = {
             run_path=Path('ts2vec') / 'toy_hourly' / 'full-series',
         ),
     ),
-    'cost-crop-128': (
+    'cost-cropped': (
         'CoST on the toy hourly series, trained on random 128-step crops, batch size 1',
         ForecastConfig(
             model=model_settings(
@@ -85,7 +85,7 @@ PRESETS = {
             data=data_settings(
                 name='ett', dataset_file_path=TOY_HOURLY, variant='ETTh1', batch_size=1
             ),
-            run_path=Path('cost') / 'toy_hourly' / 'crop-128',
+            run_path=Path('cost') / 'toy_hourly' / 'cropped',
         ),
     ),
 }

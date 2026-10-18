@@ -39,7 +39,7 @@ example = Study(
             axes={
                 'recipe': from_presets(
                     forecast.PRESETS,
-                    names=('ts2vec-full-series', 'cost-crop-128'),
+                    names=('ts2vec-full-series', 'cost-cropped'),
                     without=('data', 'run_path'),
                 ),
                 'variant': {
@@ -54,7 +54,7 @@ example = Study(
             # The preset's batch size lived in its data settings, which a study
             # drops; give the run its batch size back here.
             overrides=(
-                Override(match={'recipe': 'cost-crop-128'}, settings={'data.batch_size': 1}),
+                Override(match={'recipe': 'cost-cropped'}, settings={'data.batch_size': 1}),
             ),
         ),
     },

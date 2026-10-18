@@ -18,16 +18,11 @@ is logged and skipped.
 
 ## W&B on clusters
 
-W&B can mark a run `crashed` when the network drops or a job is killed. TSLab
-starts W&B with generous timeouts, falls back to offline mode and then to no
-W&B when the server is unreachable, and records the real exit status. Repair
-the view of the server afterwards:
-
-```bash
-uv run tslab wandb-sync runs/ --dry-run     # what would be resynced
-uv run tslab wandb-sync runs/               # resync crashed and failed runs
-uv run tslab wandb-sync runs/ --include-offline
-```
+W&B can mark a run `crashed` when the network drops or a job is killed. The
+full notes — offline mode on clusters without network, and
+`tslab wandb-sync` to repair the server afterwards (also available as an
+automatic follow-up job of a study) — are on the
+[Studies and HPC](studies.md#hpc-environment-notes) page.
 
 `--tracking.shell-log-path` uploads a SLURM output file to W&B at the end of
 the run.

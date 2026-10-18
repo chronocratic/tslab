@@ -18,13 +18,17 @@ again and it resumes from its last checkpoint.
 A job killed at its time limit leaves its lock behind. The lock carries a
 heartbeat refreshed every minute, so after ten minutes without one the next
 job takes the run over, on any node. `tslab status runs/` lists such runs as
-`interrupted`.
+`interrupted`. `tslab study resubmit` resubmits such runs of a study
+automatically; see [Studies and HPC](studies.md#resubmit).
 
 ## Many runs
 
-Give each run its own folder (`--run-path ts2vec/Coffee/seed_0`) and submit
-one job per run, for example as a SLURM array whose task index picks the model,
-dataset and seed. After the array:
+A [study](studies.md) is the supported way to run many runs: one saved
+definition, one SLURM array per grid, fixed run names, status and resubmit.
+
+For one-off batches without a study, give each run its own folder
+(`--run-path ts2vec/Coffee/seed_0`) and submit one job per run. Check the
+folders afterwards:
 
 ```bash
 uv run tslab status runs/            # one line per run: state and instance counts
