@@ -45,7 +45,7 @@ if answers:
     sys.stderr.write(answer.get('stderr', ''))
     sys.exit(int(answer.get('exit', 0)))
 if NAME == 'sbatch':
-    sys.stdout.write(f'{{1000 + prior}};tslab\\n')
+    sys.stdout.write(f'{1000 + prior};tslab\\n')
 sys.exit(0)
 """
 
