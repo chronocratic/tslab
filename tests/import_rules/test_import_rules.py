@@ -78,6 +78,17 @@ FORBIDDEN_IN_DATASETS_ADAPTER = (
     'tslab.adapters.chronocratic.models',
     *TRACKER_SDKS,
 )
+FORBIDDEN_IN_STUDY = (
+    'lightning',
+    'pytorch_lightning',
+    'sklearn',
+    'chronocratic',
+    'tslab.tasks',
+    'tslab.adapters',
+    'tslab.lightning',
+    'tslab.tracking',
+    *TRACKER_SDKS,
+)
 
 
 def loaded_by(*, module: str) -> set[str]:
@@ -135,6 +146,16 @@ def test_datasets_adapter_loads_no_model_code() -> None:
     loaded = loaded_by(module='tslab.adapters.chronocratic.datasets')
     assert 'chronocratic.datasets' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_DATASETS_ADAPTER) == []
+
+
+@pytest.mark.slow
+def test_study_loads_no_heavy_code() -> None:
+    # tslab.study is the import surface user study modules use; it must not
+    # pull in heavy code. tslab.cli.study is checked by hand instead of here:
+    # the CLI package __init__ imports WandbSync, which eagerly imports
+    # tslab.tracking.wandb_log (a light log parser, not the wandb SDK, which
+    # wandb_sync imports lazily). See the final report for that finding.
+    assert offending(loaded=loaded_by(module='tslab.study'), forbidden=FORBIDDEN_IN_STUDY) == []
 
 
 def test_chronocratic_namespace_imports_nothing() -> None:
