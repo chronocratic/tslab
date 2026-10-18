@@ -14,10 +14,11 @@ import shutil
 from typing import Any, override
 
 from lightning.pytorch.loggers import Logger
+from lightning.pytorch.utilities import rank_zero_only
 
 from tslab.interfaces.tracker import RunStatus, Tracker
 
-__all__ = ['LightningLoggerTracker', 'lightning_loggers']
+__all__ = ['LightningLoggerTracker', 'TrackerLogger', 'lightning_loggers']
 
 _LOGGER = logging.getLogger(__name__)
 _GUARDED_METHODS = ('log_hyperparams', 'log_metrics', 'save', 'finalize')
@@ -109,20 +110,64 @@ class LightningLoggerTracker(Tracker):
             self._logger.finalize(status='success' if status is RunStatus.FINISHED else 'failed')
 
 
+class TrackerLogger(Logger):
+    """A Lightning logger that forwards to a ``Tracker`` that has no Lightning logger.
+
+    This is how the metrics of Lightning reach the local CSV tracker of every
+    run, and any tracker you write yourself. The tracker is started and
+    finished by ``Run``, not by this logger.
+    """
+
+    def __init__(self, *, tracker: Tracker) -> None:
+        """Wrap ``tracker``."""
+        super().__init__()
+        self._tracker = tracker
+
+    @property
+    @override
+    def name(self) -> str:
+        return type(self._tracker).__name__
+
+    @property
+    @override
+    def version(self) -> str:
+        return '0'
+
+    @override
+    @rank_zero_only
+    def log_hyperparams(self, params: Any, *args: Any, **kwargs: Any) -> None:
+        self._tracker.log_params(params=_as_dict(params=params))
+
+    @override
+    @rank_zero_only
+    def log_metrics(self, metrics: Mapping[str, float], step: int | None = None) -> None:
+        self._tracker.log_metrics(metrics=dict(metrics), step=step)
+
+
+def _as_dict(*, params: Any) -> dict[str, object]:  # noqa: ANN401 # why: Lightning passes dicts or namespaces
+    if isinstance(params, Mapping):
+        return dict(params)
+    return dict(vars(params))
+
+
 def lightning_loggers(*, trackers: Iterable[Tracker]) -> list[Logger]:
     """Return the working Lightning loggers behind ``trackers``.
 
     ``LightningTrainer`` passes these to ``lightning.Trainer(logger=...)`` so
-    Lightning's training metrics reach the same tracker runs.
+    the training metrics of Lightning reach the same tracker runs.
 
     Args:
-        trackers: The run's trackers; trackers without a Lightning logger are skipped.
+        trackers: The trackers of the run. A tracker that wraps a Lightning
+            logger contributes it; any other tracker gets a ``TrackerLogger``.
+            A wrapper whose logger failed to start is skipped.
 
     Returns:
-        The started Lightning loggers.
+        The Lightning loggers, all guarded against failures.
     """
-    return [
-        tracker.lightning_logger
-        for tracker in trackers
-        if isinstance(tracker, LightningLoggerTracker) and tracker.lightning_logger is not None
-    ]
+    loggers: list[Logger] = []
+    for tracker in trackers:
+        if not isinstance(tracker, LightningLoggerTracker):
+            loggers.append(guard_logger(logger=TrackerLogger(tracker=tracker)))
+        elif tracker.lightning_logger is not None:
+            loggers.append(tracker.lightning_logger)
+    return loggers

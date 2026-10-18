@@ -6,6 +6,7 @@ import lightning
 from lightning import LightningModule
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 import pytest
+import torch
 
 from tslab.lightning.callbacks import (
     AccumulatingTimerCallback,
@@ -45,7 +46,7 @@ def test_callbacks_with_validation(tmp_path: Path) -> None:
     checkpoint = callbacks[0]
     assert isinstance(checkpoint, ModelCheckpoint)
     assert checkpoint.monitor == 'val_loss_epoch'
-    assert checkpoint.filename == '{epoch}-{val_loss_epoch:.2f}'
+    assert checkpoint.filename == 'epoch={epoch}-val_loss_epoch={val_loss_epoch:.2f}'
     assert checkpoint.save_top_k == 3
     assert checkpoint.save_last is True
     early_stopping = callbacks[1]
@@ -53,6 +54,21 @@ def test_callbacks_with_validation(tmp_path: Path) -> None:
     assert early_stopping.patience == 250
     # Lightning stores min_delta with a sign that depends on the mode.
     assert abs(early_stopping.min_delta) == pytest.approx(0.001)
+
+
+def test_a_monitor_with_a_slash_keeps_checkpoints_in_one_folder(tmp_path: Path) -> None:
+    config = LightningTrainerConfig(monitor='val/loss')
+    (checkpoint, *_) = build_callbacks(
+        config=config, checkpoint_directory=tmp_path, has_validation=True, has_logger=False
+    )
+    assert isinstance(checkpoint, ModelCheckpoint)
+    path = Path(
+        checkpoint.format_checkpoint_name(
+            {'epoch': torch.tensor(3), 'val/loss': torch.tensor(0.123)}
+        )
+    )
+    assert path.parent == tmp_path.resolve() or path.parent == tmp_path
+    assert path.name == 'epoch=3-val_loss=0.12.ckpt'
 
 
 def test_callbacks_without_validation_or_logger(

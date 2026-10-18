@@ -38,6 +38,13 @@ def test_candidate_order(tmp_path: Path) -> None:
     ]
 
 
+def test_a_monitor_with_a_slash_is_ranked_by_its_file_name_form(tmp_path: Path) -> None:
+    write_checkpoint(path=tmp_path / 'epoch=1-val_loss=0.50.ckpt', modified=100)
+    write_checkpoint(path=tmp_path / 'epoch=2-val_loss=0.20.ckpt', modified=50)
+    names = [path.name for path in resume_candidates(directory=tmp_path, monitor='val/loss')]
+    assert names == ['epoch=2-val_loss=0.20.ckpt', 'epoch=1-val_loss=0.50.ckpt']
+
+
 def test_last_is_chosen_when_it_loads(tmp_path: Path) -> None:
     make_folder(directory=tmp_path)
     assert choose_resume_checkpoint(directory=tmp_path, monitor=MONITOR) == tmp_path / 'last.ckpt'

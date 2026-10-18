@@ -1,8 +1,11 @@
 import dataclasses
 
+import pytest
+
 from tslab.core.config import config_from_yaml, config_to_yaml
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.lightning.config import LightningTrainerConfig
+from tslab.lightning.trainer import LightningTrainer
 
 
 def fingerprint(*, config: LightningTrainerConfig) -> str:
@@ -65,3 +68,10 @@ def test_config_file_round_trip() -> None:
     )
     text = config_to_yaml(config=config)
     assert config_from_yaml(config_class=LightningTrainerConfig, text=text) == config
+
+
+def test_extra_trainer_kwargs_cannot_replace_what_tslab_builds() -> None:
+    config = LightningTrainerConfig(extra_trainer_kwargs={'logger': False, 'max_time': '00:01:00'})
+    with pytest.raises(ValueError, match=r"\['logger', 'max_time'\]"):
+        LightningTrainer(config=config)
+    LightningTrainer(config=LightningTrainerConfig(extra_trainer_kwargs={'gradient_clip_val': 1.0}))

@@ -1,11 +1,11 @@
-"""Reader for W&B's local transaction log (the ``run-<id>.wandb`` file).
+"""Reader for the local transaction log of W&B (the ``run-<id>.wandb`` file).
 
 ``wandb sync`` replays this file to the server, so its exit records decide
 which state a resync can reach. wandb 0.30 removed the Python reader
 (``wandb.sdk.internal.datastore``), which silently turns an exit-code check
 built on it into a no-op. This module reads the format directly.
 
-Format (a LevelDB-style log, unchanged since wandb's first datastore):
+Format (a LevelDB-style log, unchanged since the first datastore of wandb):
 
 - a 7-byte header: ``b':W&B'``, magic ``0xBEE1`` (little-endian), version ``0``;
 - then 32 KiB blocks of records, each with a 7-byte header (CRC-32 of the
@@ -15,6 +15,7 @@ Format (a LevelDB-style log, unchanged since wandb's first datastore):
 """
 
 from collections.abc import Iterator
+import logging
 from pathlib import Path
 import struct
 from typing import Any
@@ -22,6 +23,7 @@ import zlib
 
 __all__ = ['read_exit_codes', 'read_records', 'read_run_coordinates']
 
+_LOGGER = logging.getLogger(__name__)
 _HEADER = struct.Struct('<4sHB')
 _HEADER_IDENT = b':W&B'
 _HEADER_MAGIC = 0xBEE1
@@ -48,11 +50,13 @@ def read_records(*, path: Path) -> Iterator[bytes]:
         path: A ``run-<id>.wandb`` transaction log.
 
     Yields:
-        Serialised ``wandb_internal_pb2.Record`` messages, in log order.
+        Serialized ``wandb_internal_pb2.Record`` messages, in log order.
+
+    A truncated last record, as a killed process leaves, ends the iteration
+    with a warning.
 
     Raises:
-        ValueError: If the header is not a W&B log or a record checksum fails
-            (a truncated or corrupt file).
+        ValueError: If the header is not a W&B log or a record checksum fails.
     """
     data = path.read_bytes()
     _check_header(path=path, data=data)
@@ -68,6 +72,11 @@ def read_records(*, path: Path) -> Iterator[bytes]:
         if kind == 0 and length == 0:
             break  # zero padding: end of written data
         payload = data[offset : offset + length]
+        if len(payload) < length:
+            # A process killed mid-write leaves a short last record; the records
+            # before it are still good.
+            _LOGGER.warning('%s ends in a truncated record; ignoring it', path.as_posix())
+            break
         offset += length
         if zlib.crc32(bytes([kind]) + payload) != checksum:
             message = f'{path.as_posix()}: corrupt record at byte {offset - length}'
@@ -117,7 +126,7 @@ def read_exit_codes(*, path: Path) -> list[int]:
 
 
 def read_run_coordinates(*, path: Path) -> tuple[str | None, str | None, str | None]:
-    """Return ``(entity, project, run_id)`` from the log's first run record.
+    """Return ``(entity, project, run_id)`` from the first run record of the log.
 
     wandb writes the run record at start-up, so it is present even when the run
     crashed before its debug logs showed a W&B URL. Offline runs started

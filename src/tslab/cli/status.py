@@ -19,6 +19,7 @@ from typing import Annotated
 
 import tyro
 
+from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
 from tslab.core.status import (
     InstanceRecord,
@@ -32,7 +33,6 @@ from tslab.core.status import (
 __all__ = ['Status']
 
 _LOGGER = logging.getLogger(__name__)
-_STATUS_FILE = 'status.json'
 _INTERRUPTED = 'interrupted'
 _FINGERPRINT_PREFIX = 8
 _SECONDS_PER_MINUTE = 60
@@ -69,14 +69,14 @@ class Status:
             _LOGGER.error('%s is not a folder', self.path.as_posix())
             return 2
         try:
-            snapshot = read_status(path=self.path / _STATUS_FILE)
+            snapshot = read_status(path=self.path / STATUS_FILE)
         except StatusFileError as error:
             _LOGGER.error('%s', error)  # noqa: TRY400 # why: a traceback adds nothing
             return 1
         if snapshot is not None:
             _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
             return 0
-        runs = sorted(status_file.parent for status_file in self.path.rglob(_STATUS_FILE))
+        runs = sorted(status_file.parent for status_file in self.path.rglob(STATUS_FILE))
         if not runs:
             _LOGGER.info('no runs below %s', self.path.as_posix())
             return 1
@@ -171,7 +171,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     totals: Counter[str] = Counter()
     for directory in runs:
         try:
-            snapshot = read_status(path=directory / _STATUS_FILE)
+            snapshot = read_status(path=directory / STATUS_FILE)
         except StatusFileError as error:
             _LOGGER.warning('skipping an unreadable run: %s', error)
             continue

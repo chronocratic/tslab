@@ -15,7 +15,12 @@ from lightning.pytorch.callbacks import (
 
 from tslab.lightning.config import LightningTrainerConfig
 
-__all__ = ['AccumulatingTimerCallback', 'build_callbacks', 'resolve_early_stopping_patience']
+__all__ = [
+    'AccumulatingTimerCallback',
+    'build_callbacks',
+    'file_safe_name',
+    'resolve_early_stopping_patience',
+]
 
 _LOGGER = logging.getLogger(__name__)
 _STATE_KEY = 'timer_callback_state'
@@ -89,6 +94,11 @@ class AccumulatingTimerCallback(Callback):
             self.sessions_times[self.sessions_count] = time.perf_counter() - self.start_time
 
 
+def file_safe_name(*, name: str) -> str:
+    """Return ``name`` as it appears in checkpoint file names (``/`` becomes ``_``)."""
+    return name.replace('/', '_')
+
+
 def resolve_early_stopping_patience(*, config: LightningTrainerConfig) -> int:
     """Return the early-stopping patience, in validation checks.
 
@@ -128,7 +138,10 @@ def build_callbacks(
         callbacks.append(
             ModelCheckpoint(
                 dirpath=checkpoint_directory,
-                filename=f'{{epoch}}-{{{config.monitor}:.2f}}',
+                # A "/" in the metric name would put the file in a sub-folder.
+                filename=f'epoch={{epoch}}-{file_safe_name(name=config.monitor)}='
+                f'{{{config.monitor}:.2f}}',
+                auto_insert_metric_name=False,
                 monitor=config.monitor,
                 mode='min',
                 save_top_k=config.checkpoint_save_top_k,

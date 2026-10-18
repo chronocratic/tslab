@@ -11,7 +11,7 @@ __all__ = ['TensorBoardTracker']
 
 
 class TensorBoardTracker(LightningLoggerTracker):
-    """Wraps Lightning's ``TensorBoardLogger``. Needs the ``tslab[tensorboard]`` extra."""
+    """Wraps the Lightning ``TensorBoardLogger``. Needs the ``tslab[tensorboard]`` extra."""
 
     @override
     def _create_logger(self, *, run_directory: Path, run_name: str) -> Logger | None:

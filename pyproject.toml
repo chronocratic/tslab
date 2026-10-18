@@ -37,6 +37,8 @@ dependencies = [
 wandb = ["wandb>=0.30,<0.31"]
 mlflow = ["mlflow>=3.0,<4"]
 tensorboard = ["tensorboard>=2.18"]
+# mid-epoch resume: Lightning saves the position of a stateful data loader
+torchdata = ["torchdata>=0.11"]
 chronocratic-models = [
     "chronocratic-models>=0.1.0a20,<0.2",
 ]

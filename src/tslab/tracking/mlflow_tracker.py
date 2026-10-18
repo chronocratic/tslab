@@ -7,7 +7,6 @@ from typing import override
 
 from lightning.pytorch.loggers import Logger, MLFlowLogger
 
-from tslab.interfaces.tracker import RunStatus
 from tslab.tracking.lightning_bridge import LightningLoggerTracker
 
 __all__ = ['MLflowTracker']
@@ -16,11 +15,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MLflowTracker(LightningLoggerTracker):
-    """Wraps Lightning's ``MLFlowLogger``.
+    """Wraps the Lightning ``MLFlowLogger``.
 
     MLflow parameters are immutable per run: logging an existing key with a
     new value raises. The tracker remembers which keys it logged and sends
-    only new ones.
+    only new ones; a later, different value for a logged key is dropped with
+    a warning. An experiment that already exists keeps its own artifact location.
     """
 
     def __init__(self, *, experiment: str = 'tslab', tracking_uri: str | None = None) -> None:
@@ -36,6 +36,7 @@ class MLflowTracker(LightningLoggerTracker):
         self._experiment = experiment
         self._tracking_uri = tracking_uri
         self._logged_keys: set[str] = set()
+        self._logged_values: dict[str, object] = {}
 
     @override
     def _create_logger(self, *, run_directory: Path, run_name: str) -> Logger | None:
@@ -81,17 +82,18 @@ class MLflowTracker(LightningLoggerTracker):
 
     @override
     def log_params(self, *, params: Mapping[str, object]) -> None:
+        for key, value in params.items():
+            if key in self._logged_keys and self._logged_values.get(key) != value:
+                _LOGGER.warning(
+                    'MLflow parameters are immutable: %r keeps its first value, not %r', key, value
+                )
         new_params = {key: value for key, value in params.items() if key not in self._logged_keys}
         if new_params:
             super().log_params(params=new_params)
             self._logged_keys.update(new_params)
+            self._logged_values.update(new_params)
 
     @override
     def log_file(self, *, path: Path) -> None:
         if isinstance(self._logger, MLFlowLogger) and self._logger.run_id is not None:
             self._logger.experiment.log_artifact(run_id=self._logger.run_id, local_path=str(path))
-
-    @override
-    def finish(self, *, status: RunStatus) -> None:
-        # Lightning maps 'success' to MLflow FINISHED and anything else to FAILED.
-        super().finish(status=status)

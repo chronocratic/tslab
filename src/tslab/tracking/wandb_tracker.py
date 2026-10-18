@@ -67,13 +67,13 @@ def build_wandb_settings() -> 'wandb.Settings':
 
 
 class WandbTracker(LightningLoggerTracker):
-    """Wraps Lightning's ``WandbLogger`` with hardening for long HPC runs.
+    """Wraps the Lightning ``WandbLogger`` with hardening for long HPC runs.
 
-    - Initialises eagerly in ``start``, so a wandb-core start-up failure
+    - Initializes eagerly in ``start``, so a wandb-core start-up failure
       happens where TSLab can degrade instead of inside ``Trainer.fit``.
     - Falls back online, then offline, then no W&B, each with a warning. A
       missing ``wandb`` package gives a warning naming the ``tslab[wandb]`` extra.
-    - Tags are the given tags plus every part of the run's relative path, so
+    - Tags are the given tags plus every part of the relative path of the run, so
       ``ts2vec/Coffee/seed_42`` gives the tags ``ts2vec``, ``Coffee`` and ``seed_42``.
     - ``finish`` uploads the shell log, then calls ``run.finish(exit_code=...)``:
       0 marks the run finished, 1 marks it failed.
@@ -110,30 +110,27 @@ class WandbTracker(LightningLoggerTracker):
             _LOGGER.warning('wandb is not installed; install tslab[wandb]. Continuing without W&B.')
             return None
         tags = [*self._tags, *Path(run_name).parts]
-        try:
+        modes = [self._mode] if self._mode == 'offline' else [self._mode, 'offline']
+        for mode in modes:
             try:
                 return self._build(
-                    run_directory=run_directory, run_name=run_name, tags=tags, mode=self._mode
+                    run_directory=run_directory, run_name=run_name, tags=tags, mode=mode
                 )
-            except Exception:
-                if self._mode == 'offline':
-                    raise
-                _LOGGER.warning(
-                    'W&B init failed in %s mode; retrying offline. Sync later with '
-                    '`tslab wandb-sync`.',
-                    self._mode,
-                    exc_info=True,
-                )
-                return self._build(
-                    run_directory=run_directory, run_name=run_name, tags=tags, mode='offline'
-                )
-        except Exception:  # wandb raises version-unstable private exception types
-            _LOGGER.warning(
-                'W&B initialisation failed, including offline. Continuing without W&B; '
-                'results are unaffected and CSV tracking is still on.',
-                exc_info=True,
-            )
-            return None
+            except Exception:  # wandb raises version-unstable private exception types
+                if mode == modes[-1]:
+                    _LOGGER.warning(
+                        'W&B initialization failed, including offline. Continuing without W&B; '
+                        'results are unaffected and CSV tracking is still on.',
+                        exc_info=True,
+                    )
+                else:
+                    _LOGGER.warning(
+                        'W&B init failed in %s mode; retrying offline. Sync later with '
+                        '`tslab wandb-sync`.',
+                        mode,
+                        exc_info=True,
+                    )
+        return None
 
     def _build(
         self, *, run_directory: Path, run_name: str, tags: list[str], mode: str

@@ -9,6 +9,7 @@ encode sliding windows, once per horizon. Both paths produce the keys of
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import logging
 from typing import Protocol
 
 import torch
@@ -20,6 +21,8 @@ from tslab.core.stage import stage
 from tslab.interfaces import Encoder, SequenceEncoder, Split, SPLITS, Trainer
 from tslab.stages import check_representations
 from tslab.tasks.data import TSDataInfo
+
+_LOGGER = logging.getLogger(__name__)
 
 __all__ = [
     'ForecastingSeries',
@@ -58,6 +61,7 @@ class TSForecastingDataInfo(TSDataInfo):
             ValueError: If there is no target channel, an index is out of range
                 or repeated, or a channel is both target and covariate.
         """
+        super().__post_init__()
         if not self.target_channels:
             message = 'a forecasting dataset needs at least one target channel'
             raise ValueError(message)
@@ -80,7 +84,8 @@ class ForecastingSeries(Protocol):
 
     The TS2Vec forecasting protocol encodes the whole series once, so later
     splits see earlier steps as context; it then cuts each split out of the
-    result.
+    result. Normalize the series with statistics of the train split only;
+    TSLab does not scale it.
     """
 
     @property
@@ -414,6 +419,10 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
         raise ValueError(message)
     prefix = () if name is None else normalize_instance_name(name=name)
     if isinstance(encoder(model), SequenceEncoder):
+        if window_length is not None or stride != 1:
+            _LOGGER.warning(
+                'this encoder has encode_sequence, so window_length and stride are ignored'
+            )
         sequences = encode_series(
             run=run,
             name=name,
