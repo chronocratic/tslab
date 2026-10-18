@@ -15,6 +15,36 @@ class Config:
     learning_rate: float = 0.1
 
 
+def test_experiment_already_created_by_another_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A shared tracking URI survives a race: another run creates the experiment in between."""
+    uri = f'sqlite:///{(tmp_path / "shared.db").as_posix()}'
+    real_get = MlflowClient.get_experiment_by_name
+    calls = {'n': 0}
+
+    def get_then_missing(self: MlflowClient, name: str) -> object:
+        calls['n'] += 1
+        if calls['n'] == 1:  # first look: not there yet; meanwhile another run creates it
+            MlflowClient(tracking_uri=uri).create_experiment(name)
+            return None
+        return real_get(self, name)
+
+    monkeypatch.setattr(MlflowClient, 'get_experiment_by_name', get_then_missing)
+    tracker = MLflowTracker(experiment='shared', tracking_uri=uri)
+    # why: a run that only logs its config params (no metrics) is enough to reproduce the
+    # race, because it is the tracker's single .experiment access
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[tracker]):
+        pass
+    # why: the real method, unpatched; the tracker must have survived the race and kept the run
+    client = MlflowClient(tracking_uri=uri)
+    experiment = real_get(client, 'shared')
+    assert experiment is not None
+    runs = client.search_runs(experiment_ids=[experiment.experiment_id])
+    assert len(runs) == 1
+    assert runs[0].info.status == 'FINISHED'
+
+
 def test_tensorboard_writes_event_files(tmp_path: Path) -> None:
     with Run(
         config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[TensorBoardTracker()]
