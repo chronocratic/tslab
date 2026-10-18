@@ -30,7 +30,9 @@ It also ships:
 - experiment trackers (CSV always; Weights & Biases, MLflow and TensorBoard as extras);
 - typed command-line configs with presets;
 - adapters for the chronocratic model and dataset libraries;
-- `tslab new`, a project template, and `tslab status`, an overview of runs.
+- `tslab new`, a project template; `tslab status`, an overview of runs;
+  `tslab study`, experiment grids on SLURM or locally; and `tslab wandb-sync`,
+  which uploads offline W&B runs.
 
 ## Install
 
@@ -66,8 +68,8 @@ The generated `README.md` explains the rest.
 ## Documentation
 
 [tslab.readthedocs.io](https://tslab.readthedocs.io): concepts, resuming and
-failures, configs and presets, studies and HPC, tracking, HPC, extending
-TSLab, and the API.
+failures, configs and presets, studies, HPC, tracking, extending TSLab, and
+the API.
 
 ## Contributing
 

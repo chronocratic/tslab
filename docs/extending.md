@@ -38,8 +38,8 @@ and the class method `_from_file(cls, *, path)`.
 
 ## A trainer
 
-`tslab.interfaces.Trainer[M]` has two methods: `fit(*, run, model, data, checkpoint_directory) -> Checkpoint`
-and `load(*, model, checkpoint)`. `tslab.lightning.LightningTrainer` is the
+`tslab.interfaces.Trainer[M]` has two methods:
+`fit(*, run, model, data, checkpoint_directory) -> Checkpoint` and `load(*, model, checkpoint)`. `tslab.lightning.LightningTrainer` is the
 ready one.
 
 ## A data source

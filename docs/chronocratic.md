@@ -37,12 +37,12 @@ augmentation producer; its return annotation names the view type:
 @dataclass(frozen=True, kw_only=True)
 class JitterThenScaleRecipe:
     sigma: float = 0.8
-    ratio: float = 1.1
+    scale_sigma: float = 1.1
 
     def __call__(self) -> AugmentationProducer[ViewPair]:
         return RolePairProducer(
             first=Jitter(params=JitterParameters(sigma=self.sigma)),
-            second=Scaling(params=ScalingParameters(sigma=self.ratio)),
+            second=Scaling(params=ScalingParameters(sigma=self.scale_sigma)),
         )
 ```
 
@@ -75,6 +75,9 @@ from tslab.adapters.chronocratic.datasets import (
 - Every datamodule chronocratic exports is a subcommand: `data:ucr`,
   `data:uea`, `data:ett`, `data:electricity`, `data:weather`, with its
   constructor arguments as flags.
+- `ucr_datasets(root=..., names=...)` and `uea_datasets(...)` build the dataset
+  axis of a study (see [Studies and HPC](studies.md)); they set `data`,
+  `data.dataset_folder_path` and `data.target_column_name` for every name.
 - `build_chronocratic_data_source(config=...)` returns a
   `ChronocraticClassificationData` or a `ChronocraticForecastingData`; check
   which with `isinstance` before passing it to the stages of a task.
@@ -114,8 +117,7 @@ python -m my_paper.forecast no-preset model:ts2vec data:ett --data.variant ETTh1
 #   mcl, tstcc, recurrentautoencoder, series2vec, timenet: no crop setting
 ```
 
-For long classification series, `--model.max-train-length 3000` follows the
-TS2Vec paper.
+For long classification series, `--model.max-train-length 3000` is a good starting point for TS2Vec.
 
 ## Known limitations
 

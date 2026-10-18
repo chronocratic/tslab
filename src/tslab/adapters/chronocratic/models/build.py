@@ -92,8 +92,7 @@ def build_chronocratic_model(
     ``input_dim`` comes from the channel count of the data; an unset
     ``sequence_length`` takes the length of the data. The parameter class of
     chronocratic is built first, so its own checks run here. An augmentation
-    recipe is called and its producer
-    passed to the model.
+    recipe is called and its producer passed to the model.
 
     Args:
         config: A model chosen through ``chronocratic_model_choice``.

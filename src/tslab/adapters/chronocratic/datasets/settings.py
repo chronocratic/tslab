@@ -7,7 +7,6 @@ import inspect
 import operator
 from pathlib import Path
 import re
-import sys
 import typing
 from typing import Annotated, Any
 
@@ -15,6 +14,7 @@ import chronocratic.datasets
 from lightning import LightningDataModule
 import tyro
 
+from tslab.adapters.chronocratic.generated import make_settings_class, unknown_settings
 from tslab.core.fingerprint import NotFingerprinted
 
 __all__ = [
@@ -41,7 +41,7 @@ class DataModuleEntry:
     """One chronocratic datamodule found in ``chronocratic.datasets``.
 
     Attributes:
-        name: Subcommand name (``'ucr``, ``'ett'``).
+        name: Subcommand name (``'ucr'``, ``'ett'``).
         datamodule_class: The chronocratic ``LightningDataModule`` class.
         settings_class: The generated settings dataclass.
     """
@@ -81,17 +81,12 @@ def _settings_class(*, datamodule_class: Any) -> type:  # noqa: ANN401 # why: a 
             else dataclasses.field(default=parameter.default)
         )
         fields.append((parameter.name, annotation, default))
-    settings_class = dataclasses.make_dataclass(
-        cls_name=f'{datamodule_class.__name__}Settings',
+    return make_settings_class(
+        name=f'{datamodule_class.__name__}Settings',
         fields=fields,
         namespace={_DATAMODULE_ATTRIBUTE: datamodule_class, '__doc__': datamodule_class.__doc__},
-        frozen=True,
-        kw_only=True,
         module=__name__,
     )
-    # Pickle finds classes by module and name.
-    setattr(sys.modules[__name__], settings_class.__name__, settings_class)
-    return settings_class
 
 
 def _discover_datamodules() -> dict[str, DataModuleEntry]:
@@ -105,12 +100,18 @@ def _discover_datamodules() -> dict[str, DataModuleEntry]:
             and not class_name.startswith('Base')
             and not inspect.isabstract(candidate)
         ):
-            entry = DataModuleEntry(
-                name=_subcommand(class_name=class_name),
+            name = _subcommand(class_name=class_name)
+            if name in entries:
+                message = (
+                    f'{class_name} and {entries[name].datamodule_class.__name__} both give '
+                    f'the subcommand {name!r}'
+                )
+                raise ValueError(message)
+            entries[name] = DataModuleEntry(
+                name=name,
                 datamodule_class=candidate,
                 settings_class=_settings_class(datamodule_class=candidate),
             )
-            entries[entry.name] = entry
     return entries
 
 
@@ -161,7 +162,7 @@ def data_settings(*, name: str, **values: object) -> Any:  # noqa: ANN401
         message = f'no dataset {name!r}; choose from {sorted(DATAMODULES)}'
         raise ValueError(message)
     settings_class = DATAMODULES[name].settings_class
-    unknown = sorted(set(values) - {field.name for field in dataclasses.fields(settings_class)})
+    unknown = unknown_settings(settings_class=settings_class, values=values)
     if unknown:
         message = f'dataset {name!r} has no settings {unknown}'
         raise ValueError(message)

@@ -38,7 +38,7 @@ time = "00:30:00"
 match = { recipe = "cost-cropped" }
 slurm = { time = "5-00:00:00" }
 
-[[overrides]] # both recipes of the classification grid get the long time
+[[overrides]] # the classification grid has one recipe and gets a longer time
 match = { grid = "classification" }
 slurm = { time = "4-00:00:00" }
 

@@ -5,4 +5,4 @@ output_root = "runs"
 # Settings applied to every run on this machine, as in the grids of the study.
 # [settings]
 # "tracking.wandb_mode" = "offline"
-# "trainer.max-epochs" = 100
+# "trainer.max_epochs" = 100

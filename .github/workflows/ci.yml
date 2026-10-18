@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 # Slow tests (real training, example and template runs) only run on PRs into
 # main and on manual runs; dev pushes and other PRs run the fast suite.
 env:

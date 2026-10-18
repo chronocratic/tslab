@@ -36,6 +36,9 @@ FORBIDDEN_IN_CORE = (
     'tslab.adapters',
     'tslab.lightning',
     'tslab.tasks',
+    'tslab.probes',
+    'tslab.study',
+    'tslab.cli',
 )
 FORBIDDEN_IN_LIGHTNING = (
     'sklearn',
@@ -107,6 +110,11 @@ def offending(*, loaded: set[str], forbidden: tuple[str, ...]) -> list[str]:
     )
 
 
+def test_package_import_loads_no_optional_layers() -> None:
+    # The one fast rule: the top-level import is what every user pays for.
+    assert offending(loaded=loaded_by(module='tslab'), forbidden=FORBIDDEN_IN_CORE) == []
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize('module', CORE_MODULES)
 def test_core_modules_load_no_optional_layers(*, module: str) -> None:
@@ -151,10 +159,7 @@ def test_datasets_adapter_loads_no_model_code() -> None:
 @pytest.mark.slow
 def test_study_loads_no_heavy_code() -> None:
     # tslab.study is the import surface user study modules use; it must not
-    # pull in heavy code. tslab.cli.study is checked by hand instead of here:
-    # the CLI package __init__ imports WandbSync, which eagerly imports
-    # tslab.tracking.wandb_log (a light log parser, not the wandb SDK, which
-    # wandb_sync imports lazily). See the final report for that finding.
+    # pull in heavy code.
     assert offending(loaded=loaded_by(module='tslab.study'), forbidden=FORBIDDEN_IN_STUDY) == []
 
 

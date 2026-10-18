@@ -1,9 +1,7 @@
-from collections.abc import Generator
-import contextlib
 import dataclasses
-from dataclasses import dataclass, field
 from pathlib import Path
 
+from integration_helpers import run_in
 from lightning_toy import FAST
 import pytest
 import torch
@@ -16,18 +14,6 @@ from tslab.probes import RidgeProbe, SVMProbe
 from tslab.tasks import forecasting_representations
 
 ENCODER = tslab.ModelAsEncoder(device='cpu')
-
-
-@dataclass(frozen=True, kw_only=True)
-class Config:
-    seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
-
-
-@contextlib.contextmanager
-def run_in(*, root: Path) -> Generator[tslab.Run]:
-    with tslab.Run(config=Config(), root=root, relative_path=Path('r')) as run:
-        yield run
 
 
 pytestmark = pytest.mark.slow

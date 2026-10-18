@@ -47,6 +47,17 @@ import never pulls in heavy code. The commands (`submit`, `status`,
 .. autodata:: tslab.study.DEFAULT_RUN_SETTINGS
 ```
 
+## Command line
+
+`tslab --help` lists the commands, and `tslab <command> --help` their flags.
+
+| Command | What it does | Flags |
+|---|---|---|
+| `tslab new PATH` | copy the project template to `PATH` | `--name` (distribution name; default: the folder name) |
+| `tslab status PATH` | one line per run below `PATH`, or per instance for one run | `--stage` (only this stage) |
+| `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](studies.md) | see that page |
+| `tslab wandb-sync ROOT` | resync crashed, failed and killed W&B runs below `ROOT` | `--states`, `--include-offline`, `--wandb-project`, `--wandb-entity`, `--dry-run` |
+
 ## Time series
 
 ```{eval-rst}

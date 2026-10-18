@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -49,3 +50,18 @@ def test_generated_project_passes_its_checks(tmp_path: Path) -> None:
     ):
         result = uv(*command, cwd=project)
         assert result.returncode == 0, f'uv {" ".join(command)}:\n{result.stdout}\n{result.stderr}'
+
+
+def test_long_package_name_passes_ruff(tmp_path: Path) -> None:
+    # A long package name lengthens the import lines of the template files.
+    project = tmp_path / 'robust-forecasting-study'
+    create_project(path=project)
+    for command in (('check', '.'), ('format', '--check', '.')):
+        result = subprocess.run(  # noqa: S603 # why: runs this interpreter's ruff
+            [sys.executable, '-m', 'ruff', *command],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, f'ruff {" ".join(command)}:\n{result.stdout}'

@@ -7,7 +7,7 @@ the run folder, one `version` per execution. Others are opt-in through
 
 | Tracker | Install | Flags |
 |---|---|---|
-| Weights & Biases | `tslab[wandb]` | `--tracking.wandb-mode online\|offline`, `--tracking.wandb-project`, `--tracking.wandb-entity`, `--tracking.wandb-tags` |
+| Weights & Biases | `tslab[wandb]` | `--tracking.wandb-mode online\|offline\|disabled` (the default), `--tracking.wandb-project`, `--tracking.wandb-entity`, `--tracking.wandb-tags` |
 | MLflow | `tslab[mlflow]` | `--tracking.mlflow`, `--tracking.mlflow-tracking-uri`, `--tracking.mlflow-experiment` |
 | TensorBoard | `tslab[tensorboard]` | `--tracking.tensorboard` |
 

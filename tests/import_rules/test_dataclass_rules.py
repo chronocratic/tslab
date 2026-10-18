@@ -11,7 +11,7 @@ DECORATOR = re.compile(r'^\s*@(?:dataclasses\.)?dataclass\b(.*)$')
 def dataclass_decorators() -> list[tuple[str, int, str]]:
     # Line-based, not ast: template files hold {{placeholders}} and do not parse.
     files = subprocess.run(
-        ['git', 'ls-files', '*.py', '*.md'],  # noqa: S607 # why: fixed git command, no user input
+        ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '*.py', '*.md'],  # noqa: S607 # why: fixed git command, no user input
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -21,10 +21,18 @@ def dataclass_decorators() -> list[tuple[str, int, str]]:
     for name in files:
         if name.startswith('planning/') or name == 'CHANGELOG.md':
             continue
-        for number, line in enumerate((ROOT / name).read_text().splitlines(), start=1):
+        if not (ROOT / name).is_file():
+            continue  # listed by git but deleted in the working tree
+        lines = (ROOT / name).read_text().splitlines()
+        for number, line in enumerate(lines, start=1):
             match = DECORATOR.match(line)
             if match:
-                found.append((name, number, str(match.group(1))))
+                arguments = str(match.group(1))
+                # A decorator may span several lines; read on until the parenthesis closes.
+                following = iter(lines[number:])
+                while arguments.count('(') > arguments.count(')'):
+                    arguments += next(following, ')')
+                found.append((name, number, arguments))
     return found
 
 

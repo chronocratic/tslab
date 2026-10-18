@@ -16,7 +16,7 @@ At release time, `towncrier build` moves them into `CHANGELOG.md`.
 | Type | Use for |
 |------|---------|
 | `added` | new features |
-| `changed` | changes to existing behaviour |
+| `changed` | changes to existing behavior |
 | `deprecated` | features that will be removed |
 | `removed` | removed features |
 | `fixed` | bug fixes |
@@ -25,6 +25,6 @@ At release time, `towncrier build` moves them into `CHANGELOG.md`.
 ## Commands
 
 ```bash
-uv run towncrier build --draft --version 0.1.0a1   # preview the next release's notes
+uv run towncrier build --draft --version 0.1.0a1   # preview the notes of the next release
 uv run towncrier check --compare-with origin/dev   # does this branch add a fragment?
 ```

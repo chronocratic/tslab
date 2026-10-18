@@ -25,9 +25,7 @@ from tslab.interfaces.tracker import RunStatus, Tracker
 
 try:
     __version__ = version('tslab')
-except (
-    PackageNotFoundError
-):  # pragma: no cover - only when running from a source tree without install
+except PackageNotFoundError:  # pragma: no cover - source tree without an install
     __version__ = '0.0.0'
 
 __all__ = [

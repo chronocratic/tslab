@@ -20,7 +20,6 @@ from tslab.adapters.chronocratic.datasets import (
 )
 from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
-    chronocratic_model_choice,
     ChronocraticEncoder,
     model_settings,
 )
@@ -29,9 +28,7 @@ from tslab.probes import RidgeProbe
 from tslab.tasks import forecasting_representations
 from tslab.tracking import build_trackers, TrackingOptions
 
-from {{package_name}}.augmentations import JitterThenScaleRecipe
-
-Models = chronocratic_model_choice(augmentations=(JitterThenScaleRecipe,))
+from {{package_name}}.models import Models
 
 
 @dataclass(frozen=True, kw_only=True)

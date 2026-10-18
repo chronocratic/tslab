@@ -18,13 +18,14 @@ import functools
 import inspect
 import operator
 import re
-import sys
 import typing
 from typing import Annotated, Any
 
 import chronocratic.models
 from chronocratic.models.augmentation import AugmentationProducer
 import tyro
+
+from tslab.adapters.chronocratic.generated import make_settings_class, unknown_settings
 
 __all__ = [
     'DEFAULT_AUGMENTATION',
@@ -188,17 +189,14 @@ def _settings_class(*, entry: ModelEntry, recipes: Sequence[type]) -> type:
             fields.append(('sequence_length', int | None, dataclasses.field(default=None)))
             continue
         fields.append((field.name, hints[field.name], _copied_default(field=field)))
-    settings_class = dataclasses.make_dataclass(
-        cls_name=f'{entry.model_class.__name__}Settings',
+    # Another set of recipes gives other classes, so each set gets its own names.
+    suffix = ''.join(f'_{recipe.__name__}' for recipe in recipes)
+    return make_settings_class(
+        name=f'{entry.model_class.__name__}Settings{suffix}',
         fields=fields,
         namespace={_MODEL_ATTRIBUTE: entry.name, '__doc__': entry.parameters_class.__doc__},
-        frozen=True,
-        kw_only=True,
         module=__name__,
     )
-    # Pickle finds classes by module and name.
-    setattr(sys.modules[__name__], settings_class.__name__, settings_class)
-    return settings_class
 
 
 # why: the union is built at run time; Any lets it serve as a field annotation
@@ -207,7 +205,7 @@ def chronocratic_model_choice(*, augmentations: Sequence[type] = ()) -> Any:  # 
 
     Use the result as a config field annotation, ``model: ModelChoice``; on the
     command line, ``model:ts2vec`` selects a model and ``--model.<field>``
-    sets its settings. Call it once, at module level.
+    sets its settings. The same recipes always give the same union.
 
     Args:
         augmentations: Augmentation recipes. Each appears as
@@ -223,6 +221,13 @@ def chronocratic_model_choice(*, augmentations: Sequence[type] = ()) -> Any:  # 
         ValueError: If two recipes have the same name, or one is named
             ``default``.
     """
+    return _model_choice(augmentations=tuple(augmentations))
+
+
+# Pickle finds a settings class by module and name, so the classes of one set of
+# recipes are generated once; a second call returns the same union.
+@functools.cache
+def _model_choice(*, augmentations: tuple[type, ...]) -> Any:  # noqa: ANN401 # why: run-time union
     _check_recipes(recipes=augmentations)
     members: list[Any] = []
     for name, entry in MODELS.items():
@@ -277,7 +282,7 @@ def model_settings(*, choice: Any, name: str, **values: object) -> Any:  # noqa:
     if name not in classes:
         message = f'no model {name!r}; choose from {sorted(classes)}'
         raise ValueError(message)
-    unknown = sorted(set(values) - {field.name for field in dataclasses.fields(classes[name])})
+    unknown = unknown_settings(settings_class=classes[name], values=values)
     if unknown:
         message = f'model {name!r} has no settings {unknown}'
         raise ValueError(message)

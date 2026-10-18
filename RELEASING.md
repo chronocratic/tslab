@@ -88,4 +88,6 @@ No API token is stored anywhere.
 - **The docs of a tag are missing**: check the Read the Docs connection
   (one-time setup, step 2), then *Versions → Add version* or re-sync versions.
 - **The fast-forward failed**: `dev` is not ahead of `main`. Rebase `dev` on
-  `main` and push, then comment `/fast-forward` again.
+  `main`; the ruleset of `dev` blocks the force push this needs, so disable it
+  for the push and enable it again right after. Then comment `/fast-forward`
+  again.

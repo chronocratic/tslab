@@ -10,7 +10,8 @@ into one table.
 uv run tslab study submit my_paper.studies:example --machine machines/cluster.toml
 uv run tslab study status   my_paper.studies:example --machine machines/cluster.toml
 uv run tslab study resubmit my_paper.studies:example --machine machines/cluster.toml
-uv run tslab study results  my_paper.studies:example --machine machines/cluster.toml --out results.csv
+uv run tslab study results  my_paper.studies:example --machine machines/cluster.toml \
+    --out results.csv
 ```
 
 The study layer turns every run into the flags of the user's own `no-preset`
@@ -52,6 +53,8 @@ A larger study: classification over UCR and UEA in one grid, forecasting with
 a `variant` axis, an `exclude`, and an `Override`:
 
 ```python
+from tslab.adapters.chronocratic.datasets import ucr_datasets, uea_datasets
+
 UCR = ('Coffee', 'Wallet', 'EigenWorms')  # user code may compute these
 UEA = ('BasicMotions', 'Epilepsy')
 
@@ -112,8 +115,8 @@ Rules that matter when writing one:
 - **Names.** Study, grid, axis and value names match `[A-Za-z0-9._-]+` and
   are not `.` or `..`; `short_name` matches `[A-Za-z0-9_-]{1,8}` and is unique
   among the grids. Violations raise `ValueError` when the study is built.
-- **Validation at import:** every settings path must exist on the grid's
-  `config` (a typo fails before anything is submitted). **Validation at
+- **Validation at import:** every settings path must exist on the
+  `config` of the grid (a typo fails before anything is submitted). **Validation at
   `submit`, `resubmit` and `--dry-run`:** each selected run is parsed with
   `tslab.parse_config` before any job is written, so missing required fields,
   wrong types and impossible union choices are caught there.
@@ -126,9 +129,10 @@ Rules that matter when writing one:
   are TSLab placeholders, expanded per run; nothing else in `{...}` is
   substituted.
 - **A study holds data, not logic.** A study file may list data — including
-  one dict comprehension over a constant tuple, as `forecasting`'s `variant`
-  does — but it must not compute, branch or loop over results. The script's
-  presets stay complete and unchanged (§Presets); the study only re-reads
+  one dict comprehension over a constant tuple, as the `variant` axis of
+  `forecasting` does — but it must not compute, branch or loop over results. The presets of the
+  script stay complete and unchanged (see
+  [Configs and presets](configs-and-presets.md)); the study only re-reads
   them through `from_presets` and drops the parts it chooses on its own axes.
 
 ## Machine profiles
@@ -180,7 +184,8 @@ Rules:
   field by field; `settings` merge path by path in the same order.
 - **Unknown names in machine overrides only warn.** One profile serves many
   studies, so an axis, grid or value name the current study lacks is a
-  warning printed once per command, not an error (an override for the study of last year must not block the study of this year). Matches written in the study
+  warning printed once per command, not an error (an override written for an older
+  study must not block a newer one). Matches written in the study
   itself (`exclude`, `Override`) still raise.
 - **Secrets never go in the profile.** W&B keys come from `wandb login`.
 - **Resources resolve when a run is submitted** (and again at resubmit), so
@@ -218,8 +223,8 @@ adding, removing or reordering axis values never moves an existing run. The
 index plus `short_name` of the grid names the run everywhere: `<short_name>_<index>`
 in `squeue`, in `scancel <job>_<index>`, and in its log
 `.study/logs/cls_17.out`, which collects every attempt under a header line.
-`short_name` is at most 8 characters because `squeue`'s default name column
-shows 8. An index at or above `max_array_size` stops the submission before
+`short_name` is at most 8 characters because the default name column of
+`squeue` shows 8. An index at or above `max_array_size` stops the submission before
 anything is written, naming the grid — raise `max_array_size` (or the
 MaxArraySize of the cluster) for grids beyond about 1000 runs.
 
@@ -231,7 +236,7 @@ resubmit is a sparse array of the same indices.
 
 ```bash
 uv run tslab study status my_paper.studies:example --machine machines/cluster.toml \
-    [--grid NAME] [--only AXIS=V1,V2] [--state STATE]
+    [--grid NAME] [--only AXIS=V1,V2] [--states STATE]
 ```
 
 Every expected run gets exactly one of six states, decided in this order:
@@ -297,14 +302,15 @@ automatic.** For runs stopped by time limits, `status` suggests it; the
 change goes in `[[overrides]]` of the machine profile.
 
 With `[followup] wandb_sync = true`, one more follow-up job runs
-`<tslab_command> wandb-sync <output_root>/<study>` after the submission's
-jobs end, so offline W&B runs reach the server even though the cluster has
+`<tslab_command> wandb-sync <output_root>/<study>` after the jobs of the
+submission end, so offline W&B runs reach the server even though the cluster has
 no network (see below).
 
 ## Results
 
 ```bash
-uv run tslab study results my_paper.studies:example --machine machines/cluster.toml --out results.csv
+uv run tslab study results my_paper.studies:example --machine machines/cluster.toml \
+    --out results.csv
 ```
 
 One row per (run, instance), plus one row per run that has no instances, so
@@ -334,7 +340,7 @@ Python: `Study.results(*, machine)` returns the rows).
 
   ```bash
   uv run tslab wandb-sync runs/ --dry-run     # what would be resynced
-  uv run tslab wandb-sync runs/               # resync crashed and failed runs
+  uv run tslab wandb-sync runs/               # resync crashed, failed and killed runs
   uv run tslab wandb-sync runs/ --include-offline
   ```
 
