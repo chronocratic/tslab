@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study import expand_placeholders, expand_setting, expand_variables
+from tslab.study.expansion import expand_placeholders, expand_setting, expand_variables
 
 
 def test_variables() -> None:
@@ -34,3 +34,16 @@ def test_expand_setting_types() -> None:
     assert expand_setting(value=Path('${R}/{study}'), env=env, values=values) == Path('/d/s')
     assert expand_setting(value=('${R}', 3), env=env, values=values) == ('/d', 3)
     assert expand_setting(value=7, env=env, values=values) == 7
+
+
+def test_env_values_are_not_scanned_for_placeholders() -> None:
+    values = {'study': 's'}
+    assert expand_setting(value='${R}/{study}', env={'R': '{study}'}, values=values) == '{study}/s'
+    with pytest.raises(ValueError, match='nope'):
+        expand_setting(value='{nope}', env={}, values=values)
+
+
+def test_doubled_braces_escape_a_literal_brace() -> None:
+    values = {'study': 's'}
+    assert expand_placeholders(text='{{epoch}}-{study}', values=values) == '{epoch}-s'
+    assert expand_setting(value='ckpt-{{epoch}}', env={}, values=values) == 'ckpt-{epoch}'

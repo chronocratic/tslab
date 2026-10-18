@@ -12,7 +12,8 @@ __all__ = ['PLACEHOLDERS', 'expand_placeholders', 'expand_setting', 'expand_vari
 PLACEHOLDERS = ('output_root', 'study', 'run_path', 'log_file')
 
 _VARIABLE_PATTERN = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}')
-_PLACEHOLDER_PATTERN = re.compile(r'\{([A-Za-z_][A-Za-z0-9_]*)\}')
+_PLACEHOLDER_PATTERN = re.compile(r'\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)\}')
+_BOTH_PATTERN = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)\}')
 
 
 def expand_variables(*, text: str, env: Mapping[str, str]) -> str:
@@ -49,7 +50,8 @@ def expand_placeholders(*, text: str, values: Mapping[str, str]) -> str:
     """Every ``{name}`` in ``text`` replaced with ``values[name]``.
 
     Only the names in ``PLACEHOLDERS`` are accepted; any other ``{...}``
-    raises, so a typo in a study setting cannot hide in a path.
+    raises, so a typo in a study setting cannot hide in a path. ``{{`` and
+    ``}}`` stand for a literal brace, e.g. for a checkpoint filename template.
 
     Args:
         text: The text to expand.
@@ -68,6 +70,8 @@ def expand_placeholders(*, text: str, values: Mapping[str, str]) -> str:
 def _replace_placeholder(*, values: Mapping[str, str]) -> Callable[[re.Match[str]], str]:
     def replace(match: re.Match[str]) -> str:
         name = match.group(1)
+        if name is None:
+            return match.group(0)[0]
         if name not in PLACEHOLDERS or name not in values:
             message = f'{name!r} is not a placeholder value for this run'
             raise ValueError(message)
@@ -77,7 +81,16 @@ def _replace_placeholder(*, values: Mapping[str, str]) -> Callable[[re.Match[str
 
 
 def _expand_text(*, text: str, env: Mapping[str, str], values: Mapping[str, str]) -> str:
-    return expand_placeholders(text=expand_variables(text=text, env=env), values=values)
+    """Variables and placeholders in one pass, so a value is never scanned again."""
+    variable = _replace_variable(env=env)
+    placeholder = _replace_placeholder(values=values)
+
+    def replace(match: re.Match[str]) -> str:
+        if match.group(1) is not None:
+            return variable(match)
+        return placeholder(cast('re.Match[str]', _PLACEHOLDER_PATTERN.fullmatch(match.group(0))))
+
+    return _BOTH_PATTERN.sub(replace, text)
 
 
 def expand_setting(
@@ -85,7 +98,7 @@ def expand_setting(
 ) -> SettingValue:
     """A setting value with its strings, paths and sequence items expanded.
 
-    Variables are expanded first, then placeholders, on ``str`` values, on the
+    Variables and placeholders are expanded in one pass on ``str`` values, on the
     POSIX text of ``Path`` values (the result is a ``Path`` again) and on the
     string items of tuples and lists; every other value is returned unchanged.
 

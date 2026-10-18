@@ -8,7 +8,8 @@ import subprocess
 import pytest
 
 from study.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.study import array_spec, job_script, query_job_states, sbatch, SlurmError, SlurmSettings
+from tslab.study.machine import SlurmSettings
+from tslab.study.slurm import array_spec, job_script, query_job_states, sbatch, SlurmError
 
 TASKS_LINES = [
     '3 1 ' + shlex.join(['python3', '-c', 'print(3)']),
@@ -171,3 +172,70 @@ def test_query_job_states(fake: FakeSlurm) -> None:
         '6_1': 'TIMEOUT',
     }
     assert fake.calls('squeue')[0][:2] == ['--array', '--jobs']
+
+
+def test_query_job_states_raises_when_squeue_fails(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'}])
+    with pytest.raises(SlurmError, match='Socket timed out'):
+        query_job_states(job_ids=['7'])
+
+
+def test_query_job_states_raises_when_sacct_fails(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '7_0|RUNNING\n'}])
+    fake.set_answers('sacct', [{'exit': 1, 'stderr': 'sacct: error: Problem talking to slurmdbd'}])
+    with pytest.raises(SlurmError, match='slurmdbd'):
+        query_job_states(job_ids=['7'])
+
+
+def test_query_job_states_accepts_squeue_not_knowing_a_job(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id specified'}]
+    )
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '6_0|COMPLETED\n'}])
+    assert query_job_states(job_ids=['6']) == {'6_0': 'COMPLETED'}
+
+
+def _script(tmp_path: Path, **changes: object) -> str:
+    values: dict[str, object] = {
+        'job_name': 'cls',
+        'slurm': SlurmSettings(partition='p', time='1:00:00'),
+        'indices': (0,),
+        'tasks_file': tmp_path / '1.tasks',
+        'log_pattern': tmp_path / 'logs' / 'cls_%a.out',
+        'project_root': tmp_path,
+        'env': {},
+    }
+    return job_script(**{**values, **changes})  # ty: ignore[invalid-argument-type]
+
+
+@pytest.mark.parametrize(
+    'changes',
+    [
+        {'job_name': 'a\nrm -rf x'},
+        {'dependency': 'afterok:1\nrm -rf x'},
+        {'begin': 'now\nrm'},
+        {'slurm': SlurmSettings(partition='p\nrm', time='1:00:00')},
+        {'slurm': SlurmSettings(partition='p', time='1:00:00', sbatch_extra=('--x\nrm',))},
+    ],
+)
+def test_job_script_rejects_line_breaks(tmp_path: Path, changes: dict[str, object]) -> None:
+    with pytest.raises(ValueError, match='line break'):
+        _script(tmp_path, **changes)
+
+
+@pytest.mark.parametrize('name', ['A;rm -rf x', '1X', 'A B', 'A=B'])
+def test_job_script_rejects_bad_env_names(tmp_path: Path, name: str) -> None:
+    with pytest.raises(ValueError, match='environment variable name'):
+        _script(tmp_path, env={name: 'v'})
+
+
+def test_missing_task_message_survives_a_hostile_path(tmp_path: Path) -> None:
+    folder = tmp_path / 'a"; touch pwned; "b'
+    folder.mkdir()
+    tasks_file = folder / '3.tasks'
+    script = write_script(tmp_path, tasks_file)
+    result = run_task_section(script, task_id='5')
+    assert result.returncode == 1
+    assert str(tasks_file) in result.stderr
+    assert not (tmp_path / 'pwned').exists()
+    assert not Path('pwned').exists()
