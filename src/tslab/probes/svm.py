@@ -10,12 +10,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import torch
 
-from tslab.interfaces import Probe
 from tslab.probes._protocol import (
     cap_samples,
     fit_on_predefined_split,
     PROTOCOL_RANDOM_STATE,
     require_validation,
+    SklearnProbe,
     to_float64,
     to_numpy,
 )
@@ -26,6 +26,7 @@ __all__ = ['SVMProbe', 'SVMProbeSettings']
 # Below these sizes the C search is skipped (see SVMProbe).
 _MIN_SAMPLES_PER_CLASS = 5
 _MIN_SAMPLES = 50
+_MIN_CLASSES = 2
 # Near the hard margin, the dual coefficients of libsvm diverge at C=inf when
 # overlap; a finite C keeps them bounded.
 _HARD_MARGIN_C = 1e6
@@ -39,16 +40,18 @@ class SVMProbeSettings:
     max_train_samples: int | None
 
 
-class SVMProbe(Probe):
+class SVMProbe(SklearnProbe[SVMProbeSettings]):
     """RBF support-vector classifier on frozen representations.
 
-    Features are cast to float64, imputed (constant) and standardised. C is
+    Features are cast to float64, imputed (constant) and standardized. C is
     chosen from ``{1e-4, ..., 1e4, 1e6}`` on the validation split, then the
     best model is refitted on train and validation together. With fewer than
-    5 samples per class or fewer than 50 samples, the search is skipped and
+    5 samples per class on average or fewer than 50 samples, the search is skipped and
     ``C=1e6`` is fitted on train and validation: a tiny validation split ties
     every C, and the search would keep the smallest one, a constant predictor.
     """
+
+    _label = 'SVMProbe'
 
     def __init__(self, *, max_train_samples: int | None = 10_000, n_jobs: int = -1) -> None:
         """Configure the probe.
@@ -58,25 +61,8 @@ class SVMProbe(Probe):
                 this many training rows; ``None`` uses all of them.
             n_jobs: Parallel jobs of the C search (``-1``: all cores).
         """
+        super().__init__(n_jobs=n_jobs)
         self._settings = SVMProbeSettings(max_train_samples=max_train_samples)
-        self._n_jobs = n_jobs
-        self._pipeline: Pipeline | None = None
-
-    def fingerprint_settings(self) -> SVMProbeSettings:
-        """Return the settings that change results (not ``n_jobs``)."""
-        return self._settings
-
-    @property
-    def pipeline(self) -> Pipeline:
-        """Return the fitted scikit-learn pipeline.
-
-        Raises:
-            RuntimeError: Before ``fit``.
-        """
-        if self._pipeline is None:
-            message = 'SVMProbe is not fitted; call fit first'
-            raise RuntimeError(message)
-        return self._pipeline
 
     @override
     def fit(
@@ -122,6 +108,9 @@ class SVMProbe(Probe):
             ]
         )
         labels = np.concatenate([train_labels, val_labels], axis=0)
+        if len(np.unique(labels)) < _MIN_CLASSES:
+            message = f'SVMProbe needs at least 2 classes, but the labels hold {np.unique(labels)}'
+            raise ValueError(message)
         if (
             len(labels) // len(np.unique(labels)) < _MIN_SAMPLES_PER_CLASS
             or len(labels) < _MIN_SAMPLES
@@ -142,15 +131,12 @@ class SVMProbe(Probe):
         )
 
     @override
-    def predict(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        """Predict class labels."""
-        return torch.from_numpy(self.pipeline.predict(X=to_numpy(tensor=inputs)))
-
-    @override
     def default_metrics(
         self, *, predictions: torch.Tensor, targets: torch.Tensor
     ) -> dict[str, float]:
         """Return accuracy, precision, recall and F1 (see ``classification_metrics``)."""
         return classification_metrics(
-            predictions=to_numpy(tensor=predictions), targets=to_numpy(tensor=targets)
+            predictions=to_numpy(tensor=predictions),
+            targets=to_numpy(tensor=targets),
+            classes=self.pipeline.classes_,
         )

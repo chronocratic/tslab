@@ -34,6 +34,10 @@ __all__ = [
 ]
 
 
+def _has_duplicates(values: tuple[int, ...]) -> bool:
+    return len(set(values)) != len(values)
+
+
 @dataclass(frozen=True, kw_only=True)
 class TSForecastingDataInfo(TSDataInfo):
     """Facts about a forecasting dataset.
@@ -62,9 +66,7 @@ class TSForecastingDataInfo(TSDataInfo):
         if outside:
             message = f'channels {outside} are outside range({self.num_channels})'
             raise ValueError(message)
-        if len(set(self.target_channels)) != len(self.target_channels) or len(
-            set(self.covariate_channels)
-        ) != len(self.covariate_channels):
+        if _has_duplicates(self.target_channels) or _has_duplicates(self.covariate_channels):
             message = 'target_channels and covariate_channels must not contain duplicates'
             raise ValueError(message)
         both = sorted(set(self.target_channels) & set(self.covariate_channels))
@@ -173,6 +175,7 @@ def window_samples(
 
     Returns:
         Inputs ``(N, W, window_length, C)`` and targets ``(N, W, horizon, C)``.
+        Both are views on ``series``; reshaping them copies.
 
     Raises:
         ValueError: If a setting is below 1 or the series is too short.
@@ -188,9 +191,11 @@ def window_samples(
             f'= {window_length + horizon}'
         )
         raise ValueError(message)
-    inputs = torch.stack(tensors=[series[:, end - window_length : end] for end in positions], dim=1)
-    targets = torch.stack(tensors=[series[:, end : end + horizon] for end in positions], dim=1)
-    return inputs, targets
+    count = len(positions)
+    # Views on ``series``: unfold puts the window axis last, so move it back.
+    inputs = series[:, : total_time - horizon].unfold(1, window_length, stride)[:, :count]
+    targets = series[:, window_length:].unfold(1, horizon, stride)[:, :count]
+    return inputs.permute(0, 1, 3, 2), targets.permute(0, 1, 3, 2)
 
 
 def _input_series(*, data: ForecastingSeries, series: Tensors | None) -> torch.Tensor:
@@ -319,36 +324,37 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
     """
     del run, name
     slices = checked_split_slices(data=data)
-    inputs = _input_series(data=data, series=series)
+    encoded_series = _input_series(data=data, series=series)
     clean = data.full_series().to(dtype=torch.float32)
-    windows: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
-    for split in SPLITS:
-        # Windows from the encoded series, targets from the data.
-        input_windows, _ = window_samples(
-            series=inputs[:, slices[split]],
-            window_length=window_length,
-            horizon=horizon,
-            stride=stride,
-        )
-        _, targets = window_samples(
-            series=clean[:, slices[split]],
-            window_length=window_length,
-            horizon=horizon,
-            stride=stride,
-        )
-        windows[split] = (input_windows, targets)
     trainer.load(model=model, checkpoint=checkpoint)
     window_encoder = encoder(model)
     target_channels = list(data.info.target_channels)
     tensors: dict[str, torch.Tensor] = {}
-    for split, (inputs, targets) in windows.items():
-        flat_inputs = inputs.reshape(-1, *inputs.shape[-2:])
+    # One split at a time, so only one split of copied windows is in memory.
+    for split in SPLITS:
+        description = f'the {split} split, horizon {horizon}'
+        try:
+            # Windows from the encoded series, targets from the data.
+            windows, _ = window_samples(
+                series=encoded_series[:, slices[split]],
+                window_length=window_length,
+                horizon=horizon,
+                stride=stride,
+            )
+            _, targets = window_samples(
+                series=clean[:, slices[split]],
+                window_length=window_length,
+                horizon=horizon,
+                stride=stride,
+            )
+        except ValueError as error:
+            message = f'{description}: {error}'
+            raise ValueError(message) from error
+        flat_windows = windows.reshape(-1, *windows.shape[-2:])
         with torch.inference_mode():
-            features = window_encoder.encode(inputs=flat_inputs)
+            features = window_encoder.encode(inputs=flat_windows)
         check_representations(
-            representations=features,
-            expected_rows=len(flat_inputs),
-            description=f'the {split} split, horizon {horizon}',
+            representations=features, expected_rows=len(flat_windows), description=description
         )
         tensors[f'{split}_representations'] = features
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])

@@ -1,6 +1,7 @@
 """``MLflowTracker``: an MLflow run per TSLab run. Needs the ``tslab[mlflow]`` extra."""
 
 from collections.abc import Mapping
+import logging
 from pathlib import Path
 from typing import override
 
@@ -10,6 +11,8 @@ from tslab.interfaces.tracker import RunStatus
 from tslab.tracking.lightning_bridge import LightningLoggerTracker
 
 __all__ = ['MLflowTracker']
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MLflowTracker(LightningLoggerTracker):
@@ -39,15 +42,23 @@ class MLflowTracker(LightningLoggerTracker):
         mlflow_directory = (run_directory / 'trackers' / 'mlflow').resolve()
         mlflow_directory.mkdir(parents=True, exist_ok=True)
         tracking_uri = self._tracking_uri or f'sqlite:///{mlflow_directory.as_posix()}/mlflow.db'
-        if self._tracking_uri is not None:
-            self._ensure_experiment(tracking_uri=tracking_uri)
-        return MLFlowLogger(
-            experiment_name=self._experiment,
-            run_name=run_name,
-            tracking_uri=tracking_uri,
-            artifact_location=(mlflow_directory / 'artifacts').as_uri(),
-            synchronous=True,
-        )
+        # Lightning creates the MLflow run lazily on first use; do it here, where a
+        # failure disables the tracker instead of ending training.
+        try:
+            if self._tracking_uri is not None:
+                self._ensure_experiment(tracking_uri=tracking_uri)
+            logger = MLFlowLogger(
+                experiment_name=self._experiment,
+                run_name=run_name,
+                tracking_uri=tracking_uri,
+                artifact_location=(mlflow_directory / 'artifacts').as_uri(),
+                synchronous=True,
+            )
+            _ = logger.run_id
+        except Exception as error:  # noqa: BLE001 # why: any MLflow failure disables the tracker
+            _LOGGER.warning('MLflow is unavailable, tracking is disabled: %s', error)
+            return None
+        return logger
 
     def _ensure_experiment(self, *, tracking_uri: str) -> None:
         """Create the experiment on a shared URI, tolerating a concurrent creation.

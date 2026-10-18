@@ -11,12 +11,12 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import torch
 
-from tslab.interfaces import Probe
 from tslab.probes._protocol import (
     cap_samples,
     fit_on_predefined_split,
     PROTOCOL_RANDOM_STATE,
     require_validation,
+    SklearnProbe,
     to_float64,
     to_numpy,
 )
@@ -40,13 +40,15 @@ class RidgeProbeSettings:
     max_samples: int | None
 
 
-class RidgeProbe(Probe):
+class RidgeProbe(SklearnProbe[RidgeProbeSettings]):
     """Ridge regression on frozen representations, for forecasting.
 
-    Features are cast to float64, imputed (mean) and standardised. Alpha is
+    Features are cast to float64, imputed (mean) and standardized. Alpha is
     chosen from ``{0.1, ..., 1000}`` on the validation split by the lowest
     RMSE + MAE, then the best model is refitted on train and validation.
     """
+
+    _label = 'RidgeProbe'
 
     def __init__(self, *, max_samples: int | None = 100_000, n_jobs: int = -1) -> None:
         """Configure the probe.
@@ -57,25 +59,8 @@ class RidgeProbe(Probe):
                 ``None`` uses every row.
             n_jobs: Parallel jobs of the alpha search (``-1``: all cores).
         """
+        super().__init__(n_jobs=n_jobs)
         self._settings = RidgeProbeSettings(max_samples=max_samples)
-        self._n_jobs = n_jobs
-        self._pipeline: Pipeline | None = None
-
-    def fingerprint_settings(self) -> RidgeProbeSettings:
-        """Return the settings that change results (not ``n_jobs``)."""
-        return self._settings
-
-    @property
-    def pipeline(self) -> Pipeline:
-        """Return the fitted scikit-learn pipeline.
-
-        Raises:
-            RuntimeError: Before ``fit``.
-        """
-        if self._pipeline is None:
-            message = 'RidgeProbe is not fitted; call fit first'
-            raise RuntimeError(message)
-        return self._pipeline
 
     @override
     def fit(
@@ -122,11 +107,6 @@ class RidgeProbe(Probe):
             scoring=make_scorer(_rmse_plus_mae, greater_is_better=False),
             n_jobs=self._n_jobs,
         )
-
-    @override
-    def predict(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        """Predict the targets."""
-        return torch.from_numpy(self.pipeline.predict(X=to_numpy(tensor=inputs)))
 
     @override
     def default_metrics(

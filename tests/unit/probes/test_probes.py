@@ -109,6 +109,58 @@ def test_classification_metrics_average_binary_or_macro(*, classes: int) -> None
     assert set(metrics) == {'accuracy', 'precision', 'recall', 'f1'}
 
 
+def test_the_average_follows_the_fitted_classes_not_the_test_labels() -> None:
+    # Three classes were fitted, but the test split only holds two of them.
+    targets = np.array([0, 0, 1, 1])
+    predictions = np.array([0, 2, 1, 1])
+    metrics = classification_metrics(
+        predictions=predictions, targets=targets, classes=np.array([0, 1, 2])
+    )
+    assert metrics['f1'] == f1_score(y_true=targets, y_pred=predictions, average='macro')
+
+
+def test_svm_default_metrics_use_the_fitted_classes() -> None:
+    probe = fitted_svm(train=30, val=10, classes=3)
+    targets = torch.tensor([0, 0, 1, 1])
+    predictions = torch.tensor([0, 2, 1, 1])
+    metrics = probe.default_metrics(predictions=predictions, targets=targets)
+    assert metrics['f1'] == f1_score(
+        y_true=targets.numpy(), y_pred=predictions.numpy(), average='macro'
+    )
+
+
+def test_a_single_class_or_empty_validation_split_gets_a_clear_error() -> None:
+    inputs = torch.randn(60, 4)
+    with pytest.raises(ValueError, match='at least 2 classes'):
+        SVMProbe(n_jobs=1).fit(
+            train_inputs=inputs,
+            train_targets=torch.zeros(60, dtype=torch.long),
+            val_inputs=inputs[:10],
+            val_targets=torch.zeros(10, dtype=torch.long),
+        )
+    with pytest.raises(ValueError, match='empty'):
+        RidgeProbe(n_jobs=1).fit(
+            train_inputs=inputs, train_targets=inputs, val_inputs=inputs[:0], val_targets=inputs[:0]
+        )
+
+
+def test_the_cap_survives_a_class_with_one_member() -> None:
+    inputs, labels = blobs(per_class=30, classes=2, seed=0)
+    labels[0] = 5
+    probe = SVMProbe(max_train_samples=20, n_jobs=1)
+    probe.fit(
+        train_inputs=inputs, train_targets=labels, val_inputs=inputs[:10], val_targets=labels[:10]
+    )
+    assert probe.pipeline.named_steps['svc'].shape_fit_[0] == 30
+
+
+def test_metrics_reject_mismatched_shapes() -> None:
+    with pytest.raises(ValueError, match='shape'):
+        forecasting_metrics(predictions=np.zeros((4, 1)), targets=np.zeros(4))
+    with pytest.raises(ValueError, match='shape'):
+        classification_metrics(predictions=np.zeros((4, 1)), targets=np.zeros(4))
+
+
 def test_mape_divides_by_at_least_1e_minus_8() -> None:
     metrics = forecasting_metrics(predictions=np.array([1.0, 2.0]), targets=np.array([0.0, 2.0]))
     assert metrics == pytest.approx({'mse_loss': 0.5, 'mae_loss': 0.5, 'mape_loss': 0.5 / 1e-8})

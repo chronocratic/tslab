@@ -1,31 +1,16 @@
-from collections.abc import Generator
-import contextlib
 import dataclasses
-from dataclasses import dataclass
 import logging
 from pathlib import Path
 
+from integration_helpers import run_in
 from lightning_toy import FAST, ToyData, ToyDataModule, ToyInfo, ToyRegressor
 from mlflow.tracking.client import MlflowClient
 import pytest
 import torch
 
 from tslab.core.artifact import Checkpoint
-from tslab.core.run import Run
-from tslab.interfaces.tracker import Tracker
 from tslab.lightning import LightningDataSource, LightningTrainer, TrainingTimeLimitReached
 from tslab.tracking.mlflow_tracker import MLflowTracker
-
-
-@dataclass(frozen=True, kw_only=True)
-class Config:
-    seed: int = 0
-
-
-@contextlib.contextmanager
-def run_in(*, root: Path, trackers: tuple[Tracker, ...] = ()) -> Generator[Run]:
-    with Run(config=Config(), root=root, relative_path=Path('r'), trackers=trackers) as run:
-        yield run
 
 
 def trainer(**changes: object) -> LightningTrainer:
