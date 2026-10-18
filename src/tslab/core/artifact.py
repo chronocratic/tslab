@@ -15,14 +15,15 @@ import logging
 import math
 from pathlib import Path
 import shutil
-from typing import ClassVar, NoReturn, override, Self
+from typing import cast, ClassVar, NoReturn, override, Self
 
 from safetensors import safe_open
-from safetensors.torch import load_file, save_file
+from safetensors.torch import save_file
 import torch
 
 from tslab.core.fingerprint import compute_fingerprint, hash_path_contents
-from tslab.core.paths import atomic_write_text, require_path
+from tslab.core.paths import atomic_write_json, atomic_write_text, read_json_object, require_path
+from tslab.core.text import qualified_name
 
 __all__ = [
     'Artifact',
@@ -128,7 +129,7 @@ class Artifact(ABC):
         fingerprint = compute_fingerprint(
             document={
                 'external': True,
-                'artifact_type': f'{cls.__module__}.{cls.__qualname__}',
+                'artifact_type': qualified_name(cls=cls),
                 'content_sha256': hash_path_contents(path=path),
             }
         )
@@ -168,7 +169,7 @@ def bind_identity(*, artifact: Artifact, identity: ArtifactIdentity) -> None:
 
 
 class Json(Artifact):
-    """A JSON-serialisable mapping saved as ``data.json``.
+    """A JSON-serializable mapping saved as ``data.json``.
 
     Non-finite floats (NaN, infinity) are not valid JSON. They are written as
     ``null`` with a warning instead of producing a file other tools reject.
@@ -180,7 +181,7 @@ class Json(Artifact):
         """Create the artifact.
 
         Args:
-            data: JSON-serialisable mapping with ``str`` keys.
+            data: JSON-serializable mapping with ``str`` keys.
         """
         self.data: dict[str, object] = dict(data)
 
@@ -209,7 +210,7 @@ class Json(Artifact):
 
     @classmethod
     def _from_file(cls, *, path: Path) -> Self:
-        return cls(data=json.loads(path.read_text(encoding='utf-8')))
+        return cls(data=read_json_object(path=path))
 
 
 def _replace_non_finite(*, value: object, location: str) -> object:
@@ -264,8 +265,10 @@ class Metrics(Json):
     @classmethod
     @override
     def _from_file(cls, *, path: Path) -> Self:
-        raw = json.loads(path.read_text(encoding='utf-8'))
-        return cls(data={key: math.nan if value is None else value for key, value in raw.items()})
+        raw = read_json_object(path=path)
+        # ``__init__`` checks that every value is a number.
+        data = {key: math.nan if value is None else value for key, value in raw.items()}
+        return cls(data=cast('Mapping[str, float]', data))
 
 
 class Tensors(Artifact):
@@ -321,7 +324,8 @@ class Tensors(Artifact):
     def _from_file(cls, *, path: Path) -> Self:
         with safe_open(path, framework='pt') as handle:
             metadata = handle.metadata() or {}
-        return cls(tensors=load_file(filename=path), metadata=metadata)
+            tensors = {key: handle.get_tensor(key) for key in handle.keys()}  # noqa: SIM118
+        return cls(tensors=tensors, metadata=metadata)
 
 
 class Checkpoint(Artifact):
@@ -332,11 +336,13 @@ class Checkpoint(Artifact):
     are never copied. A training checkpoint is a pickle, and loading a pickle
     can execute code, so ``trusted`` says whether full unpickling is allowed:
     checkpoints written by a stage in this run folder are trusted, files given
-    to ``external`` are not unless the caller says so.
+    to ``external`` are not unless the caller says so. The flag is saved in
+    ``checkpoint.json``, so an untrusted file stays untrusted when a later run
+    loads the cached result.
     """
 
     FILE_NAME: ClassVar[str] = 'checkpoint.json'
-    FORMAT_VERSION: ClassVar[int] = 1
+    FORMAT_VERSION: ClassVar[int] = 2
 
     def __init__(self, *, directory: Path, best: str, last: str, trusted: bool = True) -> None:
         """Create the artifact.
@@ -376,10 +382,13 @@ class Checkpoint(Artifact):
         if directory.resolve() != self.directory.resolve():
             for name in sorted({self.best, self.last}):
                 shutil.copy2(self.directory / name, directory / name)
-        document = {'best': self.best, 'format_version': self.FORMAT_VERSION, 'last': self.last}
-        atomic_write_text(
-            path=directory / self.FILE_NAME, text=json.dumps(document, indent=2) + '\n'
-        )
+        document = {
+            'best': self.best,
+            'format_version': self.FORMAT_VERSION,
+            'last': self.last,
+            'trusted': self.trusted,
+        }
+        atomic_write_json(path=directory / self.FILE_NAME, document=document)
 
     @classmethod
     @override
@@ -391,8 +400,8 @@ class Checkpoint(Artifact):
             FileNotFoundError: If a named checkpoint file is missing.
         """
         require_path(value=directory, parameter='directory')
-        document = json.loads((directory / cls.FILE_NAME).read_text(encoding='utf-8'))
-        if not isinstance(document, dict) or document.get('format_version') != cls.FORMAT_VERSION:
+        document = read_json_object(path=directory / cls.FILE_NAME)
+        if document.get('format_version') != cls.FORMAT_VERSION:
             message = (
                 f'{(directory / cls.FILE_NAME).as_posix()}: expected format_version '
                 f'{cls.FORMAT_VERSION}'
@@ -400,10 +409,14 @@ class Checkpoint(Artifact):
             raise ValueError(message)
         best = document.get('best')
         last = document.get('last')
-        if not isinstance(best, str) or not isinstance(last, str):
-            message = f'{(directory / cls.FILE_NAME).as_posix()}: best and last must be strings'
+        trusted = document.get('trusted')
+        if not isinstance(best, str) or not isinstance(last, str) or not isinstance(trusted, bool):
+            message = (
+                f'{(directory / cls.FILE_NAME).as_posix()}: best and last must be strings '
+                f'and trusted a boolean'
+            )
             raise ValueError(message)  # noqa: TRY004 # why: bad file content, not arguments
-        checkpoint = cls(directory=directory, best=best, last=last)
+        checkpoint = cls(directory=directory, best=best, last=last, trusted=trusted)
         missing = [name for name in (best, last) if not (directory / name).is_file()]
         if missing:
             message = f'checkpoint files missing in {directory.as_posix()}: {missing}'

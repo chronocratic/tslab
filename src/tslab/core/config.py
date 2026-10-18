@@ -49,6 +49,7 @@ import tyro
 import yaml
 
 from tslab.core.paths import atomic_write_text, require_path
+from tslab.core.text import qualified_name
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
@@ -60,10 +61,13 @@ __all__ = [
     'config_from_yaml',
     'config_to_data',
     'config_to_yaml',
+    'decode_dataclass',
     'load_config',
     'parse_config',
     'save_config',
+    'strip_annotated',
     'union_choices',
+    'union_members',
 ]
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,16 +77,13 @@ CONFIG_FORMAT_VERSION = 1
 # user must give it on the command line (tyro stops with "Missing ...").
 REQUIRED: Any = tyro.MISSING
 _TYPE_KEY = '__type__'
+NO_PRESET = 'no-preset'
 _SCALARS = (bool, int, float, str)
 _MAPPING_ARGUMENT_COUNT = 2
 
 
 class ConfigFileError(ValueError):
     """Raised when a config file does not match the config class."""
-
-
-def _type_name(*, cls: type) -> str:
-    return f'{cls.__module__}.{cls.__qualname__}'
 
 
 # The type of a ``tyro.conf.subcommand(name=...)`` metadata item, computed from
@@ -96,7 +97,7 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
     A *choice union* is a ``Union`` (or ``|``) with at least one dataclass
     member, optionally wrapped in ``Annotated``: the field that picks a model
     or a dataset. Every member must be named with
-    ``tyro.conf.subcommand(name=...)``; a member's name is the ``name`` of the
+    ``tyro.conf.subcommand(name=...)``; the name of a member is the ``name`` of the
     first such metadata item on it.
 
     Args:
@@ -110,13 +111,13 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
         ValueError: If a dataclass member carries no ``tyro.conf.subcommand``
             name, naming the member.
     """
-    annotation = _strip_annotated(annotation=annotation)
+    annotation = strip_annotated(annotation=annotation)
     if get_origin(annotation) not in {Union, types.UnionType}:
         return None
     members = get_args(annotation)
     has_dataclass = any(
         isinstance(member, type) and dataclasses.is_dataclass(member)
-        for member in (_strip_annotated(annotation=member) for member in members)
+        for member in (strip_annotated(annotation=member) for member in members)
     )
     if not has_dataclass:
         return None
@@ -126,7 +127,7 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
             stripped: object = member
             name = None
         else:
-            stripped = _strip_annotated(annotation=member)
+            stripped = strip_annotated(annotation=member)
             name = next(
                 (meta.name for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE), None
             )
@@ -147,15 +148,28 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
     return choices
 
 
-def _union_members(*, annotation: object) -> tuple[object, ...] | None:
+def union_members(*, annotation: object) -> tuple[object, ...] | None:
+    """Return the members of a union annotation, or ``None`` for any other annotation.
+
+    Members wrapped in ``Annotated`` are unwrapped, and a bare ``None`` member
+    becomes ``type(None)``.
+
+    Args:
+        annotation: A type annotation.
+    """
     if get_origin(annotation) not in {Union, types.UnionType}:
         return None
     # Subcommand names wrap members in Annotated; a bare None member means NoneType.
-    members = (_strip_annotated(annotation=member) for member in get_args(annotation))
+    members = (strip_annotated(annotation=member) for member in get_args(annotation))
     return tuple(type(None) if member is None else member for member in members)
 
 
-def _strip_annotated(*, annotation: object) -> object:
+def strip_annotated(*, annotation: object) -> object:
+    """Return the wrapped type of ``Annotated[T, ...]``, or ``annotation`` itself.
+
+    Args:
+        annotation: A type annotation.
+    """
     return get_args(annotation)[0] if get_origin(annotation) is Annotated else annotation
 
 
@@ -186,7 +200,7 @@ def _fail(*, data: object, expected: str, location: str) -> NoReturn:
 
 
 def _encode(*, value: object, annotation: object, location: str) -> object:
-    annotation = _strip_annotated(annotation=annotation)
+    annotation = strip_annotated(annotation=annotation)
     if isinstance(value, Enum):  # before scalars: StrEnum and IntEnum members are str and int
         return value.name
     if value is None or isinstance(value, _SCALARS):
@@ -203,8 +217,15 @@ def _encode(*, value: object, annotation: object, location: str) -> object:
         ]
     if isinstance(value, Mapping):
         value_annotation = _mapping_value_annotation(annotation=annotation)
+        for key in value:
+            if not isinstance(key, str):
+                message = (
+                    f'{location}: mapping keys must be str to be saved in a config file, '
+                    f'got {key!r}; YAML would load other keys back as text'
+                )
+                raise TypeError(message)
         return {
-            str(key): _encode(value=item, annotation=value_annotation, location=f'{location}.{key}')
+            key: _encode(value=item, annotation=value_annotation, location=f'{location}.{key}')
             for key, item in value.items()
         }
     message = (
@@ -218,9 +239,11 @@ def _encode_dataclass(
     *, value: 'DataclassInstance', annotation: object, location: str
 ) -> dict[str, object]:
     encoded: dict[str, object] = {}
-    members = _union_members(annotation=annotation)
+    members = union_members(annotation=annotation)
     if members is not None:
-        if len([member for member in members if member is not type(None)]) > 1:
+        choices = [member for member in members if member is not type(None)]
+        if len(choices) > 1:
+            _reject_duplicate_names(members=choices, location=location)
             encoded[_TYPE_KEY] = type(value).__name__
     elif annotation is not Any and annotation is not type(value):
         message = (
@@ -239,14 +262,33 @@ def _encode_dataclass(
     return encoded
 
 
+def _reject_duplicate_names(*, members: Sequence[object], location: str) -> None:
+    """Raise if two dataclass members of a union share a class name.
+
+    ``__type__`` holds only the class name, so such members could not be told apart.
+    """
+    names = [
+        member.__name__
+        for member in members
+        if isinstance(member, type) and dataclasses.is_dataclass(member)
+    ]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        message = (
+            f'{location}: union members share the class name {duplicates}; '
+            f'give each member a distinct class name so {_TYPE_KEY} can tell them apart'
+        )
+        raise TypeError(message)
+
+
 # Decoding (YAML data to values, driven by annotations) --------------------------------
 
 
 def _decode(*, data: object, annotation: object, location: str) -> object:
-    annotation = _strip_annotated(annotation=annotation)
+    annotation = strip_annotated(annotation=annotation)
     if annotation is Any:
         return data
-    members = _union_members(annotation=annotation)
+    members = union_members(annotation=annotation)
     if members is not None:
         return _decode_union(data=data, members=members, location=location)
     origin = get_origin(annotation)
@@ -301,7 +343,7 @@ def _decode_class(*, data: object, cls: type, location: str) -> object:
             return cls(data)
         _fail(data=data, expected='path string', location=location)
     if dataclasses.is_dataclass(cls):
-        return _decode_dataclass(data=data, cls=cls, location=location)
+        return decode_dataclass(data=data, cls=cls, location=location)
     if cls in _SCALARS:
         return _decode_scalar(data=data, cls=cls, location=location)
     message = f'{location}: config files do not support fields of type {cls.__qualname__}'
@@ -333,12 +375,15 @@ def _decode_union(*, data: object, members: tuple[object, ...], location: str) -
     if isinstance(data, dict) and _TYPE_KEY in data:
         name = data[_TYPE_KEY]
         matches = [member for member in dataclass_members if member.__name__ == name]
+        if len(matches) > 1:
+            message = f'{location}: {_TYPE_KEY} {name!r} names several union members'
+            raise ConfigFileError(message)
         if len(matches) != 1:
             names = [member.__name__ for member in dataclass_members]
             message = f'{location}: {_TYPE_KEY} {name!r} is not one of {names}'
             raise ConfigFileError(message)
         body = {key: value for key, value in data.items() if key != _TYPE_KEY}
-        return _decode_dataclass(data=body, cls=matches[0], location=location)
+        return decode_dataclass(data=body, cls=matches[0], location=location)
     if isinstance(data, dict) and len(dataclass_members) > 1:
         names = [member.__name__ for member in dataclass_members]
         message = f'{location}: missing {_TYPE_KEY}; it must name one of {names}'
@@ -353,23 +398,61 @@ def _decode_union(*, data: object, members: tuple[object, ...], location: str) -
     raise ConfigFileError(message)
 
 
-def _decode_dataclass(*, data: object, cls: type, location: str) -> object:
+def decode_dataclass[C](*, data: object, cls: type[C], location: str) -> C:
+    """Build a dataclass instance from plain data, strictly, driven by its annotations.
+
+    This is the decoder behind ``load_config``. It is public so other layers
+    (for example machine profiles read from TOML) validate with the same rules
+    and report errors in the same form.
+
+    Args:
+        data: A mapping of field names to plain values.
+        cls: The dataclass to build.
+        location: Dotted path of ``data`` for error messages, for example ``'config'``.
+
+    Returns:
+        The instance.
+
+    Raises:
+        ConfigFileError: If a key is unknown, a required field is missing, a
+            value has the wrong type, or the constructor rejects the values.
+            The message names the field.
+        TypeError: If ``cls`` is not a dataclass.
+    """
     if not dataclasses.is_dataclass(cls):
         message = f'{location}: {cls.__qualname__} is not a dataclass'
         raise TypeError(message)
     if not isinstance(data, dict):
         _fail(data=data, expected=f'mapping for {cls.__name__}', location=location)
-    fields = {field.name for field in dataclasses.fields(cls) if field.init}
+    init_fields = [field for field in dataclasses.fields(cls) if field.init]
+    fields = {field.name for field in init_fields}
     unknown = sorted(set(data) - fields)
     if unknown:
         message = f'{location}: unknown keys {unknown} for {cls.__name__}; known: {sorted(fields)}'
+        raise ConfigFileError(message)
+    missing = [
+        field.name
+        for field in init_fields
+        if field.name not in data
+        and field.default is dataclasses.MISSING
+        and field.default_factory is dataclasses.MISSING
+    ]
+    if missing:
+        names = ', '.join(f'{location}.{name}' for name in missing)
+        message = (
+            f'{location}: missing required {"field" if len(missing) == 1 else "fields"} {names}'
+        )
         raise ConfigFileError(message)
     hints = get_type_hints(cls, include_extras=True)
     values = {
         name: _decode(data=item, annotation=hints[name], location=f'{location}.{name}')
         for name, item in data.items()
     }
-    return cls(**values)
+    try:
+        return cls(**values)
+    except (TypeError, ValueError) as error:
+        message = f'{location}: {cls.__name__} rejected the values: {error}'
+        raise ConfigFileError(message) from error
 
 
 def config_to_data(*, config: object) -> dict[str, object]:
@@ -394,7 +477,7 @@ def config_to_data(*, config: object) -> dict[str, object]:
 
 
 def config_to_yaml(*, config: object) -> str:
-    """Serialise a config dataclass to YAML.
+    """Serialize a config dataclass to YAML.
 
     Args:
         config: A dataclass instance.
@@ -408,7 +491,7 @@ def config_to_yaml(*, config: object) -> str:
     """
     document = {
         'format_version': CONFIG_FORMAT_VERSION,
-        'config_type': _type_name(cls=type(config)),
+        'config_type': qualified_name(cls=type(config)),
         'config': config_to_data(config=config),
     }
     return yaml.safe_dump(document, sort_keys=False, allow_unicode=True)
@@ -431,13 +514,13 @@ def config_from_yaml[C](*, config_class: type[C], text: str) -> C:
     if not isinstance(document, dict) or document.get('format_version') != CONFIG_FORMAT_VERSION:
         message = f'not a TSLab config file (format_version {CONFIG_FORMAT_VERSION} expected)'
         raise ConfigFileError(message)
-    if document.get('config_type') != _type_name(cls=config_class):
+    if document.get('config_type') != qualified_name(cls=config_class):
         _LOGGER.warning(
             'config file was written for %s, loading it as %s',
             document.get('config_type'),
-            _type_name(cls=config_class),
+            qualified_name(cls=config_class),
         )
-    config = _decode_dataclass(data=document.get('config'), cls=config_class, location='config')
+    config = decode_dataclass(data=document.get('config'), cls=config_class, location='config')
     if not isinstance(config, config_class):
         message = f'decoded config is {type(config).__qualname__}, not {config_class.__qualname__}'
         raise ConfigFileError(message)
@@ -514,9 +597,8 @@ def parse_config[C](
             raise ValueError(message)
         choice = _preset_choice(config_class=config_class, presets=presets)
         parsed = tyro.cli(choice, args=args, config=cascade)
-        if not isinstance(
-            parsed, config_class
-        ):  # narrows the Any of tyro; presets are config_class instances
+        # tyro returns Any; every preset is an instance of config_class.
+        if not isinstance(parsed, config_class):
             message = f'a preset is not a {config_class.__qualname__}: {type(parsed).__qualname__}'
             raise TypeError(message)
         return parsed
@@ -525,15 +607,11 @@ def parse_config[C](
     return tyro.cli(config_class, default=default, args=args, config=cascade)
 
 
-NO_PRESET = 'no-preset'
+type _Presets[C] = Mapping[str, tuple[str, C]]
 
 
-def _preset_choice[C](
-    # why: a union built at run time
-    *,
-    config_class: type[C],
-    presets: Mapping[str, tuple[str, C]],
-) -> Any:  # noqa: ANN401
+# why: the return value is a union type built at run time, which no annotation can name
+def _preset_choice[C](*, config_class: type[C], presets: _Presets[C]) -> Any:  # noqa: ANN401
     """Return the tyro union of ``no-preset`` and the presets.
 
     ``AvoidSubcommands`` on a preset turns each union field that has a default

@@ -7,9 +7,11 @@ from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
     InstanceState,
+    parse_instance_id,
     read_status,
     RunState,
     RunStatusSnapshot,
+    StatusFileError,
     write_status,
 )
 
@@ -42,3 +44,45 @@ def test_instance_id_format() -> None:
     assert format_instance_id(stage_name='transform', name_parts=('forecasting', 'h24', 'smooth')) == (
         'transform[forecasting/h24/smooth]'
     )
+
+
+def test_parse_instance_id_inverts_format_instance_id() -> None:
+    instance_id = format_instance_id(stage_name='transform', name_parts=('forecasting', 'h24', 'smooth'))
+    assert parse_instance_id(instance_id=instance_id) == ('transform', ('forecasting', 'h24', 'smooth'))
+    assert parse_instance_id(instance_id='encode[default]') == ('encode', ('default',))
+
+
+@pytest.mark.parametrize('instance_id', ['encode', 'encode[', '[x]', 'encode[x'])
+def test_parse_instance_id_rejects_other_shapes(instance_id: str) -> None:
+    with pytest.raises(ValueError, match='invalid instance id'):
+        parse_instance_id(instance_id=instance_id)
+
+
+def _document(*, instances: str) -> str:
+    return (
+        '{"format_version": 1, "run_state": "running", "updated_at": "t", '
+        f'"instances": {instances}}}'
+    )
+
+
+@pytest.mark.parametrize(
+    'content',
+    [
+        '[1]',
+        '{broken',
+        '{"format_version": 1}',
+        _document(instances='{}').replace('running', 'nope'),
+        _document(instances='5'),
+        _document(instances='{"a[b]": {"state": "bogus"}}'),
+        _document(instances='{"a[b]": {}}'),
+        _document(instances='{"a[b]": 3}'),
+    ],
+)
+def test_every_bad_status_file_is_one_error_naming_the_file(tmp_path: Path, content: str) -> None:
+    (tmp_path / 'status.json').write_text(content, encoding='utf-8')
+    with pytest.raises(StatusFileError, match=r'status\.json'):
+        read_status(path=tmp_path / 'status.json')
+
+
+def test_status_file_error_is_a_value_error() -> None:
+    assert issubclass(StatusFileError, ValueError)

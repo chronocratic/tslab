@@ -107,3 +107,9 @@ class Constant(DownstreamModel):
 def test_default_metrics_explain_what_to_do() -> None:
     with pytest.raises(NotImplementedError, match='metrics='):
         Constant().default_metrics(predictions=torch.zeros(2), targets=torch.zeros(2))
+
+
+@pytest.mark.parametrize('batch_size', [0, -3])
+def test_non_positive_batch_size_is_rejected(batch_size: int) -> None:
+    with pytest.raises(ValueError, match='batch_size must be positive'):
+        ModelAsEncoder(batch_size=batch_size)

@@ -10,24 +10,36 @@ import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from enum import StrEnum
-import json
 from pathlib import Path
 
-from tslab.core.paths import atomic_write_text, require_path
+from tslab.core.paths import (
+    atomic_write_json,
+    JsonFileError,
+    read_json_object,
+    require_path,
+    STATUS_FILE,
+)
 
 __all__ = [
+    'STATUS_FILE',
     'STATUS_FORMAT_VERSION',
     'InstanceRecord',
     'InstanceState',
     'RunState',
     'RunStatusSnapshot',
+    'StatusFileError',
     'format_instance_id',
+    'parse_instance_id',
     'read_status',
     'utc_now_iso',
     'write_status',
 ]
 
 STATUS_FORMAT_VERSION = 1
+
+
+class StatusFileError(JsonFileError):
+    """Raised when ``status.json`` is unreadable, malformed or of another format version."""
 
 
 class InstanceState(StrEnum):
@@ -166,6 +178,27 @@ def format_instance_id(*, stage_name: str, name_parts: tuple[str, ...]) -> str:
     return f'{stage_name}[{"/".join(name_parts)}]'
 
 
+def parse_instance_id(*, instance_id: str) -> tuple[str, tuple[str, ...]]:
+    """Split an instance id into its stage name and name parts.
+
+    This is the inverse of ``format_instance_id``.
+
+    Args:
+        instance_id: For example ``transform[forecasting/h24/smooth]``.
+
+    Returns:
+        ``('transform', ('forecasting', 'h24', 'smooth'))``.
+
+    Raises:
+        ValueError: If ``instance_id`` does not have the form ``stage[name]``.
+    """
+    stage_name, bracket, rest = instance_id.partition('[')
+    if not bracket or not rest.endswith(']') or not stage_name:
+        message = f'invalid instance id {instance_id!r}; expected stage[name]'
+        raise ValueError(message)
+    return stage_name, tuple(rest[:-1].split('/'))
+
+
 def read_status(*, path: Path) -> RunStatusSnapshot | None:
     """Read ``status.json``.
 
@@ -176,33 +209,43 @@ def read_status(*, path: Path) -> RunStatusSnapshot | None:
         The snapshot, or ``None`` if the file does not exist yet.
 
     Raises:
-        TypeError: If the file is not a JSON object.
-        ValueError: If the file lacks a required key or has an unsupported
-            ``format_version``.
+        StatusFileError: If the file is not a JSON object, lacks a required key,
+            has an unsupported ``format_version`` or holds a malformed record.
+            The message names the file.
     """
     require_path(value=path, parameter='path')
     if not path.exists():
         return None
-    document = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(document, dict):
-        message = f'{path.as_posix()} must be a JSON object, got {type(document).__name__}'
-        raise TypeError(message)
+    try:
+        return _snapshot_from_document(path=path, document=read_json_object(path=path))
+    except StatusFileError:
+        raise
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        message = f'{path.as_posix()} is malformed: {error!r}'
+        raise StatusFileError(message) from error
+
+
+def _snapshot_from_document(*, path: Path, document: Mapping[str, object]) -> RunStatusSnapshot:
     if document.get('format_version') != STATUS_FORMAT_VERSION:
         message = (
             f'{path.as_posix()} has format_version {document.get("format_version")!r}; '
             f'this TSLab version reads only {STATUS_FORMAT_VERSION}'
         )
-        raise ValueError(message)
+        raise StatusFileError(message)
     missing = [key for key in ('run_state', 'updated_at', 'instances') if key not in document]
     if missing:
         message = f'{path.as_posix()} is missing required keys: {missing}'
-        raise ValueError(message)
+        raise StatusFileError(message)
+    instances = document['instances']
+    if not isinstance(instances, dict) or not isinstance(document['updated_at'], str):
+        message = f'{path.as_posix()} has a malformed instances or updated_at entry'
+        raise StatusFileError(message)
     return RunStatusSnapshot(
         run_state=RunState(document['run_state']),
         updated_at=document['updated_at'],
         instances={
             instance_id: InstanceRecord.from_json(document=record)
-            for instance_id, record in document['instances'].items()
+            for instance_id, record in instances.items()
         },
     )
 
@@ -222,4 +265,4 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
             instance_id: record.to_json() for instance_id, record in snapshot.instances.items()
         },
     }
-    atomic_write_text(path=path, text=json.dumps(document, indent=2, sort_keys=True) + '\n')
+    atomic_write_json(path=path, document=document)

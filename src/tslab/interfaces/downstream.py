@@ -42,7 +42,7 @@ class DownstreamModel(ABC):
     def default_metrics(
         self, *, predictions: torch.Tensor, targets: torch.Tensor
     ) -> dict[str, float]:
-        """Return the metrics of this model's evaluation protocol.
+        """Return the metrics of the evaluation protocol of this model.
 
         ``evaluate`` uses them when it is called without ``metrics=``.
 
