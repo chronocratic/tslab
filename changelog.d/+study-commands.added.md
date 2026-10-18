@@ -1,1 +1,1 @@
-`tslab study submit`, `status` and `resubmit`: submit a study to SLURM arrays or run it locally, see every expected run's state, resubmit interrupted, missing or failed runs, and optionally retry interrupted runs automatically.
+`tslab study submit`, `status` and `resubmit`: submit a study to SLURM arrays or run it locally, see the state of every expected run, resubmit interrupted, missing or failed runs, and optionally retry interrupted runs automatically.

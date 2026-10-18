@@ -1,13 +1,13 @@
 # Example SLURM machine profile.
 #
-# Copy this file to machines/cluster.toml, fill in the cluster's values
+# Copy this file to machines/cluster.toml, fill in the values of the cluster
 # (partition, limits, paths) and commit that file. Nothing here is
 # cluster-specific except what says CHANGE_ME.
 launcher = "slurm"
 output_root = "${SCRATCH}/runs"
 tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
 
-[settings] # the same settings as the study's grids, for every run on this machine
+[settings] # the same settings as the grids of the study, for every run on this machine
 # "tracking.wandb_mode" = "offline"
 # "tracking.shell_log_path" = "{log_file}"
 
@@ -23,7 +23,7 @@ cpus_per_task = 2
 mem_per_cpu = "16G"
 gpus = 0
 max_concurrent = 100 # the %N of --array
-max_array_size = 1000 # array indices stay below the cluster's MaxArraySize
+max_array_size = 1000 # array indices stay below the MaxArraySize of the cluster
 sbatch_extra = [] # raw lines, e.g. ["--exclude=login02"]
 node_local_tmp = true # put TMPDIR and the W&B folders on node-local scratch
 submit_pause_seconds = 0.5

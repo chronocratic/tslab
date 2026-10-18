@@ -30,11 +30,21 @@ class Command(Protocol):
         ...
 
 
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Study:
+    """Run a study of experiments: submit, status, resubmit, results."""
+
+    def run(self) -> int:
+        # why: never reached; `_parse` hands every `study` call to the study group
+        msg = 'unreachable'
+        raise AssertionError(msg)
+
+
 def main(args: Sequence[str] | None = None) -> None:
     """Entry point of the ``tslab`` console script.
 
     Arguments after the first ``--`` are pass-through: tslab does not parse
-    them and hands them to the command's ``extra_args`` field. A ``--`` on a
+    them and hands them to the ``extra_args`` field of the command. A ``--`` on a
     command without that field exits 2.
 
     Args:
@@ -77,5 +87,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
             STUDY_COMMANDS, prog='tslab study', args=list(argv[1:])
         )
     return tyro.extras.subcommand_cli_from_dict(
-        {'new': New, 'status': Status, 'wandb-sync': WandbSync}, prog='tslab', args=list(argv)
+        {'new': New, 'status': Status, 'study': _Study, 'wandb-sync': WandbSync},
+        prog='tslab',
+        args=list(argv),
     )

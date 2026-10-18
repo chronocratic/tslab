@@ -83,8 +83,8 @@ machine. The marker is **optional**; presets without it are unaffected.
 
 ### A preset as a study recipe
 
-`from_presets` turns presets into the settings of a study's recipe axis. It
-keeps each choice field as its member's **name** and every other field
+`from_presets` turns presets into the settings of the recipe axis of a study. It
+keeps each choice field as the **name** of its member and every other field
 **only where it differs from the default**, plus every field without a
 default. `ts2vec-paper` above gives:
 
@@ -93,7 +93,7 @@ default. `ts2vec-paper` above gives:
 ```
 
 (with the dataset paths removed by `without=('data',)`). Each setting mapping
-becomes flags of the grid's `no-preset` command:
+becomes flags of the `no-preset` command of the grid:
 
 ```bash
 uv run python -m my_paper.classify no-preset model:ts2vec \
@@ -125,7 +125,7 @@ Settings are **dotted paths** of the config class (`model.depth`,
 
 - **A preset** — one run by hand: `classify ts2vec-paper`.
 - **`from_presets` plus axes** — a study: the preset becomes the recipe axis,
-  and the study's data and seed axes choose what it runs over.
+  and the data and seed axes of the study choose what it runs over.
 - **A hand-written settings axis** — what no preset covers, e.g. a learning
   rate sweep: `setting_axis(path='model.learning_rate', values=(1e-3, 5e-4))`.
 

@@ -66,7 +66,7 @@ def test_example_study_runs_one_run_locally() -> None:
     """The example study submits and runs one slice locally, through the CLI.
 
     Runs from the project root (where ``uv run pytest`` is meant to run), so
-    the study's ``uv run`` command finds the venv; ``machines/local.toml`` and
+    the ``uv run`` command of the study finds the venv; ``machines/local.toml`` and
     ``data/`` come from the project, as in the README flow.
     """
     root = Path.cwd()

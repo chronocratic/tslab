@@ -2,7 +2,7 @@
 launcher = "local"
 output_root = "runs"
 
-# Settings applied to every run on this machine, as in the study's grids.
+# Settings applied to every run on this machine, as in the grids of the study.
 # [settings]
 # "tracking.wandb_mode" = "offline"
 # "trainer.max-epochs" = 100

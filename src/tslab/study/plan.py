@@ -43,11 +43,11 @@ _LOGGER = logging.getLogger('tslab.study')
 
 @dataclass(frozen=True, kw_only=True)
 class ResolvedRun:
-    """One run with its machine's settings and resources applied.
+    """One run with the settings and resources of its machine applied.
 
     Args:
         run: The study run this resolves.
-        settings: The run's settings, then the machine settings, then the
+        settings: The settings of the run, then the machine settings, then the
             matching machine overrides' settings; not yet expanded.
         slurm: The base ``[slurm]`` table with the matching overrides'
             ``slurm`` applied field by field, or ``None`` off SLURM.
@@ -61,7 +61,7 @@ class ResolvedRun:
 def resolve_runs(
     *, study: Study, machine: MachineProfile, runs: Sequence[StudyRun]
 ) -> list[ResolvedRun]:
-    """Every run with the machine's settings and resources applied.
+    """Every run with the settings and resources of the machine applied.
 
     Machine settings paths are checked against every grid they can apply to;
     an override that names an axis, grid or value this study lacks is logged
@@ -127,7 +127,7 @@ def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
 def _override_grids(
     *, study: Study, grid_names: Sequence[str], match: Mapping[str, object]
 ) -> list[tuple[str, Grid]]:
-    """The grids an override's settings apply to, for path checking."""
+    """The grids the settings of an override apply to, for path checking."""
     axes = [key for key in match if key != 'grid']
     return [
         (name, grid)
@@ -181,7 +181,7 @@ def run_arguments(
 
     Args:
         grid: The grid of the run; its ``config`` class the flags are read into.
-        settings: The run's resolved settings, not yet expanded.
+        settings: The resolved settings of the run, not yet expanded.
         env: The variable names to values for expansion.
         placeholders: The placeholder names to values for this run.
 
@@ -191,7 +191,7 @@ def run_arguments(
     Raises:
         ValueError: If a value names an unset variable or an unknown
             placeholder.
-        ValueError: If a setting path is not a field of the grid's config.
+        ValueError: If a setting path is not a field of the config of the grid.
     """
     expanded = {
         path: expand_setting(value=value, env=env, values=placeholders)
@@ -208,7 +208,7 @@ def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str |
         arguments: The flags plus any pass-through arguments.
 
     Returns:
-        ``None`` when the arguments parse, else tyro's error text.
+        ``None`` when the arguments parse, else the error text of tyro.
     """
     buffer = StringIO()
     try:
@@ -230,8 +230,8 @@ class PlannedTask:
 
     Args:
         resolved: The resolved run this is a task for.
-        index: The run's array index, the same in every attempt.
-        log_file: The file the task's output is appended to.
+        index: The array index of the run, the same in every attempt.
+        log_file: The file the output of the task is appended to.
         command: The full command: the grid's, the flags, the extra args.
         extra_args: The pass-through arguments, last in ``command``.
         attempt: The attempt number of this submission.
@@ -250,14 +250,14 @@ class PlannedTask:
 
 @dataclass(frozen=True, kw_only=True)
 class JobGroup:
-    """The runs submitted as one job: one grid's runs with one set of resources.
+    """The runs submitted as one job: the runs of one grid with one set of resources.
 
     Args:
-        grid: The grid name the group's runs came from.
-        job_name: The grid's ``short_name``; it names the job and its logs.
+        grid: The grid name the runs of the group came from.
+        job_name: The ``short_name`` of the grid; it names the job and its logs.
         slurm: The resources of the job; ``None`` when the machine is local.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
-        tasks: The group's tasks, sorted by index.
+        tasks: The tasks of the group, sorted by index.
     """
 
     grid: str
@@ -295,7 +295,7 @@ def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> di
 
 
 def study_folder(*, machine: MachineProfile, study: Study) -> Path:
-    """The study's hidden folder: ``<output_root>/<study>/.study``."""
+    """The hidden folder of the study: ``<output_root>/<study>/.study``."""
     return machine.output_root / study.name / '.study'
 
 
@@ -315,7 +315,7 @@ def next_job_file(*, study_folder: Path) -> int:
 def _task_error(*, grid_name: str, run_path: str, index: int, max_array_size: int) -> str:
     return (
         f'grid {grid_name}: run {run_path} needs array index {index}, '
-        f"but max_array_size is {max_array_size} (the cluster's MaxArraySize)"
+        f'but max_array_size is {max_array_size} (the MaxArraySize of the cluster)'
     )
 
 

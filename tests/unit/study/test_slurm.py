@@ -93,6 +93,28 @@ def test_task_line_round_trips_through_bash(tmp_path: Path) -> None:
     assert result.stdout.splitlines()[1] == "['a b', \"it's\"]"
 
 
+def test_followup_task_line_round_trips_through_bash(tmp_path: Path) -> None:
+    # why: the follow-up jobs use the non-array section, whose tasks file
+    # lines also start with the index and attempt
+    tasks_file = tmp_path / 'followup.tasks'
+    tasks_file.write_text('0 1 ' + shlex.join(['python3', '-c', "print('followed')"]) + '\n')
+    script = tmp_path / 'followup.sbatch'
+    script.write_text(
+        job_script(
+            job_name='wbsync',
+            slurm=SlurmSettings(partition='CHANGE_ME', time='00:10:00', node_local_tmp=False),
+            indices=None,
+            tasks_file=tasks_file,
+            log_pattern=tmp_path / 'logs' / 'wbsync.out',
+            project_root=tmp_path,
+            env={},
+        )
+    )
+    result = run_task_section(script, task_id='0')
+    assert result.returncode == 0
+    assert result.stdout.splitlines()[-1] == 'followed'
+
+
 def test_missing_task_index_fails_with_a_message(tmp_path: Path) -> None:
     tasks_file = tmp_path / '3.tasks'
     script = write_script(tmp_path, tasks_file)

@@ -83,7 +83,7 @@ class TaskRecord:
     """One run in one submitted job.
 
     Args:
-        index: The run's array index, the same in every attempt.
+        index: The array index of the run, the same in every attempt.
         grid: The grid the run belongs to.
         run_path: The run path within the study.
         command: The full command of the run.

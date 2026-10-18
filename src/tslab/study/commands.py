@@ -232,10 +232,10 @@ def submit(
     extra_args: tuple[str, ...],
     sleep: Callable[[float], None] = time.sleep,
 ) -> int:
-    """Submit the runs that need submitting, on the context's machine.
+    """Submit the runs that need submitting, on the machine of the context.
 
     Queued and running runs are never submitted; done runs only when
-    ``include_done``. Nothing is written when one run's arguments do not
+    ``include_done``. Nothing is written when the arguments of one run do not
     parse.
 
     Args:
@@ -243,7 +243,7 @@ def submit(
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The pass-through arguments, appended to every run.
-        sleep: What waits out the cluster's submission pause.
+        sleep: What waits out the submission pause of the cluster.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -362,20 +362,20 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         states: The states to resubmit; interrupted and missing by default.
         cancel_live: Cancel the live runs of the selection first.
         dry_run: Write the job files and print the plan, submit nothing.
-        extra_args: The pass-through arguments; the run's last submission's
-            when ``None``.
-        auto: The follow-up job's mode: only interrupted runs that made
+        extra_args: The pass-through arguments; taken from the last
+            submission when ``None``.
+        auto: The mode of the follow-up job: only interrupted runs that made
             progress since their last attempt, up to the machine's
             ``followup.max_attempts``; the rest are logged and left alone,
             and ``cancel_live`` is ignored.
-        sleep: What waits out the cluster's submission pause.
+        sleep: What waits out the submission pause of the cluster.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
         ``1`` when a run does not parse or a submission failed.
     """
     if auto:
-        # why: auto is the follow-up job's path: it retries interrupted runs
+        # why: auto is the path of the follow-up job: it retries interrupted runs
         # with progress only, and never touches the live ones
         states = (StudyState.INTERRUPTED,)
         cancel_live = False
@@ -399,7 +399,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         _LOGGER.info('nothing to resubmit')
         return 0
     if cancel_live:
-        _cancel_live(reports=selected)
+        _cancel_live(reports=selected, launcher=context.machine.launcher)
     _remove_ended_locks(reports=selected, study_directory=_study_directory(context))
     reuse = latest_tasks(jobs=context.jobs)
     args: dict[str, tuple[str, ...]] = {}
@@ -422,7 +422,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
 
 
 def results(*, context: Context, out: Path) -> int:
-    """Write the results table of the context's runs to ``out`` as CSV.
+    """Write the results table of the runs of the context to ``out`` as CSV.
 
     Args:
         context: The context of the command.
@@ -462,8 +462,8 @@ def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[Ru
 def _made_progress(*, report: RunReport, context: Context) -> bool:
     """Whether the run moved since its latest submission.
 
-    More done instances than the latest task's snapshot, or a newer
-    checkpoint than the snapshot's (a snapshot without one counts as old).
+    More done instances than the snapshot of the latest task, or a newer
+    checkpoint than the one of the snapshot (a snapshot without one counts as old).
     """
     progress = take_progress(run_directory=_study_directory(context) / report.run.run_path)
     before = report.task.progress if report.task is not None else None
@@ -477,7 +477,10 @@ def _made_progress(*, report: RunReport, context: Context) -> bool:
     )
 
 
-def _cancel_live(*, reports: Sequence[RunReport]) -> None:
+def _cancel_live(*, reports: Sequence[RunReport], launcher: str) -> None:
+    if launcher != 'slurm':
+        _LOGGER.info('skipped the live runs: only SLURM jobs can be cancelled')
+        return
     ids = [report.job_id for report in reports if report.job_id is not None]
     if ids:
         scancel(job_ids=ids)
@@ -534,7 +537,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         reports: The state reports of the runs to submit.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The run path to pass-through arguments.
-        sleep: What waits out the cluster's submission pause.
+        sleep: What waits out the submission pause of the cluster.
         begin: A SLURM ``--begin`` for the submitted jobs.
 
     Returns:
@@ -580,13 +583,13 @@ def queue_followups(  # why: keyword-only public API; each option is documented 
     With ``followup.auto_retry``: one job that resubmits the interrupted
     runs with ``--auto``, so the retry chain continues on the cluster
     without a person at the keyboard. With ``followup.wandb_sync``: one job
-    that syncs the study's run folders to W&B. Each waits for ``job_ids``
+    that syncs the run folders of the study to W&B. Each waits for ``job_ids``
     with ``afterany``.
 
     Args:
         context: The context the runs were submitted under.
         job_ids: The job ids the helper jobs wait for; empty does nothing.
-        sleep: What waits out the cluster's submission pause.
+        sleep: What waits out the submission pause of the cluster.
 
     Returns:
         The submitted helper jobs; empty when there is nothing to queue.
