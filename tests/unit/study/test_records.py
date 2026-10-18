@@ -1,5 +1,6 @@
 """``submissions.jsonl``: job records, appended and read back."""
 
+import fcntl
 import json
 import logging
 import os
@@ -15,12 +16,13 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.study import (
+from tslab.study.records import (
     append_job,
     JobRecord,
     latest_tasks,
     ProgressSnapshot,
     read_jobs,
+    submission_lock,
     take_progress,
     TaskRecord,
 )
@@ -113,3 +115,35 @@ def test_take_progress(tmp_path: Path) -> None:
     assert take_progress(run_directory=tmp_path / 'missing') == ProgressSnapshot(
         done_instances=0, newest_checkpoint_mtime=None
     )
+
+
+def test_take_progress_counts_an_unreadable_status_as_no_progress(tmp_path: Path) -> None:
+    (tmp_path / 'status.json').write_text('{')
+    progress = take_progress(run_directory=tmp_path)
+    assert progress.done_instances == 0
+    assert progress.newest_checkpoint_mtime is None
+
+
+def test_read_jobs_skips_a_line_missing_a_key(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    path = tmp_path / 's.jsonl'
+    append_job(path=path, record=job())
+    document = job().to_json()
+    del document['job_id']
+    with path.open('a', encoding='utf-8') as handle:
+        handle.write(json.dumps(document) + '\n')
+    with caplog.at_level('WARNING'):
+        assert len(read_jobs(path=path)) == 1
+    assert 'skipping line 2' in caplog.text
+
+
+def test_submission_lock_excludes_a_second_holder(tmp_path: Path) -> None:
+    with (
+        submission_lock(study_folder=tmp_path),
+        (tmp_path / 'submit.lock').open('a') as other,
+        pytest.raises(BlockingIOError),
+    ):
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    with (tmp_path / 'submit.lock').open('a') as other:
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

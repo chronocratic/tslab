@@ -7,23 +7,11 @@ import pytest
 
 from study.configs import grid, PRESETS
 from tslab.core.status import utc_now_iso
-from tslab.study import (
-    assign_indices,
-    expand_runs,
-    from_presets,
-    JobRecord,
-    MachineOverride,
-    MachineProfile,
-    next_job_file,
-    plan_jobs,
-    ProgressSnapshot,
-    resolve_runs,
-    SlurmSettings,
-    Study,
-    StudyRun,
-    TaskRecord,
-    validate_jobs,
-)
+from tslab.study import from_presets, Study, StudyRun
+from tslab.study.definition import expand_runs
+from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.plan import assign_indices, next_job_file, plan_jobs, resolve_runs, validate_jobs
+from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 
 
 @pytest.fixture

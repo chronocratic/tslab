@@ -3,7 +3,8 @@
 import pytest
 
 from study.configs import grid
-from tslab.study import expand_runs, select_runs, setting_axis, Study
+from tslab.study import setting_axis, Study
+from tslab.study.definition import expand_runs, select_runs
 
 
 def test_only_filters_grids_with_that_axis() -> None:

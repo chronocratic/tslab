@@ -4,75 +4,17 @@ from pathlib import Path
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
-from study.project import write_toy_project
+from study.fake_slurm import FakeSlurm
+from study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
-from tslab.study import Context, load_context, parse_states, Selection, status, StudyState, submit
-
-
-def no_sleep(_seconds: float) -> None:
-    """Skip the submission pause."""
+from tslab.study.commands import parse_states, status
+from tslab.study.state import StudyState
 
 
 def normalized(text: str) -> str:
     """Collapse runs of spaces, so column widths are free."""
     return ' '.join(text.split())
-
-
-def context(*, project: Path, machine_file: str) -> Context:
-    return load_context(
-        reference='toy_studies:study',
-        machine_path=project / machine_file,
-        selection=Selection(),
-        project_root=Path.cwd(),
-    )
-
-
-def submit_study(*, project: Path) -> None:
-    code = submit(
-        context=context(project=project, machine_file='cluster.toml'),
-        include_done=False,
-        dry_run=False,
-        extra_args=(),
-        sleep=no_sleep,
-    )
-    assert code == 0
-
-
-def finish_run(*, project: Path, model: str, seed: int) -> None:
-    """Write a done status.json, so the run reads as done from its folder."""
-    folder = project / 'runs' / 's' / f'g/{model}/{seed}'
-    folder.mkdir(parents=True)
-    write_status(
-        path=folder / 'status.json',
-        snapshot=RunStatusSnapshot(
-            run_state=RunState.FINISHED,
-            updated_at=utc_now_iso(),
-            instances={'train': InstanceRecord(state=InstanceState.DONE)},
-        ),
-    )
-
-
-@pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    folder = write_toy_project(project=tmp_path / 'proj')
-    # why: load_study imports from the current directory, like a user in a project
-    monkeypatch.chdir(folder)
-    return folder
-
-
-@pytest.fixture
-def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
-    return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
 
 
 def test_status_counts_and_lines(
@@ -165,11 +107,11 @@ def test_cli_parses_state_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
                 'toy_studies:study',
                 '--machine',
                 str(tmp_path / 'm.toml'),
-                '--state',
+                '--states',
                 'failed,missing',
-                '--state',
+                '--states',
                 'done',
             ]
         )
     assert exit_info.value.code == 0
-    assert seen[0].state == ('failed,missing', 'done')
+    assert seen[0].states == ('failed,missing', 'done')

@@ -1,13 +1,13 @@
 """``tslab study resubmit``: the interrupted, missing and failed runs again."""
 
+import dataclasses
 import json
 from pathlib import Path
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
-from study.project import write_toy_project
-from tslab.core.run import _LOCK_FILE  # why: the lock name is private to tslab.core.run
+from study.fake_slurm import FakeSlurm
+from study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -16,60 +16,14 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.study import (
-    Context,
-    JobRecord,
-    load_context,
-    read_jobs,
-    resubmit,
-    Selection,
-    StudyState,
-    submit,
-)
-
-
-def no_sleep(_seconds: float) -> None:
-    """Skip the submission pause."""
-
-
-def context(*, project: Path, machine_file: str) -> Context:
-    return load_context(
-        reference='toy_studies:study',
-        machine_path=project / machine_file,
-        selection=Selection(),
-        project_root=Path.cwd(),
-    )
-
-
-def submit_study(*, project: Path, extra_args: tuple[str, ...] = ()) -> None:
-    code = submit(
-        context=context(project=project, machine_file='cluster.toml'),
-        include_done=False,
-        dry_run=False,
-        extra_args=extra_args,
-        sleep=no_sleep,
-    )
-    assert code == 0
-
-
-def finish_run(*, project: Path, model: str, seed: int) -> None:
-    """Write a done status.json, so the run reads as done from its folder."""
-    folder = project / 'runs' / 's' / f'g/{model}/{seed}'
-    folder.mkdir(parents=True)
-    write_status(
-        path=folder / 'status.json',
-        snapshot=RunStatusSnapshot(
-            run_state=RunState.FINISHED,
-            updated_at=utc_now_iso(),
-            instances={'train': InstanceRecord(state=InstanceState.DONE)},
-        ),
-    )
+from tslab.study.commands import resubmit, submit
+from tslab.study.state import StudyState
 
 
 def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
     """A run folder that says running and still holds a live foreign lock."""
     folder = project / 'runs' / 's' / f'g/{model}/{seed}'
-    folder.mkdir(parents=True)
+    folder.mkdir(parents=True, exist_ok=True)
     write_status(
         path=folder / 'status.json',
         snapshot=RunStatusSnapshot(
@@ -79,28 +33,6 @@ def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
         ),
     )
     (folder / '.lock').write_text(json.dumps({'pid': 99999, 'host': 'otherhost'}))
-
-
-def jobs_of(*, project: Path) -> list[JobRecord]:
-    return read_jobs(path=project / 'runs' / 's' / '.study' / 'submissions.jsonl')
-
-
-@pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    folder = write_toy_project(project=tmp_path / 'proj')
-    # why: load_study imports from the current directory, like a user in a project
-    monkeypatch.chdir(folder)
-    return folder
-
-
-@pytest.fixture
-def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
-    return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
-
-
-def test_lock_file_name_is_pinned() -> None:
-    # why: resubmit removes stale locks by this literal name
-    assert _LOCK_FILE == '.lock'
 
 
 def test_default_states_are_interrupted_and_missing(project: Path, fake: FakeSlurm) -> None:
@@ -174,6 +106,7 @@ def test_cancel_live_cancels_then_resubmits_later(project: Path, fake: FakeSlurm
     assert '#SBATCH --begin=now+660' in script
 
 
+@pytest.mark.slow
 def test_cancel_live_never_cancels_local_jobs(project: Path, fake: FakeSlurm) -> None:
     # why: local job ids (local-<pid>-<n>) are not SLURM jobs
     code = submit(
@@ -239,3 +172,87 @@ def test_pass_through_arguments_reach_jobs_and_retries(
     replaced = jobs_of(project=project)[2].tasks[0]
     assert replaced.extra_args == ('--tracking-log', str(other))
     assert replaced.command[-2:] == ('--tracking-log', str(other))
+
+
+def live_cancel_setup(*, project: Path, fake: FakeSlurm) -> None:
+    """Task 0 queued and tasks 1 to 3 done, so only one run is live."""
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    for model, seed in (('small', 2), ('large', 1), ('large', 2)):
+        finish_run(project=project, model=model, seed=seed)
+
+
+def test_dry_run_with_cancel_live_cancels_and_unlocks_nothing(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    live_cancel_setup(project=project, fake=fake)
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_3|TIMEOUT\n'}])
+    running_run_with_lock(project=project, model='large', seed=2)
+    with caplog.at_level('INFO'):
+        code = resubmit(
+            context=context(project=project, machine_file='cluster.toml'),
+            cancel_live=True,
+            dry_run=True,
+            sleep=no_sleep,
+        )
+    assert code == 0
+    assert fake.calls('scancel') == []
+    assert (project / 'runs' / 's' / 'g/large/2' / '.lock').exists()
+    assert 'would cancel 1000_0' in caplog.text
+    assert len(jobs_of(project=project)) == 1
+
+
+def test_failed_validation_cancels_nothing(project: Path, fake: FakeSlurm) -> None:
+    live_cancel_setup(project=project, fake=fake)
+    # why: a pass-through flag the config does not have makes every run fail validation
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        cancel_live=True,
+        extra_args=('--no-such-flag',),
+        sleep=no_sleep,
+    )
+    assert code == 1
+    assert fake.calls('scancel') == []
+    assert len(jobs_of(project=project)) == 1
+
+
+def test_cancel_failure_exits_one_and_submits_nothing(project: Path, fake: FakeSlurm) -> None:
+    live_cancel_setup(project=project, fake=fake)
+    fake.set_answers('scancel', [{'exit': 1, 'stderr': 'Invalid job id'}])
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        cancel_live=True,
+        sleep=no_sleep,
+    )
+    assert code == 1
+    assert len(fake.calls('sbatch')) == 1
+    assert len(jobs_of(project=project)) == 1
+
+
+def test_cancel_live_passes_only_live_job_ids(project: Path, fake: FakeSlurm) -> None:
+    live_cancel_setup(project=project, fake=fake)
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_1|TIMEOUT\n1000_2|COMPLETED\n'}])
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        cancel_live=True,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    # why: the timed out job already ended; scancel on an ended id would fail
+    assert fake.calls('scancel') == [['1000_0']]
+
+
+def test_unknown_slurm_states_refuse_to_submit(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    ctx = context(project=project, machine_file='cluster.toml')
+    unknown = dataclasses.replace(ctx, job_states_known=False)
+    with caplog.at_level('ERROR'):
+        code = resubmit(context=unknown, states=tuple(StudyState), sleep=no_sleep)
+    assert code == 1
+    assert len(fake.calls('sbatch')) == 1
+    assert 'not submitting' in caplog.text

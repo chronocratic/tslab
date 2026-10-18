@@ -1,13 +1,13 @@
 """Follow-up jobs: the automatic retry and the W&B sync behind the jobs of the study."""
 
-from collections.abc import Iterator
+import dataclasses
 from pathlib import Path
 import sys
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
-from study.project import write_toy_project
+from study.fake_slurm import FakeSlurm
+from study.helpers import context, jobs_of, no_sleep, submit_study
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -16,18 +16,9 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.study import (
-    append_job,
-    Context,
-    JobRecord,
-    load_context,
-    ProgressSnapshot,
-    read_jobs,
-    resubmit,
-    Selection,
-    submit,
-    TaskRecord,
-)
+from tslab.study.commands import resubmit, submit
+from tslab.study.followups import queue_followups
+from tslab.study.records import append_job, JobRecord, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six
 STUDIES = '''
@@ -59,39 +50,11 @@ study = Study(
 '''
 
 
-def no_sleep(_seconds: float) -> None:
-    """Skip the submission pause."""
-
-
-def context(*, project: Path, machine_file: str) -> Context:
-    return load_context(
-        reference='toy_studies:study',
-        machine_path=project / machine_file,
-        selection=Selection(),
-        project_root=Path.cwd(),
-    )
-
-
-def submit_study(*, project: Path, machine_file: str = 'cluster.toml') -> None:
-    code = submit(
-        context=context(project=project, machine_file=machine_file),
-        include_done=False,
-        dry_run=False,
-        extra_args=(),
-        sleep=no_sleep,
-    )
-    assert code == 0
-
-
 def with_followups(*, project: Path) -> None:
     """The [followup] table, on top of the written cluster profile."""
     profile = project / 'cluster.toml'
     text = profile.read_text() + '\n[followup]\nauto_retry = true\nwandb_sync = true\n'
     profile.write_text(text)
-
-
-def jobs_of(*, project: Path) -> list[JobRecord]:
-    return read_jobs(path=project / 'runs' / 's' / '.study' / 'submissions.jsonl')
 
 
 def job_file_of(*, project: Path, job_file: int, suffix: str) -> Path:
@@ -124,25 +87,11 @@ def bump_attempts(*, project: Path, run_path: str, index: int, up_to: int) -> No
         append_job(path=project / 'runs' / 's' / '.study' / 'submissions.jsonl', record=record)
 
 
-@pytest.fixture(autouse=True)
-def _fresh_study_module() -> Iterator[None]:
-    """Drop the module cache so other tests import their own toy study."""
-    yield
-    sys.modules.pop('toy_studies', None)
-
-
 @pytest.fixture
-def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    folder = write_toy_project(project=tmp_path / 'proj')
+def project(project: Path) -> Path:
+    folder = project
     (folder / 'toy_studies.py').write_text(STUDIES)
-    # why: load_study imports from the current directory, like a user in a project
-    monkeypatch.chdir(folder)
     return folder
-
-
-@pytest.fixture
-def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
-    return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
 
 
 def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm) -> None:
@@ -246,6 +195,7 @@ def test_followup_chain_stops_when_nothing_is_resubmitted(project: Path, fake: F
     assert [job.kind for job in jobs_of(project=project)] == ['run', 'followup', 'followup']
 
 
+@pytest.mark.slow
 def test_no_followups_locally_or_on_dry_run(project: Path, fake: FakeSlurm) -> None:
     with_followups(project=project)
     code = submit(
@@ -261,3 +211,37 @@ def test_no_followups_locally_or_on_dry_run(project: Path, fake: FakeSlurm) -> N
     submit_study(project=project, machine_file='local.toml')
     assert fake.calls('sbatch') == []
     assert [job.kind for job in jobs_of(project=project)] == ['run']
+
+
+def test_followup_sbatch_failure_exits_one_and_skips_the_rest(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with_followups(project=project)
+    fake.set_answers(
+        'sbatch',
+        [{'exit': 0, 'stdout': '1000;tslab\n'}, {'exit': 1, 'stderr': 'sbatch: error: bad'}],
+    )
+    with caplog.at_level('ERROR'):
+        code = submit(
+            context=context(project=project, machine_file='cluster.toml'),
+            include_done=False,
+            dry_run=False,
+            extra_args=(),
+            sleep=no_sleep,
+        )
+    assert code == 1
+    assert [job.kind for job in jobs_of(project=project)] == ['run']
+    assert 'follow-up retry not submitted' in caplog.text
+    assert len(fake.calls('sbatch')) == 2
+
+
+def test_retry_followup_needs_a_study_reference(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with_followups(project=project)
+    ctx = dataclasses.replace(context(project=project, machine_file='cluster.toml'), reference='')
+    with caplog.at_level('WARNING'):
+        code, records = queue_followups(context=ctx, job_ids=['1000'], sleep=no_sleep)
+    assert code == 0
+    assert len(records) == 1
+    assert 'automatic retry follow-up is skipped' in caplog.text

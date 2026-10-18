@@ -5,17 +5,45 @@ behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 from typing import Annotated
 
 import tyro
 
-from tslab.study import load_context, parse_states, resubmit, results, Selection, status, submit
+from tslab.cli.usage import UsageError
+from tslab.study.commands import parse_states, resubmit, results, status, submit
+from tslab.study.context import Context, load_context, Selection
+from tslab.study.state import StudyState
 
 __all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
 
-_LOGGER = logging.getLogger(__name__)
+
+def _context_of(
+    *,
+    study: str,
+    machine: Path,
+    grid: tuple[str, ...],
+    only: tuple[str, ...],
+    read_only: bool = False,
+) -> Context:
+    """The context of a study reference; a bad reference or profile is a usage error."""
+    try:
+        return load_context(
+            reference=study,
+            machine_path=machine,
+            selection=Selection(grids=grid, only=only),
+            project_root=Path.cwd(),
+            read_only=read_only,
+        )
+    except (ValueError, TypeError, FileNotFoundError, ModuleNotFoundError) as error:
+        raise UsageError(str(error)) from error
+
+
+def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:
+    try:
+        return parse_states(values=values)
+    except ValueError as error:
+        raise UsageError(str(error)) from error
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -44,11 +72,8 @@ class Submit:
     def run(self) -> int:
         """Submit and return the exit code."""
         return submit(
-            context=load_context(
-                reference=self.study,
-                machine_path=self.machine,
-                selection=Selection(grids=self.grid, only=self.only),
-                project_root=Path.cwd(),
+            context=_context_of(
+                study=self.study, machine=self.machine, grid=self.grid, only=self.only
             ),
             include_done=self.include_done,
             dry_run=self.dry_run,
@@ -66,34 +91,28 @@ class Status:
         grid: Keep only this grid; repeatable.
         only: Keep only the runs that match ``axis=value``; repeatable,
             comma separated for several values of one axis.
-        state: Show only the runs in this state; repeatable, comma separated
-            for several states.
+        states: Show only the runs in these states; repeatable, comma separated.
     """
 
     study: Annotated[str, tyro.conf.Positional]
     machine: Path
     grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    state: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
 
     def run(self) -> int:
         """Print the table and return the exit code."""
-        try:
-            states = parse_states(values=self.state)
-        except ValueError as error:
-            failure = error  # logged below, without a traceback: it is a usage error
-        else:
-            return status(
-                context=load_context(
-                    reference=self.study,
-                    machine_path=self.machine,
-                    selection=Selection(grids=self.grid, only=self.only),
-                    project_root=Path.cwd(),
-                ),
-                states=states,
-            )
-        _LOGGER.error('%s', failure)
-        return 2
+        states = _states_of(values=self.states)
+        return status(
+            context=_context_of(
+                study=self.study,
+                machine=self.machine,
+                grid=self.grid,
+                only=self.only,
+                read_only=True,
+            ),
+            states=states,
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -128,15 +147,10 @@ class Resubmit:
 
     def run(self) -> int:
         """Resubmit and return the exit code."""
-        states = ()
-        if self.states:
-            states = parse_states(values=self.states)
+        states = _states_of(values=self.states)
         return resubmit(
-            context=load_context(
-                reference=self.study,
-                machine_path=self.machine,
-                selection=Selection(grids=self.grid, only=self.only),
-                project_root=Path.cwd(),
+            context=_context_of(
+                study=self.study, machine=self.machine, grid=self.grid, only=self.only
             ),
             states=states,
             cancel_live=self.cancel_live,
@@ -168,11 +182,12 @@ class Results:
     def run(self) -> int:
         """Write the table and return the exit code."""
         return results(
-            context=load_context(
-                reference=self.study,
-                machine_path=self.machine,
-                selection=Selection(grids=self.grid, only=self.only),
-                project_root=Path.cwd(),
+            context=_context_of(
+                study=self.study,
+                machine=self.machine,
+                grid=self.grid,
+                only=self.only,
+                read_only=True,
             ),
             out=self.out,
         )

@@ -7,23 +7,12 @@ import pytest
 
 from study.configs import grid
 from study.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.study import (
-    assign_indices,
-    expand_runs,
-    JobGroup,
-    launch,
-    LocalLauncher,
-    MachineOverride,
-    MachineProfile,
-    plan_jobs,
-    read_jobs,
-    resolve_runs,
-    SlurmLauncher,
-    SlurmSettings,
-    Study,
-    study_folder,
-    write_job_files,
-)
+from tslab.study import Study
+from tslab.study.definition import expand_runs
+from tslab.study.launch import launch, LocalLauncher, SlurmLauncher, write_job_files
+from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
+from tslab.study.records import read_jobs
 
 
 @pytest.fixture
@@ -203,3 +192,34 @@ def test_write_job_files_creates_tasks_and_sbatch(
     lines = (folder / 'jobs' / '3.tasks').read_text().splitlines()
     assert len(lines) == 2
     assert all(line.startswith(f'{i} 1 ') for i, line in enumerate(lines))
+
+
+def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_command(
+    machine: MachineProfile, tmp_path: Path
+) -> None:
+    study = Study(
+        name='s', grids={'g': grid(short_name='g1', command=(str(tmp_path / 'no-such-command'),))}
+    )
+    runs = expand_runs(study=study)
+    groups = plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolve_runs(study=study, machine=machine, runs=runs),
+        indices=assign_indices(runs=runs, jobs=[]),
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+    )
+    report = launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}),
+        machine=machine,
+        study=study,
+        groups=groups,
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=machine, study=study)
+    assert len(report.submitted) == len(groups)
+    assert len(read_jobs(path=folder / 'submissions.jsonl')) == len(groups)
+    logs = ''.join(path.read_text() for path in (folder / 'logs').glob('*.out'))
+    assert logs.count('could not start') == sum(len(group.tasks) for group in groups)

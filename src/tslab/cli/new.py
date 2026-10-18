@@ -9,6 +9,7 @@ two placeholders are replaced in file names and contents: ``{{project_name}}``
 
 from dataclasses import dataclass
 from importlib import resources
+import keyword
 import logging
 from pathlib import Path
 import re
@@ -72,7 +73,8 @@ def create_project(*, path: Path, name: str | None = None) -> str:
     Raises:
         TypeError: If ``path`` is not a ``pathlib.Path``.
         ValueError: If ``path`` is a non-empty folder or a file, or the name
-            is not letters, digits and dashes starting with a letter.
+            is not letters, digits and dashes starting with a letter, or the
+            package name is a Python keyword.
     """
     require_path(value=path, parameter='path')
     if path.exists() and (not path.is_dir() or any(path.iterdir())):
@@ -86,6 +88,12 @@ def create_project(*, path: Path, name: str | None = None) -> str:
         )
         raise ValueError(message)
     package_name = project_name.replace('-', '_').lower()
+    if keyword.iskeyword(package_name):
+        message = (
+            f'project name {project_name!r} would make the package {package_name!r}, '
+            'a Python keyword that cannot be imported; pass another --name'
+        )
+        raise ValueError(message)
     replacements = {'{{project_name}}': project_name, '{{package_name}}': package_name}
     with resources.as_file(resources.files('tslab') / 'templates' / 'project') as template:
         for source in sorted(template.rglob('*')):

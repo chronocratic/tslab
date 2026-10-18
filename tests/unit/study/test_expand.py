@@ -3,7 +3,8 @@
 import pytest
 
 from study.configs import grid
-from tslab.study import expand_runs, Override, Study
+from tslab.study import Override, Study
+from tslab.study.definition import expand_runs
 
 
 def test_run_path_follows_axis_order() -> None:

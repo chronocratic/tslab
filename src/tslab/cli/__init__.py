@@ -15,6 +15,7 @@ import tyro
 from tslab.cli.new import New
 from tslab.cli.status import Status
 from tslab.cli.study import STUDY_COMMANDS
+from tslab.cli.usage import UsageError
 from tslab.cli.wandb_sync import WandbSync
 
 __all__ = ['main']
@@ -64,7 +65,14 @@ def main(args: Sequence[str] | None = None) -> None:
         # ty: ignore[unsound-assignment]
         # — the check above guarantees a dataclass with the extra_args field
         command = dataclasses.replace(cast('Any', command), extra_args=extra_args)
-    raise SystemExit(command.run())
+    try:
+        code = command.run()
+    except UsageError as error:
+        failure = error  # logged below, without a traceback: it is a usage error
+    else:
+        raise SystemExit(code)
+    _LOGGER.error('%s', failure)
+    raise SystemExit(2)
 
 
 def _split_pass_through(*, argv: Sequence[str]) -> tuple[list[str], tuple[str, ...]]:

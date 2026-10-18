@@ -1,8 +1,7 @@
-"""``tslab wandb-sync``: find local W&B runs the server shows as crashed or failed, and resync them.
+"""``tslab wandb-sync``: resync local W&B runs the server shows as crashed or failed.
 
-Long HPC runs often
-finish their work but show "crashed" on W&B, because the final exit record
-never reached the server. ``wandb sync`` replays the local transaction log,
+Long HPC runs often finish their work but show "crashed" on W&B, because the
+final exit record never reached the server. ``wandb sync`` replays the local transaction log,
 which repairs the state **only if** that log recorded a clean exit. This
 command finds such runs, resyncs them, and verifies the result. It never
 claims a repair it did not observe.
@@ -26,6 +25,7 @@ states are what the files of the run say happened:
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
+import functools
 import logging
 import os
 from pathlib import Path
@@ -67,6 +67,24 @@ _NOTHING_SYNCED = 'No runs to sync'
 _VERIFY_BACKOFF_SECONDS = (5, 10, 20)
 # A run whose .wandb log was written this recently counts as alive.
 _RUNNING_WINDOW_SECONDS = 30 * 60
+
+
+@functools.lru_cache(maxsize=16)
+def _read_log(path: Path, modified_ns: int) -> str:
+    # why: the debug logs can be large and are needed for both coordinates and state;
+    # keyed on the modification time, so a log that grows is read again.
+    del modified_ns
+    return path.read_text(encoding='utf-8', errors='ignore')
+
+
+def _debug_log_texts(*, run_directory: Path) -> list[str]:
+    """Return the text of each existing debug log of the run, in lookup order."""
+    texts = []
+    for name in ('debug-internal.log', 'debug.log'):
+        log = run_directory / 'logs' / name
+        if log.is_file():
+            texts.append(_read_log(log, log.stat().st_mtime_ns))
+    return texts
 
 
 class LocalState(StrEnum):
@@ -113,11 +131,7 @@ class LocalRun:
         Returns:
             The local state.
         """
-        for name in ('debug-internal.log', 'debug.log'):
-            log = self.run_directory / 'logs' / name
-            if not log.is_file():
-                continue
-            text = log.read_text(encoding='utf-8', errors='ignore')
+        for text in _debug_log_texts(run_directory=self.run_directory):
             if 'finishing run' not in text:
                 continue
             code = _EXIT_CODE_PATTERN.search(text)
@@ -153,12 +167,10 @@ def parse_run_url(*, text: str) -> tuple[str, str, str] | None:
 
 def _read_coordinates(*, run_directory: Path) -> tuple[str | None, str | None, str | None]:
     """Read ``(entity, project, run_id)``: debug-log URL, then transaction log, then folder name."""
-    for name in ('debug-internal.log', 'debug.log'):
-        log = run_directory / 'logs' / name
-        if log.is_file():
-            coordinates = parse_run_url(text=log.read_text(encoding='utf-8', errors='ignore'))
-            if coordinates is not None:
-                return coordinates
+    for text in _debug_log_texts(run_directory=run_directory):
+        coordinates = parse_run_url(text=text)
+        if coordinates is not None:
+            return coordinates
     entity, project, run_id = None, None, None
     for transaction_log in sorted(run_directory.glob('*.wandb')):
         try:
@@ -183,8 +195,11 @@ def discover_runs(*, root: Path) -> list[LocalRun]:
     """
     runs: dict[Path, LocalRun] = {}
     for wandb_file in root.rglob('*.wandb'):
+        # The pointer folder is a symlink; resolve() would replace its name by the target.
+        if wandb_file.parent.name == 'latest-run':
+            continue
         run_directory = wandb_file.parent.resolve()
-        if run_directory.name == 'latest-run' or run_directory in runs:
+        if run_directory in runs:
             continue
         entity, project, run_id = _read_coordinates(run_directory=run_directory)
         runs[run_directory] = LocalRun(

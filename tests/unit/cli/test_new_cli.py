@@ -15,6 +15,7 @@ EXPECTED_FILES = {
     'src/my_paper/studies.py',
     'src/my_paper/augmentations.py',
     'src/my_paper/classify.py',
+    'src/my_paper/models.py',
     'src/my_paper/forecast.py',
     'src/my_paper/stages.py',
     'src/my_paper/toy_data.py',
@@ -78,3 +79,10 @@ def test_command_line_entry_point(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as raised:
         main(args=['new', str(tmp_path / 'my-paper')])
     assert raised.value.code == 1
+
+
+@pytest.mark.parametrize('name', ['class', 'import', 'def'])
+def test_python_keyword_names_are_rejected(tmp_path: Path, name: str) -> None:
+    with pytest.raises(ValueError, match='Python keyword'):
+        create_project(path=tmp_path / 'p', name=name)
+    assert not (tmp_path / 'p').exists()

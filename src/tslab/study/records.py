@@ -1,14 +1,17 @@
 """The ``submissions.jsonl`` record of a study: one line per submitted job."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
+import fcntl
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Any, Literal
 
-from tslab.core.status import read_status
+from tslab.core.paths import STATUS_FILE
+from tslab.core.status import InstanceState, read_status
 
 __all__ = [
     'SUBMISSIONS_FORMAT_VERSION',
@@ -18,12 +21,13 @@ __all__ = [
     'append_job',
     'latest_tasks',
     'read_jobs',
+    'submission_lock',
     'take_progress',
 ]
 
 SUBMISSIONS_FORMAT_VERSION = 1
 
-_LOGGER = logging.getLogger('tslab.study')
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -66,10 +70,15 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
     Returns:
         The snapshot; an unreadable or missing folder counts as no progress.
     """
-    snapshot = read_status(path=run_directory / 'status.json')
+    try:
+        snapshot = read_status(path=run_directory / STATUS_FILE)
+    except (TypeError, ValueError, OSError):
+        snapshot = None
     done = 0
     if snapshot is not None:
-        done = sum(1 for record in snapshot.instances.values() if record.state.value == 'done')
+        done = sum(
+            1 for record in snapshot.instances.values() if record.state is InstanceState.DONE
+        )
     checkpoints = [
         path.stat().st_mtime for path in run_directory.rglob('last.ckpt') if path.is_file()
     ]
@@ -184,23 +193,48 @@ class JobRecord:
         )
 
 
+@contextmanager
+def submission_lock(*, study_folder: Path) -> Generator[None]:
+    """Hold the submission lock of a study, so two submissions never interleave.
+
+    Planning a job reads the records and the job files and ends with a
+    new record; the lock makes that sequence one step across processes
+    (a person and the follow-up job of the cluster, for example).
+
+    Args:
+        study_folder: The ``.study`` folder of the study; created if missing.
+    """
+    study_folder.mkdir(parents=True, exist_ok=True)
+    with (study_folder / 'submit.lock').open('a') as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 def append_job(*, path: Path, record: JobRecord) -> None:
     """Append one record as one line, flushed to disk.
+
+    The line goes out in a single write, so concurrent appenders do not
+    interleave inside a line.
 
     Args:
         path: The ``submissions.jsonl`` file; parent folders are created.
         record: The job to record.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    line = json.dumps(record.to_json(), sort_keys=True)
-    with path.open('a') as handle:
-        handle.write(line + '\n')
-        handle.flush()
-        os.fsync(handle.fileno())
+    line = json.dumps(record.to_json(), sort_keys=True) + '\n'
+    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        os.write(descriptor, line.encode('utf-8'))
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def read_jobs(*, path: Path) -> list[JobRecord]:
-    """The job records of a file; a torn last line is skipped, not fatal.
+    """The job records of a file; a torn or malformed line is skipped, not fatal.
 
     Args:
         path: The ``submissions.jsonl`` file; a missing file means no jobs.
@@ -214,7 +248,7 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
     if not path.is_file():
         return []
     records: list[JobRecord] = []
-    for line_number, line in enumerate(path.read_text().splitlines(), start=1):
+    for line_number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), start=1):
         if not line.strip():
             continue
         try:
@@ -230,11 +264,9 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
             )
             raise ValueError(message)
         try:
-            record = JobRecord.from_json(document=document)
-        except ValueError as error:
+            records.append(JobRecord.from_json(document=document))
+        except (ValueError, KeyError, TypeError) as error:
             _LOGGER.warning('%s: skipping line %d: %s', path, line_number, error)
-            continue
-        records.append(record)
     return records
 
 
