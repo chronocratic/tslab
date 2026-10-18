@@ -60,3 +60,10 @@ def test_help_lists_study_actions(capsys: pytest.CaptureFixture[str]) -> None:
         main(args=['study', '--help'])
     assert exit_info.value.code == 0
     assert 'submit' in capsys.readouterr().out
+
+
+def test_top_level_help_lists_study(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        main(args=['--help'])
+    assert exit_info.value.code == 0
+    assert 'study' in capsys.readouterr().out

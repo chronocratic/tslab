@@ -1,4 +1,4 @@
-"""``resolve_runs``: each run's settings and resources on one machine."""
+"""``resolve_runs``: the settings and resources of each run on one machine."""
 
 import logging
 from pathlib import Path

@@ -81,7 +81,7 @@ def install_fake_slurm(
     """Install the fake scheduler commands on ``PATH`` and return their handle.
 
     Args:
-        tmp_path: The test's scratch directory the fakes live in.
+        tmp_path: The scratch directory of the test where the fakes live.
         monkeypatch: The fixture that puts the fakes on ``PATH`` and reverts it.
         answers: Per-command answer lists to start with.
     """

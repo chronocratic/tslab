@@ -58,7 +58,7 @@ def write_job_files(  # noqa: PLR0913 # why: keyword-only public API; each optio
     """The ``jobs/<n>.tasks`` and ``jobs/<n>.sbatch`` files of every group.
 
     Args:
-        study_folder: The study's ``.study`` folder.
+        study_folder: The ``.study`` folder of the study.
         groups: The planned groups.
         machine: The machine the jobs run on; its ``[env]`` goes in the scripts.
         project_root: The directory the scripts ``cd`` into.
@@ -94,18 +94,18 @@ class Launcher(Protocol):
     """What one launch does with a written group: returns the job id."""
 
     def submit(self, *, group: JobGroup, study_folder: Path) -> str:
-        """Submit one group's job files and return the job id."""
+        """Submit the job files of one group and return the job id."""
 
 
 class SlurmLauncher:
-    """One ``sbatch`` per group, paused between the cluster's limits."""
+    """One ``sbatch`` per group, paused between the limits of the cluster."""
 
     def __init__(self, *, sleep: Callable[[float], None] = time.sleep) -> None:
-        """Args: sleep: What waits out the cluster's submission pause."""
+        """Args: sleep: What waits out the submission pause of the cluster."""
         self._sleep = sleep
 
     def submit(self, *, group: JobGroup, study_folder: Path) -> str:
-        """The id of the group's ``sbatch`` job."""
+        """The id of the ``sbatch`` job of the group."""
         job_id = sbatch(script=study_folder / 'jobs' / f'{group.job_file}.sbatch')
         if group.slurm is not None:
             self._sleep(group.slurm.submit_pause_seconds)
@@ -113,10 +113,10 @@ class SlurmLauncher:
 
 
 class LocalLauncher:
-    """The group's tasks, one after another, in the foreground."""
+    """The tasks of the group, one after another, in the foreground."""
 
     def __init__(self, *, project_root: Path, env: Mapping[str, str]) -> None:
-        """Args: project_root: The directory the tasks run in; env: the machine's ``[env]``."""
+        """Args: project_root: The directory the tasks run in; env: the ``[env]`` of the machine."""
         self._project_root = project_root
         self._env = env
 

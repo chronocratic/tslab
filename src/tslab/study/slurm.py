@@ -89,6 +89,9 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
         )
     return (
         'TASK_LINE=$(sed -n 1p ' + shlex.quote(str(tasks_file)) + ')\n'
+        # why: like the array section, the line starts with the index and the attempt
+        'TASK_LINE=${TASK_LINE#* }\n'
+        'TASK_LINE=${TASK_LINE#* }\n'
         'echo "=== tslab job ${SLURM_JOB_ID} | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
         'eval "$TASK_LINE"'
     )

@@ -72,7 +72,7 @@ def read_folder(*, run_directory: Path) -> FolderFacts:
         run_directory: The run folder.
 
     Returns:
-        The folder's snapshot, read error, and lock state.
+        The snapshot, read error, and lock state of the folder.
     """
     try:
         snapshot = read_status(path=run_directory / 'status.json')
@@ -98,7 +98,7 @@ class RunReport:
         job_state: The SLURM state of that task id, when queried.
         attempt: The attempt of the latest submission; 0 when never submitted.
         task: The latest submitted task of the run.
-        folder: The run folder's facts.
+        folder: The facts of the run folder.
     """
 
     run: StudyRun
@@ -136,9 +136,9 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
     """The state of one run, from its folder and the state of its SLURM task.
 
     Args:
-        job_state: The SLURM state of the run's latest task id, or ``None``
+        job_state: The SLURM state of the latest task id of the run, or ``None``
             when the run was never submitted or SLURM is unavailable.
-        folder: The run folder's facts.
+        folder: The facts of the run folder.
 
     Returns:
         The state and a one-line reason, in the order of spec §7.

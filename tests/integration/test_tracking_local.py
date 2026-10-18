@@ -33,7 +33,7 @@ def test_experiment_already_created_by_another_run(
     monkeypatch.setattr(MlflowClient, 'get_experiment_by_name', get_then_missing)
     tracker = MLflowTracker(experiment='shared', tracking_uri=uri)
     # why: a run that only logs its config params (no metrics) is enough to reproduce the
-    # race, because it is the tracker's single .experiment access
+    # race, because it is the single .experiment access of the tracker
     with Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[tracker]):
         pass
     # why: the real method, unpatched; the tracker must have survived the race and kept the run

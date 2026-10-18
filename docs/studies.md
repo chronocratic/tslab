@@ -7,10 +7,10 @@ status`, resubmitted after crashes, and collected with `tslab study results`
 into one table.
 
 ```bash
-uv run tslab study submit my_paper.studies:rbs6 --machine machines/cluster.toml
-uv run tslab study status   my_paper.studies:rbs6 --machine machines/cluster.toml
-uv run tslab study resubmit my_paper.studies:rbs6 --machine machines/cluster.toml
-uv run tslab study results  my_paper.studies:rbs6 --machine machines/cluster.toml --out results.csv
+uv run tslab study submit my_paper.studies:example --machine machines/cluster.toml
+uv run tslab study status   my_paper.studies:example --machine machines/cluster.toml
+uv run tslab study resubmit my_paper.studies:example --machine machines/cluster.toml
+uv run tslab study results  my_paper.studies:example --machine machines/cluster.toml --out results.csv
 ```
 
 The study layer turns every run into the flags of the user's own `no-preset`
@@ -19,7 +19,7 @@ command and hands them to a launcher. TSLab never runs experiment code.
 ## Define a study
 
 The `tslab new` template ships `src/<package>/studies.py`, a two-grid example
-over the template's own presets and toy data:
+over the presets and toy data of the template:
 
 ```python
 # my_paper/studies.py
@@ -90,22 +90,24 @@ forecasting = Grid(
     },
 )
 
-rbs6 = Study(name='rbs6', grids={'classification': classification, 'forecasting': forecasting})
+example = Study(
+    name='example', grids={'classification': classification, 'forecasting': forecasting}
+)
 ```
 
 From the shell a study is referenced as `module:attribute`:
-`my_paper.studies:rbs6`. Importing it imports the user's scripts, so a few
+`my_paper.studies:example`. Importing it imports the user's scripts, so a few
 seconds on a login node is normal.
 
 Rules that matter when writing one:
 
-- **Axis order is folder order.** A run's path is
+- **Axis order is folder order.** The path of a run is
   `<grid>/<value of axis 1>/<value of axis 2>/…`, and its folder is
   `<output_root>/<study>/<run path>`. Reorder the axes and the folders move
   with them.
-- **Merge order, later paths replace earlier ones:** each axis's value in
-  axis order, then the grid's `run_settings`, then matching `Grid.overrides`,
-  then the machine profile's `[settings]`, then matching machine overrides.
+- **Merge order, later paths replace earlier ones:** the value of each axis in
+  axis order, then `run_settings` of the grid, then matching `Grid.overrides`,
+  then `[settings]` of the machine profile, then matching machine overrides.
   After the merge each path appears once.
 - **Names.** Study, grid, axis and value names match `[A-Za-z0-9._-]+` and
   are not `.` or `..`; `short_name` matches `[A-Za-z0-9_-]{1,8}` and is unique
@@ -119,7 +121,7 @@ Rules that matter when writing one:
   seeds, learning rates, epochs. Any other hand-written mapping of value name
   to settings is also an axis, and one can combine axes with `|`.
 - **`${VAR}`** in any string setting expands at submit time from the machine
-  profile's `[env]` and then the submit process's environment; an unset
+  [env] of the machine profile and then the environment of the submit process; an unset
   variable raises. **`{output_root}`, `{study}`, `{run_path}`, `{log_file}`**
   are TSLab placeholders, expanded per run; nothing else in `{...}` is
   substituted.
@@ -142,7 +144,7 @@ runnable `machines/local.toml` and a fully commented
 | `launcher` | required | `"local"` or `"slurm"` |
 | `output_root` | required | Root of the run folders, e.g. `"${SCRATCH}/exps"` |
 | `tslab_command` | `["uv", "run", "tslab"]` | How follow-up jobs call TSLab |
-| `[settings]` | none | Settings of the study's kind, applied to every run on this machine |
+| `[settings]` | none | Settings of the kind of the study, applied to every run on this machine |
 | `[env]` | none | Variables exported in every job and read by `${...}` at submit |
 | `[slurm]` | — | Job settings (below) |
 | `[followup]` | — | Automatic helper jobs (below) |
@@ -151,7 +153,7 @@ runnable `machines/local.toml` and a fully commented
 `[slurm]` keys and defaults: `partition` (required), `qos = null`,
 `time = "2-00:00:00"`, `cpus_per_task = 1`, `mem_per_cpu = null`, `gpus = 0`,
 `max_concurrent = 100` (the `%N` of `--array`), `max_array_size = 1000`
-(array indices must stay below the cluster's MaxArraySize),
+(array indices must stay below the MaxArraySize of the cluster),
 `sbatch_extra = []` (raw `#SBATCH` lines), `node_local_tmp = true` (points
 `TMPDIR`, `WANDB_CACHE_DIR`, `WANDB_CONFIG_DIR` at node-local scratch),
 `submit_pause_seconds = 0.5`.
@@ -178,8 +180,7 @@ Rules:
   field by field; `settings` merge path by path in the same order.
 - **Unknown names in machine overrides only warn.** One profile serves many
   studies, so an axis, grid or value name the current study lacks is a
-  warning printed once per command, not an error (an override for last
-  year's study must not block this year's). Matches written in the study
+  warning printed once per command, not an error (an override for the study of last year must not block the study of this year). Matches written in the study
   itself (`exclude`, `Override`) still raise.
 - **Secrets never go in the profile.** W&B keys come from `wandb login`.
 - **Resources resolve when a run is submitted** (and again at resubmit), so
@@ -189,12 +190,12 @@ Rules:
 ## Submit
 
 ```bash
-uv run tslab study submit my_paper.studies:rbs6 --machine machines/cluster.toml \
+uv run tslab study submit my_paper.studies:example --machine machines/cluster.toml \
     [--grid NAME] [--only AXIS=V1,V2] [--include-done] [--dry-run] [-- extra args]
 ```
 
 - **Filters** (`--grid`, `--only`, both repeatable) choose a subset; they
-  never change a run's path. `--only` applies to every grid that has that
+  never change the path of a run. `--only` applies to every grid that has that
   axis; an unknown axis or value name raises.
 - **Skips** runs that are already done or have a live job (queued or
   running). `--include-done` resubmits done runs too (useful with
@@ -203,7 +204,7 @@ uv run tslab study submit my_paper.studies:rbs6 --machine machines/cluster.toml 
   prints the plan (runs per array, resources, the full command of the first
   run of each array) without submitting or recording.
 - **Pass-through:** everything after `--` is appended, raw, to every
-  run's command — flags of the user's script TSLab does not know about.
+  command of the run — flags of the user's script that TSLab does not know about.
 - The study folder `<output_root>/<study>/.study/` holds everything the
   layer writes: `jobs/` (one `.sbatch` and one `.tasks` file per submission),
   `logs/` (one file per run, every attempt) and `submissions.jsonl` — the
@@ -214,13 +215,13 @@ uv run tslab study submit my_paper.studies:rbs6 --machine machines/cluster.toml 
 **Run names on the cluster.** The first time a run is submitted it gets the
 next free array index of its grid and keeps it through every resubmit, so
 adding, removing or reordering axis values never moves an existing run. The
-index plus the grid's `short_name` names the run everywhere: `<short_name>_<index>`
+index plus `short_name` of the grid names the run everywhere: `<short_name>_<index>`
 in `squeue`, in `scancel <job>_<index>`, and in its log
 `.study/logs/cls_17.out`, which collects every attempt under a header line.
 `short_name` is at most 8 characters because `squeue`'s default name column
 shows 8. An index at or above `max_array_size` stops the submission before
 anything is written, naming the grid — raise `max_array_size` (or the
-cluster's MaxArraySize) for grids beyond about 1000 runs.
+MaxArraySize of the cluster) for grids beyond about 1000 runs.
 
 Runs of one grid with identical resolved SLURM settings share one array job
 (`--array=3,7,12%max_concurrent`, consecutive indices written as ranges). A
@@ -229,7 +230,7 @@ resubmit is a sparse array of the same indices.
 ## Status
 
 ```bash
-uv run tslab study status my_paper.studies:rbs6 --machine machines/cluster.toml \
+uv run tslab study status my_paper.studies:example --machine machines/cluster.toml \
     [--grid NAME] [--only AXIS=V1,V2] [--state STATE]
 ```
 
@@ -254,7 +255,7 @@ always: a status report is not a failure.
 ## Resubmit
 
 ```bash
-uv run tslab study resubmit my_paper.studies:rbs6 --machine machines/cluster.toml \
+uv run tslab study resubmit my_paper.studies:example --machine machines/cluster.toml \
     [--states failed,interrupted,missing] [--cancel-live] [--dry-run] [-- extra args]
 ```
 
@@ -262,13 +263,13 @@ uv run tslab study resubmit my_paper.studies:rbs6 --machine machines/cluster.tom
   `--states failed`, because a failure usually needs a change first.
 - A run with a live job is never resubmitted; `--cancel-live` runs `scancel`
   on those jobs first. Replacements start about 11 minutes later, when the
-  old lock's heartbeat (refreshed every minute) has gone stale and the new
+  heartbeat of the old lock (refreshed every minute) has gone stale and the new
   run takes the folder over.
 - Stale locks are removed when SLURM says the job has ended, so a run does
   not wait out the full ten minutes if the job is provably gone.
 - Each resubmitted task records `attempt = previous + 1`, and resources are
   resolved again from the current profile. Pass-through arguments after `--`
-  are kept from the run's last submission when new ones are not given.
+  are kept from the last submission of the run when new ones are not given.
 
 ## Automatic retry
 
@@ -293,7 +294,7 @@ resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
 
 **Escalating resources (more time, another qos, a GPU) is never
 automatic.** For runs stopped by time limits, `status` suggests it; the
-change goes in the machine profile's `[[overrides]]`.
+change goes in `[[overrides]]` of the machine profile.
 
 With `[followup] wandb_sync = true`, one more follow-up job runs
 `<tslab_command> wandb-sync <output_root>/<study>` after the submission's
@@ -303,7 +304,7 @@ no network (see below).
 ## Results
 
 ```bash
-uv run tslab study results my_paper.studies:rbs6 --machine machines/cluster.toml --out results.csv
+uv run tslab study results my_paper.studies:example --machine machines/cluster.toml --out results.csv
 ```
 
 One row per (run, instance), plus one row per run that has no instances, so
@@ -328,7 +329,7 @@ Python: `Study.results(*, machine)` returns the rows).
   or a job is killed. TSLab starts W&B with generous timeouts, falls back to
   offline mode and then to no W&B when the server is unreachable, and
   records the real exit status. On a cluster without network, run with
-  `--tracking.wandb-mode offline` (via the profile's `[settings]`) and sync
+  `--tracking.wandb-mode offline` (via `[settings]` of the profile) and sync
   afterwards — from the login node, or from the automatic follow-up job:
 
   ```bash

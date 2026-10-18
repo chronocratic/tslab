@@ -1,6 +1,6 @@
 """The results table: one row per instance, every metric of every run.
 
-A run's metrics live in the ``data.json`` of the instances whose ``meta.json``
+The metrics of a run live in the ``data.json`` of the instances whose ``meta.json``
 names the ``Metrics`` artifact. Malformed files must never stop the table:
 they become an ``unreadable`` row with the error text.
 """
@@ -38,7 +38,7 @@ def collect_results(
 
     Returns:
         The rows, in report order, the instances in ``status.json`` order; the
-        axis columns come from the run's grid and are empty where the grid
+        axis columns come from the grid of the run and are empty where the grid
         lacks the axis.
     """
     axes = _axis_names(study=study)

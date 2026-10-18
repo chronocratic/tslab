@@ -112,8 +112,8 @@ class Resubmit:
             resubmit them a little later.
         dry_run: Write the job files and print the plan, submit nothing.
         auto: Follow-up mode, used by TSLab itself.
-        extra_args: The arguments after ``--``; the run's last submission's
-            when omitted.
+        extra_args: The arguments after ``--``; taken from the last
+            submission when omitted.
     """
 
     study: Annotated[str, tyro.conf.Positional]

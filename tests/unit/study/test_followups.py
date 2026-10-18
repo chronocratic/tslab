@@ -1,4 +1,4 @@
-"""Follow-up jobs: the automatic retry and the W&B sync behind the study's jobs."""
+"""Follow-up jobs: the automatic retry and the W&B sync behind the jobs of the study."""
 
 from collections.abc import Iterator
 from pathlib import Path

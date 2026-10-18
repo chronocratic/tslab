@@ -26,7 +26,7 @@ example = Study(
                 'recipe': from_presets(
                     classify.PRESETS, names=('ts2vec-archive-split',), without=('data', 'run_path')
                 ),
-                # The dataset: a UCR archive under the project's data/ folder.
+                # The dataset: a UCR archive under the data/ folder of the project.
                 'dataset': ucr_datasets(root='data', names=('ToySpectra',)),
                 # The seed, one value per run.
                 'seed': setting_axis(path='seed', values=(0, 1)),
@@ -51,7 +51,7 @@ example = Study(
                 },
                 'seed': setting_axis(path='seed', values=(0,)),
             },
-            # The preset's batch size lived in its data settings, which a study
+            # The batch size of the preset lived in its data settings, which a study
             # drops; give the run its batch size back here.
             overrides=(
                 Override(match={'recipe': 'cost-cropped'}, settings={'data.batch_size': 1}),

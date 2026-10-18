@@ -99,7 +99,7 @@ def run_toy(*, project: Path, model: str, seed: int) -> None:
             f'model:{model}',
             '--seed',
             str(seed),
-            # why: the study's runs live under <output_root>/<study>
+            # why: the runs of the study live under <output_root>/<study>
             '--output-root',
             str(project / 'runs' / 's'),
             '--run-path',

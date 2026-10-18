@@ -96,7 +96,7 @@ class Grid:
         short_name: At most 8 characters, unique in the study; shown where a
             full grid name does not fit, e.g. on ``squeue``.
         command: The no-preset command of the script, as a word tuple.
-        config: The script's config class the settings are typed against.
+        config: The config class of the script that the settings are typed against.
         axes: Axis name to ``{value name: settings}``, in run-path order.
         exclude: Matches naming the runs to drop.
         overrides: Settings applied to matching runs.
@@ -261,11 +261,11 @@ def match_problems(*, grids: Mapping[str, Grid], match: Match) -> list[str]:
 def run_matches(*, grid_name: str, values: Mapping[str, str], match: Match) -> bool:
     """Whether a run of one grid matches: every key must hold.
 
-    A key the run's grid has no axis for makes the run not match.
+    A key the grid of the run has no axis for makes the run not match.
 
     Args:
         grid_name: The grid the run belongs to.
-        values: The run's axis name to value name.
+        values: The axis name to value name of the run.
         match: The match to test.
 
     Returns:
@@ -307,7 +307,7 @@ def merge_overrides(
         base: The settings to apply the overrides to.
         overrides: Pairs of match and settings.
         grid_name: The grid the run belongs to.
-        values: The run's axis name to value name.
+        values: The axis name to value name of the run.
 
     Returns:
         The base settings with the matching overrides applied in order.
@@ -333,7 +333,7 @@ def expand_runs(*, study: Study) -> list[StudyRun]:
         study: The study to expand.
 
     Returns:
-        The runs, one per point of every grid's axis product that is not
+        The runs, one per point of the axis product of every grid that is not
         excluded, in grid order and then axis order.
     """
     runs: list[StudyRun] = []
@@ -375,7 +375,7 @@ def select_runs(
     An empty ``grids`` keeps every grid; a name that is not a grid raises.
     Each ``only`` item is ``AXIS=V1,V2``: it keeps the runs of the grids that
     have ``AXIS`` whose value for it is named; a malformed item, an axis no
-    grid has or a value no grid's axis has raises. Filtering never changes
+    grid has or a value the axis of no grid has raises. Filtering never changes
     run paths.
 
     Args:
@@ -389,7 +389,7 @@ def select_runs(
 
     Raises:
         ValueError: If a grid name is unknown, an ``only`` item is malformed,
-            an axis belongs to no grid or a value belongs to no grid's axis.
+            an axis belongs to no grid or a value belongs to the axis of no grid.
     """
     unknown_grids = [name for name in grids if name not in study.grids]
     if unknown_grids:
@@ -411,7 +411,7 @@ def select_runs(
 
 
 def _parse_only(*, item: str, study: Study) -> tuple[str, tuple[str, ...]]:
-    """One ``AXIS=V1,V2`` item, checked against the study's grids."""
+    """One ``AXIS=V1,V2`` item, checked against the grids of the study."""
     axis, separator, values = item.partition('=')
     if not separator or not axis or not values:
         message = (
