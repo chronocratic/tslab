@@ -2,9 +2,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Annotated
 
+import pytest
 import tyro
 
 import tslab
+import tslab.core.config
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -47,3 +49,28 @@ def test_named_none_member_round_trips(tmp_path: Path) -> None:
     path = tmp_path / 'config.yaml'
     tslab.save_config(config=config, path=path)
     assert tslab.load_config(config_class=NamedChoices, path=path) == config
+
+
+def _same_named_members() -> tuple[type, type]:
+    @dataclass(frozen=True, kw_only=True)
+    class Twin:
+        size: int = 1
+
+    first = Twin
+
+    @dataclass(frozen=True, kw_only=True)
+    class Twin:  # why: a second class with the same name, as in two modules
+        size: int = 2
+
+    return first, Twin
+
+
+def test_same_named_union_members_are_rejected_on_save() -> None:
+    first, second = _same_named_members()
+
+    @dataclass(frozen=True, kw_only=True)
+    class Holder:
+        choice: first | second = field(default_factory=first)  # ty: ignore[invalid-type-form]
+
+    with pytest.raises(TypeError, match=r"share the class name \['Twin'\]"):
+        tslab.core.config.config_to_data(config=Holder())

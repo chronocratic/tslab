@@ -2,14 +2,10 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from tslab.core.artifact import Checkpoint
+from tslab.core.run import Run
 from tslab.interfaces.data import DataSource
-
-if TYPE_CHECKING:
-    # tslab.core.run imports this package, so a runtime import here would be circular.
-    from tslab.core.run import Run
 
 __all__ = ['Trainer']
 
@@ -25,7 +21,7 @@ class Trainer[M](ABC):
 
     @abstractmethod
     def fit(
-        self, *, run: 'Run', model: M, data: DataSource[object], checkpoint_directory: Path
+        self, *, run: Run, model: M, data: DataSource[object], checkpoint_directory: Path
     ) -> Checkpoint:
         """Train ``model``, resuming from checkpoints already in ``checkpoint_directory``.
 

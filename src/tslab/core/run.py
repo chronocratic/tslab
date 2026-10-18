@@ -14,18 +14,24 @@ import json
 import logging
 import os
 from pathlib import Path
+import signal
 import sys
 import threading
 import time
-from types import TracebackType
+from types import FrameType, TracebackType
 from typing import Literal, Self
+import uuid
 
 from tslab.core.config import config_to_data, config_to_yaml, save_config
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
 from tslab.core.paths import (
-    atomic_write_text,
+    atomic_write_json,
+    CONFIG_FILE,
     InstanceName,
+    LOCK_FILE,
+    LOGS_DIRECTORY,
+    META_FILE,
     normalize_instance_name,
     require_path,
     validate_relative_path,
@@ -33,36 +39,40 @@ from tslab.core.paths import (
 )
 from tslab.core.seeding import seed_everything
 from tslab.core.status import (
+    format_instance_id,
     InstanceRecord,
     InstanceState,
     read_status,
     RunState,
     RunStatusSnapshot,
+    STATUS_FILE,
     utc_now_iso,
     write_status,
 )
-from tslab.interfaces.tracker import RunStatus, Tracker
+from tslab.core.tracker import LocalTracker, RunStatus, Tracker
 
-__all__ = ['Run', 'RunLockedError', 'RunOptions', 'is_run_active', 'is_writer_process']
+__all__ = ['LOCK_FILE', 'Run', 'RunLockedError', 'RunOptions', 'is_run_active', 'is_writer_process']
 
 _LOGGER = logging.getLogger(__name__)
 _RANK_VARIABLES = ('RANK', 'SLURM_PROCID', 'LOCAL_RANK')
-_LOCK_FILE = '.lock'
 _HEARTBEAT_SECONDS = 60.0
 _STALE_AFTER_SECONDS = 600.0
-_STATUS_FILE = 'status.json'
-_META_FILE = 'meta.json'
-_CONFIG_FILE = 'config.yaml'
-_LOG_FILE = Path('logs') / 'run.log'
+_TAKEOVER_GUARD_SECONDS = 30.0
+_LOCK_ATTEMPTS = 50
+_LOCK_RETRY_SECONDS = 0.05
+_SIGTERM_EXIT_CODE = 128 + signal.SIGTERM
+_LOG_FILE = Path(LOGS_DIRECTORY) / 'run.log'
 _LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
 
 
 @dataclass(frozen=True, kw_only=True)
 class RunOptions:
-    """Command-line controllable behaviour of a run (``--run.*`` flags via tyro).
+    """Command-line controllable behavior of a run (``--run.*`` flags via tyro).
 
     Attributes:
         force_all: Treat every cached result as invalid and run everything again.
+            This covers the instances the script calls; folders of instances it
+            does not call are left alone.
         rerun_from: A stage name. Every instance of this stage, and of every
             stage called after it, runs again.
         rerun: Instance ids to run again, for example attack[pgd] or attack[h24/pgd].
@@ -79,7 +89,11 @@ class RunOptions:
     log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
 
     def fingerprint_settings(self) -> None:
-        """Run options never change results, so they never enter a fingerprint."""
+        """Run options never change results, so they never enter a fingerprint.
+
+        ``canonicalize`` tries ``Fingerprintable`` before the dataclass rule, so
+        returning ``None`` here removes the options from every fingerprint.
+        """
         return
 
 
@@ -125,7 +139,8 @@ class Run:
             relative_path: Relative folder of this run under ``root``; several
                 parts create hierarchy, for example ``Path('ts2vec/Coffee/seed_42')``.
             trackers: Experiment trackers; started on enter, finished on exit.
-                A ``CSVTracker`` is always added in front of them.
+                A ``LocalTracker`` (CSV and YAML files in the run folder) is added in
+                front of them unless one of them already is a ``LocalTracker``.
             options: Run behaviour; defaults to ``config.run`` if it is a
                 ``RunOptions``, otherwise to ``RunOptions()``.
             seed: Seed for every random generator; defaults to ``config.seed``,
@@ -143,11 +158,9 @@ class Run:
         self._config = config
         self._relative_path = relative_path
         self._directory = root / relative_path
-        # why: keeps `import tslab.core.run` free of Lightning
-        from tslab.tracking.csv_tracker import CSVTracker  # noqa: PLC0415
-
-        # The CSV tracker is always on: it is the local record when remote trackers fail.
-        self._trackers = (CSVTracker(), *trackers)
+        # The local tracker is always on: it is the record when remote trackers fail.
+        has_local = any(isinstance(tracker, LocalTracker) for tracker in trackers)
+        self._trackers = (*trackers,) if has_local else (LocalTracker(), *trackers)
         self._options = options if options is not None else _options_from_config(config=config)
         if self._options.rerun_from is not None:
             validate_stage_name(name=self._options.rerun_from)
@@ -156,14 +169,18 @@ class Run:
         self._snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at=utc_now_iso())
         self._claimed: dict[str, list[tuple[str, ...]]] = {}
         self._rerun_from_reached = False
+        self._claimed_ids: set[str] = set()
         self._matched_rerun_ids: set[str] = set()
         self._dry_run_plan: list[tuple[str, str]] = []
         self._log_handlers: list[logging.Handler] = []
         self._previous_root_level: int | None = None
-        self._lock_held = False
+        self._previous_tslab_level: int | None = None
+        self._previous_sigterm: signal.Handlers | None = None
+        self._lock_nonce: str | None = None
         self._heartbeat: _Heartbeat | None = None
         self._entered = False
         self._meta: dict[str, object] = {}
+        self._environment: dict[str, object] | None = None
 
     @property
     def directory(self) -> Path:
@@ -203,6 +220,25 @@ class Run:
         parts = normalize_instance_name(name=instance_name)
         return self._directory.joinpath(validate_stage_name(name=stage_name), *parts)
 
+    def environment(self) -> dict[str, object]:
+        """Return the package versions and git state of the code that runs now.
+
+        Computed once per ``Run``. Stages record it in the ``meta.json`` of every
+        instance they execute, so a result keeps the commit that produced it even
+        after a later execution rewrites the ``meta.json`` of the run.
+
+        Returns:
+            Mapping with keys ``versions`` and ``git``. The git state is read from
+            the folder of the main script, not from the working directory, because
+            ``sbatch`` may start the script from elsewhere.
+        """
+        if self._environment is None:
+            self._environment = {
+                'versions': collect_versions(),
+                'git': collect_git_state(directory=_project_directory()),
+            }
+        return self._environment
+
     def status(self) -> RunStatusSnapshot:
         """Return the current run state and instance records."""
         return self._snapshot
@@ -239,6 +275,9 @@ class Run:
         Raises:
             ValueError: If the name was already used in this process or conflicts.
         """
+        if stage_name == self._options.rerun_from:
+            self._rerun_from_reached = True  # even if this instance is later skipped
+        self._claimed_ids.add(format_instance_id(stage_name=stage_name, name_parts=name_parts))
         claimed = self._claimed.setdefault(stage_name, [])
         if name_parts in claimed:
             if name_parts == ('default',):
@@ -254,14 +293,22 @@ class Run:
             for instance_id in self._snapshot.instances
             if instance_id.startswith(f'{stage_name}[')
         ]
-        for other in [*claimed, *recorded]:
+        for other, is_recorded in [
+            *((item, False) for item in claimed),
+            *((item, True) for item in recorded),
+        ]:
             shorter, longer = sorted((name_parts, other), key=len)
             if shorter != longer and longer[: len(shorter)] == shorter:
                 message = (
                     f'instance name {"/".join(name_parts)!r} of stage {stage_name!r} conflicts '
-                    f'with '
-                    f'{"/".join(other)!r}: one would be stored inside the other'
+                    f'with {"/".join(other)!r}: one would be stored inside the other'
                 )
+                if is_recorded:
+                    message += (
+                        f'. {"/".join(other)!r} comes from an earlier execution in status.json; '
+                        f'if it is obsolete, delete its folder and its entry in '
+                        f'{(self._directory / STATUS_FILE).as_posix()}, or choose another name'
+                    )
                 raise ValueError(message)
         claimed.append(name_parts)
 
@@ -274,21 +321,18 @@ class Run:
         self._snapshot = self._snapshot.with_instance(instance_id=instance_id, record=record)
         self._persist_status()
 
-    def invalidation_reason(self, *, stage_name: str, instance_id: str) -> str | None:
+    def invalidation_reason(self, *, instance_id: str) -> str | None:
         """Return why ``RunOptions`` force this instance to run, or ``None``.
 
-        Calling this for ``rerun_from``'s stage marks it as reached, so every
-        later call (of any stage) is invalidated too.
+        ``claim_instance`` marks the ``rerun_from`` stage as reached, so every
+        instance claimed after it is invalidated too.
 
         Args:
-            stage_name: The stage name.
             instance_id: The instance id.
 
         Returns:
             A short reason for the log, or ``None`` if the cache may be used.
         """
-        if stage_name == self._options.rerun_from:
-            self._rerun_from_reached = True
         if self._options.force_all:
             return '--run.force-all'
         if instance_id in self._options.rerun:
@@ -316,21 +360,23 @@ class Run:
         self._entered = True
         try:
             self._configure_logging()
+            self._install_sigterm_handler()
             seed_everything(seed=self._seed)
             if self.writes_files:
                 self._directory.mkdir(parents=True, exist_ok=True)
-                _acquire_lock(path=self._directory / _LOCK_FILE)
-                self._lock_held = True
-                self._heartbeat = _Heartbeat(path=self._directory / _LOCK_FILE)
+                self._lock_nonce = _acquire_lock(path=self._directory / LOCK_FILE)
+                self._heartbeat = _Heartbeat(
+                    path=self._directory / LOCK_FILE, nonce=self._lock_nonce
+                )
                 self._attach_file_log()
-            existing = read_status(path=self._directory / _STATUS_FILE)
+            existing = read_status(path=self._directory / STATUS_FILE)
             if existing is not None:
                 self._snapshot = existing.with_run_state(run_state=RunState.RUNNING)
             if self._options.dry_run:
                 _LOGGER.info('dry run of %s; nothing is executed or written', self._directory)
                 _LOGGER.info('config:\n%s', config_to_yaml(config=self._config))
             elif self.writes_files:
-                save_config(config=self._config, path=self._directory / _CONFIG_FILE)
+                save_config(config=self._config, path=self._directory / CONFIG_FILE)
                 self._write_meta(finished_at=None)
                 self._persist_status()
                 self._start_trackers()
@@ -361,7 +407,7 @@ class Run:
                         tracker=tracker,
                         action='finish',
                         call=lambda tracker=tracker: tracker.finish(
-                            status=RunStatus(run_state.value)
+                            status=RunStatus.from_run_state(run_state=run_state)
                         ),
                     )
             self._log_summary(run_state=run_state)
@@ -371,14 +417,30 @@ class Run:
 
     def _persist_status(self) -> None:
         if self.writes_files:
-            write_status(path=self._directory / _STATUS_FILE, snapshot=self._snapshot)
+            write_status(path=self._directory / STATUS_FILE, snapshot=self._snapshot)
+
+    def _install_sigterm_handler(self) -> None:
+        """Turn SIGTERM into ``SystemExit`` so a SLURM kill still records the final state.
+
+        Only the main thread can install a handler, and a handler that someone
+        else installed (Lightning does for requeueing) is left alone.
+        """
+        if threading.current_thread() is not threading.main_thread():
+            return
+        previous = signal.getsignal(signal.SIGTERM)
+        if previous is not signal.SIG_DFL:
+            return
+        signal.signal(signal.SIGTERM, _exit_on_sigterm)
+        self._previous_sigterm = previous
 
     def _configure_logging(self) -> None:
         level = logging.getLevelNamesMapping()[self._options.log_level]
         root_logger = logging.getLogger()
         self._previous_root_level = root_logger.level
         root_logger.setLevel(min(root_logger.level or logging.WARNING, level))
-        logging.getLogger('tslab').setLevel(level)
+        tslab_logger = logging.getLogger('tslab')
+        self._previous_tslab_level = tslab_logger.level
+        tslab_logger.setLevel(level)
         if not root_logger.handlers:
             console = logging.StreamHandler(stream=sys.stderr)
             console.setFormatter(logging.Formatter(fmt=_LOG_FORMAT))
@@ -403,22 +465,21 @@ class Run:
                 if isinstance(canonical_config, dict)
                 else canonical_config
             )
+            environment = self.environment()
             self._meta = {
                 'format_version': META_FORMAT_VERSION,
                 'relative_path': self._relative_path.as_posix(),
                 'seed': self._seed,
                 'config_hash': compute_fingerprint(document={'config': canonical_config}),
                 'config_hash_without_seed': compute_fingerprint(document={'config': without_seed}),
-                'versions': collect_versions(),
-                'git': collect_git_state(directory=Path.cwd()),
+                # The latest execution only; the meta.json of each instance keeps its own.
+                'versions': environment['versions'],
+                'git': environment['git'],
                 'hostname': hostname(),
                 'started_at': utc_now_iso(),
             }
         self._meta['finished_at'] = finished_at
-        atomic_write_text(
-            path=self._directory / _META_FILE,
-            text=json.dumps(self._meta, indent=2, sort_keys=True) + '\n',
-        )
+        atomic_write_json(path=self._directory / META_FILE, document=self._meta)
 
     def _start_trackers(self) -> None:
         # The config.yaml view, not the fingerprint view: numbers must stay numbers.
@@ -438,18 +499,26 @@ class Run:
             )
 
     def _log_summary(self, *, run_state: RunState) -> None:
+        if not self._writer:
+            return  # one summary per job, not one per rank
         if self._options.dry_run:
             _LOGGER.info('dry run plan:')
             for instance_id, action in self._dry_run_plan:
                 _LOGGER.info('  %-40s %s', instance_id, action)
             return
-        counts = Counter(record.state for record in self._snapshot.instances.values())
+        # Only instances this execution called: records of earlier executions stay out.
+        records = {
+            instance_id: record
+            for instance_id, record in self._snapshot.instances.items()
+            if instance_id in self._claimed_ids
+        }
+        counts = Counter(record.state for record in records.values())
         _LOGGER.info(
             'run %s: %s',
             run_state.value,
             ', '.join(f'{counts[state]} {state.value}' for state in InstanceState),
         )
-        for instance_id, record in self._snapshot.instances.items():
+        for instance_id, record in records.items():
             if record.state is InstanceState.FAILED:
                 _LOGGER.error('  failed  %s: %s', instance_id, record.error)
             elif record.state is InstanceState.SKIPPED:
@@ -465,9 +534,12 @@ class Run:
         if self._heartbeat is not None:
             self._heartbeat.stop()
             self._heartbeat = None
-        if self._lock_held:
-            (self._directory / _LOCK_FILE).unlink(missing_ok=True)
-            self._lock_held = False
+        if self._lock_nonce is not None:
+            _release_lock(path=self._directory / LOCK_FILE, nonce=self._lock_nonce)
+            self._lock_nonce = None
+        if self._previous_sigterm is not None:
+            signal.signal(signal.SIGTERM, self._previous_sigterm)
+            self._previous_sigterm = None
         root_logger = logging.getLogger()
         for handler in self._log_handlers:
             root_logger.removeHandler(handler)
@@ -475,6 +547,8 @@ class Run:
         self._log_handlers.clear()
         if self._previous_root_level is not None:
             root_logger.setLevel(self._previous_root_level)
+        if self._previous_tslab_level is not None:
+            logging.getLogger('tslab').setLevel(self._previous_tslab_level)
 
 
 def _options_from_config(*, config: object) -> RunOptions:
@@ -521,29 +595,56 @@ def _flatten(*, value: object, prefix: str) -> dict[str, object]:
     return {prefix: value}
 
 
+def _exit_on_sigterm(signal_number: int, frame: FrameType | None) -> None:
+    del signal_number, frame
+    raise SystemExit(_SIGTERM_EXIT_CODE)
+
+
+def _project_directory() -> Path:
+    """Return the folder of the main script, or the working directory without one."""
+    script = getattr(sys.modules.get('__main__'), '__file__', None)
+    if isinstance(script, str) and Path(script).resolve().parent.is_dir():
+        return Path(script).resolve().parent
+    return Path.cwd()
+
+
 @dataclass(frozen=True, kw_only=True)
 class _LockOwner:
-    """Contents of the ``.lock`` file."""
+    """Contents of the ``.lock`` file.
+
+    ``nonce`` is random per ``Run``: it lets a process check that the lock it is
+    about to touch is still its own, even if its pid was reused or a stale lock
+    was taken over.
+    """
 
     pid: int
     host: str
+    nonce: str | None = None
 
 
 class _Heartbeat:
     """Touch the lock file every ``_HEARTBEAT_SECONDS`` from a daemon thread.
 
     The modification time of the lock then tells any host whether its owner is
-    still alive: a job killed by SLURM stops touching it.
+    still alive: a job killed by SLURM stops touching it. The thread stops
+    touching the file once another process owns it.
     """
 
-    def __init__(self, *, path: Path) -> None:
+    def __init__(self, *, path: Path, nonce: str) -> None:
         self._path = path
+        self._nonce = nonce
         self._stopped = threading.Event()
         self._thread = threading.Thread(target=self._beat, name='tslab-heartbeat', daemon=True)
         self._thread.start()
 
     def _beat(self) -> None:
         while not self._stopped.wait(timeout=_HEARTBEAT_SECONDS):
+            owner = _read_lock_owner(path=self._path)
+            if owner is None or owner.nonce != self._nonce:
+                _LOGGER.warning(
+                    '%s is no longer owned by this run; stopped refreshing it', self._path
+                )
+                return
             try:
                 os.utime(self._path)
             except OSError as error:
@@ -565,7 +666,7 @@ def is_run_active(*, directory: Path) -> bool:
     Args:
         directory: The run folder.
     """
-    path = directory / _LOCK_FILE
+    path = directory / LOCK_FILE
     try:
         age = time.time() - path.stat().st_mtime
     except FileNotFoundError:
@@ -579,18 +680,24 @@ def _lock_is_stale(*, owner: _LockOwner | None, age: float) -> bool:
     return owner is not None and owner.host == hostname() and not _pid_alive(pid=owner.pid)
 
 
-def _acquire_lock(*, path: Path) -> None:
+def _acquire_lock(*, path: Path) -> str:
     """Create the lock file atomically, replacing it once if it is stale.
 
     ``O_CREAT | O_EXCL`` makes creation atomic: exactly one process succeeds.
     A lock is stale when its heartbeat stopped more than ``_STALE_AFTER_SECONDS``
-    ago (any host), or when its process is dead (this host).
+    ago (any host), or when its process is dead (this host). Removing a stale
+    lock goes through ``_remove_stale_lock``, so two processes cannot both remove
+    it and then both create their own.
+
+    Returns:
+        The nonce stored in the lock; pass it to ``_release_lock``.
 
     Raises:
         RunLockedError: If a live process owns the lock.
     """
-    payload = json.dumps({'pid': os.getpid(), 'host': hostname()})
-    for _attempt in range(2):
+    nonce = uuid.uuid4().hex
+    payload = json.dumps({'pid': os.getpid(), 'host': hostname(), 'nonce': nonce})
+    for _attempt in range(_LOCK_ATTEMPTS):
         try:
             descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError:
@@ -600,13 +707,8 @@ def _acquire_lock(*, path: Path) -> None:
             except FileNotFoundError:
                 continue
             if _lock_is_stale(owner=owner, age=age):
-                _LOGGER.warning(
-                    'removing stale lock %s left by %s (last heartbeat %.0f s ago)',
-                    path.as_posix(),
-                    owner or 'an unknown process',
-                    age,
-                )
-                path.unlink(missing_ok=True)
+                if not _remove_stale_lock(path=path):
+                    time.sleep(_LOCK_RETRY_SECONDS)  # another process is deciding; look again
                 continue
             message = (
                 f'{path.parent.as_posix()} is in use by {owner or "an unknown process"}; '
@@ -615,9 +717,59 @@ def _acquire_lock(*, path: Path) -> None:
             raise RunLockedError(message) from None
         with os.fdopen(descriptor, mode='w', encoding='utf-8') as handle:
             handle.write(payload)
-        return
+        return nonce
     message = f'could not acquire {path.as_posix()}'
     raise RunLockedError(message)
+
+
+def _remove_stale_lock(*, path: Path) -> bool:
+    """Delete a lock that is still stale, while holding the takeover guard.
+
+    The guard file serializes takeovers. Without it, two processes could both
+    judge the same lock stale, one could delete it and create its own, and the
+    other could then delete that fresh lock. Under the guard the staleness is
+    checked again before the delete.
+
+    Returns:
+        ``False`` if another process holds the guard, ``True`` otherwise.
+    """
+    guard = path.with_name(f'{path.name}.takeover')
+    try:
+        descriptor = os.open(guard, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        try:
+            if time.time() - guard.stat().st_mtime > _TAKEOVER_GUARD_SECONDS:
+                guard.unlink(missing_ok=True)  # its holder died mid-takeover
+        except FileNotFoundError:
+            pass
+        return False
+    os.close(descriptor)
+    try:
+        owner = _read_lock_owner(path=path)
+        try:
+            age = time.time() - path.stat().st_mtime
+        except FileNotFoundError:
+            return True
+        if _lock_is_stale(owner=owner, age=age):
+            _LOGGER.warning(
+                'removing stale lock %s left by %s (last heartbeat %.0f s ago)',
+                path.as_posix(),
+                owner or 'an unknown process',
+                age,
+            )
+            path.unlink(missing_ok=True)
+    finally:
+        guard.unlink(missing_ok=True)
+    return True
+
+
+def _release_lock(*, path: Path, nonce: str) -> None:
+    """Delete the lock file, but only if this run still owns it."""
+    owner = _read_lock_owner(path=path)
+    if owner is not None and owner.nonce == nonce:
+        path.unlink(missing_ok=True)
+    elif path.exists():
+        _LOGGER.warning('%s now belongs to another process; leaving it in place', path.as_posix())
 
 
 def _read_lock_owner(*, path: Path) -> _LockOwner | None:
@@ -628,10 +780,10 @@ def _read_lock_owner(*, path: Path) -> _LockOwner | None:
         return None
     if not isinstance(document, dict):
         return None
-    pid, host = document.get('pid'), document.get('host')
+    pid, host, nonce = document.get('pid'), document.get('host'), document.get('nonce')
     if not isinstance(pid, int) or not isinstance(host, str):
         return None
-    return _LockOwner(pid=pid, host=host)
+    return _LockOwner(pid=pid, host=host, nonce=nonce if isinstance(nonce, str) else None)
 
 
 def _pid_alive(*, pid: int) -> bool:

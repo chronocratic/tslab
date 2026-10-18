@@ -1,8 +1,10 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 import json
+import logging
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import threading
@@ -12,7 +14,16 @@ from typing import override
 import pytest
 
 from tslab.core.meta import hostname
-from tslab.core.run import _acquire_lock, is_run_active, Run, RunLockedError, RunOptions
+from tslab.core.run import (
+    _acquire_lock,
+    _release_lock,
+    is_run_active,
+    Run,
+    RunLockedError,
+    RunOptions,
+)
+from tslab.core.status import InstanceRecord, InstanceState
+from tslab.core.tracker import LocalTracker
 from tslab.interfaces.tracker import RunStatus, Tracker
 
 
@@ -245,3 +256,142 @@ def test_run_cannot_be_entered_twice(tmp_path: Path) -> None:
         pass
     with pytest.raises(RuntimeError, match='only once'):
         run.__enter__()
+
+
+def test_concurrent_takeover_of_a_stale_lock_has_one_winner(tmp_path: Path) -> None:
+    lock = tmp_path / '.lock'
+    lock.write_text(json.dumps({'pid': 1, 'host': 'node123'}), encoding='utf-8')
+    _age_file(path=lock, seconds=601)
+    barrier = threading.Barrier(8)
+    outcomes: list[str] = []
+
+    def contender() -> None:
+        barrier.wait()
+        try:
+            _acquire_lock(path=lock)
+        except RunLockedError:
+            outcomes.append('locked out')
+        else:
+            outcomes.append('owner')
+
+    threads = [threading.Thread(target=contender) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert outcomes.count('owner') == 1
+    assert outcomes.count('locked out') == 7
+
+
+def test_release_only_removes_the_lock_of_the_owner(tmp_path: Path) -> None:
+    lock = tmp_path / '.lock'
+    mine = _acquire_lock(path=lock)
+    lock.write_text(json.dumps({'pid': 1, 'host': 'node123', 'nonce': 'theirs'}), encoding='utf-8')
+    _release_lock(path=lock, nonce=mine)
+    assert lock.exists()
+    _release_lock(path=lock, nonce='theirs')
+    assert not lock.exists()
+
+
+def test_run_leaves_a_lock_taken_over_by_another_process(tmp_path: Path) -> None:
+    lock = tmp_path / 'a' / '.lock'
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
+        lock.write_text(json.dumps({'pid': 1, 'host': 'node123', 'nonce': 'x'}), encoding='utf-8')
+    assert json.loads(lock.read_text(encoding='utf-8'))['nonce'] == 'x'
+
+
+def test_heartbeat_does_not_touch_a_foreign_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr('tslab.core.run._HEARTBEAT_SECONDS', 0.01)
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
+        lock = tmp_path / 'a' / '.lock'
+        lock.write_text(json.dumps({'pid': 1, 'host': 'node123', 'nonce': 'x'}), encoding='utf-8')
+        _age_file(path=lock, seconds=500)
+        before = lock.stat().st_mtime
+        time.sleep(0.2)
+        assert lock.stat().st_mtime == before
+
+
+def test_default_tracker_is_local_and_core_stays_free_of_lightning(tmp_path: Path) -> None:
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
+        assert isinstance(run.trackers[0], LocalTracker)
+        run.log_metrics(metrics={'loss': 0.5}, step=3)
+    assert (tmp_path / 'a' / 'trackers' / 'csv' / 'version_0' / 'metrics.csv').is_file()
+
+
+def test_a_given_local_tracker_replaces_the_default(tmp_path: Path) -> None:
+    mine = LocalTracker()
+    run = Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[mine])
+    assert run.trackers == (mine,)
+
+
+def test_sigterm_ends_the_run_as_crashed(tmp_path: Path) -> None:
+    before = signal.getsignal(signal.SIGTERM)
+    with (
+        pytest.raises(SystemExit) as raised,
+        Run(config=Config(), root=tmp_path, relative_path=Path('a')),
+    ):
+        signal.raise_signal(signal.SIGTERM)
+    assert raised.value.code == 128 + signal.SIGTERM
+    status = json.loads((tmp_path / 'a' / 'status.json').read_text(encoding='utf-8'))
+    assert status['run_state'] == 'crashed'
+    assert not (tmp_path / 'a' / '.lock').exists()
+    assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_logger_levels_are_restored(tmp_path: Path) -> None:
+    tslab_logger = logging.getLogger('tslab')
+    before = tslab_logger.level
+    with Run(
+        config=Config(run=RunOptions(log_level='DEBUG')), root=tmp_path, relative_path=Path('a')
+    ):
+        assert tslab_logger.level == logging.DEBUG
+    assert tslab_logger.level == before
+
+
+def test_summary_counts_only_this_execution(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
+        run.claim_instance(stage_name='old', name_parts=('default',))
+        run.record_instance(
+            instance_id='old[default]', record=InstanceRecord(state=InstanceState.DONE)
+        )
+    caplog.clear()
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
+        run.claim_instance(stage_name='new', name_parts=('default',))
+        run.record_instance(
+            instance_id='new[default]', record=InstanceRecord(state=InstanceState.DONE)
+        )
+    summary = next(line for line in caplog.messages if line.startswith('run finished'))
+    assert '1 done' in summary
+
+
+def test_non_zero_rank_logs_no_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv('LOCAL_RANK', '1')
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
+        pass
+    assert not [line for line in caplog.messages if line.startswith('run finished')]
+
+
+def test_name_conflict_with_an_earlier_execution_names_the_remedy(tmp_path: Path) -> None:
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
+        run.claim_instance(stage_name='attack', name_parts=('a',))
+        run.record_instance(
+            instance_id='attack[a]', record=InstanceRecord(state=InstanceState.DONE)
+        )
+    with (
+        Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run,
+        pytest.raises(ValueError, match='delete its folder and its entry in'),
+    ):
+        run.claim_instance(stage_name='attack', name_parts=('a', 'b'))
+
+
+def test_environment_is_computed_once_and_has_git_and_versions(tmp_path: Path) -> None:
+    run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
+    environment = run.environment()
+    assert set(environment) == {'git', 'versions'}
+    assert run.environment() is environment

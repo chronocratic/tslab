@@ -24,8 +24,8 @@ class SequenceEncoder(Protocol):
     """Turns series into one representation per timestep, causally.
 
     The representation at step ``t`` may only depend on steps ``<= t``. The
-    TS2Vec forecasting protocol relies on this to
-    encode a whole series once and read off every forecast position.
+    TS2Vec forecasting protocol relies on this to encode a whole series once
+    and read off every forecast position.
     """
 
     def encode_sequence(self, *, inputs: torch.Tensor) -> torch.Tensor:
@@ -73,6 +73,12 @@ class ModelAsEncoder:
 
     device: Annotated[str, NotFingerprinted] = 'auto'
     batch_size: int | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a ``batch_size`` that is not positive."""
+        if self.batch_size is not None and self.batch_size <= 0:
+            message = f'batch_size must be positive or None, got {self.batch_size}'
+            raise ValueError(message)
 
     def __call__(self, model: Encoder) -> Encoder:
         """Wrap ``model``; nothing moves until the first encode call.

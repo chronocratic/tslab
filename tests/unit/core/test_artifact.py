@@ -15,6 +15,7 @@ from tslab.core.artifact import (
     UnavailableReason,
 )
 from tslab.core.fingerprint import canonicalize
+from tslab.core.paths import JsonFileError
 
 
 def test_json_round_trip(tmp_path: Path) -> None:
@@ -92,3 +93,18 @@ def test_unavailable_artifact_raises_on_use() -> None:
     assert not is_available(artifact=placeholder)
     with pytest.raises(UnavailableArtifactError, match=r'attack\[pgd\] is unavailable'):
         _ = placeholder.tensors
+
+
+def test_json_file_that_is_not_an_object_names_the_file(tmp_path: Path) -> None:
+    (tmp_path / 'data.json').write_text('[1, 2]', encoding='utf-8')
+    with pytest.raises(JsonFileError, match=r'data\.json must be a JSON object'):
+        Json.load(directory=tmp_path)
+    with pytest.raises(JsonFileError, match=r'data\.json must be a JSON object'):
+        Metrics.load(directory=tmp_path)
+
+
+def test_tensors_are_read_through_one_open_file(tmp_path: Path) -> None:
+    Tensors(tensors={'a': torch.ones(2)}, metadata={'k': 'v'}).save(directory=tmp_path)
+    loaded = Tensors.external(path=tmp_path / 'tensors.safetensors')
+    assert torch.equal(loaded.tensors['a'], torch.ones(2))
+    assert loaded.metadata == {'k': 'v'}

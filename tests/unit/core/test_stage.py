@@ -208,3 +208,140 @@ def test_in_place_stage_resumes_and_restarts_on_fingerprint_change(tmp_path: Pat
         'last.ckpt',
         'meta.json',
     ]
+
+
+def run_with_options(tmp_path: Path, **options: object) -> tslab.Run:
+    return tslab.Run(
+        config=Config(),
+        root=tmp_path,
+        relative_path=Path('r'),
+        options=tslab.RunOptions(**options),  # ty: ignore[invalid-argument-type]
+    )
+
+
+def test_failed_rerun_keeps_the_previous_good_result(tmp_path: Path) -> None:
+    fail = False
+
+    @tslab.stage(name='flaky', output=tslab.Json)
+    def flaky(*, run: tslab.Run) -> tslab.Json:
+        if fail:
+            message = 'transient out of memory'
+            raise MemoryError(message)
+        return tslab.Json(data={'ok': True})
+
+    with open_run(tmp_path) as run:
+        flaky(run=run)
+    fail = True
+    with run_with_options(tmp_path, rerun=('flaky[default]',)) as run:
+        result = flaky(run=run)
+    assert not tslab.is_available(artifact=result)
+    folder = tmp_path / 'r' / 'flaky' / 'default'
+    assert json.loads((folder / 'data.json').read_text(encoding='utf-8')) == {'ok': True}
+    assert 'MemoryError' in (folder / 'error.txt').read_text(encoding='utf-8')
+    assert not list(folder.parent.glob('*.tmp-*'))
+    fail = False
+    with open_run(tmp_path) as run:
+        again = flaky(run=run)
+    assert isinstance(again, tslab.Json)
+    assert not (folder / 'error.txt').exists()
+
+
+def test_rerun_from_applies_after_a_skipped_stage(tmp_path: Path) -> None:
+    executed: list[str] = []
+
+    @tslab.stage(name='first', output=tslab.Json)
+    def first(*, run: tslab.Run, fail: bool) -> tslab.Json:
+        if fail:
+            message = 'boom'
+            raise RuntimeError(message)
+        return tslab.Json(data={})
+
+    @tslab.stage(name='second', output=tslab.Json)
+    def second(*, run: tslab.Run, upstream: tslab.Json) -> tslab.Json:
+        executed.append('second')
+        return tslab.Json(data={})
+
+    @tslab.stage(name='third', output=tslab.Json)
+    def third(*, run: tslab.Run) -> tslab.Json:
+        executed.append('third')
+        return tslab.Json(data={})
+
+    with open_run(tmp_path) as run:
+        second(run=run, upstream=first(run=run, fail=False))
+        third(run=run)
+    executed.clear()
+    # second is skipped because first fails, yet it is the rerun-from stage: third must rerun.
+    with run_with_options(tmp_path, rerun_from='second', force_all=False, fail_fast=False) as run:
+        second(run=run, upstream=first(run=run, fail=True))
+        third(run=run)
+    assert executed == ['third']
+
+
+def test_prepare_failure_is_recorded_as_a_failed_instance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*, source: Path, destination: Path) -> None:
+        raise OSError(source, destination)
+
+    monkeypatch.setattr('tslab.core.stage.replace_directory', broken)
+    with open_run(tmp_path) as run:
+        result = count(run=run, value=5)
+    assert not tslab.is_available(artifact=result)
+    status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
+    assert status['instances']['count[default]']['state'] == 'failed'
+    assert status['run_state'] == 'finished'
+
+
+def test_unwritable_work_directory_is_a_stage_failure(tmp_path: Path) -> None:
+    run = open_run(tmp_path)
+    with run:
+        (tmp_path / 'r' / 'count').write_text('a file where the stage folder must go', 'utf-8')
+        result = count(run=run, value=1)
+    assert not tslab.is_available(artifact=result)
+    status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
+    assert status['instances']['count[default]']['state'] == 'failed'
+
+
+def test_instance_meta_records_the_environment(tmp_path: Path) -> None:
+    with open_run(tmp_path) as run:
+        count(run=run, value=1)
+    meta = json.loads(
+        (tmp_path / 'r' / 'count' / 'default' / 'meta.json').read_text(encoding='utf-8')
+    )
+    assert set(meta['environment']) == {'git', 'versions'}
+    assert meta['environment']['versions']['python']
+
+
+def test_dry_run_survives_unreadable_meta(tmp_path: Path) -> None:
+    with open_run(tmp_path) as run:
+        count(run=run, value=1)
+    meta_path = tmp_path / 'r' / 'count' / 'default' / 'meta.json'
+    meta_path.write_text('{broken', encoding='utf-8')
+    with run_with_options(tmp_path, dry_run=True) as run:
+        placeholder = count(run=run, value=1)
+    assert not tslab.is_available(artifact=placeholder)
+
+
+def test_concrete_stage_class_must_define_name_and_output_type() -> None:
+    with pytest.raises(TypeError, match='must define name and output_type'):
+
+        class Nameless(tslab.Stage[tslab.Json]):
+            @override
+            def execute(self, **arguments: object) -> tslab.Json:
+                return tslab.Json(data={})
+
+    with pytest.raises(TypeError, match='must define output_type'):
+
+        class Typeless(tslab.Stage[tslab.Json]):
+            name = 'typeless'
+
+            @override
+            def execute(self, **arguments: object) -> tslab.Json:
+                return tslab.Json(data={})
+
+
+def test_var_positional_is_reported_by_name() -> None:
+    with pytest.raises(TypeError, match=r"positional: \['args'\]"):
+        tslab.stage(name='varargs', output=tslab.Json)(
+            lambda *args, run: tslab.Json(data={})  # noqa: ARG005
+        )

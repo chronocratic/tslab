@@ -10,14 +10,13 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import inspect
-import json
 import logging
 import os
 from pathlib import Path
 import shutil
 import time
 import traceback
-from typing import Any, cast, get_type_hints, override
+from typing import Any, cast, ClassVar, get_type_hints, override
 import uuid
 
 from tslab.core.artifact import (
@@ -34,20 +33,30 @@ from tslab.core.fingerprint import (
     is_not_fingerprinted,
 )
 from tslab.core.paths import (
+    atomic_write_json,
     atomic_write_text,
+    ERROR_FILE,
+    JsonFileError,
+    META_FILE,
     normalize_instance_name,
+    read_json_object,
     replace_directory,
     validate_stage_name,
 )
 from tslab.core.run import Run
-from tslab.core.status import format_instance_id, InstanceRecord, InstanceState, utc_now_iso
+from tslab.core.status import (
+    format_instance_id,
+    InstanceRecord,
+    InstanceState,
+    StatusFileError,
+    utc_now_iso,
+)
+from tslab.core.text import describe_error, qualified_name
 
 __all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'Stage', 'stage']
 
 _LOGGER = logging.getLogger(__name__)
 INSTANCE_META_FORMAT_VERSION = 1
-_META_FILE = 'meta.json'
-_ERROR_FILE = 'error.txt'
 _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
 
@@ -82,6 +91,20 @@ class Stage[Out: Artifact](ABC):
     version: int = 1
     output_type: type[Out]
     in_place: bool = False
+    # ``FunctionStage`` sets name and output_type per instance, not on the class.
+    _configured_in_init: ClassVar[bool] = False
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:  # noqa: ANN401 # why: cooperative super call
+        """Reject a concrete subclass that does not define ``name`` and ``output_type``."""
+        super().__init_subclass__(**kwargs)
+        if cls._configured_in_init or getattr(cls.execute, '__isabstractmethod__', False):
+            return
+        missing = [
+            attribute for attribute in ('name', 'output_type') if not hasattr(cls, attribute)
+        ]
+        if missing:
+            message = f'stage class {cls.__qualname__} must define {" and ".join(missing)}'
+            raise TypeError(message)
 
     @abstractmethod
     # why: each stage declares its own inputs
@@ -166,23 +189,15 @@ class Stage[Out: Artifact](ABC):
             }
         )
         # 4. Decide: load or run.
-        invalidation = run.invalidation_reason(stage_name=stage_name, instance_id=instance_id)
+        invalidation = run.invalidation_reason(instance_id=instance_id)
         record = run.instance_record(instance_id=instance_id)
         stale_reason = invalidation or _stale_reason(
             record=record, fingerprint=fingerprint, directory=directory, inputs=inputs
         )
         if run.options.dry_run:
-            action = 'load' if stale_reason is None else f'run ({stale_reason})'
-            run.record_dry_run_action(instance_id=instance_id, action=action)
-            placeholder = UnavailableArtifact(
-                instance_id=instance_id, reason=UnavailableReason.DRY_RUN, detail=action
+            return _plan_dry_run(
+                run=run, instance_id=instance_id, directory=directory, stale_reason=stale_reason
             )
-            if stale_reason is None:
-                bind_identity(
-                    artifact=placeholder,
-                    identity=_identity_from_meta(directory=directory, instance_id=instance_id),
-                )
-            return placeholder
         if stale_reason is None:
             loaded = self._try_load(directory=directory, instance_id=instance_id)
             if loaded is not None:
@@ -247,10 +262,10 @@ class Stage[Out: Artifact](ABC):
                 state=InstanceState.RUNNING, fingerprint=fingerprint, started_at=started_at
             ),
         )
-        work_directory = self._prepare_work_directory(
-            run=run, directory=directory, resume=resume, instance_id=instance_id
-        )
         try:
+            work_directory = self._prepare_work_directory(
+                run=run, directory=directory, resume=resume, instance_id=instance_id
+            )
             artifact = self.execute(**arguments)
             if not isinstance(artifact, self.output_type):
                 message = (
@@ -262,33 +277,23 @@ class Stage[Out: Artifact](ABC):
             seconds = time.perf_counter() - start
             if run.writes_files:
                 artifact.save(directory=work_directory)
-                _write_instance_meta(
-                    directory=work_directory,
-                    document={
-                        'format_version': INSTANCE_META_FORMAT_VERSION,
-                        'instance_id': instance_id,
-                        'stage_version': self.version,
-                        'fingerprint': fingerprint,
-                        'execution_id': execution_id,
-                        'artifact_type': _qualified_name(value=artifact),
-                        'settings': execution.settings,
-                        'inputs': _describe_inputs(inputs=execution.inputs),
-                        'external_inputs': _describe_external_inputs(inputs=execution.inputs),
-                        'started_at': started_at,
-                        'finished_at': utc_now_iso(),
-                        'seconds': seconds,
-                    },
+                atomic_write_json(
+                    path=work_directory / META_FILE,
+                    document=_instance_meta_document(
+                        stage=self,
+                        execution=execution,
+                        artifact=artifact,
+                        execution_id=execution_id,
+                        started_at=started_at,
+                        seconds=seconds,
+                    ),
                 )
-                if self.in_place:
-                    (directory / _INCOMPLETE_MARKER).unlink(missing_ok=True)
-                else:
-                    replace_directory(source=work_directory, destination=directory)
+                self._publish(work_directory=work_directory, directory=directory)
         # why: any stage error is recorded; fail_fast re-raises
         except Exception as error:  # noqa: BLE001
             return self._record_failure(
                 execution=execution,
                 error=error,
-                work_directory=work_directory,
                 started_at=started_at,
                 seconds=time.perf_counter() - start,
             )
@@ -312,6 +317,19 @@ class Stage[Out: Artifact](ABC):
         _LOGGER.info('done %s in %.1fs', instance_id, seconds)
         return artifact
 
+    def _publish(self, *, work_directory: Path, directory: Path) -> None:
+        """Make a fully written result visible: drop the marker or swap the folder in."""
+        if self.in_place:
+            (directory / _INCOMPLETE_MARKER).unlink(missing_ok=True)
+        else:
+            replace_directory(source=work_directory, destination=directory)
+
+    def _work_directory(self, *, directory: Path) -> Path:
+        """Return where ``execute`` writes: the final folder, or a temporary sibling."""
+        if self.in_place:
+            return directory
+        return directory.with_name(f'{directory.name}.tmp-{os.getpid()}')
+
     def _prepare_work_directory(
         self, *, run: Run, directory: Path, resume: bool, instance_id: str
     ) -> Path:
@@ -319,40 +337,38 @@ class Stage[Out: Artifact](ABC):
             return directory
         for leftover in directory.parent.glob(f'{directory.name}.tmp-*'):
             shutil.rmtree(leftover, ignore_errors=True)
+        work_directory = self._work_directory(directory=directory)
         if self.in_place:
             if resume:
                 _LOGGER.info('resume %s in %s', instance_id, directory.as_posix())
-                (directory / _ERROR_FILE).unlink(missing_ok=True)
+                (directory / ERROR_FILE).unlink(missing_ok=True)
             elif directory.exists():
                 shutil.rmtree(directory)
             directory.mkdir(parents=True, exist_ok=True)
             (directory / _INCOMPLETE_MARKER).touch()
             return directory
-        work_directory = directory.with_name(f'{directory.name}.tmp-{os.getpid()}')
         work_directory.mkdir(parents=True)
         return work_directory
 
     def _record_failure(
-        self,
-        *,
-        execution: _Execution,
-        error: Exception,
-        work_directory: Path,
-        started_at: str,
-        seconds: float,
+        self, *, execution: _Execution, error: Exception, started_at: str, seconds: float
     ) -> Artifact:
         run, instance_id, directory = execution.run, execution.instance_id, execution.directory
-        error_line = f'{type(error).__name__}: {error}'
+        error_line = describe_error(error=error)
         traceback_file: str | None = None
         if run.writes_files:
             if not self.in_place:
-                shutil.rmtree(work_directory, ignore_errors=True)
-                if directory.exists():
-                    shutil.rmtree(directory)
-                directory.mkdir(parents=True)
-            error_path = directory / _ERROR_FILE
-            atomic_write_text(path=error_path, text=''.join(traceback.format_exception(error)))
-            traceback_file = error_path.relative_to(run.directory).as_posix()
+                shutil.rmtree(self._work_directory(directory=directory), ignore_errors=True)
+            # A result from an earlier successful execution stays in the folder: it is
+            # replaced only when a new execution succeeds. ``error.txt`` lands beside it.
+            error_path = directory / ERROR_FILE
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                atomic_write_text(path=error_path, text=''.join(traceback.format_exception(error)))
+            except OSError:
+                _LOGGER.warning('cannot write %s', error_path.as_posix(), exc_info=True)
+            else:
+                traceback_file = error_path.relative_to(run.directory).as_posix()
         run.record_instance(
             instance_id=instance_id,
             record=InstanceRecord(
@@ -371,6 +387,56 @@ class Stage[Out: Artifact](ABC):
         return UnavailableArtifact(
             instance_id=instance_id, reason=UnavailableReason.FAILED, detail=error_line
         )
+
+
+def _plan_dry_run(
+    *, run: Run, instance_id: str, directory: Path, stale_reason: str | None
+) -> UnavailableArtifact:
+    """Record what a dry run would do and return a placeholder carrying the cached identity."""
+    action = 'load' if stale_reason is None else f'run ({stale_reason})'
+    run.record_dry_run_action(instance_id=instance_id, action=action)
+    placeholder = UnavailableArtifact(
+        instance_id=instance_id, reason=UnavailableReason.DRY_RUN, detail=action
+    )
+    if stale_reason is None:
+        try:
+            identity = _identity_from_meta(directory=directory, instance_id=instance_id)
+        except StatusFileError:
+            _LOGGER.warning(
+                'cannot read result metadata of %s; its inputs stay unknown', instance_id
+            )
+        else:
+            bind_identity(artifact=placeholder, identity=identity)
+    return placeholder
+
+
+def _instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fact
+    *,
+    stage: Stage[Any],
+    execution: _Execution,
+    artifact: Artifact,
+    execution_id: str,
+    started_at: str,
+    seconds: float,
+) -> dict[str, object]:
+    """Return the content of the ``meta.json`` of one executed instance."""
+    return {
+        'format_version': INSTANCE_META_FORMAT_VERSION,
+        'instance_id': execution.instance_id,
+        'stage_version': stage.version,
+        'fingerprint': execution.fingerprint,
+        'execution_id': execution_id,
+        'artifact_type': qualified_name(cls=type(artifact)),
+        'settings': execution.settings,
+        'inputs': _describe_inputs(inputs=execution.inputs),
+        'external_inputs': _describe_external_inputs(inputs=execution.inputs),
+        # The code and package versions that made this result. A resumed run
+        # rewrites the run meta.json, so only here do they stay tied to the result.
+        'environment': execution.run.environment(),
+        'started_at': started_at,
+        'finished_at': utc_now_iso(),
+        'seconds': seconds,
+    }
 
 
 def _blocking_input(*, inputs: Mapping[str, Artifact]) -> UnavailableArtifact | None:
@@ -404,7 +470,7 @@ def _stale_reason(
         return f'fingerprint changed {record.fingerprint} -> {fingerprint}'
     if record.state is not InstanceState.DONE:
         return f'previous state {record.state.value}'
-    meta_path = directory / _META_FILE
+    meta_path = directory / META_FILE
     if not meta_path.exists():
         return 'result folder missing'
     document = _read_instance_meta(path=meta_path)
@@ -435,7 +501,7 @@ def _can_resume(*, record: InstanceRecord | None, fingerprint: str) -> bool:
 
 
 def _identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentity:
-    document = _read_instance_meta(path=directory / _META_FILE)
+    document = _read_instance_meta(path=directory / META_FILE)
     fingerprint: object = None
     execution_id: object = None
     if document is not None and document.get('format_version') == INSTANCE_META_FORMAT_VERSION:
@@ -443,7 +509,7 @@ def _identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentit
         execution_id = document.get('execution_id')
     if not isinstance(fingerprint, str) or not isinstance(execution_id, str):
         message = f'cannot read result metadata of {instance_id}'
-        raise TypeError(message)
+        raise StatusFileError(message)
     return ArtifactIdentity(
         fingerprint=fingerprint, instance_id=instance_id, execution_id=execution_id
     )
@@ -456,14 +522,10 @@ def _read_instance_meta(*, path: Path) -> dict[str, object] | None:
     instead (see ``_stale_reason`` and ``_identity_from_meta``).
     """
     try:
-        document = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return read_json_object(path=path)
+    except (OSError, JsonFileError):
         _LOGGER.warning('cannot read %s; treating the result as stale', path.as_posix())
         return None
-    if not isinstance(document, dict):
-        _LOGGER.warning('%s is not a JSON object; treating the result as stale', path.as_posix())
-        return None
-    return cast('dict[str, object]', document)
 
 
 def _describe_inputs(*, inputs: Mapping[str, Artifact]) -> dict[str, dict[str, str | None]]:
@@ -491,21 +553,13 @@ def _describe_external_inputs(*, inputs: Mapping[str, Artifact]) -> dict[str, di
     return described
 
 
-def _qualified_name(*, value: object) -> str:
-    return f'{type(value).__module__}.{type(value).__qualname__}'
-
-
-def _write_instance_meta(*, directory: Path, document: Mapping[str, object]) -> None:
-    atomic_write_text(
-        path=directory / _META_FILE, text=json.dumps(document, indent=2, sort_keys=True) + '\n'
-    )
-
-
 class FunctionStage[**P, Out: Artifact](Stage[Out]):
     """A ``Stage`` built from a plain function by ``@stage``.
 
     Calls are type-checked against the signature of the wrapped function itself.
     """
+
+    _configured_in_init: ClassVar[bool] = True
 
     def __init__(
         self,
@@ -522,7 +576,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
         positional = [
             parameter.name
             for parameter in parameters.values()
-            if parameter.kind is not inspect.Parameter.KEYWORD_ONLY
+            if parameter.kind not in {inspect.Parameter.KEYWORD_ONLY, inspect.Parameter.VAR_KEYWORD}
         ]
         if positional:
             message = (

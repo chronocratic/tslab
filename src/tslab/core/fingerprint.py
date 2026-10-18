@@ -26,6 +26,8 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from tslab.core.text import qualified_name
+
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
@@ -40,7 +42,7 @@ __all__ = [
     'is_not_fingerprinted',
 ]
 
-FINGERPRINT_FORMAT_VERSION = 1
+FINGERPRINT_FORMAT_VERSION = 2
 _FINGERPRINT_LENGTH = 16
 _CHUNK_SIZE = 1024 * 1024
 
@@ -62,11 +64,11 @@ class Fingerprintable(Protocol):
 
     Live objects such as models, trainers and data sources cannot be hashed
     directly. They implement this protocol by returning their configuration
-    (usually a frozen dataclass), which is then canonicalised.
+    (usually a frozen dataclass), which is then canonicalized.
     """
 
     def fingerprint_settings(self) -> object:
-        """Return a canonicalisable description of this object."""
+        """Return a canonicalizable description of this object."""
         ...
 
 
@@ -100,9 +102,7 @@ def is_not_fingerprinted(*, annotation: object) -> bool:
 def _canonicalize_dataclass(*, value: 'DataclassInstance') -> dict[str, object]:
     value_type = type(value)
     type_hints = get_type_hints(value_type, include_extras=True)
-    canonical: dict[str, object] = {
-        '__type__': f'{value_type.__module__}.{value_type.__qualname__}'
-    }
+    canonical: dict[str, object] = {'__type__': qualified_name(cls=value_type)}
     for field in dataclasses.fields(value):
         if is_not_fingerprinted(annotation=type_hints.get(field.name)):
             continue
@@ -118,17 +118,17 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
         - ``None``, ``bool``, ``int``, ``str`` are kept as they are.
         - ``float`` becomes its ``repr`` string, which is exact.
         - ``Path`` becomes its POSIX string; the file content is *not* hashed.
-        - ``Enum`` becomes ``"ClassName.MEMBER"``.
+        - ``Enum`` becomes ``"module.ClassName.MEMBER"``.
         - Artifacts are replaced by their fingerprint. An artifact without one
           (created by user code, not by a stage) raises ``TypeError``.
         - ``Fingerprintable`` objects are replaced by their settings.
         - Dataclasses become a dict with a ``__type__`` key plus their fields,
           skipping fields annotated with ``NotFingerprinted``.
         - Lists and tuples become lists; mappings with ``str`` keys become
-          dicts (key order is handled by sorted JSON serialisation).
+          dicts (key order is handled by sorted JSON serialization).
 
     Args:
-        value: The value to canonicalise.
+        value: The value to canonicalize.
 
     Returns:
         A JSON-compatible value.
@@ -138,7 +138,7 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
             would let stale results be reused.
     """
     if isinstance(value, Enum):  # before scalars: StrEnum and IntEnum members are str and int
-        return f'{type(value).__name__}.{value.name}'
+        return f'{qualified_name(cls=type(value))}.{value.name}'
     if value is None or isinstance(value, bool | int | str):
         return value
     if isinstance(value, float):
@@ -154,6 +154,9 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
             )
             raise TypeError(message)
         return {'__fingerprint__': fingerprint}
+    # Fingerprintable comes before the dataclass rule on purpose: a dataclass such as
+    # ``RunOptions`` can opt out of the fingerprint by returning ``None`` from
+    # ``fingerprint_settings``.
     if isinstance(value, Fingerprintable):
         return canonicalize(value=value.fingerprint_settings())
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
@@ -196,15 +199,16 @@ def _hash_file(*, path: Path) -> str:
     return digest.hexdigest()
 
 
-_content_hash_cache: dict[tuple[str, int, int], str] = {}
+_content_hash_cache: dict[tuple[str, int, int, int], str] = {}
 
 
 def hash_path_contents(*, path: Path) -> str:
     """Return the SHA-256 hex digest of a file or the contents of a directory tree.
 
     For a directory, the digest covers the POSIX path of each file relative to the
-    directory plus the content hash of that file, in sorted order. Results are
-    memoised per process, keyed by resolved path, size and modification time,
+    directory plus the content hash of that file, in sorted order, each followed by a
+    NUL byte. Results are
+    memoized per process, keyed by resolved path, inode, size and modification time,
     so hashing a large checkpoint twice in one run costs nothing.
 
     Args:
@@ -221,12 +225,13 @@ def hash_path_contents(*, path: Path) -> str:
         raise FileNotFoundError(message)
     if path.is_file():
         stat = path.stat()
-        cache_key = (path.resolve().as_posix(), stat.st_size, stat.st_mtime_ns)
+        cache_key = (path.resolve().as_posix(), stat.st_ino, stat.st_size, stat.st_mtime_ns)
         if cache_key not in _content_hash_cache:
             _content_hash_cache[cache_key] = _hash_file(path=path)
         return _content_hash_cache[cache_key]
     digest = hashlib.sha256()
     for file_path in sorted(item for item in path.rglob('*') if item.is_file()):
-        digest.update(file_path.relative_to(path).as_posix().encode('utf-8'))
-        digest.update(hash_path_contents(path=file_path).encode('ascii'))
+        # NUL separates the fields, so no file name can run into the hash after it.
+        digest.update(file_path.relative_to(path).as_posix().encode('utf-8') + b'\0')
+        digest.update(hash_path_contents(path=file_path).encode('ascii') + b'\0')
     return digest.hexdigest()
