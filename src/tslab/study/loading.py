@@ -1,4 +1,4 @@
-"""Load a study from a ``module:attribute`` reference in a user's module."""
+"""Load a study from a ``module:attribute`` reference in a module of the user."""
 
 import importlib
 from pathlib import Path
@@ -12,9 +12,11 @@ __all__ = ['load_study']
 def load_study(*, reference: str) -> Study:
     """The ``Study`` a ``module:attribute`` reference points at.
 
-    The module is imported after the current working directory is on
-    ``sys.path``; an ``ImportError`` raised by the user's module propagates
-    unchanged, so a broken module breaks the study with its own error.
+    The module is imported while the current working directory is on
+    ``sys.path``, which is restored afterwards. A module of the same name
+    cached from another folder is dropped first. An ``ImportError`` raised by
+    the module of the user propagates unchanged, so a broken module breaks
+    the study with its own error.
 
     Args:
         reference: ``module:attribute``; the attribute must be a ``Study``.
@@ -28,13 +30,23 @@ def load_study(*, reference: str) -> Study:
         TypeError: If the attribute is not a ``Study``.
     """
     module_name, separator, attribute_name = reference.partition(':')
-    if not separator or not module_name or not attribute_name:
+    if not separator or not module_name or not attribute_name or ':' in attribute_name:
         message = f'reference {reference!r} is malformed; references are module:attribute'
         raise ValueError(message)
-    cwd = str(Path.cwd())
-    if cwd not in sys.path:
-        sys.path.insert(0, cwd)
-    module = importlib.import_module(module_name)
+    cwd = Path.cwd()
+    _drop_foreign_module(module_name=module_name, cwd=cwd)
+    inserted = str(cwd) not in sys.path
+    if inserted:
+        sys.path.insert(0, str(cwd))
+    try:
+        module = importlib.import_module(module_name)
+    except BaseException:
+        # why: a half-imported module must not satisfy the next import
+        sys.modules.pop(module_name, None)
+        raise
+    finally:
+        if inserted and str(cwd) in sys.path:
+            sys.path.remove(str(cwd))
     if not hasattr(module, attribute_name):
         message = f'module {module_name!r} has no attribute {attribute_name!r}'
         raise ValueError(message)
@@ -43,3 +55,11 @@ def load_study(*, reference: str) -> Study:
         message = f'{reference!r} does not name a Study, it is a {type(study).__name__}'
         raise TypeError(message)
     return study
+
+
+def _drop_foreign_module(*, module_name: str, cwd: Path) -> None:
+    """Forget a cached module of this name that came from another folder."""
+    cached = sys.modules.get(module_name)
+    origin = getattr(cached, '__file__', None)
+    if cached is not None and (origin is None or Path(origin).parent.resolve() != cwd.resolve()):
+        sys.modules.pop(module_name, None)

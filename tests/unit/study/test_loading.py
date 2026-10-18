@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from tslab.study import load_study
+from tslab.study.loading import load_study
 
 
 @pytest.fixture(autouse=True)
@@ -41,3 +41,53 @@ def test_load_study_import_error_keeps_the_cause(
     monkeypatch.chdir(tmp_path)
     with pytest.raises(ModuleNotFoundError, match='does_not_exist'):
         load_study(reference='broken_study:x')
+
+
+def test_load_study_leaves_sys_path_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / 'my_studies.py').write_text(
+        'from study.configs import grid\n'
+        'from tslab.study import Study\n'
+        '\n'
+        'rbs = Study(name="rbs", grids={"c": grid()})\n'
+    )
+    monkeypatch.chdir(tmp_path)
+    before = list(sys.path)
+    load_study(reference='my_studies:rbs')
+    assert sys.path == before
+    with pytest.raises(ValueError, match='attribute'):
+        load_study(reference='my_studies:nope')
+    assert sys.path == before
+
+
+def test_load_study_sys_path_restored_on_import_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / 'broken_study.py').write_text('import does_not_exist\n')
+    monkeypatch.chdir(tmp_path)
+    before = list(sys.path)
+    with pytest.raises(ModuleNotFoundError):
+        load_study(reference='broken_study:x')
+    assert sys.path == before
+    assert 'broken_study' not in sys.modules
+
+
+def test_load_study_prefers_the_module_of_the_current_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for folder, name in (('one', 'first'), ('two', 'second')):
+        (tmp_path / folder).mkdir()
+        (tmp_path / folder / 'my_studies.py').write_text(
+            'from study.configs import grid\n'
+            'from tslab.study import Study\n'
+            '\n'
+            f'rbs = Study(name="{name}", grids={{"c": grid()}})\n'
+        )
+    monkeypatch.chdir(tmp_path / 'one')
+    assert load_study(reference='my_studies:rbs').name == 'first'
+    monkeypatch.chdir(tmp_path / 'two')
+    assert load_study(reference='my_studies:rbs').name == 'second'
+
+
+def test_three_part_reference_is_malformed() -> None:
+    with pytest.raises(ValueError, match='malformed'):
+        load_study(reference='a:b:c')

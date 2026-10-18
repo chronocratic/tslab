@@ -1,6 +1,6 @@
 """Typed dotted settings: the declarative twin of command-line flags.
 
-``Settings`` maps a dotted field path of the script's config class to a value
+``Settings`` maps a dotted field path of the config class of the script to a value
 (``{'model': 'ts2vec', 'model.depth': 10}``). ``settings_to_args`` turns them
 into the flags tyro reads back into the same config; the round trip
 settings to flags to ``tslab.parse_config`` is pinned by tests.
@@ -83,14 +83,14 @@ def _allows_none(*, annotation: object) -> bool:
 
 
 def _default_choice_name(*, holder: type, field_name: str) -> str | None:
-    """The subcommand name of a union field's default instance, if it has one."""
+    """The subcommand name of the default instance of a union field, if it has one."""
     dc_fields = dataclasses.fields(cast('Any', holder))  # a dataclass, checked by the caller
     field = next(item for item in dc_fields if item.name == field_name)
     instance: object = None
     if field.default is not MISSING:
         instance = field.default
-    elif field.default_factory is not MISSING:  # type: ignore[misc]
-        instance = field.default_factory()  # type: ignore[misc]
+    elif field.default_factory is not MISSING:
+        instance = field.default_factory()
     if instance is None:
         return None
     choices = union_choices(annotation=get_type_hints(holder, include_extras=True)[field_name])
@@ -106,7 +106,7 @@ def field_annotation(*, config_class: type, path: str, settings: Settings) -> ob
     """The annotation at a dotted path of ``config_class``.
 
     At a choice union, the member named in the same settings mapping is used;
-    an unchosen union uses the union field's default member when it has one.
+    an unchosen union uses the default member of the union field when it has one.
 
     Args:
         config_class: The config dataclass the path is relative to.
@@ -176,8 +176,9 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
 
     Raises:
         ValueError: If a path is unknown, a choice name is unknown, an
-            unchosen union has no default member, or the text ``'None'`` is
-            given for a field that accepts ``None``.
+            unchosen union has no default member, ``None`` is given for a
+            field that does not accept it, or the text ``'None'`` is given for
+            a field that does.
         TypeError: If a value is not a settings value.
     """
     words: list[str] = []
@@ -197,12 +198,19 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
                 raise TypeError(message)
             flags += _bool_flag(path=path, value=value)
         else:
+            if value is None and not _allows_none(annotation=annotation):
+                message = f'{path}: None is not a value of a field that does not accept None'
+                raise ValueError(message)
             if isinstance(value, str) and value == 'None' and _allows_none(annotation=annotation):
                 message = (
                     f'{path}: the text None is ambiguous; pass the Python value '
                     f'None (not the string) to set no value'
                 )
                 raise ValueError(message)
+            if isinstance(value, str) and value.startswith('-'):
+                # why: a separate word would be read as another flag
+                flags.append(f'{_flag(path=path)}={value}')
+                continue
             flags.append(_flag(path=path))
             flags += _value_args(value=value, path=path)
     words.sort(key=lambda word: word.count('.'))
@@ -217,15 +225,16 @@ def from_presets(
 ) -> dict[str, dict[str, SettingValue]]:
     """Turn presets of the script into settings, one mapping per preset.
 
-    A preset gives, for every choice union field, its chosen member's name,
-    and for every other field, its value only where it differs from the
-    field's default in the chosen class, plus every field that has no
+    A preset gives, for every choice union field, the name of the chosen
+    member, and for every other field, the value only where it differs from
+    the default tyro starts from (the default instance of the field when it
+    has one, else the default of the class), plus every field that has no
     default. Fields holding ``tslab.REQUIRED`` are skipped: the study must
     supply them on an axis. Every path under a path named in ``without`` is
     dropped too.
 
     Args:
-        presets: The script's preset registry, ``{name: (description, config)}``.
+        presets: The preset registry of the script, ``{name: (description, config)}``.
         names: Which presets to read, in this order; ``None`` reads all of
             them in registry order.
         without: Field paths to drop, e.g. ``('data',)``: the path and every
@@ -235,7 +244,8 @@ def from_presets(
         ``{preset name: settings}`` in the order of ``names``.
 
     Raises:
-        ValueError: If a name in ``names`` is not in ``presets``.
+        ValueError: If a name in ``names`` is not in ``presets``, or a path in
+            ``without`` is no field of any selected preset.
         TypeError: If a preset holds a leaf value settings cannot hold, or a
             choice union field holds a non-member.
     """
@@ -247,11 +257,22 @@ def from_presets(
             message = f'unknown preset names {unknown}; known: {sorted(presets)}'
             raise ValueError(message)
         selected = list(names)
+    unknown_without = [
+        drop
+        for drop in without
+        if not any(_has_path(config=presets[name][1], path=drop) for name in selected)
+    ]
+    if unknown_without:
+        message = (
+            f'without names {unknown_without}, which is no field of any selected preset; '
+            f'check the spelling'
+        )
+        raise ValueError(message)
     result: dict[str, dict[str, SettingValue]] = {}
     for name in selected:
         _, config = presets[name]
         settings: dict[str, SettingValue] = {}
-        _preset_settings(config=config, prefix='', preset_name=name, out=settings)
+        _preset_settings(config=config, base=None, prefix='', preset_name=name, out=settings)
         result[name] = {
             path: value
             for path, value in settings.items()
@@ -295,8 +316,32 @@ def _preset_leaf(
     out[path] = cast('SettingValue', item)
 
 
+def _has_path(*, config: object, path: str) -> bool:
+    """Whether the dotted field path exists on the preset config."""
+    current = config
+    for part in path.split('.'):
+        if not dataclasses.is_dataclass(current) or isinstance(current, type):
+            return False
+        if part not in {item.name for item in fields(current)}:
+            return False
+        current = getattr(current, part)
+    return True
+
+
+def _default_of(*, field: Field[Any], base: object | None) -> object:
+    """The default tyro starts from: the field of the base instance, else the class default."""
+    if base is not None:
+        return getattr(base, field.name)
+    return _field_default(field=field)
+
+
 def _preset_settings(
-    *, config: object, prefix: str, preset_name: str, out: dict[str, SettingValue]
+    *,
+    config: object,
+    base: object | None,
+    prefix: str,
+    preset_name: str,
+    out: dict[str, SettingValue],
 ) -> None:
     if not dataclasses.is_dataclass(config) or isinstance(config, type):
         message = f'preset {preset_name} holds a non-dataclass at {prefix or "the top level"}'
@@ -308,6 +353,7 @@ def _preset_settings(
             continue
         path = f'{prefix}.{field.name}' if prefix else field.name
         item = getattr(config, field.name)
+        default = _default_of(field=field, base=base)
         choices = union_choices(annotation=hints[field.name])
         if choices is not None:
             choice_name = next(
@@ -326,12 +372,19 @@ def _preset_settings(
                 raise TypeError(message)
             out[path] = choice_name
             if item is not None:
-                _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
+                # why: tyro starts a chosen member from the default instance only when the
+                # default is a member of the same class; otherwise from the class defaults
+                member_base = default if type(default) is type(item) else None
+                _preset_settings(
+                    config=item, base=member_base, prefix=path, preset_name=preset_name, out=out
+                )
             continue
-        default = _field_default(field=field)
         if dataclasses.is_dataclass(item) and not isinstance(item, type):
             if default is _NO_DEFAULT or item != default:
-                _preset_settings(config=item, prefix=path, preset_name=preset_name, out=out)
+                nested_base = default if type(default) is type(item) else None
+                _preset_settings(
+                    config=item, base=nested_base, prefix=path, preset_name=preset_name, out=out
+                )
             continue
         _preset_leaf(item=item, path=path, preset_name=preset_name, default=default, out=out)
 
@@ -386,7 +439,7 @@ def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
         member = _strip(annotation=annotation)
         if isinstance(member, type) and dataclasses.is_dataclass(member):
             return [member]
-        return [holder]
+        return []
     if isinstance(name, str) and name in choices:
         return [choices[name]]
     return list(choices.values())

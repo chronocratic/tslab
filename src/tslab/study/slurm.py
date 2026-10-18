@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -24,6 +25,10 @@ __all__ = [
 QOS_LIMIT_MARKERS = ('QOSMaxSubmitJobPerUserLimit', 'Job violates accounting/QOS policy')
 
 _EMPTY_INDICES = 'indices must not be empty'
+_CONTROL_PATTERN = re.compile(r'[\x00-\x1f\x7f]')
+_ENV_NAME_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+#: What squeue prints for job ids it no longer knows; the accounting database answers then.
+_UNKNOWN_JOB = 'Invalid job id specified'
 
 
 class SlurmError(RuntimeError):
@@ -78,7 +83,9 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
             + shlex.quote(str(tasks_file))
             + ')\n'
             'if [ -z "$TASK_LINE" ]; then\n'
-            '    echo "no task ${SLURM_ARRAY_TASK_ID} in ' + str(tasks_file) + '" >&2\n'
+            '    echo "no task ${SLURM_ARRAY_TASK_ID} in "'
+            + shlex.quote(str(tasks_file))
+            + ' >&2\n'
             '    exit 1\n'
             'fi\n'
             'ATTEMPT=${TASK_LINE%% *}\n'
@@ -97,7 +104,41 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
     )
 
 
-def job_script(  # noqa: PLR0913 # why: keyword-only public API; each line of the script is one option
+def _check_text(*, value: object, what: str) -> None:
+    """Reject a line break or other control character: it would start a new script line."""
+    if _CONTROL_PATTERN.search(str(value)):
+        message = f'{what} must not hold a line break or other control character: {value!r}'
+        raise ValueError(message)
+
+
+def _check_job_values(  # noqa: PLR0913 # why: keyword-only private helper, one per checked value
+    *,
+    job_name: str,
+    slurm: SlurmSettings,
+    log_pattern: Path,
+    dependency: str | None,
+    begin: str | None,
+    env: Mapping[str, str],
+) -> None:
+    for what, value in (
+        ('job_name', job_name),
+        ('partition', slurm.partition),
+        ('qos', slurm.qos or ''),
+        ('time', slurm.time),
+        ('mem_per_cpu', slurm.mem_per_cpu or ''),
+        ('log_pattern', log_pattern),
+        ('dependency', dependency or ''),
+        ('begin', begin or ''),
+        *(('sbatch_extra', line) for line in slurm.sbatch_extra),
+    ):
+        _check_text(value=value, what=what)
+    for name in env:
+        if _ENV_NAME_PATTERN.fullmatch(name) is None:
+            message = f'{name!r} is not a valid environment variable name'
+            raise ValueError(message)
+
+
+def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per script line
     *,
     job_name: str,
     slurm: SlurmSettings,
@@ -124,7 +165,20 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; each line of th
 
     Returns:
         The script text, ``#SBATCH`` lines first.
+
+    Raises:
+        ValueError: If a value written to an ``#SBATCH`` line holds a line
+            break or other control character, or a name in ``env`` is not a
+            shell variable name.
     """
+    _check_job_values(
+        job_name=job_name,
+        slurm=slurm,
+        log_pattern=log_pattern,
+        dependency=dependency,
+        begin=begin,
+        env=env,
+    )
     array = indices is not None
     lines = [
         '#!/bin/bash',
@@ -159,9 +213,14 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; each line of th
 
 
 def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603 # why: fixed scheduler command on PATH; exit checked by the caller
-        command, check=False, capture_output=True, text=True
-    )
+    try:
+        # why: fixed scheduler command on PATH; the exit code is checked by the caller
+        return subprocess.run(  # noqa: S603
+            command, check=False, capture_output=True, text=True
+        )
+    except FileNotFoundError as error:
+        message = f'{command[0]} is not on PATH; is this a machine with SLURM?'
+        raise SlurmError(message) from error
 
 
 def sbatch(*, script: Path, sleep: Callable[[float], None] = time.sleep) -> str:
@@ -209,7 +268,7 @@ def scancel(*, job_ids: Sequence[str]) -> None:
 
 def slurm_available() -> bool:
     """Whether the scheduler commands this module calls exist on ``PATH``."""
-    return shutil.which('squeue') is not None and shutil.which('sacct') is not None
+    return all(shutil.which(name) is not None for name in ('sbatch', 'scancel', 'squeue', 'sacct'))
 
 
 def _pipe_lines(*, stdout: str) -> dict[str, str]:
@@ -232,11 +291,19 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
         ``{task id: state}`` with task ids ``<job>_<index>`` or ``<job>``;
         ``squeue`` wins over ``sacct`` for the same id, and unparseable
         lines are ignored.
+
+    Raises:
+        SlurmError: If ``squeue`` or ``sacct`` exits non-zero (squeue not
+            knowing a purged job id is not an error): an empty answer from a
+            failed call must not read as every job missing.
     """
     if not job_ids:
         return {}
     ids = ','.join(job_ids)
     squeue = _run(['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%T'])
+    if squeue.returncode != 0 and _UNKNOWN_JOB not in squeue.stderr:
+        message = f'squeue failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
+        raise SlurmError(message)
     states = _pipe_lines(stdout=squeue.stdout)
     sacct = _run(
         [
@@ -249,6 +316,9 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
             '--format=JobID,State',
         ]
     )
+    if sacct.returncode != 0:
+        message = f'sacct failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'
+        raise SlurmError(message)
     for key, value in _pipe_lines(stdout=sacct.stdout).items():
         states.setdefault(key, value)
     return states

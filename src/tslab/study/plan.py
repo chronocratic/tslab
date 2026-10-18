@@ -13,8 +13,9 @@ import tslab
 from tslab.study.definition import (
     Grid,
     match_problems,
+    matching_in_order,
     merge_overrides,
-    run_matches,
+    merge_settings,
     Study,
     StudyRun,
 )
@@ -28,6 +29,7 @@ __all__ = [
     'PlannedTask',
     'ResolvedRun',
     'assign_indices',
+    'check_machine',
     'expansion_env',
     'next_job_file',
     'plan_jobs',
@@ -38,7 +40,10 @@ __all__ = [
     'validate_jobs',
 ]
 
-_LOGGER = logging.getLogger('tslab.study')
+_LOGGER = logging.getLogger(__name__)
+
+# why: commands check the machine once, then resolve; a warning is worth saying once
+_WARNED: set[tuple[Path, int, str]] = set()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -48,7 +53,7 @@ class ResolvedRun:
     Args:
         run: The study run this resolves.
         settings: The settings of the run, then the machine settings, then the
-            matching machine overrides' settings; not yet expanded.
+            settings of the matching machine overrides; not yet expanded.
         slurm: The base ``[slurm]`` table with the matching overrides'
             ``slurm`` applied field by field, or ``None`` off SLURM.
     """
@@ -80,13 +85,12 @@ def resolve_runs(
             applies to; the error names the profile file, the override index
             or ``settings``, the grid and the paths.
     """
-    _settings_problems(study=study, machine=machine)
-    _override_warnings(study=study, machine=machine)
+    check_machine(study=study, machine=machine)
     return [
         ResolvedRun(
             run=run,
             settings=merge_overrides(
-                base={**run.settings, **machine.settings},
+                base=merge_settings(base=run.settings, update=machine.settings),
                 overrides=[(override.match, override.settings) for override in machine.overrides],
                 grid_name=run.grid,
                 values=run.values,
@@ -100,6 +104,26 @@ def resolve_runs(
         )
         for run in runs
     ]
+
+
+def check_machine(*, study: Study, machine: MachineProfile) -> None:
+    """Check the machine settings against the grids; warn about dead overrides.
+
+    Every command that reads a machine should call this, not only the ones
+    that submit: a profile that does not fit the study is a mistake to hear
+    about early. A warning is logged once per override.
+
+    Args:
+        study: The study the machine runs.
+        machine: The machine profile to check.
+
+    Raises:
+        ValueError: If a machine setting path is not a field of a grid it
+            applies to; the error names the profile file, the override index
+            or ``settings``, the grid and the paths.
+    """
+    _settings_problems(study=study, machine=machine)
+    _override_warnings(study=study, machine=machine)
 
 
 def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
@@ -139,12 +163,14 @@ def _override_grids(
 def _override_warnings(*, study: Study, machine: MachineProfile) -> None:
     for position, override in enumerate(machine.overrides):
         problems = match_problems(grids=study.grids, match=override.match)
-        if problems:
+        text = '; '.join(problems)
+        if problems and (machine.path, position, text) not in _WARNED:
+            _WARNED.add((machine.path, position, text))
             _LOGGER.warning(
                 'machine override %d of %s matches nothing in this study: %s',
                 position,
                 machine.path,
-                '; '.join(problems),
+                text,
             )
 
 
@@ -155,19 +181,17 @@ def _slurm_for(
     grid_name: str,
     values: Mapping[str, str],
 ) -> SlurmSettings | None:
-    merged: dict[str, object] = {}
-    if base is not None:
-        merged = {item.name: getattr(base, item.name) for item in dataclasses.fields(base)}
-    matching = [
-        override
-        for override in overrides
-        if run_matches(grid_name=grid_name, values=values, match=override.match)
-    ]
-    matching.sort(key=lambda override: len(override.match))
-    for override in matching:
-        merged.update(override.slurm)
-    # ty: ignore[invalid-argument-type] — merged holds SlurmSettings fields by name
-    return SlurmSettings(**merged) if merged else None
+    if base is None:
+        return None  # why: no [slurm] table means no scheduler; overrides cannot add one
+    merged: dict[str, object] = {
+        item.name: getattr(base, item.name) for item in dataclasses.fields(base)
+    }
+    order = matching_in_order(
+        matches=[override.match for override in overrides], grid_name=grid_name, values=values
+    )
+    for position in order:
+        merged.update(overrides[position].slurm)
+    return SlurmSettings(**merged)  # ty: ignore[invalid-argument-type]
 
 
 def run_arguments(
@@ -208,7 +232,8 @@ def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str |
         arguments: The flags plus any pass-through arguments.
 
     Returns:
-        ``None`` when the arguments parse, else the error text of tyro.
+        ``None`` when the arguments parse, else the error text of tyro or of
+        the config class.
     """
     buffer = StringIO()
     try:
@@ -216,6 +241,9 @@ def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str |
             tslab.parse_config(config_class=config_class, args=list(arguments))
     except SystemExit:
         return buffer.getvalue()
+    except (ValueError, TypeError) as error:
+        # why: the __post_init__ of a config class can reject a value tyro accepted
+        return f'{buffer.getvalue()}{type(error).__name__}: {error}'
     return None
 
 
@@ -232,7 +260,7 @@ class PlannedTask:
         resolved: The resolved run this is a task for.
         index: The array index of the run, the same in every attempt.
         log_file: The file the output of the task is appended to.
-        command: The full command: the grid's, the flags, the extra args.
+        command: The full command: the one of the grid, the flags, the extra args.
         extra_args: The pass-through arguments, last in ``command``.
         attempt: The attempt number of this submission.
         error: A planning problem, e.g. an index past ``max_array_size``;
@@ -275,8 +303,8 @@ def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> di
         jobs: The job records of the study, in submission order.
 
     Returns:
-        The run path to index. A run with a task record keeps that record's
-        index; the others get, in the order of ``runs``, one plus the largest
+        The run path to index. A run with a task record keeps the index of
+        that record; the others get, in the order of ``runs``, one plus the largest
         index their grid already uses in ``jobs`` or was assigned earlier.
     """
     latest = latest_tasks(jobs=jobs)
@@ -353,11 +381,14 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     groups: list[JobGroup] = []
     lookup: dict[tuple[str, SlurmSettings | None], int] = {}
     next_file = first_job_file
+    tasks_of: dict[int, list[PlannedTask]] = {}
+    env = expansion_env(machine=machine)
     for run in resolved:
         grid = study.grids[run.run.grid]
         key = (run.run.grid, run.slurm)
         if key not in lookup:
             lookup[key] = len(groups)
+            tasks_of[lookup[key]] = []
             groups.append(
                 JobGroup(
                     grid=run.run.grid,
@@ -368,7 +399,6 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                 )
             )
             next_file += 1
-        group = groups[lookup[key]]
         index = indices[run.run.run_path]
         args = extra_args.get(run.run.run_path, ())
         log_file = folder / 'logs' / f'{grid.short_name}_{index}.out'
@@ -376,7 +406,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             arguments = run_arguments(
                 grid=grid,
                 settings=run.settings,
-                env=expansion_env(machine=machine),
+                env=env,
                 placeholders={
                     'output_root': str(machine.output_root),
                     'study': study.name,
@@ -390,12 +420,13 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         else:
             error_text = None
         if run.slurm is not None and index >= run.slurm.max_array_size:
-            error_text = _task_error(
+            size_error = _task_error(
                 grid_name=run.run.grid,
                 run_path=run.run.run_path,
                 index=index,
                 max_array_size=run.slurm.max_array_size,
             )
+            error_text = size_error if error_text is None else f'{error_text}\n{size_error}'
         task = PlannedTask(
             resolved=run,
             index=index,
@@ -405,10 +436,10 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             attempt=attempts.get(run.run.run_path, 0) + 1,
             error=error_text,
         )
-        groups[lookup[key]] = replace(group, tasks=(*group.tasks, task))
+        tasks_of[lookup[key]].append(task)
     return [
-        replace(group, tasks=tuple(sorted(group.tasks, key=lambda task: task.index)))
-        for group in groups
+        replace(group, tasks=tuple(sorted(tasks_of[position], key=lambda task: task.index)))
+        for position, group in enumerate(groups)
     ]
 
 

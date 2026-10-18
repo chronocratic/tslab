@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study import FollowupSettings, load_machine, MachineProfileError, SlurmSettings
+from tslab.study.machine import FollowupSettings, load_machine, MachineProfileError, SlurmSettings
 
 CLUSTER_TOML = """\
 launcher = "slurm"
@@ -93,8 +93,8 @@ def test_full_example_loads(cluster_toml: Path, monkeypatch: pytest.MonkeyPatch)
     [
         ('[slurm]\ncpu_per_task = 2', 'slurm.cpu_per_task'),
         ('colour = "red"', 'colour'),
-        ('[slurm]\ngpus = "1"', 'slurm.gpus'),
-        ('[slurm]\ngpus = true', 'slurm.gpus'),
+        ('[slurm]\npartition = "p"\ngpus = "1"', 'slurm.gpus'),
+        ('[slurm]\npartition = "p"\ngpus = true', 'slurm.gpus'),
         ('[[overrides]]\nslurm = { gpus = 1 }', 'overrides[0].match'),
         ('[[overrides]]\nmatch = { grid = "g" }\nslurm = { gpu = 1 }', 'overrides[0].slurm.gpu'),
     ],
@@ -128,3 +128,131 @@ def test_nested_settings_tables_flatten(tmp_path: Path) -> None:
         'tracking.wandb_mode': 'offline',
         'trainer.max_epochs': 3,
     }
+
+
+def _write(tmp_path: Path, text: str) -> Path:
+    path = tmp_path / 'm.toml'
+    path.write_text(text)
+    return path
+
+
+LOCAL = 'launcher = "local"\noutput_root = "runs"\n'
+SLURM_TABLE = '[slurm]\npartition = "p"\ntime = "1:00:00"\n'
+
+
+@pytest.mark.parametrize(
+    ('text', 'location'),
+    [
+        (LOCAL + SLURM_TABLE, 'slurm'),
+        (LOCAL + '[[overrides]]\nmatch = { grid = "g" }\nslurm = { gpus = 1 }\n', 'overrides[0]'),
+    ],
+)
+def test_local_profile_rejects_slurm_tables(tmp_path: Path, text: str, location: str) -> None:
+    with pytest.raises(MachineProfileError, match=location.replace('[', '\\[').replace(']', '\\]')):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_local_override_with_settings_only_is_fine(tmp_path: Path) -> None:
+    text = LOCAL + '[[overrides]]\nmatch = { grid = "g" }\nsettings = { seed = 1 }\n'
+    assert load_machine(path=_write(tmp_path, text)).overrides[0].settings == {'seed': 1}
+
+
+@pytest.mark.parametrize('text', ['settings = 5\n', 'settings = [1]\n'])
+def test_settings_must_be_a_table(tmp_path: Path, text: str) -> None:
+    with pytest.raises(MachineProfileError, match='settings must be a table'):
+        load_machine(path=_write(tmp_path, LOCAL + text))
+
+
+def test_override_settings_must_be_a_table(tmp_path: Path) -> None:
+    text = LOCAL + '[[overrides]]\nmatch = { grid = "g" }\nsettings = 5\n'
+    with pytest.raises(MachineProfileError, match=r'overrides\[0\]\.settings must be a table'):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_slurm_time_has_the_documented_default(tmp_path: Path) -> None:
+    text = 'launcher = "slurm"\noutput_root = "r"\n[slurm]\npartition = "p"\n'
+    assert load_machine(path=_write(tmp_path, text)).slurm == SlurmSettings(
+        partition='p', time='2-00:00:00'
+    )
+
+
+def test_missing_file_names_the_file(tmp_path: Path) -> None:
+    with pytest.raises(MachineProfileError, match=r'nope\.toml'):
+        load_machine(path=tmp_path / 'nope.toml')
+
+
+def test_unset_variable_in_output_root_names_the_file(tmp_path: Path) -> None:
+    text = 'launcher = "local"\noutput_root = "${TSLAB_UNSET_X}/r"\n'
+    with pytest.raises(MachineProfileError, match=r'm\.toml.*TSLAB_UNSET_X'):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_lenient_env_keeps_an_unset_variable(tmp_path: Path) -> None:
+    text = LOCAL + '[env]\nROOT = "${TSLAB_UNSET_X}/d"\n'
+    profile = load_machine(path=_write(tmp_path, text), lenient_env=True)
+    assert profile.env == {'ROOT': '${TSLAB_UNSET_X}/d'}
+
+
+@pytest.mark.parametrize(
+    'line', ['gpus = -3', 'max_array_size = 0', 'max_concurrent = 0', 'cpus_per_task = 0']
+)
+def test_slurm_ranges(tmp_path: Path, line: str) -> None:
+    text = 'launcher = "slurm"\noutput_root = "r"\n[slurm]\npartition = "p"\n' + line + '\n'
+    with pytest.raises(MachineProfileError, match=line.split(' ', maxsplit=1)[0]):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_override_slurm_ranges(tmp_path: Path) -> None:
+    text = (
+        'launcher = "slurm"\noutput_root = "r"\n'
+        + SLURM_TABLE
+        + '[[overrides]]\nmatch = { grid = "g" }\nslurm = { gpus = -1 }\n'
+    )
+    with pytest.raises(MachineProfileError, match=r'overrides\[0\]\.slurm\.gpus'):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_empty_tslab_command_and_attempts(tmp_path: Path) -> None:
+    with pytest.raises(MachineProfileError, match='tslab_command'):
+        load_machine(path=_write(tmp_path, LOCAL + 'tslab_command = []\n'))
+    with pytest.raises(MachineProfileError, match='max_attempts'):
+        load_machine(path=_write(tmp_path, LOCAL + '[followup]\nmax_attempts = 0\n'))
+
+
+def test_empty_match_list_is_rejected(tmp_path: Path) -> None:
+    text = LOCAL + '[[overrides]]\nmatch = { recipe = [] }\nsettings = { seed = 1 }\n'
+    with pytest.raises(MachineProfileError, match=r'match\.recipe'):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_settings_values_must_be_settings_values(tmp_path: Path) -> None:
+    text = LOCAL + '[settings]\nwhen = 2020-01-01\n'
+    with pytest.raises(MachineProfileError, match=r'm\.toml.*settings\.when'):
+        load_machine(path=_write(tmp_path, text))
+    text = LOCAL + '[settings]\nmany = [{ a = 1 }]\n'
+    with pytest.raises(MachineProfileError, match=r'settings\.many'):
+        load_machine(path=_write(tmp_path, text))
+
+
+@pytest.mark.parametrize('name', ['A;rm -rf x', '1X', 'A B', 'A=B'])
+def test_env_names_must_be_shell_names(tmp_path: Path, name: str) -> None:
+    text = LOCAL + f'[env]\n"{name}" = "v"\n'
+    with pytest.raises(MachineProfileError, match='env'):
+        load_machine(path=_write(tmp_path, text))
+
+
+@pytest.mark.parametrize('field', ['partition', 'qos', 'time', 'mem_per_cpu'])
+def test_slurm_strings_reject_newlines(tmp_path: Path, field: str) -> None:
+    base = {'partition': '"p"', 'time': '"1:00:00"'}
+    base[field] = '"a\\nrm -rf x"'
+    table = ''.join(f'{key} = {value}\n' for key, value in base.items())
+    text = 'launcher = "slurm"\noutput_root = "r"\n[slurm]\n' + table
+    with pytest.raises(MachineProfileError, match=field):
+        load_machine(path=_write(tmp_path, text))
+
+
+def test_sbatch_extra_rejects_newlines(tmp_path: Path) -> None:
+    text = 'launcher = "slurm"\noutput_root = "r"\n' + SLURM_TABLE
+    text += 'sbatch_extra = ["--x=1\\nrm -rf x"]\n'
+    with pytest.raises(MachineProfileError, match='sbatch_extra'):
+        load_machine(path=_write(tmp_path, text))
