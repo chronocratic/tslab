@@ -154,23 +154,57 @@ def test_a_new_horizon_reuses_the_cached_encoding(tmp_path: Path) -> None:
     assert model.sequence_calls == 0
 
 
-def test_a_replacement_series_is_encoded_instead_of_the_data(tmp_path: Path) -> None:
-    shifted = tslab.Tensors(tensors={'series': ToySeries().full_series() + 1.0})
+def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
+    clean = ToySeries().full_series()
+    shifted = tslab.Tensors(tensors={'series': clean + 1.0})
     model = CausalEncoder()
     with run_in(root=tmp_path) as run:
         result = representations(
             run=run, model=model, horizons=(2,), name='shifted', series=shifted
         )
-    expected = dilated_reference(
+    encoded = dilated_reference(
         full_data=shifted.tensors['series'],
         slices=SLICES,
         num_ts_features=1,
         forecast_horizon=2,
         encode_sequence=lambda data: model.encode_sequence(inputs=data),
     )
-    for split, (features, labels) in expected.items():
-        assert torch.equal(result[2].tensors[f'{split}_representations'], features)
-        assert torch.equal(result[2].tensors[f'{split}_targets'], labels)
+    truth = dilated_reference(
+        full_data=clean,
+        slices=SLICES,
+        num_ts_features=1,
+        forecast_horizon=2,
+        encode_sequence=lambda data: model.encode_sequence(inputs=data),
+    )
+    for split in SLICES:
+        assert torch.equal(result[2].tensors[f'{split}_representations'], encoded[split][0])
+        assert torch.equal(result[2].tensors[f'{split}_targets'], truth[split][1])
+
+
+def test_a_replacement_series_keeps_clean_window_targets(tmp_path: Path) -> None:
+    clean = ToySeries().full_series()
+    shifted = tslab.Tensors(tensors={'series': clean + 1.0})
+    model = VectorEncoder()
+    with run_in(root=tmp_path) as run:
+        result = representations(
+            run=run, model=model, horizons=(2,), window_length=4, series=shifted
+        )
+
+    def reference(full_data: torch.Tensor) -> dict[str, tuple[torch.Tensor, torch.Tensor]]:
+        return windowed_reference(
+            full_data=full_data,
+            slices=SLICES,
+            num_ts_features=1,
+            forecast_horizon=2,
+            forecast_window_length=4,
+            stride=2,
+            encode=lambda data: model.encode(inputs=data),
+        )
+
+    encoded, truth = reference(shifted.tensors['series']), reference(clean)
+    for split in SLICES:
+        assert torch.equal(result[2].tensors[f'{split}_representations'], encoded[split][0])
+        assert torch.equal(result[2].tensors[f'{split}_targets'], truth[split][1])
 
 
 def test_a_replacement_series_must_match_the_data_shape(tmp_path: Path) -> None:

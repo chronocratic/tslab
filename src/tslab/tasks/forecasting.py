@@ -227,7 +227,9 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
     """Encode every full series once, then cut out each split.
 
     ``series``, if given, is encoded instead of ``data.full_series()``: a
-    ``Tensors`` with the key ``series`` and the same shape.
+    ``Tensors`` with the key ``series`` and the same shape. It only changes
+    what the encoder sees; the target channels always come from the data, so
+    a changed input is scored against the true future.
 
     Returns:
         ``<split>_sequence`` (representations ``(N, T_split, D)``) and
@@ -254,7 +256,7 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
             f'{tuple(inputs.shape)}; expected (N, T, D)'
         )
         raise ValueError(message)
-    targets = inputs[..., list(data.info.target_channels)]
+    targets = data.full_series().to(dtype=torch.float32)[..., list(data.info.target_channels)]
     tensors: dict[str, torch.Tensor] = {}
     for split in SPLITS:
         tensors[f'{split}_sequence'] = sequences[:, slices[split]]
@@ -308,8 +310,8 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
 ) -> Tensors:
     """Encode sliding windows of every split and pair them with the steps that follow.
 
-    ``series``, if given, is encoded instead of ``data.full_series()``, as in
-    ``encode_series``.
+    ``series``, if given, is encoded instead of ``data.full_series()``; the
+    targets still come from the data, as in ``encode_series``.
 
     Returns:
         ``<split>_representations`` ``(rows, D)`` and ``<split>_targets``
@@ -318,15 +320,23 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
     del run, name
     slices = checked_split_slices(data=data)
     inputs = _input_series(data=data, series=series)
-    windows = {
-        split: window_samples(
+    clean = data.full_series().to(dtype=torch.float32)
+    windows: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
+    for split in SPLITS:
+        # Windows from the encoded series, targets from the data.
+        input_windows, _ = window_samples(
             series=inputs[:, slices[split]],
             window_length=window_length,
             horizon=horizon,
             stride=stride,
         )
-        for split in SPLITS
-    }
+        _, targets = window_samples(
+            series=clean[:, slices[split]],
+            window_length=window_length,
+            horizon=horizon,
+            stride=stride,
+        )
+        windows[split] = (input_windows, targets)
     trainer.load(model=model, checkpoint=checkpoint)
     window_encoder = encoder(model)
     target_channels = list(data.info.target_channels)
@@ -381,7 +391,10 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
             in one run.
         series: Encoded instead of ``data.full_series()``; a ``Tensors`` with
             the key ``series`` and the same shape, for example from an attack
-            stage. If the stage that made it failed, every result is skipped.
+            or corruption stage. Targets still come from ``data``, so the
+            changed input is scored against the true future. For another
+            series with its own ground truth, pass another ``data``. If the
+            stage that made it failed, every result is skipped.
 
     Returns:
         Horizon to representations and targets.
