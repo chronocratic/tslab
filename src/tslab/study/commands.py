@@ -27,15 +27,23 @@ from tslab.study.plan import (
     study_folder,
     validate_jobs,
 )
-from tslab.study.records import JobRecord, read_jobs
-from tslab.study.slurm import array_spec, query_job_states, slurm_available
-from tslab.study.state import collect_states, RunReport, slurm_task_ids, StudyState
+from tslab.study.records import JobRecord, latest_tasks, read_jobs
+from tslab.study.slurm import array_spec, query_job_states, scancel, slurm_available
+from tslab.study.state import (
+    collect_states,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+    RunReport,
+    slurm_task_ids,
+    StudyState,
+)
 
 __all__ = [
     'Context',
     'Selection',
     'load_context',
     'parse_states',
+    'resubmit',
     'status',
     'submit',
     'submit_runs',
@@ -280,6 +288,110 @@ def status(*, context: Context, states: tuple[StudyState, ...] = ()) -> int:
             limited,
         )
     return 0
+
+
+def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
+    *,
+    context: Context,
+    states: tuple[StudyState, ...] = (StudyState.INTERRUPTED, StudyState.MISSING),
+    cancel_live: bool = False,
+    dry_run: bool = False,
+    extra_args: tuple[str, ...] | None = None,
+    auto: bool = False,
+    sleep: Callable[[float], None] = time.sleep,
+) -> int:
+    """Submit the runs in the given states again, one attempt further on.
+
+    Queued and running runs are never selected by state. With
+    ``cancel_live``, the queued and running runs that hold a SLURM job id
+    are cancelled first and submitted a little later, so they restart on a
+    fresh machine.
+
+    Args:
+        context: The context to resubmit from.
+        states: The states to resubmit; interrupted and missing by default.
+        cancel_live: Cancel the live runs of the selection first.
+        dry_run: Write the job files and print the plan, submit nothing.
+        extra_args: The pass-through arguments; the run's last submission's
+            when ``None``.
+        auto: For ``resubmit(auto=True)`` only; the follow-up path adds its
+            own runs. Task 4.
+        sleep: What waits out the cluster's submission pause.
+
+    Returns:
+        ``0`` when everything submitted, or nothing needed submitting;
+        ``1`` when a run does not parse or a submission failed.
+    """
+    del auto  # task 4: follow-up jobs; a manual call ignores it
+    if not states:
+        states = (StudyState.INTERRUPTED, StudyState.MISSING)
+    live_states = (StudyState.QUEUED, StudyState.RUNNING)
+    selected = [
+        report
+        for report in context.reports
+        if report.state in states and report.state not in live_states
+    ]
+    if cancel_live:
+        selected += [
+            report
+            for report in context.reports
+            if report.state in live_states and report.job_id is not None
+        ]
+    if not selected:
+        _LOGGER.info('nothing to resubmit')
+        return 0
+    if cancel_live:
+        _cancel_live(reports=selected)
+    _remove_ended_locks(reports=selected, study_directory=_study_directory(context))
+    reuse = latest_tasks(jobs=context.jobs)
+    args: dict[str, tuple[str, ...]] = {}
+    for report in selected:
+        path = report.run.run_path
+        if extra_args is None and (task := reuse.get(path)) is not None:
+            args[path] = task[1].extra_args
+        else:
+            args[path] = extra_args or ()
+    code, _ = submit_runs(
+        context=context,
+        reports=selected,
+        dry_run=dry_run,
+        extra_args=args,
+        sleep=sleep,
+        begin='now+660' if cancel_live else None,
+    )
+    return code
+
+
+def _study_directory(context: Context) -> Path:
+    return context.machine.output_root / context.study.name
+
+
+def _cancel_live(*, reports: Sequence[RunReport]) -> None:
+    ids = [report.job_id for report in reports if report.job_id is not None]
+    if ids:
+        scancel(job_ids=ids)
+        _LOGGER.info('cancelled %s', ', '.join(ids))
+
+
+def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) -> None:
+    for report in reports:
+        job_state = report.job_state
+        if (
+            job_state is None
+            or job_state in QUEUED_JOB_STATES
+            or job_state in RUNNING_JOB_STATES
+            or not report.folder.lock_live
+        ):
+            continue
+        lock = study_directory / report.run.run_path / '.lock'
+        if lock.exists():
+            lock.unlink()
+        _LOGGER.info(
+            'removed the lock of %s: its job %s ended (%s)',
+            report.run.run_path,
+            report.job_id or '-',
+            job_state,
+        )
 
 
 def _table_line(*, name: str, grid: Counter[StudyState]) -> str:
