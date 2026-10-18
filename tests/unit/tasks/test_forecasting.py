@@ -64,6 +64,13 @@ def test_horizon_longer_than_the_series_raises() -> None:
         horizon_targets(series=series, horizon=0)
 
 
+def test_window_samples_are_views_not_copies() -> None:
+    series = torch.arange(40, dtype=torch.float32).reshape(2, 10, 2)
+    inputs, targets = window_samples(series=series, window_length=4, horizon=3, stride=2)
+    assert inputs.untyped_storage().data_ptr() == series.untyped_storage().data_ptr()
+    assert targets.untyped_storage().data_ptr() == series.untyped_storage().data_ptr()
+
+
 def test_window_samples_match_reference() -> None:
     series = torch.randn(2, 20, 3, generator=torch.Generator().manual_seed(0))
     inputs, targets = window_samples(series=series, window_length=4, horizon=3, stride=2)
@@ -205,6 +212,14 @@ def test_a_replacement_series_keeps_clean_window_targets(tmp_path: Path) -> None
     for split in SLICES:
         assert torch.equal(result[2].tensors[f'{split}_representations'], encoded[split][0])
         assert torch.equal(result[2].tensors[f'{split}_targets'], truth[split][1])
+
+
+def test_a_split_too_short_for_windows_names_the_split(tmp_path: Path) -> None:
+    with (
+        pytest.raises(ValueError, match=r'val split, horizon 2.*too short'),
+        run_in(root=tmp_path) as run,
+    ):
+        representations(run=run, model=VectorEncoder(), horizons=(2,), window_length=7)
 
 
 def test_a_replacement_series_must_match_the_data_shape(tmp_path: Path) -> None:

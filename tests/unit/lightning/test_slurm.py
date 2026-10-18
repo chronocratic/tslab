@@ -13,19 +13,25 @@ ONE_HOUR_LEFT = {'SLURM_JOB_END_TIME': str(int(NOW) + 3600)}
     ('text', 'expected'),
     [
         ('00:00:00', timedelta(0)),
-        ('24:00', timedelta(hours=24)),
+        ('90', timedelta(minutes=90)),
+        ('30:00', timedelta(minutes=30)),
+        ('0:30', timedelta(seconds=30)),
         ('1:30:15', timedelta(hours=1, minutes=30, seconds=15)),
         ('1-06:00:00', timedelta(days=1, hours=6)),
         ('2-12:00', timedelta(days=2, hours=12)),
+        ('2-12', timedelta(days=2, hours=12)),
+        ('1-00:30:10', timedelta(days=1, minutes=30, seconds=10)),
     ],
 )
 def test_parse_slurm_duration(*, text: str, expected: timedelta) -> None:
     assert parse_slurm_duration(text=text) == expected
 
 
-@pytest.mark.parametrize('text', ['', '90', '1:2:3:4', 'one:00', '-1:00'])
+@pytest.mark.parametrize(
+    'text', ['', '1:2:3:4', 'one:00', '-1:00', '1-', '1-2:3:4:5', '2:-5', '1:-30:00']
+)
 def test_parse_slurm_duration_rejects_other_formats(*, text: str) -> None:
-    with pytest.raises(ValueError, match='HH:MM:SS'):
+    with pytest.raises(ValueError, match='sbatch'):
         parse_slurm_duration(text=text)
 
 
