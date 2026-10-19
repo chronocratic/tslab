@@ -30,7 +30,9 @@ def test_save_into_another_folder_copies_the_files(tmp_path: Path) -> None:
     target = tmp_path / 'target'
     write_files(directory=source, names=(BEST, 'last.ckpt'))
     target.mkdir()
-    Checkpoint(directory=source, best=BEST, last='last.ckpt').save(directory=target)
+    checkpoint = Checkpoint(directory=source, best=BEST, last='last.ckpt')
+    checkpoint.save(directory=target)
+    assert checkpoint.best_path == target / BEST
     assert (target / BEST).read_bytes() == BEST.encode()
     assert Checkpoint.load(directory=target).last_path == target / 'last.ckpt'
 

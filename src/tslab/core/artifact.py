@@ -377,11 +377,15 @@ class Checkpoint(Artifact):
 
     @override
     def save(self, *, directory: Path) -> None:
-        """Write ``checkpoint.json``; copy the files first if ``directory`` is another folder."""
+        """Write ``checkpoint.json``; copy the files first if ``directory`` is another folder.
+
+        After a copy this checkpoint points at ``directory``, where the files now live.
+        """
         require_path(value=directory, parameter='directory')
         if directory.resolve() != self.directory.resolve():
             for name in sorted({self.best, self.last}):
                 shutil.copy2(self.directory / name, directory / name)
+            self.directory = directory
         document = {
             'best': self.best,
             'format_version': self.FORMAT_VERSION,
