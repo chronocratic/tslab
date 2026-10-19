@@ -568,15 +568,9 @@ def _parse_only(*, item: str, study: Study) -> tuple[str, tuple[str, ...]]:
         )
         raise ValueError(message)
     value_names = tuple(values.split(','))
-    axis_grids = [grid for grid in study.grids.values() if axis in grid.axes]
-    if not axis_grids:
-        message = f'axis {axis!r} is not an axis of any grid of this study'
-        raise ValueError(message)
-    known = {name for grid in axis_grids for name in grid.axes[axis]}
-    unknown = [name for name in value_names if name not in known]
-    if unknown:
-        message = f'axis {axis!r} has no value {", ".join(repr(n) for n in unknown)} in any grid'
-        raise ValueError(message)
+    problems = match_problems(grids=study.grids, match={axis: value_names})
+    if problems:
+        raise ValueError('; '.join(problems))
     return axis, value_names
 
 
