@@ -2,13 +2,16 @@
 
 import pytest
 
+from tslab.core.text import format_table
 from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
-from tslab.study.report import format_table, log_launch, log_problems, resources_of
+from tslab.study.report import log_launch, log_problems, resources_of
 
 
 def test_format_table_gives_every_row_the_same_widths() -> None:
-    lines = format_table(header=('grid', 'done'), rows=[('a', '1'), ('long-name', '120')])
+    lines = format_table(
+        header=('grid', 'done'), rows=[('a', '1'), ('long-name', '120')], right_align_numbers=True
+    )
     assert len({len(line) for line in lines}) == 1
     assert lines[1].startswith('a ')
     assert lines[2].endswith('120')
