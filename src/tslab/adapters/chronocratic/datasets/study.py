@@ -7,7 +7,7 @@ fields, so one axis can hold both, ``ucr_datasets(...) | uea_datasets(...)``.
 
 from collections.abc import Mapping, Sequence
 
-from tslab.study import SettingValue
+from tslab.study.settings import SettingValue
 
 __all__ = ['ucr_datasets', 'uea_datasets']
 
