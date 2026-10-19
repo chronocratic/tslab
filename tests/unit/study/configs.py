@@ -1,8 +1,8 @@
-"""A small config shaped like the template's ``ClassifyConfig``, for the study tests.
+"""A small config shaped like the ``ClassifyConfig`` of the template, for the study tests.
 
 Every union member is named with ``tyro.conf.subcommand(name=...)``, as Q-3
-requires of a choice union. ``PRESETS`` mirrors the shape of the template's
-preset registry, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
+requires of a choice union. ``PRESETS`` mirrors the shape of the preset
+registry of the template, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
 """
 
 from dataclasses import dataclass, field
@@ -104,7 +104,7 @@ class Trainer:
 
 @dataclass(frozen=True, kw_only=True)
 class ClassifyConfig:
-    """Mock of the template's classification config."""
+    """Mock of the template classification config."""
 
     model: Models
     data: DataChoice

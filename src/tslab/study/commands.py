@@ -145,8 +145,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         extra_args: The pass-through arguments; taken from the last
             submission when ``None``.
         auto: The mode of the follow-up job: only interrupted runs that made
-            progress since their last attempt, up to the machine's
-            ``followup.max_attempts``; the rest are logged and left alone,
+            progress since their last attempt, up to
+            ``followup.max_attempts`` of the machine; the rest are logged and left alone,
             and ``cancel_live`` is ignored.
         sleep: What waits out the submission pause of the cluster.
 

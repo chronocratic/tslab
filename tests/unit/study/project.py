@@ -54,8 +54,8 @@ class ToyConfig:
 
 
 def main() -> None:
-    # why: the same parse config tslab.parse_config uses, so the study's
-    # ``model:small`` words reach the union
+    # why: the same parse config tslab.parse_config uses, so the ``model:small``
+    # words of the study reach the union
     config = tyro.cli(ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
     with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         pass

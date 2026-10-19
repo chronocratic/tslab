@@ -20,7 +20,7 @@ Models = chronocratic_model_choice(augmentations=())
 
 @dataclass(frozen=True, kw_only=True)
 class Config:
-    """The template's classify config shape, on the real choices."""
+    """The template classify config shape, on the real choices."""
 
     model: Models
     data: ChronocraticDataChoice
