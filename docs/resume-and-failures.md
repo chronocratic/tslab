@@ -6,8 +6,9 @@ Running the same command again is always safe:
 
 - finished instances with matching fingerprints are **loaded**;
 - `train` resumes from its last checkpoint, mid-epoch when the data loader is
-  stateful (the `StatefulDataLoader` of `torchdata`); a resumed training reaches the
-  same weights as an uninterrupted one;
+  stateful (a choice of the dataset, for example the `StatefulDataLoader` of
+  `torchdata`); a resumed training reaches the same
+  weights as an uninterrupted one;
 - instances that failed or were skipped **run again**.
 
 ## When an instance fails

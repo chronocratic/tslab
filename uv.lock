@@ -3737,9 +3737,6 @@ mlflow = [
 tensorboard = [
     { name = "tensorboard" },
 ]
-torchdata = [
-    { name = "torchdata" },
-]
 wandb = [
     { name = "wandb" },
 ]
@@ -3772,11 +3769,10 @@ requires-dist = [
     { name = "scikit-learn", specifier = ">=1.6,<2" },
     { name = "tensorboard", marker = "extra == 'tensorboard'", specifier = ">=2.18" },
     { name = "torch", specifier = ">=2.4,<3" },
-    { name = "torchdata", marker = "extra == 'torchdata'", specifier = ">=0.11" },
     { name = "tyro", specifier = ">=1.0,<2" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.30,<0.31" },
 ]
-provides-extras = ["chronocratic-datasets", "chronocratic-models", "mlflow", "tensorboard", "torchdata", "wandb"]
+provides-extras = ["chronocratic-datasets", "chronocratic-models", "mlflow", "tensorboard", "wandb"]
 
 [package.metadata.requires-dev]
 dev = [
