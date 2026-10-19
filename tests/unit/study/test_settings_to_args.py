@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from study.configs import (
+from tests.unit.study.configs import (
     ClassifyConfig,
     CoSTSettings,
     Crop,

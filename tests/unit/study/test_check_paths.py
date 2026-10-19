@@ -1,6 +1,6 @@
 """``check_paths``: which setting paths exist on no reading of the config."""
 
-from study.configs import ClassifyConfig
+from tests.unit.study.configs import ClassifyConfig
 from tslab.study import check_paths
 
 

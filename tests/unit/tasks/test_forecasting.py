@@ -1,15 +1,15 @@
 from pathlib import Path
 
 import pytest
-from reference_protocol import (
+import torch
+
+from tests.unit.reference_protocol import (
     build_windowed_forecasting_samples,
     dilated_reference,
     generate_forecasting_samples,
     windowed_reference,
 )
-from stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEncoder
-import torch
-
+from tests.unit.stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEncoder
 import tslab
 from tslab.tasks import forecasting_representations, horizon_targets, window_samples
 

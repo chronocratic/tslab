@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from study.fake_slurm import FakeSlurm
-from study.helpers import context, jobs_of, no_sleep, submit_study
+from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,

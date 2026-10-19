@@ -1,6 +1,6 @@
 """``run_arguments`` and ``validate_arguments``: settings to flags, checked."""
 
-from study.configs import ClassifyConfig, grid
+from tests.unit.study.configs import ClassifyConfig, grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
 from tslab.study.plan import run_arguments, validate_arguments

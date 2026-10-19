@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from study.configs import grid
+from tests.unit.study.configs import grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
