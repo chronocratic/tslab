@@ -12,6 +12,7 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
+import torch
 
 from tslab.lightning.config import LightningTrainerConfig
 
@@ -54,6 +55,7 @@ class AccumulatingTimerCallback(Callback):
     @override
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self._record_session()
+        self._refresh_last_checkpoint(trainer=trainer)
         _LOGGER.info(
             'trained for %d session(s), %.2f s in total; per session: %s',
             self.sessions_count,
@@ -66,10 +68,7 @@ class AccumulatingTimerCallback(Callback):
         self, trainer: Trainer, pl_module: LightningModule, checkpoint: dict[str, object]
     ) -> None:
         self._record_session()
-        checkpoint[_STATE_KEY] = {
-            'sessions_count': self.sessions_count,
-            'sessions_times': dict(self.sessions_times),
-        }
+        checkpoint[_STATE_KEY] = self._state()
 
     @override
     def on_load_checkpoint(
@@ -88,6 +87,24 @@ class AccumulatingTimerCallback(Callback):
         )
         # on_train_start starts the next session.
         self.start_time = None
+
+    def _state(self) -> dict[str, object]:
+        return {'sessions_count': self.sessions_count, 'sessions_times': dict(self.sessions_times)}
+
+    def _refresh_last_checkpoint(self, *, trainer: Trainer) -> None:
+        """Store the final session time in ``last.ckpt``, which was written before it ended."""
+        callback = trainer.checkpoint_callback
+        if not trainer.is_global_zero or not isinstance(callback, ModelCheckpoint):
+            return
+        if not callback.last_model_path or not Path(callback.last_model_path).is_file():
+            return
+        path = Path(callback.last_model_path)
+        # why: the file was written by this training a moment ago
+        checkpoint = torch.load(path, map_location='cpu', weights_only=False)
+        checkpoint[_STATE_KEY] = self._state()
+        temporary = path.with_name(f'{path.name}.tmp')
+        torch.save(checkpoint, temporary)
+        temporary.replace(path)
 
     def _record_session(self) -> None:
         if self.start_time is not None:

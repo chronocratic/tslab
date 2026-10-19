@@ -115,3 +115,20 @@ def test_timer_ignores_checkpoints_without_its_state() -> None:
     timer.on_load_checkpoint(trainer, LightningModule(), {'timer_callback_state': 'garbage'})
     assert timer.sessions_count == 0
     assert timer.sessions_times == {}
+
+
+def test_training_end_stores_the_final_session_time_in_last_checkpoint(tmp_path: Path) -> None:
+    checkpoint = ModelCheckpoint(dirpath=tmp_path, save_last=True)
+    trainer = lightning.Trainer(
+        logger=False, callbacks=[checkpoint], enable_progress_bar=False, max_epochs=1
+    )
+    last = tmp_path / 'last.ckpt'
+    torch.save({'timer_callback_state': {'sessions_count': 1, 'sessions_times': {1: 0.0}}}, last)
+    checkpoint.last_model_path = str(last)
+    timer = AccumulatingTimerCallback()
+    timer.sessions_count = 1
+    timer.start_time = 0.0
+    timer.on_train_end(trainer, LightningModule())
+    state = torch.load(last, weights_only=False)['timer_callback_state']
+    assert state['sessions_times'][1] > 0.0
+    assert not list(tmp_path.glob('*.tmp'))
