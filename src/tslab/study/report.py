@@ -5,6 +5,7 @@ from collections.abc import Sequence
 import logging
 import shlex
 
+from tslab.core.text import format_table
 from tslab.study.context import Context
 from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
@@ -13,33 +14,13 @@ from tslab.study.records import JobRecord
 from tslab.study.slurm import array_spec
 from tslab.study.state import StudyState
 
-__all__ = ['format_table', 'log_launch', 'log_problems', 'log_status', 'resources_of']
+__all__ = ['log_launch', 'log_problems', 'log_status', 'resources_of']
 
 _LOGGER = logging.getLogger(__name__)
 _PROBLEMS_SHOWN = 20
 
 # the table columns, in display order
 _TABLE_STATES: tuple[StudyState, ...] = tuple(StudyState)
-
-
-def format_table(*, header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
-    """Aligned lines: the first column left, the others right, one width per column.
-
-    Args:
-        header: The column titles.
-        rows: The rows, each as long as the header.
-
-    Returns:
-        The header line, then one line per row.
-    """
-    widths = [max(len(cell) for cell in column) for column in zip(header, *rows, strict=True)]
-    return [
-        '  '.join(
-            cell.ljust(width) if position == 0 else cell.rjust(width)
-            for position, (cell, width) in enumerate(zip(row, widths, strict=True))
-        )
-        for row in (header, *rows)
-    ]
 
 
 def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None:
@@ -60,7 +41,7 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
     rows = [_table_row(name=name, grid=counts[name]) for name in sorted(counts)]
     rows.append(_table_row(name='all', grid=total))
     header = ('grid', *(state.value for state in _TABLE_STATES), 'total')
-    for line in format_table(header=header, rows=rows):
+    for line in format_table(header=header, rows=rows, right_align_numbers=True):
         _LOGGER.info('%s', line)
     for report in context.reports:
         if report.state is StudyState.DONE or (states and report.state not in states):

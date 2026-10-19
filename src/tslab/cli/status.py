@@ -29,6 +29,7 @@ from tslab.core.status import (
     RunStatusSnapshot,
     StatusFileError,
 )
+from tslab.core.text import format_table
 
 __all__ = ['Status']
 
@@ -133,14 +134,6 @@ def _note(*, record: InstanceRecord) -> str:
     return text.splitlines()[0] if text else ''
 
 
-def _table(*, header: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
-    widths = [max(len(cell) for cell in column) for column in zip(header, *rows, strict=False)]
-    return [
-        '  '.join(cell.ljust(width) for cell, width in zip(row, widths, strict=True)).rstrip()
-        for row in (header, *rows)
-    ]
-
-
 def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | None) -> None:
     run_state = run_state_shown(directory=directory, snapshot=snapshot)
     selected = _selected(snapshot=snapshot, stage=stage)
@@ -155,7 +148,9 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
         for instance_id, record in selected
     ]
     _LOGGER.info('%s: %s', directory.as_posix(), run_state)
-    for line in _table(header=('instance', 'state', 'fingerprint', 'time', 'note'), rows=rows):
+    for line in format_table(
+        header=('instance', 'state', 'fingerprint', 'time', 'note'), rows=rows
+    ):
         _LOGGER.info('%s', line)
     per_stage: dict[str, Counter[str]] = {}
     for instance_id, record in selected:
@@ -189,7 +184,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
             )
         )
     header = ('run', 'state', *(state.value for state in _COUNTED_STATES))
-    for line in _table(header=header, rows=rows):
+    for line in format_table(header=header, rows=rows):
         _LOGGER.info('%s', line)
     summary = ', '.join(f'{count} {state}' for state, count in sorted(totals.items()))
     _LOGGER.info('%d runs: %s', len(rows), summary)

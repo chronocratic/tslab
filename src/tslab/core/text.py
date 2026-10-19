@@ -1,6 +1,8 @@
 """Small text helpers shared by the engine and the layers above it."""
 
-__all__ = ['describe_error', 'first_line', 'qualified_name']
+from collections.abc import Sequence
+
+__all__ = ['describe_error', 'first_line', 'format_table', 'qualified_name']
 
 
 def first_line(*, text: str) -> str:
@@ -29,3 +31,26 @@ def qualified_name(*, cls: type) -> str:
         cls: Any class.
     """
     return f'{cls.__module__}.{cls.__qualname__}'
+
+
+def format_table(
+    *, header: Sequence[str], rows: Sequence[Sequence[str]], right_align_numbers: bool = False
+) -> list[str]:
+    """Return aligned lines: the header, then one line per row, one width per column.
+
+    Args:
+        header: The column titles.
+        rows: The rows, each as long as the header.
+        right_align_numbers: Align every column but the first to the right, for
+            columns of counts. Otherwise every column is aligned to the left and
+            trailing spaces are removed.
+    """
+    widths = [max(len(cell) for cell in column) for column in zip(header, *rows, strict=True)]
+    lines = [
+        '  '.join(
+            cell.rjust(width) if right_align_numbers and position else cell.ljust(width)
+            for position, (cell, width) in enumerate(zip(row, widths, strict=True))
+        )
+        for row in (header, *rows)
+    ]
+    return lines if right_align_numbers else [line.rstrip() for line in lines]
