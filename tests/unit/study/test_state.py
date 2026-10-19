@@ -16,7 +16,6 @@ from tslab.study import StudyRun
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.state import (
     collect_states,
-    first_line,
     FolderFacts,
     job_ended,
     read_folder,
@@ -212,10 +211,7 @@ def test_time_limit_beats_a_failing_job_state() -> None:
     assert study_state(job_state='CANCELLED', folder=folder)[0] is StudyState.INTERRUPTED
 
 
-def test_first_line_handles_empty_and_none() -> None:
-    assert first_line(None) is None
-    assert first_line('') == ''
-    assert first_line('a\nb') == 'a'
+def test_a_job_has_ended_unless_it_is_unknown_queued_or_running() -> None:
     assert job_ended('FAILED')
     assert not job_ended(None)
     assert not job_ended('RUNNING')
