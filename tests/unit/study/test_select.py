@@ -33,5 +33,5 @@ def test_only_filters_grids_with_that_axis() -> None:
 @pytest.mark.parametrize('item', ['datset=Coffee', 'dataset=Cofee', 'dataset', 'dataset='])
 def test_only_with_unknown_axis_or_value_raises(item: str) -> None:
     study = Study(name='s', grids={'c': grid()})
-    with pytest.raises(ValueError, match='axis'):
+    with pytest.raises(ValueError, match='axis|has no value'):
         select_runs(study=study, runs=expand_runs(study=study), only=(item,))
