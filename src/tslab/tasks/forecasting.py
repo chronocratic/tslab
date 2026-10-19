@@ -19,7 +19,7 @@ from tslab.core.paths import InstanceName, normalize_instance_name
 from tslab.core.run import Run
 from tslab.core.stage import stage
 from tslab.interfaces import Encoder, SequenceEncoder, Split, SPLITS, Trainer
-from tslab.stages import check_representations
+from tslab.stages.encode import check_representations, encode_checked, load_encoder
 from tslab.tasks.data import TSDataInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -253,8 +253,9 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
     del run, name
     slices = checked_split_slices(data=data)
     inputs = _input_series(data=data, series=series)
-    trainer.load(model=model, checkpoint=checkpoint)
-    sequence_encoder = encoder(model)
+    sequence_encoder = load_encoder(
+        trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
+    )
     if not isinstance(sequence_encoder, SequenceEncoder):
         message = f'{type(sequence_encoder).__qualname__} has no encode_sequence(*, inputs)'
         raise TypeError(message)
@@ -281,7 +282,9 @@ def horizon_samples(
     """Cut the forecasting samples of one horizon out of ``encode_series``'s result.
 
     The features at a position are its representation; the targets are the
-    next ``horizon`` steps of the target channels.
+    next ``horizon`` steps of the target channels. Every position with a full
+    horizon after it is a sample; no leading positions are dropped, matching the
+    reference pipeline.
 
     Returns:
         ``<split>_representations`` ``(rows, D)`` and ``<split>_targets``
@@ -331,8 +334,9 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
     slices = checked_split_slices(data=data)
     encoded_series = _input_series(data=data, series=series)
     clean = data.full_series().to(dtype=torch.float32)
-    trainer.load(model=model, checkpoint=checkpoint)
-    window_encoder = encoder(model)
+    window_encoder = load_encoder(
+        trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
+    )
     target_channels = list(data.info.target_channels)
     tensors: dict[str, torch.Tensor] = {}
     # One split at a time, so only one split of copied windows is in memory.
@@ -356,10 +360,8 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
             message = f'{description}: {error}'
             raise ValueError(message) from error
         flat_windows = windows.reshape(-1, *windows.shape[-2:])
-        with torch.inference_mode():
-            features = window_encoder.encode(inputs=flat_windows)
-        check_representations(
-            representations=features, expected_rows=len(flat_windows), description=description
+        features = encode_checked(
+            encoder=window_encoder, inputs=flat_windows, description=description
         )
         tensors[f'{split}_representations'] = features
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])

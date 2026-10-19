@@ -10,7 +10,7 @@ from tslab.core.run import Run
 from tslab.core.stage import stage
 from tslab.interfaces import Encoder, LabeledSplits, SPLITS, Trainer
 
-__all__ = ['check_representations', 'encode']
+__all__ = ['check_representations', 'encode', 'encode_checked', 'load_encoder']
 
 # At or above this fraction of entirely non-finite rows the encoder has diverged.
 _DEAD_ENCODER_FRACTION = 0.99
@@ -57,6 +57,36 @@ def check_representations(
     raise ValueError(message)
 
 
+def load_encoder[M](
+    *, trainer: Trainer[M], model: M, checkpoint: Checkpoint, encoder: Callable[[M], Encoder]
+) -> Encoder:
+    """Load the best weights of ``checkpoint`` into ``model`` and build its encoder."""
+    trainer.load(model=model, checkpoint=checkpoint)
+    return encoder(model)
+
+
+def encode_checked(*, encoder: Encoder, inputs: torch.Tensor, description: str) -> torch.Tensor:
+    """Encode ``inputs`` without gradients and check one representation per sample.
+
+    Args:
+        encoder: The encoder to use.
+        inputs: The samples, one per row.
+        description: What is encoded, for the error message.
+
+    Returns:
+        Shape ``(len(inputs), D)``.
+
+    Raises:
+        ValueError: As ``check_representations``.
+    """
+    with torch.inference_mode():
+        representations = encoder.encode(inputs=inputs)
+    check_representations(
+        representations=representations, expected_rows=len(inputs), description=description
+    )
+    return representations
+
+
 @stage(name='encode', output=Tensors)
 def encode[M](  # noqa: PLR0913 # why: keyword-only public API; each input is fingerprinted
     *,
@@ -86,18 +116,14 @@ def encode[M](  # noqa: PLR0913 # why: keyword-only public API; each input is fi
         val and test splits.
     """
     del run, name
-    trainer.load(model=model, checkpoint=checkpoint)
-    model_encoder = encoder(model)
+    model_encoder = load_encoder(
+        trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
+    )
     tensors: dict[str, torch.Tensor] = {}
-    with torch.inference_mode():
-        for split in SPLITS:
-            inputs, targets = data.labeled_split(split=split)
-            representations = model_encoder.encode(inputs=inputs)
-            check_representations(
-                representations=representations,
-                expected_rows=len(inputs),
-                description=f'the {split} split',
-            )
-            tensors[f'{split}_representations'] = representations
-            tensors[f'{split}_targets'] = targets
+    for split in SPLITS:
+        inputs, targets = data.labeled_split(split=split)
+        tensors[f'{split}_representations'] = encode_checked(
+            encoder=model_encoder, inputs=inputs, description=f'the {split} split'
+        )
+        tensors[f'{split}_targets'] = targets
     return Tensors(tensors=tensors)
