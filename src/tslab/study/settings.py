@@ -12,9 +12,9 @@ from dataclasses import Field, fields, MISSING
 from enum import Enum
 from pathlib import Path
 import types
-from typing import Annotated, Any, cast, get_args, get_origin, get_type_hints, Union
+from typing import Any, cast, get_args, get_origin, get_type_hints, Union
 
-from tslab.core.config import REQUIRED, union_choices
+from tslab.core.config import REQUIRED, strip_annotated, union_choices
 
 __all__ = [
     'SettingValue',
@@ -37,10 +37,6 @@ type SettingValue = (
     | None
 )
 type Settings = Mapping[str, SettingValue]
-
-
-def _strip(*, annotation: object) -> object:
-    return get_args(annotation)[0] if get_origin(annotation) is Annotated else annotation
 
 
 def _flag(*, path: str) -> str:
@@ -74,7 +70,7 @@ def _value_args(*, value: SettingValue, path: str) -> list[str]:
 
 
 def _allows_none(*, annotation: object) -> bool:
-    annotation = _strip(annotation=annotation)
+    annotation = strip_annotated(annotation=annotation)
     if annotation is Any:
         return True
     if get_origin(annotation) in {Union, types.UnionType}:
@@ -151,7 +147,7 @@ def field_annotation(*, config_class: type, path: str, settings: Settings) -> ob
                 raise ValueError(message)
             holder = choices[name]
         else:
-            member = _strip(annotation=annotation)
+            member = strip_annotated(annotation=annotation)
             if not (isinstance(member, type) and dataclasses.is_dataclass(member)):
                 message = f'{path}: {part} is not a dataclass field to walk into'
                 raise ValueError(message)
@@ -192,7 +188,7 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
                 message = f'{path}: {value!r} is not a choice; choices are {known}'
                 raise ValueError(message)
             words.append(f'{path}:{value}')
-        elif _strip(annotation=annotation) is bool:
+        elif strip_annotated(annotation=annotation) is bool:
             if not isinstance(value, bool):
                 message = f'{path}: expected a bool, got {type(value).__qualname__}'
                 raise TypeError(message)
@@ -436,7 +432,7 @@ def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
     annotation = hints[part]
     choices = union_choices(annotation=annotation)
     if choices is None:
-        member = _strip(annotation=annotation)
+        member = strip_annotated(annotation=annotation)
         if isinstance(member, type) and dataclasses.is_dataclass(member):
             return [member]
         return []

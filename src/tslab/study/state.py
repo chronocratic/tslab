@@ -8,6 +8,7 @@ from pathlib import Path
 from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
 from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
+from tslab.core.text import first_line
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
@@ -20,7 +21,6 @@ __all__ = [
     'RunReport',
     'StudyState',
     'collect_states',
-    'first_line',
     'job_ended',
     'read_folder',
     'slurm_task_ids',
@@ -114,14 +114,6 @@ class RunReport:
     folder: FolderFacts
 
 
-def first_line(value: str | None) -> str | None:
-    """The first line of a text; ``None`` for ``None``, ``''`` for an empty text."""
-    if value is None:
-        return None
-    lines = value.splitlines()
-    return lines[0] if lines else ''
-
-
 def job_ended(job_state: str | None) -> bool:
     """Whether a SLURM state says the job is over; ``None`` (unknown) is not."""
     return (
@@ -136,7 +128,7 @@ def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
     if snapshot is not None:
         for record in snapshot.instances.values():
             if record.state is InstanceState.FAILED and record.error is not None:
-                return first_line(record.error)
+                return first_line(text=record.error)
     if folder.read_error is not None:
         return folder.read_error
     if job_state is not None:

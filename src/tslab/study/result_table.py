@@ -14,9 +14,10 @@ from pathlib import Path
 from tslab.core.artifact import Metrics
 from tslab.core.paths import atomic_write_text, META_FILE
 from tslab.core.status import InstanceRecord, InstanceState
+from tslab.core.text import first_line
 from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
-from tslab.study.state import first_line, RunReport
+from tslab.study.state import RunReport
 
 __all__ = ['METRICS_TYPE', 'ResultRow', 'collect_results', 'study_results', 'write_results_csv']
 
@@ -124,7 +125,7 @@ def _instance_row(
     row = _row_head(report=report, axes=axes)
     row['instance'] = instance_id
     row['instance_state'] = record.state.value
-    row['error'] = first_line(record.error)
+    row['error'] = None if record.error is None else first_line(text=record.error)
     # why: only a done instance has a meta.json; the others show their own state and error
     if record.state is InstanceState.DONE:
         row.update(
