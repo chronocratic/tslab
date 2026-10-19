@@ -1,11 +1,40 @@
 """``LightningTrainerConfig``: every setting of ``LightningTrainer``."""
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from typing import Annotated
+from typing import Annotated, override
 
 from tslab.core.fingerprint import NotFingerprinted
 
 __all__ = ['LightningTrainerConfig']
+
+
+class FrozenKwargs(Mapping[str, bool | int | float | str]):
+    """A read-only, hashable and picklable mapping of trainer arguments."""
+
+    def __init__(self, items: Mapping[str, bool | int | float | str] | None = None) -> None:
+        """Copy ``items``."""
+        self._items: dict[str, bool | int | float | str] = dict(items or {})
+
+    @override
+    def __getitem__(self, key: str) -> bool | int | float | str:
+        return self._items[key]
+
+    @override
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._items)
+
+    @override
+    def __len__(self) -> int:
+        return len(self._items)
+
+    @override
+    def __hash__(self) -> int:
+        return hash(frozenset(self._items.items()))
+
+    @override
+    def __repr__(self) -> str:
+        return repr(self._items)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -53,4 +82,10 @@ class LightningTrainerConfig:
     early_stopping_min_delta: float = 0.001
     max_training_time: Annotated[str | None, NotFingerprinted] = None
     slurm_time_fraction: Annotated[float, NotFingerprinted] = 0.5
-    extra_trainer_kwargs: dict[str, bool | int | float | str] = field(default_factory=dict)
+    extra_trainer_kwargs: Mapping[str, bool | int | float | str] = field(
+        default_factory=FrozenKwargs
+    )
+
+    def __post_init__(self) -> None:
+        """Copy ``extra_trainer_kwargs`` into a read-only mapping, so the config stays frozen."""
+        object.__setattr__(self, 'extra_trainer_kwargs', FrozenKwargs(self.extra_trainer_kwargs))

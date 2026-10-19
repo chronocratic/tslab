@@ -1,4 +1,5 @@
 import dataclasses
+import pickle
 
 import pytest
 
@@ -75,3 +76,13 @@ def test_extra_trainer_kwargs_cannot_replace_what_tslab_builds() -> None:
     with pytest.raises(ValueError, match=r"\['logger', 'max_time'\]"):
         LightningTrainer(config=config)
     LightningTrainer(config=LightningTrainerConfig(extra_trainer_kwargs={'gradient_clip_val': 1.0}))
+
+
+def test_extra_trainer_kwargs_are_read_only_hashable_and_picklable() -> None:
+    config = LightningTrainerConfig(extra_trainer_kwargs={'gradient_clip_val': 1.0})
+    with pytest.raises(TypeError):
+        config.extra_trainer_kwargs['x'] = 1  # ty: ignore[invalid-assignment]
+    assert pickle.loads(pickle.dumps(config)) == config  # noqa: S301 # why: own object
+    assert hash(config) == hash(
+        LightningTrainerConfig(extra_trainer_kwargs={'gradient_clip_val': 1.0})
+    )
