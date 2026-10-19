@@ -71,3 +71,8 @@ class LightningDataSource[I]:
         if stage not in self._stages_set_up:
             self._datamodule.setup(stage=stage)
             self._stages_set_up.add(stage)
+
+    def _record_set_up(self, *, stage: str) -> None:
+        """Note that a subclass already prepared the datamodule and set up ``stage``."""
+        self._prepared = True
+        self._stages_set_up.add(stage)

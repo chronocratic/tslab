@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import inspect
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 from adapter_helpers import parse
 import chronocratic.datasets
@@ -174,3 +175,11 @@ def test_empty_validation_split_encodes_as_empty_tensors() -> None:
     samples, labels = data.labeled_split(split='val')
     assert samples.shape[0] == 0
     assert labels.shape == (0,)
+
+
+def test_the_datamodule_is_not_set_up_again_for_a_stage_already_set_up() -> None:
+    data = classification()
+    with mock.patch.object(data.datamodule, 'setup', wraps=data.datamodule.setup) as setup:
+        data.labeled_split(split='train')
+        data.labeled_split(split='val')
+    setup.assert_not_called()

@@ -79,6 +79,7 @@ class ChronocraticClassificationData(LightningDataSource[TSClassificationDataInf
             num_classes=_known(value=datamodule.num_classes, name='num_classes'),
         )
         super().__init__(datamodule=datamodule, info=info)
+        self._record_set_up(stage='fit')
         self._classification = datamodule
         self._settings = settings
 
@@ -142,6 +143,7 @@ class ChronocraticForecastingData(LightningDataSource[TSForecastingDataInfo]):
             covariate_channels=tuple(range(time_features)),
         )
         super().__init__(datamodule=datamodule, info=info)
+        self._record_set_up(stage='fit')
         self._forecasting = datamodule
         self._settings = settings
 
