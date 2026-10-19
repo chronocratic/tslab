@@ -257,6 +257,19 @@ class Run:
                 call=lambda tracker=tracker: tracker.log_metrics(metrics=metrics, step=step),
             )
 
+    def log_file(self, *, path: Path) -> None:
+        """Send a file to every tracker; tracker errors become warnings.
+
+        Args:
+            path: The file to upload or copy.
+        """
+        for tracker in self._trackers:
+            _call_tracker(
+                tracker=tracker,
+                action='log_file',
+                call=lambda tracker=tracker: tracker.log_file(path=path),
+            )
+
     # The methods below form the contract between Run and Stage. They are
     # public so Stage subclasses outside this package can use them, but user
     # scripts normally never call them.

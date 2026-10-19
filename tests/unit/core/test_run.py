@@ -320,6 +320,15 @@ def test_default_tracker_is_local_and_core_stays_free_of_lightning(tmp_path: Pat
     assert (tmp_path / 'a' / 'trackers' / 'csv' / 'version_0' / 'metrics.csv').is_file()
 
 
+def test_log_file_reaches_every_tracker(tmp_path: Path) -> None:
+    recorder = RecordingTracker()
+    note = tmp_path / 'note.txt'
+    note.write_text('hi', encoding='utf-8')
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[recorder]) as run:
+        run.log_file(path=note)
+    assert ('file', note) in recorder.events
+
+
 def test_a_given_local_tracker_replaces_the_default(tmp_path: Path) -> None:
     mine = LocalTracker()
     run = Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[mine])
