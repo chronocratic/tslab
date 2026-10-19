@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from study.fake_slurm import FakeSlurm
-from study.helpers import context, finish_run, submit_study
+from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status

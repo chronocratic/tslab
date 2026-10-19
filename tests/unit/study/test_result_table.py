@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from study.helpers import no_sleep
+from tests.unit.study.helpers import no_sleep
 import tslab
 from tslab.core.artifact import Metrics
 from tslab.core.status import (

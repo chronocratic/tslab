@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from study.configs import ClassifyConfig, Models, PRESETS, TS2VecSettings
+from tests.unit.study.configs import ClassifyConfig, Models, PRESETS, TS2VecSettings
 import tslab
 from tslab.study import check_paths, from_presets, settings_to_args
 

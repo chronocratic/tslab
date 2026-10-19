@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from study.fake_slurm import FakeSlurm
-from study.helpers import context, jobs_of, no_sleep
+from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import context, jobs_of, no_sleep
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
 from tslab.study.state import StudyState

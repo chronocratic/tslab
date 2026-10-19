@@ -2,7 +2,7 @@
 
 import pytest
 
-from study.configs import grid
+from tests.unit.study.configs import grid
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs, select_runs
 

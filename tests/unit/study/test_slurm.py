@@ -7,7 +7,7 @@ import subprocess
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
+from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.study.machine import SlurmSettings
 from tslab.study.slurm import array_spec, job_script, query_job_states, sbatch, SlurmError
 

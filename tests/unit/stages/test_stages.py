@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
 import torch
 
+from tests.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
 import tslab
 from tslab.probes import SVMProbe
 from tslab.stages import check_representations

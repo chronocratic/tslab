@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from study.configs import grid, PRESETS
+from tests.unit.study.configs import grid, PRESETS
 from tslab.core.status import utc_now_iso
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.definition import expand_runs

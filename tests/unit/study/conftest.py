@@ -6,8 +6,8 @@ import sys
 
 import pytest
 
-from study.fake_slurm import FakeSlurm, install_fake_slurm
-from study.project import write_toy_project
+from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
+from tests.unit.study.project import write_toy_project
 
 _TOY_MODULES = ('toy_studies', 'toy_script')
 
