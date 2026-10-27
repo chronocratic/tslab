@@ -143,11 +143,32 @@ machine**, so no personal path has to be hard-coded. The template ships a
 runnable `machines/local.toml` and a fully commented
 `machines/slurm.example.toml`.
 
-`--machine` takes the name of a profile: `--machine cluster` reads
-`machines/cluster.toml` under the project root, the nearest folder above the
-working directory that holds a `pyproject.toml`, so the command works from
-any subfolder. A value with a `/` or a `.toml` suffix is used as a file path.
-An unknown name fails and lists the profiles in `machines/`.
+`--machine` takes a name or a path. A value with a `/`, a `.toml` suffix, or
+that is an existing file, is a path. Any other value is a name, resolved in
+this order:
+
+1. `machines/<name>.toml` in the working directory, then in each folder above
+   it. The first hit wins, so the nearest `machines/` folder is used when
+   projects nest. The jobs run in the folder that holds that `machines/`
+   folder.
+2. The register of names, a TOML file mapping each name to the absolute path
+   of a profile file: `$TSLAB_MACHINES_FILE` if set, else
+   `$XDG_CONFIG_HOME/tslab/machines.toml`, else `~/.config/tslab/machines.toml`.
+   The jobs run in the working directory.
+
+A name found in neither place fails with the folders searched and the
+registered names. A registered name whose file is gone fails with its own
+message.
+
+```bash
+uv run tslab machine add cluster /home/me/lab/experiments/machines/cluster.toml
+uv run tslab machine list
+uv run tslab machine remove cluster
+```
+
+`add` stores the absolute path after checking that the file loads as a machine
+profile. `list` marks files that are missing. Follow-up jobs on a SLURM cluster
+get the absolute path of the profile, so the compute nodes need no register.
 
 | Key | Default | Meaning |
 |---|---|---|

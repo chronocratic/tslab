@@ -4,14 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study.machine import (
-    find_project_root,
-    FollowupSettings,
-    load_machine,
-    MachineProfileError,
-    resolve_machine_file,
-    SlurmSettings,
-)
+from tslab.study.machine import FollowupSettings, load_machine, MachineProfileError, SlurmSettings
 
 CLUSTER_TOML = """\
 launcher = "slurm"
@@ -263,39 +256,3 @@ def test_sbatch_extra_rejects_newlines(tmp_path: Path) -> None:
     text += 'sbatch_extra = ["--x=1\\nrm -rf x"]\n'
     with pytest.raises(MachineProfileError, match='sbatch_extra'):
         load_machine(path=_write(tmp_path, text))
-
-
-def test_find_project_root_walks_up_to_pyproject(tmp_path: Path) -> None:
-    (tmp_path / 'pyproject.toml').write_text('', encoding='utf-8')
-    inner = tmp_path / 'src' / 'pkg'
-    inner.mkdir(parents=True)
-    assert find_project_root(start=inner) == tmp_path
-
-
-def test_find_project_root_falls_back_to_start(tmp_path: Path) -> None:
-    assert find_project_root(start=tmp_path) == tmp_path
-
-
-def test_machine_name_resolves_under_machines_of_the_project_root(tmp_path: Path) -> None:
-    (tmp_path / 'machines').mkdir()
-    (tmp_path / 'machines' / 'cluster.toml').write_text('', encoding='utf-8')
-    found = resolve_machine_file(machine='cluster', project_root=tmp_path)
-    assert found == tmp_path / 'machines' / 'cluster.toml'
-
-
-def test_machine_with_separator_or_suffix_is_a_path(tmp_path: Path) -> None:
-    assert resolve_machine_file(machine='m/local.toml', project_root=tmp_path) == Path(
-        'm/local.toml'
-    )
-    assert resolve_machine_file(machine='local.toml', project_root=tmp_path) == Path('local.toml')
-
-
-def test_unknown_machine_name_names_the_folder_and_the_fix(tmp_path: Path) -> None:
-    (tmp_path / 'machines').mkdir()
-    (tmp_path / 'machines' / 'local.toml').write_text('', encoding='utf-8')
-    with pytest.raises(MachineProfileError) as error_info:
-        resolve_machine_file(machine='cluster', project_root=tmp_path)
-    text = str(error_info.value)
-    assert str(tmp_path / 'machines') in text
-    assert 'cluster.toml' in text
-    assert 'local' in text

@@ -55,7 +55,9 @@ uv run tslab study results {{package_name}}.studies:example \
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
 after `--` go to every run. Slurm: copy `machines/slurm.example.toml` to
-`machines/cluster.toml` and fill in the values of your cluster. The full guide:
+`machines/cluster.toml` and fill in the values of your cluster. `--machine cluster`
+finds it from this folder or any folder below. To use the name from any folder, run
+`uv run tslab machine add cluster machines/cluster.toml`. The full guide:
 the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
 TSLab docs.
 

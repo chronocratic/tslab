@@ -12,6 +12,7 @@ from typing import Any, cast, Protocol
 
 import tyro
 
+from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
 from tslab.cli.status import Status
 from tslab.cli.study import STUDY_COMMANDS
@@ -37,6 +38,16 @@ class _Study:
 
     def run(self) -> int:
         # why: never reached; `_parse` hands every `study` call to the study group
+        msg = 'unreachable'
+        raise AssertionError(msg)
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Machine:
+    """Register machine profiles under names: add, list, remove."""
+
+    def run(self) -> int:
+        # why: never reached; `_parse` hands every `machine` call to the machine group
         msg = 'unreachable'
         raise AssertionError(msg)
 
@@ -94,8 +105,20 @@ def _parse(*, argv: Sequence[str]) -> Command:
         return tyro.extras.subcommand_cli_from_dict(
             STUDY_COMMANDS, prog='tslab study', args=list(argv[1:])
         )
+    if argv and argv[0] == 'machine':
+        # ty: ignore[no-matching-overload, unsound-return-statement]
+        # — ty sees the dict of dataclass types as no Callable overload match
+        return tyro.extras.subcommand_cli_from_dict(
+            MACHINE_COMMANDS, prog='tslab machine', args=list(argv[1:])
+        )
     return tyro.extras.subcommand_cli_from_dict(
-        {'new': New, 'status': Status, 'study': _Study, 'wandb-sync': WandbSync},
+        {
+            'machine': _Machine,
+            'new': New,
+            'status': Status,
+            'study': _Study,
+            'wandb-sync': WandbSync,
+        },
         prog='tslab',
         args=list(argv),
     )
