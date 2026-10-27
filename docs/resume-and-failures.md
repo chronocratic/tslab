@@ -26,6 +26,25 @@ Fix the cause and run again: only the failed and skipped instances run.
 `--run.fail-fast` re-raises the first error instead, which is handy while
 debugging.
 
+## Checking from a script
+
+A failed instance does not raise out of the run, so a script that needs to know
+reads `status.json`:
+
+```python
+from tslab.core.status import InstanceState, read_status, STATUS_FILE
+
+snapshot = read_status(path=run_folder / STATUS_FILE)
+failed = [
+    instance_id
+    for instance_id, record in snapshot.instances.items()
+    if record.state is InstanceState.FAILED
+]
+```
+
+`read_status` returns `None` when the run has not started. The `seconds` of each
+record is the wall-clock time of that instance.
+
 ## Killed runs
 
 A run killed from outside (a SLURM time limit, a lost node, `kill -9`) cannot
