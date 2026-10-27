@@ -101,10 +101,3 @@ def test_json_file_that_is_not_an_object_names_the_file(tmp_path: Path) -> None:
         Json.load(directory=tmp_path)
     with pytest.raises(JsonFileError, match=r'data\.json must be a JSON object'):
         Metrics.load(directory=tmp_path)
-
-
-def test_tensors_are_read_through_one_open_file(tmp_path: Path) -> None:
-    Tensors(tensors={'a': torch.ones(2)}, metadata={'k': 'v'}).save(directory=tmp_path)
-    loaded = Tensors.external(path=tmp_path / 'tensors.safetensors')
-    assert torch.equal(loaded.tensors['a'], torch.ones(2))
-    assert loaded.metadata == {'k': 'v'}

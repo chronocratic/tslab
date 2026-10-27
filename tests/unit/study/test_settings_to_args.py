@@ -1,4 +1,4 @@
-"""Settings to flags: every rule pinned by the tests of S1 task 2."""
+"""Settings to flags: choice words, flag forms, value forms and the round trip."""
 
 from pathlib import Path
 from typing import cast
@@ -128,7 +128,7 @@ def test_round_trip_through_parse_config() -> None:
 
 
 def test_default_member_fields_work_when_the_choice_is_not_in_the_settings() -> None:
-    # Q-4: model.augmentation walks the default member Jitter when model is unset.
+    # model.augmentation walks the default member Jitter when model is unset.
     config = tslab.parse_config(
         config_class=ClassifyConfig,
         args=settings_to_args(

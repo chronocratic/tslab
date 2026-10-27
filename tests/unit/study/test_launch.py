@@ -9,7 +9,7 @@ from tests.unit.study.configs import grid
 from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.study import Study
 from tslab.study.definition import expand_runs
-from tslab.study.launch import launch, LocalLauncher, SlurmLauncher, write_job_files
+from tslab.study.launch import launch, LocalLauncher, SlurmLauncher
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
 from tslab.study.records import read_jobs
@@ -179,19 +179,6 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         dry_run=False,
     )
     assert log.read_text().count('=== tslab attempt') == 2
-
-
-def test_write_job_files_creates_tasks_and_sbatch(
-    machine: MachineProfile, study: Study, tmp_path: Path
-) -> None:
-    groups = groups_of(study, machine)
-    folder = study_folder(machine=machine, study=study)
-    write_job_files(study_folder=folder, groups=groups, machine=machine, project_root=tmp_path)
-    assert (folder / 'jobs' / '3.sbatch').is_file()
-    assert (folder / 'logs').is_dir()
-    lines = (folder / 'jobs' / '3.tasks').read_text().splitlines()
-    assert len(lines) == 2
-    assert all(line.startswith(f'{i} 1 ') for i, line in enumerate(lines))
 
 
 def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_command(

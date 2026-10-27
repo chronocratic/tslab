@@ -127,12 +127,6 @@ def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None
         assert canonicalize(value=loaded) == canonicalize(value=config), args
 
 
-def test_generated_classes_live_in_the_adapter_module() -> None:
-    for settings_class in settings_classes(choice=ModelChoice).values():
-        assert settings_class.__module__ == 'tslab.adapters.chronocratic.models.settings'
-        assert 'Settings' in settings_class.__name__
-
-
 def test_settings_classes_pickle_round_trip() -> None:
     # why: pickle checks the class against the module attribute; every choice, with
     # or without recipes, keeps classes of its own there

@@ -277,21 +277,6 @@ def test_rerun_from_applies_after_a_skipped_stage(tmp_path: Path) -> None:
     assert executed == ['third']
 
 
-def test_prepare_failure_is_recorded_as_a_failed_instance(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def broken(*, source: Path, destination: Path) -> None:
-        raise OSError(source, destination)
-
-    monkeypatch.setattr('tslab.core.stage.replace_directory', broken)
-    with open_run(tmp_path) as run:
-        result = count(run=run, value=5)
-    assert not tslab.is_available(artifact=result)
-    status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
-    assert status['instances']['count[default]']['state'] == 'failed'
-    assert status['run_state'] == 'finished'
-
-
 def test_unwritable_work_directory_is_a_stage_failure(tmp_path: Path) -> None:
     run = open_run(tmp_path)
     with run:

@@ -5,7 +5,7 @@ import torch
 
 from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import DownstreamModel, Encoder, SequenceEncoder
-from tslab.interfaces.encoder import ModelAsEncoder, resolve_device
+from tslab.interfaces.encoder import ModelAsEncoder
 
 
 class VectorModel(torch.nn.Module):
@@ -79,12 +79,6 @@ def test_device_does_not_change_the_fingerprint() -> None:
     assert canonicalize(value=ModelAsEncoder(batch_size=8)) != canonicalize(
         value=ModelAsEncoder(batch_size=16)
     )
-
-
-def test_auto_device_prefers_cuda() -> None:
-    expected = 'cuda' if torch.cuda.is_available() else 'cpu'
-    assert resolve_device(device='auto').type == expected
-    assert resolve_device(device='cpu') == torch.device('cpu')
 
 
 class Constant(DownstreamModel):

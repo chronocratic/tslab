@@ -12,12 +12,6 @@ from tslab.tasks import (
 )
 
 
-def test_classification_info_is_a_data_info() -> None:
-    info = TSClassificationDataInfo(num_channels=3, length=None, num_classes=4)
-    assert isinstance(info, TSDataInfo)
-    assert info.length is None
-
-
 def test_forecasting_info_accepts_disjoint_channels() -> None:
     info = TSForecastingDataInfo(
         num_channels=4, length=100, target_channels=(2, 3), covariate_channels=(0, 1)

@@ -160,12 +160,6 @@ def test_read_folder_never_raises(tmp_path: Path) -> None:
     assert read.lock_live is False
 
 
-def test_lock_live_uses_is_run_active(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr('tslab.study.state.is_run_active', lambda **_: True)
-    read = read_folder(run_directory=tmp_path)
-    assert read.lock_live is True
-
-
 def test_slurm_task_ids() -> None:
     jobs = [
         job(

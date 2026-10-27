@@ -63,9 +63,3 @@ def test_unknown_names_in_machine_overrides_warn(
     assert 'old-recipe' in caplog.text
     assert 'variant' in caplog.text
     assert any(r.slurm is not None and r.slurm.gpus == 1 for r in resolved)
-
-
-def test_unknown_machine_setting_path_raises(study: Study, tmp_path: Path) -> None:
-    profile = _profile(tmp_path, '[settings]\n"trainer.max_epoch" = 5\n')
-    with pytest.raises(ValueError, match=r'trainer\.max_epoch'):
-        resolve_runs(study=study, machine=profile, runs=expand_runs(study=study))

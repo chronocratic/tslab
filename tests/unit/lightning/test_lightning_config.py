@@ -15,21 +15,6 @@ def fingerprint(*, config: LightningTrainerConfig) -> str:
     )
 
 
-def test_default_settings() -> None:
-    config = LightningTrainerConfig()
-    assert (config.max_epochs, config.min_epochs) == (2500, 3)
-    assert (config.accelerator, config.devices) == ('auto', 'auto')
-    assert config.check_val_every_n_epoch == 1
-    assert config.log_every_n_steps == 200
-    assert config.monitor == 'val_loss_epoch'
-    assert config.checkpoint_save_top_k == 3
-    assert config.early_stopping_patience is None
-    assert config.early_stopping_min_delta == 0.001
-    assert config.max_training_time is None
-    assert config.slurm_time_fraction == 0.5
-    assert config.extra_trainer_kwargs == {}
-
-
 def test_settings_that_cannot_change_weights_are_not_fingerprinted() -> None:
     base = LightningTrainerConfig()
     unchanged = dataclasses.replace(

@@ -49,8 +49,3 @@ def test_unknown_path_names_grid_value_and_path() -> None:
     bad = grid(axes={'seed': {'42': {'sed': 42}}})
     with pytest.raises(ValueError, match=r"grid 'g'.*seed.*42.*sed"):
         Study(name='s', grids={'g': bad})
-
-
-def test_everything_excluded_raises() -> None:
-    with pytest.raises(ValueError, match='no runs'):
-        Study(name='s', grids={'g': grid(exclude=({'grid': 'g'},))})

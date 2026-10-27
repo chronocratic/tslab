@@ -1,4 +1,4 @@
-"""Planning rules found in review: machine checks, local overrides, error text."""
+"""Planning rules: machine checks, local overrides, error text."""
 
 from dataclasses import dataclass
 import logging
