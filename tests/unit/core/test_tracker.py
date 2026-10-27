@@ -50,6 +50,20 @@ def test_local_tracker_writes_metrics_and_params(tmp_path: Path) -> None:
     }
 
 
+def test_local_tracker_writes_params_yaml_cannot_represent_as_text(tmp_path: Path) -> None:
+    tracker = LocalTracker()
+    tracker.start(run_directory=tmp_path, run_name='a')
+    tracker.log_params(
+        params={'mode': RunStatus.FINISHED, 'root': Path('data'), 'nested': {'kind': Path}}
+    )
+    hparams = tmp_path / 'trackers' / 'csv' / 'version_0' / 'hparams.yaml'
+    assert yaml.safe_load(hparams.read_text(encoding='utf-8')) == {
+        'mode': 'finished',
+        'root': 'data',
+        'nested': {'kind': "<class 'pathlib.Path'>"},
+    }
+
+
 def test_local_tracker_uses_the_next_version_folder(tmp_path: Path) -> None:
     for expected in ('version_0', 'version_1'):
         tracker = LocalTracker()
