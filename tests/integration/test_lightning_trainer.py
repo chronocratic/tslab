@@ -17,6 +17,7 @@ def trainer(**changes: object) -> LightningTrainer:
     return LightningTrainer(config=dataclasses.replace(FAST, **changes))
 
 
+@pytest.mark.slow
 def test_fit_returns_a_checkpoint_naming_best_and_last(tmp_path: Path) -> None:
     with run_in(root=tmp_path) as run:
         directory = run.directory / 'train'
@@ -34,6 +35,7 @@ def test_fit_returns_a_checkpoint_naming_best_and_last(tmp_path: Path) -> None:
     assert 'train_loss_epoch' in metrics
 
 
+@pytest.mark.slow
 def test_load_restores_the_best_weights(tmp_path: Path) -> None:
     lightning_trainer = trainer()
     with run_in(root=tmp_path) as run:
@@ -49,6 +51,7 @@ def test_load_restores_the_best_weights(tmp_path: Path) -> None:
     assert torch.equal(fresh.layer.weight, best['state_dict']['layer.weight'])
 
 
+@pytest.mark.slow
 def test_without_validation_last_is_best(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING), run_in(root=tmp_path) as run:
         checkpoint = trainer().fit(
@@ -61,6 +64,7 @@ def test_without_validation_last_is_best(tmp_path: Path, caplog: pytest.LogCaptu
     assert 'no validation loader' in caplog.text
 
 
+@pytest.mark.slow
 def test_time_limit_raises_and_resubmission_resumes(tmp_path: Path) -> None:
     directory = tmp_path / 'r' / 'train'
     # A zero limit stops after the first batch, like a job whose time ran out.
@@ -75,6 +79,7 @@ def test_time_limit_raises_and_resubmission_resumes(tmp_path: Path) -> None:
     assert checkpoint.last_path.is_file()
 
 
+@pytest.mark.slow
 def test_min_epochs_with_a_time_limit_warns(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -88,6 +93,7 @@ def test_min_epochs_with_a_time_limit_warns(
     assert '--trainer.min-epochs 0' in caplog.text
 
 
+@pytest.mark.slow
 def test_training_error_propagates_without_retries(tmp_path: Path) -> None:
     model = ToyRegressor(fail_at_step=3)
     with pytest.raises(RuntimeError, match='out of memory'), run_in(root=tmp_path) as run:
@@ -113,6 +119,7 @@ def test_untrusted_external_checkpoint_refuses_objects(tmp_path: Path) -> None:
     assert torch.equal(loaded.layer.weight, saved['layer.weight'])
 
 
+@pytest.mark.slow
 def test_tracker_status_is_set_by_the_run_not_by_lightning(tmp_path: Path) -> None:
     tracker = MLflowTracker(experiment='m4')
 
@@ -152,6 +159,7 @@ def test_lightning_data_source_sets_up_lazily_and_once(tmp_path: Path) -> None:
     assert datamodule.calls == ['prepare', 'setup:fit', 'setup:test']
 
 
+@pytest.mark.slow
 def test_fit_with_a_datamodule(tmp_path: Path) -> None:
     data = LightningDataSource(datamodule=ToyDataModule(), info=ToyInfo(num_features=4))
     with run_in(root=tmp_path) as run:
