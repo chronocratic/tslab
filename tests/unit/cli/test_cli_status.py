@@ -128,6 +128,81 @@ def test_nothing_to_show(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> No
     assert shown(caplog=caplog, path=tmp_path / 'missing')[0] == 2
 
 
+def test_failed_instance_points_at_its_error_file(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    run_dir = tmp_path / 'a'
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1, -1))
+
+    code, text = shown(caplog=caplog, path=run_dir)
+
+    assert code == 0
+    assert 'failed; full error:' in text
+    assert 'error.txt' in text
+
+
+def test_interrupted_run_says_how_to_resume(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    run_dir = tmp_path / 'a'
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    kill(directory=run_dir)
+
+    _, text = shown(caplog=caplog, path=run_dir)
+
+    assert 'run the same script again to resume it' in text
+
+
+def test_finished_run_says_all_done(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    run_dir = tmp_path / 'a'
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1, 2))
+
+    _, text = shown(caplog=caplog, path=run_dir)
+
+    assert 'all 4 instances done' in text
+
+
+def test_folder_of_runs_with_failures_suggests_one_run(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('good'), factors=(1,))
+    make_run(root=tmp_path, relative_path=Path('bad'), factors=(1, -1))
+
+    _, text = shown(caplog=caplog, path=tmp_path)
+
+    assert 'details of one run: tslab status' in text
+
+
+def test_empty_folder_warns_and_explains(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    code, text = shown(caplog=caplog, path=tmp_path)
+
+    assert code == 1
+    assert any(
+        record.levelno == logging.WARNING and 'no runs below' in record.message
+        for record in caplog.records
+    )
+    assert 'holds status.json' in text
+
+
+def test_watch_refreshes_until_interrupted(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_dir = tmp_path / 'a'
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+
+    def interrupt(seconds: float) -> None:
+        assert seconds == 5
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr('time.sleep', interrupt)
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        code = Status(path=run_dir, watch=5).run()
+
+    assert code == 0
+    assert caplog.text.count('scale[f1]') == 1
+
+
 def test_command_line_entry_point(tmp_path: Path) -> None:
     make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
     with pytest.raises(SystemExit) as raised:
