@@ -54,7 +54,6 @@ class Status:
     """Show the instances of a run, or one line per run below a folder.
 
     For example:
-
         tslab status runs/
         tslab status runs/ --stage scale
         tslab status runs/ --watch 60
@@ -66,8 +65,8 @@ class Status:
     """
 
     path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
-    stage: str | None = None
-    watch: float | None = None
+    stage: Annotated[str | None, tyro.conf.arg(metavar='STAGE', help_behavior_hint='')] = None
+    watch: Annotated[float | None, tyro.conf.arg(metavar='SECONDS', help_behavior_hint='')] = None
 
     def run(self) -> int:
         """Print the status.
@@ -229,7 +228,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     for line in format_table(header=header, rows=rows):
         _LOGGER.info('%s', line)
     summary = ', '.join(f'{count} {state}' for state, count in sorted(totals.items()))
-    _LOGGER.info('%d runs: %s', len(rows), summary)
+    _LOGGER.info('%d %s: %s', len(rows), 'run' if len(rows) == 1 else 'runs', summary)
     if totals[RunState.FAILED.value] or totals[_INTERRUPTED] or has_failed_instances:
         _LOGGER.info('details of one run: tslab status <run folder>')
     if totals[RunState.RUNNING.value]:

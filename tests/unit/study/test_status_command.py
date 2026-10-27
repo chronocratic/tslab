@@ -29,9 +29,9 @@ def test_status_counts_and_lines(
     assert 'grid queued running done interrupted failed missing total' in text
     assert 'g 1 0 1 0 0 2 4' in text
     assert 'all 1 0 1 0 0 2 4' in text
-    assert 'g/small/1 queued 1000_0' in text
-    assert 'g/small/2 missing 1000_1' in text
-    assert 'g/large/2 missing 1000_3' in text
+    assert 'g/small/1 queued job 1000_0' in text
+    assert 'g/small/2 missing job 1000_1' in text
+    assert 'g/large/2 missing job 1000_3' in text
     assert 'g/large/1' not in text  # done runs get no line
 
 
@@ -48,10 +48,37 @@ def test_state_filter_hides_other_lines(
         )
     text = normalized(caplog.text)
     assert 'g/small/1' not in text
-    assert 'g/small/2 missing 1000_1' in text
-    assert 'g/large/2 missing 1000_3' in text
+    assert 'g/small/2 missing job 1000_1' in text
+    assert 'g/large/2 missing job 1000_3' in text
     # why: the filter hides lines, not counts; the table stays complete
     assert 'g 1 0 1 0 0 2 4' in text
+
+
+def test_a_study_that_never_ran_gets_no_run_lines(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('INFO'):
+        status(context=context(project=project, machine_file='cluster.toml'))
+    text = normalized(caplog.text)
+    assert 'g 0 0 0 0 0 4 4' in text
+    assert 'g/small/1' not in text
+
+
+def test_run_lines_stop_after_a_limit(
+    project: Path,
+    fake: FakeSlurm,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr('tslab.study.report._PROBLEMS_SHOWN', 1)
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    with caplog.at_level('INFO'):
+        status(context=context(project=project, machine_file='cluster.toml'))
+    text = normalized(caplog.text)
+    assert 'g/small/1 queued job 1000_0' in text
+    assert 'g/small/2' not in text
+    assert '… and 3 more; narrow with --states, --grid or --only' in text
 
 
 def test_time_limit_hint(project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture) -> None:
@@ -60,7 +87,7 @@ def test_time_limit_hint(project: Path, fake: FakeSlurm, caplog: pytest.LogCaptu
     with caplog.at_level('INFO'):
         status(context=context(project=project, machine_file='cluster.toml'))
     text = normalized(caplog.text)
-    assert 'g/large/2 interrupted 1000_3 SLURM TIMEOUT' in text
+    assert 'g/large/2 interrupted job 1000_3 SLURM TIMEOUT' in text
     assert (
         '1 runs stopped at a time limit: raise time in a machine override, '
         'or cap training with --trainer.max-training-time' in text

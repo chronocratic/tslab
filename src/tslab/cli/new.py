@@ -31,7 +31,6 @@ class New:
     """Create a project from the TSLab template.
 
     For example:
-
         tslab new my-paper
 
     Attributes:
@@ -40,7 +39,7 @@ class New:
     """
 
     path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
-    name: str | None = None
+    name: Annotated[str | None, tyro.conf.arg(metavar='NAME', help_behavior_hint='')] = None
 
     def run(self) -> int:
         """Create the project and print the next steps.

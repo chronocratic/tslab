@@ -43,12 +43,31 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
     header = ('grid', *(state.value for state in _TABLE_STATES), 'total')
     for line in format_table(header=header, rows=rows, right_align_numbers=True):
         _LOGGER.info('%s', line)
-    for report in context.reports:
-        if report.state is StudyState.DONE or (states and report.state not in states):
-            continue
-        job = report.job_id or '-'
-        reason = report.reason or ''
-        _LOGGER.info('%s %s %s %s', report.run.run_path, report.state.value, job, reason)
+    listed = [
+        report
+        for report in context.reports
+        if report.state is not StudyState.DONE and (not states or report.state in states)
+    ]
+    # why: a study that never ran has thousands of missing runs; the table already counts them
+    if listed and not all(report.state is StudyState.MISSING for report in context.reports):
+        lines = [
+            ' '.join(
+                part
+                for part in (
+                    report.run.run_path,
+                    report.state.value,
+                    None if report.job_id is None else f'job {report.job_id}',
+                    report.reason,
+                )
+                if part is not None and part != ''
+            )
+            for report in listed
+        ]
+        for line in lines[:_PROBLEMS_SHOWN]:
+            _LOGGER.info('  %s', line)
+        hidden = len(lines) - _PROBLEMS_SHOWN
+        if hidden > 0:
+            _LOGGER.info('  … and %d more; narrow with --states, --grid or --only', hidden)
     limited = sum(
         1
         for report in context.reports

@@ -41,6 +41,8 @@ def test_help_is_plain_and_free_of_flag_pairs(
 
     assert '``' not in output
     assert '--no-' not in output
+    assert '{None}' not in output
+    assert '(default: None)' not in output
     assert re.search(r'\b(STR|PATH)$', output.splitlines()[0].strip()) is None
 
 
@@ -65,3 +67,21 @@ def test_study_submit_help_names_the_positional(capsys: pytest.CaptureFixture[st
     output = _help(command=['study', 'submit'], capsys=capsys)
 
     assert 'STUDY' in output
+
+
+@pytest.mark.parametrize('command', COMMANDS[:3], ids=lambda command: ' '.join(command) or 'tslab')
+def test_group_help_lists_one_line_per_command(
+    *, command: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = _help(command=command, capsys=capsys)
+
+    assert 'For example:' not in output
+
+
+@pytest.mark.parametrize('command', LEAF_COMMANDS, ids=lambda command: ' '.join(command) or 'tslab')
+def test_command_help_has_no_double_blank_lines(
+    *, command: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = _help(command=command, capsys=capsys)
+
+    assert '\n\n\n' not in output

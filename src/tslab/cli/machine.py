@@ -6,11 +6,16 @@ directory, and otherwise looks the name up in the register these commands edit.
 
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 from typing import Annotated
 
+from rich import box
+from rich.table import Table
+from rich.text import Text
 import tyro
 
+from tslab.cli.console import make_console
 from tslab.cli.usage import UsageError
 from tslab.study.machine import (
     load_machine,
@@ -30,7 +35,6 @@ class MachineAdd:
     """Register a machine profile under a name, so --machine <name> finds it anywhere.
 
     For example:
-
         tslab machine add local machines/local.toml
 
     Attributes:
@@ -59,23 +63,58 @@ class MachineAdd:
 
 @dataclass(frozen=True, kw_only=True)
 class MachineList:
-    """Print the registered machine names and their profile files.
+    """Show the machine names --machine accepts here, and their profile files.
 
     For example:
-
         tslab machine list
     """
 
     def run(self) -> int:
-        """Print one line per name and return the exit code."""
+        """Print a table of names and return the exit code."""
         try:
-            entries = read_register()
+            registered = read_register()
         except MachineProfileError as error:
             raise UsageError(str(error)) from error
-        for name, file in sorted(entries.items()):
-            note = '' if file.is_file() else '  (missing)'
-            _LOGGER.info('%s  %s%s', name, file.as_posix(), note)
+        project = _project_machines(start=Path.cwd())
+        if not project and not registered:
+            _LOGGER.info('no machines: none in machines/ above this folder, none registered')
+            _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
+            return 0
+        table = Table(box=box.SIMPLE_HEAD, header_style='bold', pad_edge=False)
+        table.add_column('name', style='bold cyan', no_wrap=True)
+        table.add_column('source')
+        table.add_column('profile', style='dim', overflow='fold')
+        table.add_column('note')
+        for name, file in project.items():
+            table.add_row(name, 'project', os.path.relpath(file), '')
+        for name, file in sorted(registered.items()):
+            note = _register_note(name=name, file=file, project=project)
+            table.add_row(name, 'registered', _home_short(file=file), note)
+        make_console().print(table)
+        _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
         return 0
+
+
+def _project_machines(*, start: Path) -> dict[str, Path]:
+    """The ``machines/<name>.toml`` files above ``start``; the nearest wins, as in --machine."""
+    found: dict[str, Path] = {}
+    for folder in (start, *start.parents):
+        for file in sorted((folder / 'machines').glob('*.toml')):
+            found.setdefault(file.stem, file)
+    return found
+
+
+def _home_short(*, file: Path) -> str:
+    home = Path.home()
+    if file.is_relative_to(home):
+        return f'~/{file.relative_to(home).as_posix()}'
+    return file.as_posix()
+
+
+def _register_note(*, name: str, file: Path, project: dict[str, Path]) -> Text:
+    if name in project:
+        return Text('overridden by project', style='yellow')
+    return Text('') if file.is_file() else Text('missing', style='bold red')
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -83,7 +122,6 @@ class MachineRemove:
     """Remove a name from the register; the profile file stays.
 
     For example:
-
         tslab machine remove local
 
     Attributes:

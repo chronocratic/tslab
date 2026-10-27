@@ -106,7 +106,7 @@ def test_one_malformed_status_file_does_not_abort_the_scan(
     assert code == 0
     assert 'good' in text
     assert 'bad/status.json' in text
-    assert '1 runs: 1 finished' in text
+    assert '1 run: 1 finished' in text
 
 
 def test_a_malformed_run_folder_exits_1(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -120,7 +120,7 @@ def test_a_malformed_run_folder_exits_1(tmp_path: Path, caplog: pytest.LogCaptur
 def test_live_run_is_running(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     with tslab.Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         _, text = shown(caplog=caplog, path=tmp_path)
-    assert '1 runs: 1 running' in text
+    assert '1 run: 1 running' in text
     assert 'follow active runs: tslab status' in text
     assert '--watch 60' in text
 

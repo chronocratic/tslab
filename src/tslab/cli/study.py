@@ -42,7 +42,18 @@ def _context_of(
             project_root=location.project_root,
             read_only=read_only,
         )
-    except (ValueError, TypeError, FileNotFoundError, ModuleNotFoundError) as error:
+    except ModuleNotFoundError as error:
+        module_name = study.partition(':')[0]
+        message = str(error)
+        # why: only a missing study module is a usage error worth a hint; a missing
+        # dependency inside it keeps its own message
+        if error.name is not None and f'{module_name}.'.startswith(f'{error.name}.'):
+            message = (
+                f'cannot import the study module {module_name!r} ({error}); run tslab from '
+                'the project folder, or check STUDY (module:attribute)'
+            )
+        raise UsageError(message) from error
+    except (ValueError, TypeError, FileNotFoundError) as error:
         raise UsageError(str(error)) from error
 
 
@@ -77,6 +88,9 @@ def _status_hints(
         return
     selection = _selection_args(study=study, machine=machine, grid=grid, only=only)
     states = {report.state for report in context.reports}
+    if states == {StudyState.MISSING}:
+        _LOGGER.info('nothing ran yet; check the plan: tslab study submit %s --dry-run', selection)
+        return
     if StudyState.FAILED in states:
         _LOGGER.info(
             'fix the failed runs, then: tslab study resubmit %s --states failed', selection
@@ -98,17 +112,16 @@ class Submit:
     """Submit the runs of a study to a machine, or dry-run the plan.
 
     For example:
-
         tslab study submit my_paper.studies:example --machine local --dry-run
         tslab study submit my_paper.studies:example --machine local -- --trainer.max-epochs 5
 
     Attributes:
         study: The study reference, module:attribute.
-        machine: The machine name (machines/<name>.toml above the working directory, or
+        machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path.
-        grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match axis=value; repeatable,
-            comma separated for several values of one axis.
+        grid: Keep only this grid.
+        only: Keep only the runs that match axis=value; comma separated for
+            several values of one axis.
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The arguments after --, appended to every run.
@@ -149,21 +162,20 @@ class Submit:
 
 @dataclass(frozen=True, kw_only=True)
 class Status:
-    """The state table of a study, and one line per run not done.
+    """Show the state of every run of a study, and the runs not done.
 
     For example:
-
         tslab study status my_paper.studies:example --machine local
         tslab study status my_paper.studies:example --machine local --watch 60
 
     Attributes:
         study: The study reference, module:attribute.
-        machine: The machine name (machines/<name>.toml above the working directory, or
+        machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path.
-        grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match axis=value; repeatable,
-            comma separated for several values of one axis.
-        states: Show only the runs in these states; repeatable, comma separated.
+        grid: Keep only this grid.
+        only: Keep only the runs that match axis=value; comma separated for
+            several values of one axis.
+        states: Show only the runs in these states; comma separated.
         watch: Refresh every this many seconds until Ctrl-C.
     """
 
@@ -176,7 +188,7 @@ class Status:
     states: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
     ] = ()
-    watch: float | None = None
+    watch: Annotated[float | None, tyro.conf.arg(metavar='SECONDS', help_behavior_hint='')] = None
 
     def run(self) -> int:
         """Print the table and return the exit code."""
@@ -208,23 +220,22 @@ class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
     For example:
-
         tslab study resubmit my_paper.studies:example --machine local
         tslab study resubmit my_paper.studies:example --machine local --dry-run
 
     Attributes:
         study: The study reference, module:attribute.
-        machine: The machine name (machines/<name>.toml above the working directory, or
+        machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path.
-        grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match axis=value; repeatable,
-            comma separated for several values of one axis.
-        states: The states to resubmit; repeatable, comma separated.
-            Interrupted and missing when omitted.
+        grid: Keep only this grid.
+        only: Keep only the runs that match axis=value; comma separated for
+            several values of one axis.
+        states: The states to resubmit; comma separated. Interrupted and
+            missing when omitted.
         cancel_live: Cancel the queued and running runs first and
             resubmit them a little later.
         dry_run: Write the job files and print the plan, submit nothing.
-        auto: Follow-up mode, used by TSLab itself.
+        auto: Set by the follow-up jobs of TSLab; not for use by hand.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
     """
@@ -271,20 +282,19 @@ class Resubmit:
 
 @dataclass(frozen=True, kw_only=True)
 class Results:
-    """The metrics of every run of a study, as one CSV table.
+    """Collect the metrics of every run of a study into one CSV file.
 
     For example:
-
         tslab study results my_paper.studies:example --machine local --out results.csv
 
     Attributes:
         study: The study reference, module:attribute.
-        machine: The machine name (machines/<name>.toml above the working directory, or
+        machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path.
-        grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match axis=value; repeatable,
-            comma separated for several values of one axis.
-        out: The CSV file to write; required.
+        grid: Keep only this grid.
+        only: Keep only the runs that match axis=value; comma separated for
+            several values of one axis.
+        out: The CSV file to write.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]

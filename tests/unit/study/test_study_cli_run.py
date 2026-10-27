@@ -65,3 +65,22 @@ def test_usage_errors_exit_two_without_a_traceback(
     assert run_main(*args) == 2
     assert caplog.records
     assert all(record.exc_info is None for record in caplog.records)
+
+
+def test_results_says_how_many_rows_it_wrote(
+    project: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    out = tmp_path / 'out.csv'
+    with caplog.at_level('INFO'):
+        code = run_main(
+            'results', 'toy_studies:study', '--machine', 'local.toml', '--out', str(out)
+        )
+    assert code == 0
+    assert f'wrote 4 rows to {out.as_posix()}' in caplog.text
+
+
+def test_a_missing_study_module_says_where_to_run(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert run_main('status', 'no_such_module:study', '--machine', 'cluster.toml') == 2
+    assert 'cannot import the study module' in caplog.text
