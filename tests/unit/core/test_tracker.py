@@ -60,7 +60,7 @@ def test_local_tracker_writes_params_yaml_cannot_represent_as_text(tmp_path: Pat
     assert yaml.safe_load(hparams.read_text(encoding='utf-8')) == {
         'mode': 'finished',
         'root': 'data',
-        'nested': {'kind': "<class 'pathlib.Path'>"},
+        'nested': {'kind': str(Path)},
     }
 
 
