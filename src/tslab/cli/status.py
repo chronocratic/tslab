@@ -19,6 +19,7 @@ from typing import Annotated
 
 import tyro
 
+from tslab.cli.console import watch
 from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
 from tslab.core.status import (
@@ -36,6 +37,7 @@ __all__ = ['Status']
 _LOGGER = logging.getLogger(__name__)
 _INTERRUPTED = 'interrupted'
 _FINGERPRINT_PREFIX = 8
+_MAX_FAILED_INSTANCES = 10
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3600
 _COUNTED_STATES = (
@@ -54,14 +56,17 @@ class Status:
 
         tslab status runs/
         tslab status runs/ --stage scale
+        tslab status runs/ --watch 60
 
     Attributes:
         path: A run folder, or any folder above runs (for example runs/).
         stage: Count only the instances of this stage.
+        watch: Refresh every this many seconds until Ctrl-C.
     """
 
     path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
     stage: str | None = None
+    watch: float | None = None
 
     def run(self) -> int:
         """Print the status.
@@ -74,6 +79,9 @@ class Status:
         if not self.path.is_dir():
             _LOGGER.error('%s is not a folder', self.path.as_posix())
             return 2
+        return watch(seconds=self.watch, show=self._show)
+
+    def _show(self) -> int:
         try:
             snapshot = read_status(path=self.path / STATUS_FILE)
         except StatusFileError as error:
@@ -84,7 +92,8 @@ class Status:
             return 0
         runs = sorted(status_file.parent for status_file in self.path.rglob(STATUS_FILE))
         if not runs:
-            _LOGGER.info('no runs below %s', self.path.as_posix())
+            _LOGGER.warning('no runs below %s', self.path.as_posix())
+            _LOGGER.info('a run folder holds status.json; pass it, or a folder above runs')
             return 1
         _print_runs(root=self.path, runs=runs, stage=self.stage)
         return 0
@@ -164,11 +173,25 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
     for stage_name, counts in per_stage.items():
         summary = ', '.join(f'{count} {state}' for state, count in sorted(counts.items()))
         _LOGGER.info('%s: %s', stage_name, summary)
+    failed: list[tuple[str, str]] = []
+    for instance_id, record in selected:
+        if record.state is InstanceState.FAILED and record.traceback_file is not None:
+            error_file = (directory / record.traceback_file).as_posix()
+            failed.append((instance_id, error_file))
+    for instance_id, error_file in failed[:_MAX_FAILED_INSTANCES]:
+        _LOGGER.warning('%s failed; full error: %s', instance_id, error_file)
+    if len(failed) > _MAX_FAILED_INSTANCES:
+        _LOGGER.warning('… and %d more failed instances', len(failed) - _MAX_FAILED_INSTANCES)
+    if run_state == _INTERRUPTED:
+        _LOGGER.warning('run interrupted; run the same script again to resume it')
+    if selected and all(record.state is InstanceState.DONE for _, record in selected):
+        _LOGGER.info('all %d instances done', len(selected))
 
 
 def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     rows: list[tuple[str, ...]] = []
     totals: Counter[str] = Counter()
+    has_failed_instances = False
     for directory in runs:
         try:
             snapshot = read_status(path=directory / STATUS_FILE)
@@ -181,6 +204,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
         totals[run_state] += 1
         # Raw instance states: a dead run still shows its in-flight instances.
         counts = Counter(record.state for _, record in _selected(snapshot=snapshot, stage=stage))
+        has_failed_instances = has_failed_instances or counts[InstanceState.FAILED] > 0
         rows.append(
             (
                 directory.relative_to(root).as_posix(),
@@ -193,3 +217,5 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
         _LOGGER.info('%s', line)
     summary = ', '.join(f'{count} {state}' for state, count in sorted(totals.items()))
     _LOGGER.info('%d runs: %s', len(rows), summary)
+    if totals[RunState.FAILED.value] or totals[_INTERRUPTED] or has_failed_instances:
+        _LOGGER.info('details of one run: tslab status <run folder>')
