@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 import logging
 from pathlib import Path
+import shlex
 from typing import Annotated
 
 import tyro
@@ -173,6 +174,13 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
     for stage_name, counts in per_stage.items():
         summary = ', '.join(f'{count} {state}' for state, count in sorted(counts.items()))
         _LOGGER.info('%s: %s', stage_name, summary)
+
+    _log_run_hints(directory=directory, selected=selected, run_state=run_state)
+
+
+def _log_run_hints(
+    *, directory: Path, selected: list[tuple[str, InstanceRecord]], run_state: str
+) -> None:
     failed: list[tuple[str, str]] = []
     for instance_id, record in selected:
         if record.state is InstanceState.FAILED and record.traceback_file is not None:
@@ -186,6 +194,11 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
         _LOGGER.warning('run interrupted; run the same script again to resume it')
     if selected and all(record.state is InstanceState.DONE for _, record in selected):
         _LOGGER.info('all %d instances done', len(selected))
+    if run_state == RunState.RUNNING.value:
+        _LOGGER.info(
+            'follow active run: %s',
+            shlex.join(['tslab', 'status', directory.as_posix(), '--watch', '60']),
+        )
 
 
 def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
@@ -219,3 +232,8 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     _LOGGER.info('%d runs: %s', len(rows), summary)
     if totals[RunState.FAILED.value] or totals[_INTERRUPTED] or has_failed_instances:
         _LOGGER.info('details of one run: tslab status <run folder>')
+    if totals[RunState.RUNNING.value]:
+        _LOGGER.info(
+            'follow active runs: %s',
+            shlex.join(['tslab', 'status', root.as_posix(), '--watch', '60']),
+        )

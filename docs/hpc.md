@@ -35,8 +35,8 @@ uv run tslab status runs/            # one line per run: state and instance coun
 uv run tslab status runs/ --stage transform
 ```
 
-Add `--watch SECONDS` to refresh run status until Ctrl-C. Hints point to failed-instance error
-files, explain interrupted runs, and suggest opening one run when scanning several.
+Add `--watch SECONDS` to refresh run status until Ctrl-C. Run-level hints point to failed-instance
+error files and explain interrupted runs; folder hints suggest opening one run.
 
 ## Distributed training
 

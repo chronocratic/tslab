@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 import logging
+import sys
 import time
 from typing import ClassVar, IO, override
 
@@ -51,7 +52,9 @@ def make_console(*, file: IO[str] | None = None, force_terminal: bool | None = N
     Returns:
         A Rich console configured for TSLab output.
     """
-    return Console(file=file, force_terminal=force_terminal, theme=_THEME, highlight=False)
+    stream = sys.stdout if file is None else file
+    terminal = force_terminal if force_terminal is not None else stream.isatty()
+    return Console(file=file, force_terminal=terminal, theme=_THEME, highlight=False)
 
 
 CONSOLE: Console = make_console()
@@ -68,10 +71,15 @@ class ConsoleHandler(logging.Handler):
         """
         super().__init__()
         self._console = console
+        self._uses_default_console = console is CONSOLE
+        self._stdout: IO[str] | None = None
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
         try:
+            if self._uses_default_console and self._stdout is not sys.stdout:
+                self._console = make_console()
+                self._stdout = sys.stdout
             message = self.format(record)
             style = None
             if record.levelno >= logging.ERROR:

@@ -121,6 +121,8 @@ def test_live_run_is_running(tmp_path: Path, caplog: pytest.LogCaptureFixture) -
     with tslab.Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         _, text = shown(caplog=caplog, path=tmp_path)
     assert '1 runs: 1 running' in text
+    assert 'follow active runs: tslab status' in text
+    assert '--watch 60' in text
 
 
 def test_nothing_to_show(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

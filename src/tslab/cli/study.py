@@ -83,6 +83,8 @@ def _status_hints(
         )
     if StudyState.INTERRUPTED in states or StudyState.MISSING in states:
         _LOGGER.info('retry interrupted and missing runs: tslab study resubmit %s', selection)
+    if StudyState.QUEUED in states or StudyState.RUNNING in states:
+        _LOGGER.info('follow progress: tslab study status %s --watch 60', selection)
     if all(report.state is StudyState.DONE for report in context.reports):
         _LOGGER.info(
             'all %d runs done; collect metrics: tslab study results %s --out results.csv',

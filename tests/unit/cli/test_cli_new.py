@@ -22,6 +22,18 @@ def test_project_is_copied_with_names_filled_in(tmp_path: Path) -> None:
     assert 'name = "my-paper"' in (project / 'pyproject.toml').read_text(encoding='utf-8')
 
 
+def test_template_study_status_examples_are_one_shot(tmp_path: Path) -> None:
+    project = tmp_path / 'my-paper'
+    create_project(path=project)
+
+    for name in ('README.md', 'AGENTS.md'):
+        lines = (project / name).read_text(encoding='utf-8').splitlines()
+        line = next(line for line in lines if line.startswith('uv run tslab study status'))
+        command, _, comment = line.partition('#')
+        assert '--watch 60' not in command
+        assert 'add --watch 60 to refresh' in comment
+
+
 def test_name_option_overrides_the_folder_name(tmp_path: Path) -> None:
     assert create_project(path=tmp_path / 'x', name='Robust-TS') == 'robust_ts'
     assert (tmp_path / 'x' / 'src' / 'robust_ts' / 'classify.py').exists()
