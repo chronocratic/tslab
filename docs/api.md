@@ -58,8 +58,8 @@ import never pulls in heavy code. The commands (`submit`, `status`,
 | `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](studies.md) | see that page |
 | `tslab wandb-sync ROOT` | resync crashed, failed and killed W&B runs below `ROOT` | `--states`, `--include-offline`, `--wandb-project`, `--wandb-entity`, `--dry-run` |
 
-`--watch SECONDS` refreshes both status commands until Ctrl-C. Their hints
-suggest the next action and point to full error files for failed instances.
+`--watch SECONDS` refreshes both status commands until Ctrl-C. `tslab status`
+hints point to failed-instance error files; `tslab study status` hints suggest the next action.
 
 ## Time series
 

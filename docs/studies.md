@@ -269,7 +269,8 @@ uv run tslab study status my_paper.studies:example --machine cluster \
 ```
 
 Add `--watch SECONDS` to refresh this report until Ctrl-C. Hints suggest
-resubmission for failed, interrupted, or missing runs, or results collection when all runs finish.
+following active runs, resubmitting failed, interrupted, or missing runs, or collecting results
+when all runs finish.
 
 Every expected run gets exactly one of six states, decided in this order:
 
