@@ -78,16 +78,16 @@ def test_existing_file_without_suffix_is_a_path(
     assert resolve_machine(machine='profile', start=tmp_path).path == tmp_path / 'profile'
 
 
-def test_unknown_name_lists_folders_registered_names_and_the_fix(tmp_path: Path) -> None:
+def test_unknown_name_lists_the_folder_registered_names_and_the_fix(tmp_path: Path) -> None:
     write_register(entries={'known': tmp_path / 'known.toml'})
     with pytest.raises(MachineProfileError) as error_info:
         resolve_machine(machine='cluster', start=tmp_path)
     text = str(error_info.value)
     assert "'cluster'" in text
-    assert str(tmp_path / 'machines') in text
-    assert 'known' in text
-    assert 'pass the path to the profile file instead' in text
-    assert 'tslab machine add <name> <path>' in text
+    assert f'machines/cluster.toml in {tmp_path}' in text
+    assert 'registered names are: known' in text
+    assert 'Pass a profile path' in text
+    assert 'tslab machine add cluster <path>' in text
 
 
 def test_registered_name_with_a_missing_file_has_its_own_error(tmp_path: Path) -> None:

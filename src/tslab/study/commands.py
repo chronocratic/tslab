@@ -223,6 +223,7 @@ def results(*, context: Context, out: Path) -> int:
         study=context.study, study_directory=context.study_directory, reports=context.reports
     )
     write_results_csv(rows=rows, path=out)
+    _LOGGER.info('wrote %d rows to %s', len(rows), out.as_posix())
     return 0
 
 

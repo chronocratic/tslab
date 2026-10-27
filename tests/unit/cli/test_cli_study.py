@@ -80,7 +80,7 @@ def _toy_project(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str =
     return project
 
 
-def test_status_suggests_resubmit_for_missing_runs(
+def test_status_suggests_a_dry_run_when_nothing_ran(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     _toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
@@ -89,7 +89,8 @@ def test_status_suggests_resubmit_for_missing_runs(
         code = Status(study='toy_studies:study', machine='local.toml').run()
 
     assert code == 0
-    assert 'retry interrupted and missing runs: tslab study resubmit' in caplog.text
+    assert 'nothing ran yet; check the plan: tslab study submit' in caplog.text
+    assert 'tslab study resubmit' not in caplog.text
 
 
 def test_status_suggests_following_queued_runs(

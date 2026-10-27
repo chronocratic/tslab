@@ -382,7 +382,6 @@ class WandbSync:
     """Resync local W&B runs that the server shows as crashed or failed.
 
     For example:
-
         tslab wandb-sync runs/ --dry-run
 
     Attributes:
@@ -398,10 +397,18 @@ class WandbSync:
     """
 
     root: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
-    states: tuple[str, ...] = ('crashed', 'failed', 'killed')
+    states: Annotated[tuple[str, ...], tyro.conf.arg(metavar='STATE')] = (
+        'crashed',
+        'failed',
+        'killed',
+    )
     include_offline: bool = False
-    wandb_project: str | None = None
-    wandb_entity: str | None = None
+    wandb_project: Annotated[
+        str | None, tyro.conf.arg(metavar='PROJECT', help_behavior_hint='')
+    ] = None
+    wandb_entity: Annotated[str | None, tyro.conf.arg(metavar='ENTITY', help_behavior_hint='')] = (
+        None
+    )
     dry_run: bool = False
 
     def run(self, *, sleep: Callable[[float], None] = time.sleep) -> int:

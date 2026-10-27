@@ -236,11 +236,9 @@ def resolve_machine(*, machine: str, start: Path) -> MachineLocation:
             raise MachineProfileError(message)
         return MachineLocation(path=path, project_root=start)
     message = (
-        f'no machine profile named {machine!r}. Looked for {machine}.toml in: '
-        f'{", ".join(str(folder) for folder in folders)}. '
-        f'Registered names: {", ".join(sorted(registered)) or "none"}; '
-        'pass the path to the profile file instead, or register it with: '
-        'tslab machine add <name> <path>'
+        f'no machine named {machine!r}: no machines/{machine}.toml in {start} or a folder '
+        f'above it, and the registered names are: {", ".join(sorted(registered)) or "none"}. '
+        f'Pass a profile path, or register one with: tslab machine add {machine} <path>'
     )
     raise MachineProfileError(message)
 

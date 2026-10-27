@@ -4,11 +4,12 @@ Experiments are never run through this tool: users run their own script
 and the tool only offers helpers around runs.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import dataclasses
+import inspect
 import logging
 import sys
-from typing import Any, cast, Protocol
+from typing import Annotated, Any, cast, Protocol, Union
 
 import tyro
 
@@ -101,13 +102,10 @@ def _takes_pass_through(*, command: object) -> bool:
 
 def _parse(*, argv: Sequence[str]) -> Command:
     if argv and argv[0] == 'study':
-        # ty: ignore[no-matching-overload, unsound-return-statement]
-        # — ty sees the dict of dataclass types as no Callable overload match
-        return tyro.extras.subcommand_cli_from_dict(
-            STUDY_COMMANDS,
+        return _cli(
+            commands=STUDY_COMMANDS,
             prog='tslab study',
-            args=list(argv[1:]),
-            config=(tyro.conf.FlagCreatePairsOff,),
+            args=argv[1:],
             description=(
                 'Launch and follow the runs of a study. STUDY is module:attribute, for example '
                 'my_paper.studies:example; --machine is a name from tslab machine list, '
@@ -115,17 +113,14 @@ def _parse(*, argv: Sequence[str]) -> Command:
             ),
         )
     if argv and argv[0] == 'machine':
-        # ty: ignore[no-matching-overload, unsound-return-statement]
-        # — ty sees the dict of dataclass types as no Callable overload match
-        return tyro.extras.subcommand_cli_from_dict(
-            MACHINE_COMMANDS,
+        return _cli(
+            commands=MACHINE_COMMANDS,
             prog='tslab machine',
-            args=list(argv[1:]),
-            config=(tyro.conf.FlagCreatePairsOff,),
+            args=argv[1:],
             description='Name machine profiles once, then pass --machine <name> from any folder.',
         )
-    return tyro.extras.subcommand_cli_from_dict(
-        {
+    return _cli(
+        commands={
             'machine': _Machine,
             'new': New,
             'status': Status,
@@ -133,8 +128,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
             'wandb-sync': WandbSync,
         },
         prog='tslab',
-        args=list(argv),
-        config=(tyro.conf.FlagCreatePairsOff,),
+        args=argv,
         description=(
             'Helpers around TSLab runs. Experiments run through your own scripts; tslab\n'
             'creates projects, launches studies and shows what runs are doing.\n\n'
@@ -149,3 +143,41 @@ def _parse(*, argv: Sequence[str]) -> Command:
             'STUDY is module:attribute, for example my_paper.studies:example.'
         ),
     )
+
+
+def _cli(
+    *, commands: Mapping[str, type], prog: str, args: Sequence[str], description: str
+) -> Command:
+    """Parse one subcommand from ``commands``.
+
+    Without a subcommand in ``args`` tyro prints the list of commands; each
+    entry then shows only the first docstring line, so the list stays one line
+    per command. The full docstring, with its examples, is the help of the command.
+    """
+    listing = not any(arg in commands for arg in args)
+    options = tuple(
+        Annotated[
+            Any,
+            tyro.conf.subcommand(
+                name=name,
+                constructor=command,
+                description=_summary(command=command) if listing else None,
+            ),
+        ]
+        for name, command in commands.items()
+    )
+    # why: every option constructs one of the command dataclasses, each with a run method
+    return cast(
+        'Command',
+        tyro.cli(
+            cast('Any', Union[options]),  # noqa: UP007 # why: `|` cannot unpack a runtime tuple
+            prog=prog,
+            args=list(args),
+            config=(tyro.conf.FlagCreatePairsOff,),
+            description=description,
+        ),
+    )
+
+
+def _summary(*, command: type) -> str:
+    return (inspect.getdoc(command) or '').split('\n', 1)[0]
