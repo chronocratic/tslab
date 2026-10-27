@@ -343,7 +343,7 @@ uv run tslab study results my_paper.studies:example --machine cluster \
 One row per (run, instance), plus one row per run that has no instances, so
 missing and failed-at-start runs appear too. Columns: `grid`, one column per
 axis name (holding the value names), `run_path`, `study_state`, `instance`,
-`instance_state`, `error`, then one column per metric name found in
+`instance_state`, `seconds` (the wall-clock time of the instance), `error`, then one column per metric name found in
 `Metrics` instances (`metric/<name>`), empty where absent. Unreadable or
 malformed files do not stop the table: the row gets
 `instance_state = "unreadable"` and the error text.

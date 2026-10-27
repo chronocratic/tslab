@@ -110,6 +110,7 @@ def _bare_row(*, report: RunReport, axes: Sequence[str]) -> ResultRow:
     row = _row_head(report=report, axes=axes)
     row['instance'] = None
     row['instance_state'] = None if report.folder.read_error is None else 'unreadable'
+    row['seconds'] = None
     row['error'] = report.folder.read_error
     return row
 
@@ -125,6 +126,7 @@ def _instance_row(
     row = _row_head(report=report, axes=axes)
     row['instance'] = instance_id
     row['instance_state'] = record.state.value
+    row['seconds'] = record.seconds
     row['error'] = None if record.error is None else first_line(text=record.error)
     # why: only a done instance has a meta.json; the others show their own state and error
     if record.state is InstanceState.DONE:
