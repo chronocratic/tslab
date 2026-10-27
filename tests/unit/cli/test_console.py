@@ -1,9 +1,12 @@
 from collections.abc import Iterator
 from io import StringIO
 import logging
+import sys
+from typing import override
 
 import pytest
 
+import tslab.cli.console as console_module
 from tslab.cli.console import ConsoleHandler, make_console, watch
 from tslab.cli.usage import UsageError
 
@@ -47,6 +50,52 @@ def test_handler_colors_state_words_on_a_terminal(logger: logging.Logger) -> Non
 
     assert '\x1b[' in output
     assert 'done' in output
+
+
+def test_default_handler_rechecks_stdout_after_redirection(
+    logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class TerminalBuffer(StringIO):
+        @override
+        def isatty(self) -> bool:
+            return True
+
+    monkeypatch.delenv('FORCE_COLOR', raising=False)
+    monkeypatch.delenv('NO_COLOR', raising=False)
+    monkeypatch.setenv('TERM', 'xterm-256color')
+    monkeypatch.setattr(sys, 'stdout', TerminalBuffer())
+    console = make_console()
+    assert console.is_terminal
+    monkeypatch.setattr(console_module, 'CONSOLE', console)
+    buffer = StringIO()
+    monkeypatch.setattr(sys, 'stdout', buffer)
+    handler = ConsoleHandler(console=console)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(handler)
+    try:
+        logger.info('done')
+    finally:
+        logger.removeHandler(handler)
+
+    assert buffer.getvalue() == 'done\n'
+
+
+def test_force_color_does_not_color_redirected_output(
+    logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('FORCE_COLOR', '1')
+    buffer = StringIO()
+    monkeypatch.setattr(sys, 'stdout', buffer)
+    console = make_console()
+    handler = ConsoleHandler(console=console)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(handler)
+    try:
+        logger.info('done')
+    finally:
+        logger.removeHandler(handler)
+
+    assert buffer.getvalue() == 'done\n'
 
 
 def test_handler_writes_plain_text_off_a_terminal(logger: logging.Logger) -> None:

@@ -92,6 +92,23 @@ def test_status_suggests_resubmit_for_missing_runs(
     assert 'retry interrupted and missing runs: tslab study resubmit' in caplog.text
 
 
+def test_status_suggests_following_queued_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    project = _toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    fake = install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+
+    with caplog.at_level(logging.INFO):
+        Status(study='toy_studies:study', machine='cluster.toml').run()
+
+    assert (
+        'follow progress: tslab study status toy_studies:study --machine cluster.toml --watch 60'
+        in caplog.text
+    )
+
+
 def test_status_says_all_done_and_how_to_collect(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:

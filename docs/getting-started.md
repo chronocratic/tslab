@@ -44,7 +44,7 @@ uv run tslab status runs/
 ```
 
 Add `--watch SECONDS` to refresh run status until Ctrl-C. Status hints suggest
-the next command and point to `error.txt` for failed instances.
+the next command; open a failed run to see its `error.txt` path.
 
 Run the same command again: every stage loads its result. Change a setting
 and only the stages it affects run again. See {doc}`configs-and-presets` for
