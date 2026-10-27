@@ -10,13 +10,10 @@ import os
 from pathlib import Path
 from typing import Annotated
 
-from rich import box
-from rich.table import Table
-from rich.text import Text
 import tyro
 
-from tslab.cli.console import make_console
 from tslab.cli.usage import UsageError
+from tslab.helpers.text import log_table
 from tslab.study.machine import (
     load_machine,
     MachineProfileError,
@@ -80,17 +77,17 @@ class MachineList:
             _LOGGER.info('no machines: none in machines/ above this folder, none registered')
             _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
             return 0
-        table = Table(box=box.SIMPLE_HEAD, header_style='bold', pad_edge=False)
-        table.add_column('name', style='bold cyan', no_wrap=True)
-        table.add_column('source')
-        table.add_column('profile', style='dim', overflow='fold')
-        table.add_column('note')
-        for name, file in project.items():
-            table.add_row(name, 'project', os.path.relpath(file), '')
-        for name, file in sorted(registered.items()):
-            note = _register_note(name=name, file=file, project=project)
-            table.add_row(name, 'registered', _home_short(file=file), note)
-        make_console().print(table)
+        rows = [(name, 'project', os.path.relpath(file), '') for name, file in project.items()]
+        rows += [
+            (
+                name,
+                'registered',
+                _home_short(file=file),
+                _register_note(name=name, file=file, project=project),
+            )
+            for name, file in sorted(registered.items())
+        ]
+        log_table(logger=_LOGGER, header=('name', 'source', 'profile', 'note'), rows=rows)
         _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
         return 0
 
@@ -111,10 +108,10 @@ def _home_short(*, file: Path) -> str:
     return file.as_posix()
 
 
-def _register_note(*, name: str, file: Path, project: dict[str, Path]) -> Text:
+def _register_note(*, name: str, file: Path, project: dict[str, Path]) -> str:
     if name in project:
-        return Text('overridden by project', style='yellow')
-    return Text('') if file.is_file() else Text('missing', style='bold red')
+        return 'overridden by project'
+    return '' if file.is_file() else 'missing'
 
 
 @dataclass(frozen=True, kw_only=True)
