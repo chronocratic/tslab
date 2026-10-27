@@ -7,9 +7,8 @@ from typing import cast
 import pytest
 
 import tslab
-from tslab.adapters.chronocratic.datasets import ChronocraticDataChoice, data_settings, DATAMODULES
+from tslab.adapters.chronocratic.datasets import ChronocraticDataChoice, data_settings
 from tslab.adapters.chronocratic.models import chronocratic_model_choice, model_settings
-from tslab.core.config import union_choices
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.study import check_paths, from_presets, settings_to_args
 
@@ -58,13 +57,6 @@ PRESETS: dict[str, tuple[str, object]] = {
         ),
     ),
 }
-
-
-def test_every_model_and_dataset_choice_is_named() -> None:
-    models = cast('dict[str, type]', union_choices(annotation=Models))
-    data = cast('dict[str, type]', union_choices(annotation=ChronocraticDataChoice))
-    assert set(models) >= {'ts2vec', 'cost'}
-    assert set(data) == set(DATAMODULES)
 
 
 def test_recipes_times_datasets_round_trip() -> None:

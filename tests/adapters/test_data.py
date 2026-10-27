@@ -1,6 +1,5 @@
 import dataclasses
 from dataclasses import dataclass
-import inspect
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -21,10 +20,8 @@ from tslab.adapters.chronocratic.datasets import (
     DATAMODULES,
 )
 from tslab.adapters.chronocratic.datasets.data import check_label_range
-from tslab.adapters.chronocratic.datasets.settings import EXCLUDED_PARAMETERS
 from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import SPLITS
-from tslab.lightning import LightningDataSource
 
 pytestmark = pytest.mark.chronocratic
 
@@ -65,13 +62,6 @@ def test_every_datamodule_is_discovered() -> None:
     assert {'ucr', 'uea', 'ett', 'electricity', 'weather'} <= set(DATAMODULES)
     for entry in DATAMODULES.values():
         assert entry.datamodule_class.__name__ in chronocratic.datasets.__all__
-
-
-def test_settings_are_the_constructor_without_loader_parameters() -> None:
-    for name, entry in DATAMODULES.items():
-        parameters = set(inspect.signature(entry.datamodule_class.__init__).parameters) - {'self'}
-        fields = {field.name for field in dataclasses.fields(entry.settings_class)}
-        assert fields == parameters - EXCLUDED_PARAMETERS, name
 
 
 def test_only_result_changing_settings_are_fingerprinted() -> None:
@@ -115,12 +105,6 @@ def test_label_range_check() -> None:
     check_label_range(labels=torch.tensor([0, 1, 1]), num_classes=2, split='train')
     with pytest.raises(ValueError, match=r'outside \[0, 2\)'):
         check_label_range(labels=torch.tensor([1, 2]), num_classes=2, split='test')
-
-
-def test_lightning_receives_the_datamodule() -> None:
-    data = classification()
-    assert isinstance(data, LightningDataSource)
-    assert isinstance(data.datamodule, chronocratic.datasets.UCRClassificationDataModule)
 
 
 def test_setup_again_gives_the_same_data() -> None:

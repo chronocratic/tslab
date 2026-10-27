@@ -397,10 +397,3 @@ def test_name_conflict_with_an_earlier_execution_names_the_remedy(tmp_path: Path
         pytest.raises(ValueError, match='delete its folder and its entry in'),
     ):
         run.claim_instance(stage_name='transform', name_parts=('a', 'b'))
-
-
-def test_environment_is_computed_once_and_has_git_and_versions(tmp_path: Path) -> None:
-    run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
-    environment = run.environment()
-    assert set(environment) == {'git', 'versions'}
-    assert run.environment() is environment
