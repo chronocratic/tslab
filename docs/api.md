@@ -54,9 +54,12 @@ import never pulls in heavy code. The commands (`submit`, `status`,
 | Command | What it does | Flags |
 |---|---|---|
 | `tslab new PATH` | copy the project template to `PATH` | `--name` (distribution name; default: the folder name) |
-| `tslab status PATH` | one line per run below `PATH`, or per instance for one run | `--stage` (only this stage) |
+| `tslab status PATH` | one line per run below `PATH`, or per instance for one run | `--stage` (only this stage), `--watch SECONDS` |
 | `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](studies.md) | see that page |
 | `tslab wandb-sync ROOT` | resync crashed, failed and killed W&B runs below `ROOT` | `--states`, `--include-offline`, `--wandb-project`, `--wandb-entity`, `--dry-run` |
+
+`--watch SECONDS` refreshes both status commands until Ctrl-C. Their hints
+suggest the next action and point to full error files for failed instances.
 
 ## Time series
 

@@ -268,6 +268,9 @@ uv run tslab study status my_paper.studies:example --machine cluster \
     [--grid NAME] [--only AXIS=V1,V2] [--states STATE]
 ```
 
+Add `--watch SECONDS` to refresh this report until Ctrl-C. Hints suggest
+resubmission for failed, interrupted, or missing runs, or results collection when all runs finish.
+
 Every expected run gets exactly one of six states, decided in this order:
 
 | State | When |
