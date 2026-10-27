@@ -27,15 +27,19 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class MachineAdd:
-    """Register a machine profile under a name, so ``--machine <name>`` finds it anywhere.
+    """Register a machine profile under a name, so --machine <name> finds it anywhere.
+
+    For example:
+
+        tslab machine add local machines/local.toml
 
     Attributes:
-        name: The name to register: letters, digits, ``_`` and ``-``.
+        name: The name to register: letters, digits, _ and -.
         path: The machine profile file; stored as an absolute path.
     """
 
-    name: Annotated[str, tyro.conf.Positional]
-    path: Annotated[Path, tyro.conf.Positional]
+    name: Annotated[str, tyro.conf.arg(metavar='NAME'), tyro.conf.Positional]
+    path: Annotated[Path, tyro.conf.arg(metavar='PROFILE'), tyro.conf.Positional]
 
     def run(self) -> int:
         """Validate the profile, store it and return the exit code."""
@@ -55,7 +59,12 @@ class MachineAdd:
 
 @dataclass(frozen=True, kw_only=True)
 class MachineList:
-    """Print the registered machine names and their profile files."""
+    """Print the registered machine names and their profile files.
+
+    For example:
+
+        tslab machine list
+    """
 
     def run(self) -> int:
         """Print one line per name and return the exit code."""
@@ -73,11 +82,15 @@ class MachineList:
 class MachineRemove:
     """Remove a name from the register; the profile file stays.
 
+    For example:
+
+        tslab machine remove local
+
     Attributes:
         name: The registered name.
     """
 
-    name: Annotated[str, tyro.conf.Positional]
+    name: Annotated[str, tyro.conf.arg(metavar='NAME'), tyro.conf.Positional]
 
     def run(self) -> int:
         """Remove the name and return the exit code."""

@@ -381,19 +381,23 @@ def _resync_verified(
 class WandbSync:
     """Resync local W&B runs that the server shows as crashed or failed.
 
+    For example:
+
+        tslab wandb-sync runs/ --dry-run
+
     Attributes:
         root: Folder searched for W&B run folders, for example your runs root.
         states: Server states to repair.
         include_offline: Also upload offline runs (never synced).
         wandb_project: Only touch runs of this project. Also the fallback project for
-            runs whose logs do not show one; unset falls back to ``WANDB_PROJECT``,
+            runs whose logs do not show one; unset falls back to WANDB_PROJECT,
             which never filters.
         wandb_entity: Fallback entity for runs whose logs do not show one; unset
-            falls back to ``WANDB_ENTITY``.
+            falls back to WANDB_ENTITY.
         dry_run: List what would be synced without uploading.
     """
 
-    root: Annotated[Path, tyro.conf.Positional]
+    root: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
     states: tuple[str, ...] = ('crashed', 'failed', 'killed')
     include_offline: bool = False
     wandb_project: str | None = None

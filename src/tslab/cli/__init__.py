@@ -104,13 +104,25 @@ def _parse(*, argv: Sequence[str]) -> Command:
         # ty: ignore[no-matching-overload, unsound-return-statement]
         # — ty sees the dict of dataclass types as no Callable overload match
         return tyro.extras.subcommand_cli_from_dict(
-            STUDY_COMMANDS, prog='tslab study', args=list(argv[1:])
+            STUDY_COMMANDS,
+            prog='tslab study',
+            args=list(argv[1:]),
+            config=(tyro.conf.FlagCreatePairsOff,),
+            description=(
+                'Launch and follow the runs of a study. STUDY is module:attribute, for example '
+                'my_paper.studies:example; --machine is a name from tslab machine list, '
+                'machines/<name>.toml above the working folder, or a profile path.'
+            ),
         )
     if argv and argv[0] == 'machine':
         # ty: ignore[no-matching-overload, unsound-return-statement]
         # — ty sees the dict of dataclass types as no Callable overload match
         return tyro.extras.subcommand_cli_from_dict(
-            MACHINE_COMMANDS, prog='tslab machine', args=list(argv[1:])
+            MACHINE_COMMANDS,
+            prog='tslab machine',
+            args=list(argv[1:]),
+            config=(tyro.conf.FlagCreatePairsOff,),
+            description='Name machine profiles once, then pass --machine <name> from any folder.',
         )
     return tyro.extras.subcommand_cli_from_dict(
         {
@@ -122,4 +134,18 @@ def _parse(*, argv: Sequence[str]) -> Command:
         },
         prog='tslab',
         args=list(argv),
+        config=(tyro.conf.FlagCreatePairsOff,),
+        description=(
+            'Helpers around TSLab runs. Experiments run through your own scripts; tslab\n'
+            'creates projects, launches studies and shows what runs are doing.\n\n'
+            'A study, step by step:\n'
+            '  tslab new my-paper                                            create a project\n'
+            '  tslab study submit STUDY --machine local --dry-run            check the plan\n'
+            '  tslab study submit STUDY --machine local                      launch the runs\n'
+            '  tslab study status STUDY --machine local                      follow them\n'
+            '  tslab study resubmit STUDY --machine local                    '
+            'retry interrupted runs\n'
+            '  tslab study results STUDY --machine local --out results.csv   collect metrics\n\n'
+            'STUDY is module:attribute, for example my_paper.studies:example.'
+        ),
     )

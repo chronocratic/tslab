@@ -50,12 +50,17 @@ _COUNTED_STATES = (
 class Status:
     """Show the instances of a run, or one line per run below a folder.
 
+    For example:
+
+        tslab status runs/
+        tslab status runs/ --stage scale
+
     Attributes:
-        path: A run folder, or any folder above runs (for example ``runs/``).
+        path: A run folder, or any folder above runs (for example runs/).
         stage: Count only the instances of this stage.
     """
 
-    path: Annotated[Path, tyro.conf.Positional]
+    path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
     stage: str | None = None
 
     def run(self) -> int:
