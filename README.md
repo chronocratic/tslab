@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://shieldcn.dev/header/surface.svg?title=TSLab&subtitle=A+batteries-included+lab+for+time+series+research&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlRTTGFiIj4KICA8dGl0bGU%2BVFNMYWI8L3RpdGxlPgogIDxwb2x5bGluZSBwb2ludHM9IjIsNjAgMjAsNjAgMzIsMjIgNTAsODYgNjYsMTAgNzgsNTAgOTgsNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzBmNzY2ZSIgc3Ryb2tlLXdpZHRoPSI5IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc%2BCg%3D%3D&align=center&font=jetbrains-mono&logoColor=5eead4&bg=0c1015&titleColor=5eead4&subtitleColor=b0b5bd&mode=dark" />
+    <img alt="TSLab: a batteries-included lab for time series research" src="https://shieldcn.dev/header/surface.svg?title=TSLab&subtitle=A+batteries-included+lab+for+time+series+research&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlRTTGFiIj4KICA8dGl0bGU%2BVFNMYWI8L3RpdGxlPgogIDxwb2x5bGluZSBwb2ludHM9IjIsNjAgMjAsNjAgMzIsMjIgNTAsODYgNjYsMTAgNzgsNTAgOTgsNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzBmNzY2ZSIgc3Ryb2tlLXdpZHRoPSI5IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc%2BCg%3D%3D&align=center&font=jetbrains-mono&logoColor=0f766e&bg=fcfdff&titleColor=0f766e&subtitleColor=61666e&mode=light" />
+  </picture>
+</p>
+
 # TSLab
 
 [![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
