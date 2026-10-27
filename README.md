@@ -1,8 +1,13 @@
 # TSLab
 
-[![CI](https://github.com/skafai/tslab/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/skafai/tslab/actions/workflows/ci.yml)
-[![Docs](https://readthedocs.org/projects/tslab/badge/?version=latest)](https://tslab.readthedocs.io)
-[![PyPI](https://img.shields.io/pypi/v/tslab)](https://pypi.org/project/tslab/)
+[![License: BSD-3-Clause](https://img.shields.io/badge/License-BSD--3--Clause-blue.svg)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/tslab.svg)](https://pypi.org/project/tslab/)
+[![Python versions](https://img.shields.io/pypi/pyversions/tslab.svg)](https://pypi.org/project/tslab/)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/tslab?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BLUE&left_text=downloads)](https://pepy.tech/projects/tslab)
+[![Build Status](https://github.com/skafai/tslab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/skafai/tslab/actions)
+[![Documentation Status](https://readthedocs.org/projects/tslab/badge/?version=latest)](https://tslab.readthedocs.io/en/latest/?badge=latest)
+[![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![GitHub stars](https://img.shields.io/github/stars/skafai/tslab)](https://github.com/skafai/tslab/stargazers)
 
 TSLab turns a research script into a pipeline of **cached, resumable stages**.
 You keep writing a normal Python `main()`. TSLab fingerprints the inputs and
