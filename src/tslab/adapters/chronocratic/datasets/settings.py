@@ -8,7 +8,7 @@ import operator
 from pathlib import Path
 import re
 import typing
-from typing import Annotated, Any
+from typing import Annotated, Any, TYPE_CHECKING
 
 import chronocratic.datasets
 from lightning import LightningDataModule
@@ -127,7 +127,11 @@ def _data_choice() -> Any:  # noqa: ANN401
     return functools.reduce(operator.or_, members)
 
 
-ChronocraticDataChoice = _data_choice()
+# why: type checkers reject a value built by a call as an annotation
+if TYPE_CHECKING:
+    type ChronocraticDataChoice = Any
+else:
+    ChronocraticDataChoice = _data_choice()
 
 
 def datamodule_class_of(*, settings: object) -> Any:  # noqa: ANN401 # why: a third-party class
