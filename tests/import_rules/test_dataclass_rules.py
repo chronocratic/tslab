@@ -19,7 +19,7 @@ def dataclass_decorators() -> list[tuple[str, int, str]]:
     ).stdout.split()
     found = []
     for name in files:
-        if name.startswith('planning/') or name == 'CHANGELOG.md':
+        if name == 'CHANGELOG.md':
             continue
         if not (ROOT / name).is_file():
             continue  # listed by git but deleted in the working tree

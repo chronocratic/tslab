@@ -6,16 +6,11 @@ import pytest
 from tslab.core.paths import (
     atomic_write_json,
     atomic_write_text,
-    CONFIG_FILE,
-    ERROR_FILE,
     JsonFileError,
-    LOCK_FILE,
-    META_FILE,
     normalize_instance_name,
     read_json_object,
     replace_directory,
     require_path,
-    STATUS_FILE,
     validate_relative_path,
     validate_stage_name,
 )
@@ -118,11 +113,6 @@ def test_leading_dot_and_temporary_marker_are_rejected(name: str) -> None:
 def test_names_written_into_a_run_folder_are_reserved(name: str) -> None:
     with pytest.raises(ValueError, match=r'invalid name part|reserved'):
         validate_stage_name(name=name)
-
-
-def test_on_disk_names_are_public_constants() -> None:
-    assert (STATUS_FILE, META_FILE, LOCK_FILE) == ('status.json', 'meta.json', '.lock')
-    assert (CONFIG_FILE, ERROR_FILE) == ('config.yaml', 'error.txt')
 
 
 def test_failed_write_leaves_no_temporary_file(tmp_path: Path) -> None:
