@@ -253,7 +253,8 @@ Writing a study:
 - `exclude=` drops combinations; `Override(match=..., settings=...)` changes
   settings of matching runs.
 - `${VAR}` in a string expands from the machine `[env]`, then the shell
-  environment. `{output_root}`, `{study}`, `{run_path}`, `{log_file}` expand per run.
+  environment. `{output_root}`, `{study}`, `{run_path}`, `{log_file}`, `{cpus}` expand per run;
+  `{cpus}` is `cpus_per_task` on SLURM and the usable CPUs on a local machine.
 - A study holds data, not logic: no computation or branching on results.
   Every path is checked against the config class at import, and every run is
   parsed at submit, so typos fail before anything runs.

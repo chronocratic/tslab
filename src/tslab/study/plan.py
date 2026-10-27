@@ -8,6 +8,7 @@ from io import StringIO
 import logging
 import os
 from pathlib import Path
+import sys
 
 import tslab
 from tslab.study.definition import (
@@ -252,6 +253,14 @@ def expansion_env(*, machine: MachineProfile) -> dict[str, str]:
     return {**os.environ, **machine.env}
 
 
+def _usable_cpus() -> int:
+    """The CPUs this process may run on; a local launch runs its tasks here."""
+    # why: the affinity mask honours taskset and container limits; macOS has no such call
+    if sys.platform == 'linux':
+        return len(os.sched_getaffinity(0))
+    return os.cpu_count() or 1
+
+
 @dataclass(frozen=True, kw_only=True)
 class PlannedTask:
     """One run prepared for submission.
@@ -378,6 +387,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         order.
     """
     folder = study_folder(machine=machine, study=study)
+    local_cpus = _usable_cpus()
     groups: list[JobGroup] = []
     lookup: dict[tuple[str, SlurmSettings | None], int] = {}
     next_file = first_job_file
@@ -412,6 +422,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     'study': study.name,
                     'run_path': run.run.run_path,
                     'log_file': str(log_file),
+                    'cpus': str(local_cpus if run.slurm is None else run.slurm.cpus_per_task),
                 },
             )
         except (ValueError, TypeError) as error:

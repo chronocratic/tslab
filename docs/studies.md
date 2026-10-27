@@ -125,9 +125,11 @@ Rules that matter when writing one:
   to settings is also an axis, and one can combine axes with `|`.
 - **`${VAR}`** in any string setting expands at submit time from the machine
   [env] of the machine profile and then the environment of the submit process; an unset
-  variable raises. **`{output_root}`, `{study}`, `{run_path}`, `{log_file}`**
+  variable raises. **`{output_root}`, `{study}`, `{run_path}`, `{log_file}`, `{cpus}`**
   are TSLab placeholders, expanded per run; nothing else in `{...}` is
-  substituted.
+  substituted. `{cpus}` is the `cpus_per_task` of the run on a SLURM machine
+  and the CPUs the submit process may use on a local one, so a profile can set
+  `"data.num_workers" = "{cpus}"` once and keep it in step with its overrides.
 - **A study holds data, not logic.** A study file may list data — including
   one dict comprehension over a constant tuple, as the `variant` axis of
   `forecasting` does — but it must not compute, branch or loop over results. The presets of the

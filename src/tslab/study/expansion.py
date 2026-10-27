@@ -10,7 +10,7 @@ from tslab.study.settings import SettingValue
 
 __all__ = ['PLACEHOLDERS', 'expand_placeholders', 'expand_setting', 'expand_variables']
 
-PLACEHOLDERS = ('output_root', 'study', 'run_path', 'log_file')
+PLACEHOLDERS = ('output_root', 'study', 'run_path', 'log_file', 'cpus')
 
 _VARIABLE_PATTERN = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}')
 _PLACEHOLDER_PATTERN = re.compile(r'\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)\}')

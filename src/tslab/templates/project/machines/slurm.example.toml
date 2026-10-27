@@ -10,6 +10,7 @@ tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
 [settings] # the same settings as the grids of the study, for every run on this machine
 # "tracking.wandb_mode" = "offline"
 # "tracking.shell_log_path" = "{log_file}"
+# "data.num_workers" = "{cpus}" # the cpus_per_task of each run, overrides included
 
 [env] # exported in every job; ${VAR} in other strings resolves against these
 SCRATCH = "/scratch/CHANGE_ME"
