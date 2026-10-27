@@ -1,0 +1,1 @@
+Studies: the `{cpus}` placeholder expands to the `cpus_per_task` of each run on a SLURM machine and to the usable CPUs on a local one, so a machine profile can set `"data.num_workers" = "{cpus}"` once instead of repeating the number.

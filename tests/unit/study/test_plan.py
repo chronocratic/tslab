@@ -12,6 +12,7 @@ from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     check_machine,
+    JobGroup,
     plan_jobs,
     resolve_runs,
     validate_arguments,
@@ -105,3 +106,45 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
     messages = dict(validate_jobs(study=study, groups=groups))
     assert 'nope' in messages[runs[1].run_path]
     assert 'max_array_size' in messages[runs[1].run_path]
+
+
+def _epochs_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
+    return {
+        task.resolved.run.values['recipe']: task.command[
+            task.command.index('--trainer.max-epochs') + 1
+        ]
+        for group in groups
+        for task in group.tasks
+    }
+
+
+def _plan(study: Study, machine: MachineProfile) -> list[JobGroup]:
+    runs = expand_runs(study=study)
+    return plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolve_runs(study=study, machine=machine, runs=runs),
+        indices={run.run_path: i for i, run in enumerate(runs)},
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+    )
+
+
+def test_cpus_placeholder_is_the_cpus_per_task_of_the_run(study: Study, tmp_path: Path) -> None:
+    machine = _local(
+        tmp_path,
+        launcher='slurm',
+        settings={'trainer.max_epochs': '{cpus}'},
+        slurm=SlurmSettings(partition='p', cpus_per_task=6),
+        overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'cpus_per_task': 8}),),
+    )
+    assert _epochs_by_recipe(_plan(study, machine)) == {'ts2vec-paper': '6', 'cost-paper': '8'}
+
+
+def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
+    study: Study, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr('tslab.study.plan._usable_cpus', lambda: 3)
+    machine = _local(tmp_path, settings={'trainer.max_epochs': '{cpus}'})
+    assert set(_epochs_by_recipe(_plan(study, machine)).values()) == {'3'}

@@ -6,3 +6,4 @@ output_root = "runs"
 # [settings]
 # "tracking.wandb_mode" = "offline"
 # "trainer.max_epochs" = 100
+# "data.num_workers" = "{cpus}" # the CPUs this machine may use
