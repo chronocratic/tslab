@@ -42,6 +42,7 @@ from typing import (
     Literal,
     NoReturn,
     TYPE_CHECKING,
+    TypeAliasType,
     Union,
 )
 
@@ -165,12 +166,18 @@ def union_members(*, annotation: object) -> tuple[object, ...] | None:
 
 
 def strip_annotated(*, annotation: object) -> object:
-    """Return the wrapped type of ``Annotated[T, ...]``, or ``annotation`` itself.
+    """Return the type behind ``Annotated[T, ...]`` and ``type`` aliases, or ``annotation`` itself.
 
     Args:
         annotation: A type annotation.
     """
-    return get_args(annotation)[0] if get_origin(annotation) is Annotated else annotation
+    while True:
+        if isinstance(annotation, TypeAliasType):
+            annotation = annotation.__value__
+        elif get_origin(annotation) is Annotated:
+            annotation = get_args(annotation)[0]
+        else:
+            return annotation
 
 
 def _item_annotations(*, annotation: object, length: int, location: str) -> list[object]:
