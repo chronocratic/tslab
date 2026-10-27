@@ -1,5 +1,6 @@
 """``expand_variables``, ``expand_placeholders`` and ``expand_setting``."""
 
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
@@ -34,6 +35,15 @@ def test_expand_setting_types() -> None:
     assert expand_setting(value=Path('${R}/{study}'), env=env, values=values) == Path('/d/s')
     assert expand_setting(value=('${R}', 3), env=env, values=values) == ('/d', 3)
     assert expand_setting(value=7, env=env, values=values) == 7
+
+
+class Mode(StrEnum):
+    FAST = 'fast'
+
+
+def test_expand_setting_keeps_str_enum_members() -> None:
+    expanded = expand_setting(value=Mode.FAST, env={}, values={})
+    assert expanded is Mode.FAST
 
 
 def test_env_values_are_not_scanned_for_placeholders() -> None:

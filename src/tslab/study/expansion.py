@@ -1,6 +1,7 @@
 """String expansion for study settings: ``${VAR}`` and ``{placeholder}``."""
 
 from collections.abc import Callable, Mapping
+from enum import Enum
 from pathlib import Path
 import re
 from typing import cast
@@ -114,6 +115,8 @@ def expand_setting(
         ValueError: If a string holds an unset variable or an unknown
             placeholder.
     """
+    if isinstance(value, Enum):  # a str Enum is a str, but expanding it would lose the member
+        return value
     if isinstance(value, str):
         return _expand_text(text=value, env=env, values=values)
     if isinstance(value, Path):
