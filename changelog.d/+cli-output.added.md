@@ -1,0 +1,1 @@
+`tslab` output is colored on a terminal, `tslab status` and `tslab study` print the next command to run and point at the error file of failed instances, and `--watch SECONDS` refreshes `tslab status` and `tslab study status`; help pages show example commands.

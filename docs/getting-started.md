@@ -43,6 +43,9 @@ uv run python -m my_paper.forecast ts2vec-full-series
 uv run tslab status runs/
 ```
 
+Add `--watch SECONDS` to refresh run status until Ctrl-C. Status hints suggest
+the next command and point to `error.txt` for failed instances.
+
 Run the same command again: every stage loads its result. Change a setting
 and only the stages it affects run again. See {doc}`configs-and-presets` for
 choosing models and datasets, and {doc}`concepts` for what is cached and why.
