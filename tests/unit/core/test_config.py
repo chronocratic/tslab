@@ -245,3 +245,17 @@ def test_parse_config_presets() -> None:
     assert config == Config(seed=3)
     with pytest.raises(ValueError, match='either presets= or default='):
         parse_config(config_class=Config, presets=presets, default=Config(), args=[])
+
+
+type Scales = tuple[float, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
+class AliasConfig:
+    scales: Scales = (1.0, 2.0)
+
+
+def test_round_trip_through_a_type_alias_annotation() -> None:
+    config = AliasConfig(scales=(0.5, 3.0))
+    text = config_to_yaml(config=config)
+    assert config_from_yaml(config_class=AliasConfig, text=text) == config
