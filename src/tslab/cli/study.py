@@ -235,7 +235,9 @@ class Resubmit:
         cancel_live: Cancel the queued and running runs first and
             resubmit them a little later.
         dry_run: Write the job files and print the plan, submit nothing.
-        auto: Set by the follow-up jobs of TSLab; not for use by hand.
+        auto: Retry only the interrupted runs that made progress, up to
+            followup.max_attempts each; ignores --states and --cancel-live.
+            The follow-up jobs pass this.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
     """
