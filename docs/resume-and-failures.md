@@ -54,3 +54,6 @@ receiving its heartbeat, so after ten minutes:
 - `tslab status` shows the run as `interrupted`;
 - the next run of the same command takes the lock over, on any machine, and
   resumes.
+
+Add `--watch SECONDS` to `tslab status runs/` to refresh until Ctrl-C. Its hints
+explain resuming interrupted runs and point to error files for failed instances.

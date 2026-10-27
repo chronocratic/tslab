@@ -35,6 +35,9 @@ uv run tslab status runs/            # one line per run: state and instance coun
 uv run tslab status runs/ --stage attack
 ```
 
+Add `--watch SECONDS` to refresh run status until Ctrl-C. Hints point to failed-instance error
+files, explain interrupted runs, and suggest opening one run when scanning several.
+
 ## Distributed training
 
 Only rank 0 writes TSLab files; the other ranks read. Stages other than
