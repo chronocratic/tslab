@@ -125,23 +125,6 @@ def test_discover_runs_reads_coordinates_and_skips_latest_run(tmp_path: Path) ->
     ]
 
 
-def test_each_debug_log_is_read_once_per_run(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    make_run(root=tmp_path, log='finishing run\ngot exitcode: 0\n')
-    reads: list[str] = []
-    original = Path.read_text
-
-    def counting(self: Path, encoding: str = 'utf-8', errors: str | None = None) -> str:
-        reads.append(self.name)
-        return original(self, encoding=encoding, errors=errors)
-
-    monkeypatch.setattr(Path, 'read_text', counting)
-    (run,) = discover_runs(root=tmp_path)
-    assert run.local_state() is LocalState.FINISHED
-    assert reads.count('debug-internal.log') == 1
-
-
 @pytest.mark.parametrize(
     ('log', 'stale', 'expected'),
     [

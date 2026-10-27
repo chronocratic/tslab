@@ -1,4 +1,4 @@
-"""Settings rules found in review: preset fidelity, bad values, bad paths."""
+"""Settings rules: preset fidelity, bad values, bad paths."""
 
 from dataclasses import dataclass, field
 

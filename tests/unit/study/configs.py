@@ -1,7 +1,7 @@
 """A small config shaped like the ``ClassifyConfig`` of the template, for the study tests.
 
-Every union member is named with ``tyro.conf.subcommand(name=...)``, as Q-3
-requires of a choice union. ``PRESETS`` mirrors the shape of the preset
+Every union member is named with ``tyro.conf.subcommand(name=...)``, as a choice
+union requires. ``PRESETS`` mirrors the shape of the preset
 registry of the template, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
 """
 
