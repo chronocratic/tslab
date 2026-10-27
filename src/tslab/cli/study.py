@@ -5,11 +5,14 @@ behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
 from dataclasses import dataclass
+import logging
 from pathlib import Path
+import shlex
 from typing import Annotated
 
 import tyro
 
+from tslab.cli.console import watch
 from tslab.cli.usage import UsageError
 from tslab.study.commands import parse_states, resubmit, results, status, submit
 from tslab.study.context import Context, load_context, Selection
@@ -17,6 +20,8 @@ from tslab.study.machine import resolve_machine
 from tslab.study.state import StudyState
 
 __all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _context_of(
@@ -46,6 +51,44 @@ def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:
         return parse_states(values=values)
     except ValueError as error:
         raise UsageError(str(error)) from error
+
+
+def _selection_args(
+    *, study: str, machine: str, grid: tuple[str, ...], only: tuple[str, ...]
+) -> str:
+    arguments = [study, '--machine', machine]
+    for grid_name in grid:
+        arguments.extend(('--grid', grid_name))
+    for selection in only:
+        arguments.extend(('--only', selection))
+    return shlex.join(arguments)
+
+
+def _warn_no_runs(*, context: Context) -> None:
+    if not context.reports:
+        _LOGGER.warning('no runs match the selection; drop --grid/--only or check their values')
+
+
+def _status_hints(
+    *, context: Context, study: str, machine: str, grid: tuple[str, ...], only: tuple[str, ...]
+) -> None:
+    if not context.reports:
+        _warn_no_runs(context=context)
+        return
+    selection = _selection_args(study=study, machine=machine, grid=grid, only=only)
+    states = {report.state for report in context.reports}
+    if StudyState.FAILED in states:
+        _LOGGER.info(
+            'fix the failed runs, then: tslab study resubmit %s --states failed', selection
+        )
+    if StudyState.INTERRUPTED in states or StudyState.MISSING in states:
+        _LOGGER.info('retry interrupted and missing runs: tslab study resubmit %s', selection)
+    if all(report.state is StudyState.DONE for report in context.reports):
+        _LOGGER.info(
+            'all %d runs done; collect metrics: tslab study results %s --out results.csv',
+            len(context.reports),
+            selection,
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -81,14 +124,25 @@ class Submit:
 
     def run(self) -> int:
         """Submit and return the exit code."""
-        return submit(
-            context=_context_of(
-                study=self.study, machine=self.machine, grid=self.grid, only=self.only
-            ),
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only
+        )
+        _warn_no_runs(context=context)
+        code = submit(
+            context=context,
             include_done=self.include_done,
             dry_run=self.dry_run,
             extra_args=self.extra_args,
         )
+        if code == 0:
+            if self.dry_run:
+                _LOGGER.info('dry run: nothing submitted; run again without --dry-run to submit')
+            else:
+                selection = _selection_args(
+                    study=self.study, machine=self.machine, grid=self.grid, only=self.only
+                )
+                _LOGGER.info('follow progress: tslab study status %s', selection)
+        return code
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -98,6 +152,7 @@ class Status:
     For example:
 
         tslab study status my_paper.studies:example --machine local
+        tslab study status my_paper.studies:example --machine local --watch 60
 
     Attributes:
         study: The study reference, module:attribute.
@@ -107,6 +162,7 @@ class Status:
         only: Keep only the runs that match axis=value; repeatable,
             comma separated for several values of one axis.
         states: Show only the runs in these states; repeatable, comma separated.
+        watch: Refresh every this many seconds until Ctrl-C.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
@@ -118,20 +174,31 @@ class Status:
     states: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
     ] = ()
+    watch: float | None = None
 
     def run(self) -> int:
         """Print the table and return the exit code."""
         states = _states_of(values=self.states)
-        return status(
-            context=_context_of(
+
+        def show() -> int:
+            context = _context_of(
                 study=self.study,
                 machine=self.machine,
                 grid=self.grid,
                 only=self.only,
                 read_only=True,
-            ),
-            states=states,
-        )
+            )
+            code = status(context=context, states=states)
+            _status_hints(
+                context=context,
+                study=self.study,
+                machine=self.machine,
+                grid=self.grid,
+                only=self.only,
+            )
+            return code
+
+        return watch(seconds=self.watch, show=show)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -177,16 +244,27 @@ class Resubmit:
     def run(self) -> int:
         """Resubmit and return the exit code."""
         states = _states_of(values=self.states)
-        return resubmit(
-            context=_context_of(
-                study=self.study, machine=self.machine, grid=self.grid, only=self.only
-            ),
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only
+        )
+        _warn_no_runs(context=context)
+        code = resubmit(
+            context=context,
             states=states,
             cancel_live=self.cancel_live,
             dry_run=self.dry_run,
             extra_args=self.extra_args or None,
             auto=self.auto,
         )
+        if code == 0:
+            if self.dry_run:
+                _LOGGER.info('dry run: nothing submitted; run again without --dry-run to submit')
+            else:
+                selection = _selection_args(
+                    study=self.study, machine=self.machine, grid=self.grid, only=self.only
+                )
+                _LOGGER.info('follow progress: tslab study status %s', selection)
+        return code
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -217,16 +295,11 @@ class Results:
 
     def run(self) -> int:
         """Write the table and return the exit code."""
-        return results(
-            context=_context_of(
-                study=self.study,
-                machine=self.machine,
-                grid=self.grid,
-                only=self.only,
-                read_only=True,
-            ),
-            out=self.out,
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
         )
+        _warn_no_runs(context=context)
+        return results(context=context, out=self.out)
 
 
 STUDY_COMMANDS = {'submit': Submit, 'status': Status, 'resubmit': Resubmit, 'results': Results}
