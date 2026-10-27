@@ -7,10 +7,10 @@ status`, resubmitted after crashes, and collected with `tslab study results`
 into one table.
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine machines/cluster.toml
-uv run tslab study status   my_paper.studies:example --machine machines/cluster.toml
-uv run tslab study resubmit my_paper.studies:example --machine machines/cluster.toml
-uv run tslab study results  my_paper.studies:example --machine machines/cluster.toml \
+uv run tslab study submit my_paper.studies:example --machine cluster
+uv run tslab study status   my_paper.studies:example --machine cluster
+uv run tslab study resubmit my_paper.studies:example --machine cluster
+uv run tslab study results  my_paper.studies:example --machine cluster \
     --out results.csv
 ```
 
@@ -143,6 +143,12 @@ machine**, so no personal path has to be hard-coded. The template ships a
 runnable `machines/local.toml` and a fully commented
 `machines/slurm.example.toml`.
 
+`--machine` takes the name of a profile: `--machine cluster` reads
+`machines/cluster.toml` under the project root, the nearest folder above the
+working directory that holds a `pyproject.toml`, so the command works from
+any subfolder. A value with a `/` or a `.toml` suffix is used as a file path.
+An unknown name fails and lists the profiles in `machines/`.
+
 | Key | Default | Meaning |
 |---|---|---|
 | `launcher` | required | `"local"` or `"slurm"` |
@@ -195,7 +201,7 @@ Rules:
 ## Submit
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine machines/cluster.toml \
+uv run tslab study submit my_paper.studies:example --machine cluster \
     [--grid NAME] [--only AXIS=V1,V2] [--include-done] [--dry-run] [-- extra args]
 ```
 
@@ -235,7 +241,7 @@ resubmit is a sparse array of the same indices.
 ## Status
 
 ```bash
-uv run tslab study status my_paper.studies:example --machine machines/cluster.toml \
+uv run tslab study status my_paper.studies:example --machine cluster \
     [--grid NAME] [--only AXIS=V1,V2] [--states STATE]
 ```
 
@@ -260,7 +266,7 @@ always: a status report is not a failure.
 ## Resubmit
 
 ```bash
-uv run tslab study resubmit my_paper.studies:example --machine machines/cluster.toml \
+uv run tslab study resubmit my_paper.studies:example --machine cluster \
     [--states failed,interrupted,missing] [--cancel-live] [--dry-run] [-- extra args]
 ```
 
@@ -283,7 +289,7 @@ Off by default (`[followup] auto_retry = true` turns it on).
 After each submission, one follow-up job is queued with
 `--dependency=afterany:<all job ids of that submission>` and minimal
 resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
-`<tslab_command> study resubmit <study> --machine <toml> --auto`:
+`<tslab_command> study resubmit <study> --machine <name> --auto`:
 
 - `--auto` resubmits **only `interrupted` runs**, never `failed` or
   `missing` (startup failures and code errors, including out-of-memory, stay
@@ -309,7 +315,7 @@ no network (see below).
 ## Results
 
 ```bash
-uv run tslab study results my_paper.studies:example --machine machines/cluster.toml \
+uv run tslab study results my_paper.studies:example --machine cluster \
     --out results.csv
 ```
 

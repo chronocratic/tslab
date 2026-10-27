@@ -228,11 +228,11 @@ A study runs one script command over the product of its axes. See
 `studies.py` for the example.
 
 ```bash
-uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml --dry-run
-uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study status {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study resubmit {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study results {{package_name}}.studies:example --machine machines/local.toml --out results.csv
+uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
+uv run tslab study submit {{package_name}}.studies:example --machine local
+uv run tslab study status {{package_name}}.studies:example --machine local
+uv run tslab study resubmit {{package_name}}.studies:example --machine local
+uv run tslab study results {{package_name}}.studies:example --machine local --out results.csv
 ```
 
 `--grid NAME` and `--only axis=value` select a slice; arguments after `--` go

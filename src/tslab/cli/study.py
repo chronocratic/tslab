@@ -13,6 +13,7 @@ import tyro
 from tslab.cli.usage import UsageError
 from tslab.study.commands import parse_states, resubmit, results, status, submit
 from tslab.study.context import Context, load_context, Selection
+from tslab.study.machine import find_project_root, resolve_machine_file
 from tslab.study.state import StudyState
 
 __all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
@@ -21,18 +22,19 @@ __all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
 def _context_of(
     *,
     study: str,
-    machine: Path,
+    machine: str,
     grid: tuple[str, ...],
     only: tuple[str, ...],
     read_only: bool = False,
 ) -> Context:
     """The context of a study reference; a bad reference or profile is a usage error."""
+    project_root = find_project_root(start=Path.cwd())
     try:
         return load_context(
             reference=study,
-            machine_path=machine,
+            machine_path=resolve_machine_file(machine=machine, project_root=project_root),
             selection=Selection(grids=grid, only=only),
-            project_root=Path.cwd(),
+            project_root=project_root,
             read_only=read_only,
         )
     except (ValueError, TypeError, FileNotFoundError, ModuleNotFoundError) as error:
@@ -52,7 +54,7 @@ class Submit:
 
     Attributes:
         study: The study reference, ``module:attribute``.
-        machine: The machine profile to submit to.
+        machine: The machine name (``machines/<name>.toml`` of the project) or a profile path.
         grid: Keep only this grid; repeatable.
         only: Keep only the runs that match ``axis=value``; repeatable,
             comma separated for several values of one axis.
@@ -62,7 +64,7 @@ class Submit:
     """
 
     study: Annotated[str, tyro.conf.Positional]
-    machine: Path
+    machine: str
     grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     include_done: bool = False
@@ -87,7 +89,7 @@ class Status:
 
     Attributes:
         study: The study reference, ``module:attribute``.
-        machine: The machine profile the runs run on.
+        machine: The machine name (``machines/<name>.toml`` of the project) or a profile path.
         grid: Keep only this grid; repeatable.
         only: Keep only the runs that match ``axis=value``; repeatable,
             comma separated for several values of one axis.
@@ -95,7 +97,7 @@ class Status:
     """
 
     study: Annotated[str, tyro.conf.Positional]
-    machine: Path
+    machine: str
     grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
@@ -121,7 +123,7 @@ class Resubmit:
 
     Attributes:
         study: The study reference, ``module:attribute``.
-        machine: The machine profile the runs run on.
+        machine: The machine name (``machines/<name>.toml`` of the project) or a profile path.
         grid: Keep only this grid; repeatable.
         only: Keep only the runs that match ``axis=value``; repeatable,
             comma separated for several values of one axis.
@@ -136,7 +138,7 @@ class Resubmit:
     """
 
     study: Annotated[str, tyro.conf.Positional]
-    machine: Path
+    machine: str
     grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
@@ -166,7 +168,7 @@ class Results:
 
     Attributes:
         study: The study reference, ``module:attribute``.
-        machine: The machine profile the runs run on.
+        machine: The machine name (``machines/<name>.toml`` of the project) or a profile path.
         grid: Keep only this grid; repeatable.
         only: Keep only the runs that match ``axis=value``; repeatable,
             comma separated for several values of one axis.
@@ -174,7 +176,7 @@ class Results:
     """
 
     study: Annotated[str, tyro.conf.Positional]
-    machine: Path
+    machine: str
     grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
     out: Path

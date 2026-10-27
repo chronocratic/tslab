@@ -5,7 +5,7 @@ command over the product of its axes; every run lands in
 ``runs/<study>/<grid>/<axis values>/``. Run one:
 
     uv run tslab study submit {{package_name}}.studies:example \
-        --machine machines/local.toml --grid classification --only seed=0 --dry-run
+        --machine local --grid classification --only seed=0 --dry-run
 """
 
 from tslab.adapters.chronocratic.datasets import ucr_datasets
