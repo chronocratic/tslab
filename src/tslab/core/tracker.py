@@ -25,6 +25,15 @@ __all__ = ['LocalTracker', 'RunStatus', 'Tracker']
 _VERSION_PATTERN = re.compile(r'version_(\d+)')
 
 
+class _ParamsDumper(yaml.SafeDumper):
+    """A safe dumper that writes any value it cannot represent as its text."""
+
+
+# Lightning passes the raw init arguments of a model, which can hold enums, paths
+# or classes; safe_dump refuses those, and the whole hparams.yaml would be lost.
+_ParamsDumper.add_multi_representer(object, lambda dumper, value: dumper.represent_str(str(value)))
+
+
 class RunStatus(StrEnum):
     """Final status reported to a tracker when the run ends.
 
@@ -127,7 +136,7 @@ class LocalTracker(Tracker):
     @override
     def log_params(self, *, params: Mapping[str, object]) -> None:
         if self._directory is not None:
-            text = yaml.safe_dump(dict(params), sort_keys=True, allow_unicode=True)
+            text = yaml.dump(dict(params), Dumper=_ParamsDumper, sort_keys=True, allow_unicode=True)
             atomic_write_text(path=self._directory / 'hparams.yaml', text=text)
 
     @override
