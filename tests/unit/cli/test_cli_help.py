@@ -1,0 +1,67 @@
+import re
+
+import pytest
+
+from tslab.cli import main
+
+COMMANDS: list[list[str]] = [
+    [],
+    ['study'],
+    ['machine'],
+    ['new'],
+    ['status'],
+    ['wandb-sync'],
+    ['study', 'submit'],
+    ['study', 'status'],
+    ['study', 'resubmit'],
+    ['study', 'results'],
+    ['machine', 'add'],
+    ['machine', 'list'],
+    ['machine', 'remove'],
+]
+LEAF_COMMANDS = COMMANDS[3:]
+
+
+def _command_id(*, command: list[str]) -> str:
+    return ' '.join(command) or 'tslab'
+
+
+def _help(*, command: list[str], capsys: pytest.CaptureFixture[str]) -> str:
+    with pytest.raises(SystemExit) as raised:
+        main(args=[*command, '--help'])
+    assert raised.value.code == 0
+    return capsys.readouterr().out
+
+
+@pytest.mark.parametrize('command', COMMANDS, ids=lambda command: ' '.join(command) or 'tslab')
+def test_help_is_plain_and_free_of_flag_pairs(
+    *, command: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = _help(command=command, capsys=capsys)
+
+    assert '``' not in output
+    assert '--no-' not in output
+    assert re.search(r'\b(STR|PATH)$', output.splitlines()[0].strip()) is None
+
+
+@pytest.mark.parametrize('command', LEAF_COMMANDS, ids=lambda command: ' '.join(command) or 'tslab')
+def test_command_help_shows_an_example(
+    *, command: list[str], capsys: pytest.CaptureFixture[str]
+) -> None:
+    output = _help(command=command, capsys=capsys)
+
+    assert 'For example:' in output
+    assert f'tslab {_command_id(command=command)}' in output
+
+
+def test_top_help_shows_the_study_workflow(capsys: pytest.CaptureFixture[str]) -> None:
+    output = _help(command=[], capsys=capsys)
+
+    assert 'A study, step by step:' in output
+    assert 'tslab study resubmit STUDY' in output
+
+
+def test_study_submit_help_names_the_positional(capsys: pytest.CaptureFixture[str]) -> None:
+    output = _help(command=['study', 'submit'], capsys=capsys)
+
+    assert 'STUDY' in output
