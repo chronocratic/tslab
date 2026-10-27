@@ -52,22 +52,29 @@ def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:
 class Submit:
     """Submit the runs of a study to a machine, or dry-run the plan.
 
+    For example:
+
+        tslab study submit my_paper.studies:example --machine local --dry-run
+        tslab study submit my_paper.studies:example --machine local -- --trainer.max-epochs 5
+
     Attributes:
-        study: The study reference, ``module:attribute``.
-        machine: The machine name (``machines/<name>.toml`` above the working directory, or
-            registered with ``tslab machine add``) or a profile path.
+        study: The study reference, module:attribute.
+        machine: The machine name (machines/<name>.toml above the working directory, or
+            registered with tslab machine add) or a profile path.
         grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match ``axis=value``; repeatable,
+        only: Keep only the runs that match axis=value; repeatable,
             comma separated for several values of one axis.
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
-        extra_args: The arguments after ``--``, appended to every run.
+        extra_args: The arguments after --, appended to every run.
     """
 
-    study: Annotated[str, tyro.conf.Positional]
-    machine: str
-    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
     include_done: bool = False
     dry_run: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
@@ -88,21 +95,29 @@ class Submit:
 class Status:
     """The state table of a study, and one line per run not done.
 
+    For example:
+
+        tslab study status my_paper.studies:example --machine local
+
     Attributes:
-        study: The study reference, ``module:attribute``.
-        machine: The machine name (``machines/<name>.toml`` above the working directory, or
-            registered with ``tslab machine add``) or a profile path.
+        study: The study reference, module:attribute.
+        machine: The machine name (machines/<name>.toml above the working directory, or
+            registered with tslab machine add) or a profile path.
         grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match ``axis=value``; repeatable,
+        only: Keep only the runs that match axis=value; repeatable,
             comma separated for several values of one axis.
         states: Show only the runs in these states; repeatable, comma separated.
     """
 
-    study: Annotated[str, tyro.conf.Positional]
-    machine: str
-    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    states: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
+    ] = ()
 
     def run(self) -> int:
         """Print the table and return the exit code."""
@@ -123,12 +138,17 @@ class Status:
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
+    For example:
+
+        tslab study resubmit my_paper.studies:example --machine local
+        tslab study resubmit my_paper.studies:example --machine local --dry-run
+
     Attributes:
-        study: The study reference, ``module:attribute``.
-        machine: The machine name (``machines/<name>.toml`` above the working directory, or
-            registered with ``tslab machine add``) or a profile path.
+        study: The study reference, module:attribute.
+        machine: The machine name (machines/<name>.toml above the working directory, or
+            registered with tslab machine add) or a profile path.
         grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match ``axis=value``; repeatable,
+        only: Keep only the runs that match axis=value; repeatable,
             comma separated for several values of one axis.
         states: The states to resubmit; repeatable, comma separated.
             Interrupted and missing when omitted.
@@ -136,15 +156,19 @@ class Resubmit:
             resubmit them a little later.
         dry_run: Write the job files and print the plan, submit nothing.
         auto: Follow-up mode, used by TSLab itself.
-        extra_args: The arguments after ``--``; taken from the last
+        extra_args: The arguments after --; taken from the last
             submission when omitted.
     """
 
-    study: Annotated[str, tyro.conf.Positional]
-    machine: str
-    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    states: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    states: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
+    ] = ()
     cancel_live: bool = False
     dry_run: bool = False
     auto: bool = False
@@ -169,21 +193,27 @@ class Resubmit:
 class Results:
     """The metrics of every run of a study, as one CSV table.
 
+    For example:
+
+        tslab study results my_paper.studies:example --machine local --out results.csv
+
     Attributes:
-        study: The study reference, ``module:attribute``.
-        machine: The machine name (``machines/<name>.toml`` above the working directory, or
-            registered with ``tslab machine add``) or a profile path.
+        study: The study reference, module:attribute.
+        machine: The machine name (machines/<name>.toml above the working directory, or
+            registered with tslab machine add) or a profile path.
         grid: Keep only this grid; repeatable.
-        only: Keep only the runs that match ``axis=value``; repeatable,
+        only: Keep only the runs that match axis=value; repeatable,
             comma separated for several values of one axis.
         out: The CSV file to write; required.
     """
 
-    study: Annotated[str, tyro.conf.Positional]
-    machine: str
-    grid: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    only: Annotated[tuple[str, ...], tyro.conf.UseAppendAction] = ()
-    out: Path
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    out: Annotated[Path, tyro.conf.arg(metavar='FILE')]
 
     def run(self) -> int:
         """Write the table and return the exit code."""

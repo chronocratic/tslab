@@ -30,12 +30,16 @@ _SKIPPED_PARTS = frozenset({'__pycache__'})
 class New:
     """Create a project from the TSLab template.
 
+    For example:
+
+        tslab new my-paper
+
     Attributes:
         path: Folder to create; it must not exist or must be empty.
         name: Project name (letters, digits and dashes); defaults to the folder name.
     """
 
-    path: Annotated[Path, tyro.conf.Positional]
+    path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
     name: str | None = None
 
     def run(self) -> int:
