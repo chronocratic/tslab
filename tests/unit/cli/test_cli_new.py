@@ -7,6 +7,7 @@ from tslab.cli.new import create_project
 
 EXPECTED_FILES = {
     '.gitignore',
+    'AGENTS.md',
     'README.md',
     'machines/local.toml',
     'machines/slurm.example.toml',
