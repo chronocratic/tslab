@@ -24,8 +24,10 @@ __all__ = [
     'MachineProfile',
     'MachineProfileError',
     'SlurmSettings',
+    'find_project_root',
     'flatten_settings',
     'load_machine',
+    'resolve_machine_file',
 ]
 
 _ENV_NAME_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
@@ -99,6 +101,52 @@ class MachineProfile:
 _TOP_LEVEL_KEYS = frozenset(
     item.name for item in dataclasses.fields(MachineProfile) if item.name != 'path'
 )
+
+
+def find_project_root(*, start: Path) -> Path:
+    """The nearest folder at or above ``start`` that holds a ``pyproject.toml``.
+
+    Args:
+        start: The folder to search from, usually the working directory.
+
+    Returns:
+        The project root, or ``start`` when no ``pyproject.toml`` is found.
+    """
+    for folder in (start, *start.parents):
+        if (folder / 'pyproject.toml').is_file():
+            return folder
+    return start
+
+
+def resolve_machine_file(*, machine: str, project_root: Path) -> Path:
+    """The profile file a ``--machine`` value names.
+
+    A bare name such as ``cluster`` (no path separator, no ``.toml`` suffix)
+    is ``<project_root>/machines/<name>.toml``. Anything else is a path.
+
+    Args:
+        machine: The name or the path given on the command line.
+        project_root: The folder that holds ``machines/``.
+
+    Returns:
+        The profile file.
+
+    Raises:
+        MachineProfileError: If a name has no file; the message lists the
+            names that exist.
+    """
+    if '/' in machine or '\\' in machine or machine.endswith('.toml'):
+        return Path(machine)
+    folder = project_root / 'machines'
+    path = folder / f'{machine}.toml'
+    if not path.is_file():
+        known = ', '.join(sorted(item.stem for item in folder.glob('*.toml'))) or 'none'
+        message = (
+            f'no machine profile {path} (machine {machine!r}); available in {folder}: {known}. '
+            f'Create {path.name} there, or pass the path of a profile file'
+        )
+        raise MachineProfileError(message)
+    return path
 
 
 def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:

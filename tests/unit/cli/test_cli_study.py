@@ -41,7 +41,7 @@ def test_cli_parses_filters_and_pass_through(
     assert exit_info.value.code == 0
     assert len(seen) == 1
     assert seen[0].study == 'toy_studies:study'
-    assert seen[0].machine == tmp_path / 'm.toml'
+    assert seen[0].machine == str(tmp_path / 'm.toml')
     assert seen[0].only == ('recipe=a,b', 'seed=42')
     assert seen[0].grid == ('g',)
     assert seen[0].include_done is False

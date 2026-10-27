@@ -45,12 +45,12 @@ A study runs one command of a script over a product of axes (see
 `machines/`:
 
 ```bash
-uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml --dry-run
-uv run tslab study submit {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study status {{package_name}}.studies:example --machine machines/local.toml
-uv run tslab study resubmit {{package_name}}.studies:example --machine machines/local.toml
+uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
+uv run tslab study submit {{package_name}}.studies:example --machine local
+uv run tslab study status {{package_name}}.studies:example --machine local
+uv run tslab study resubmit {{package_name}}.studies:example --machine local
 uv run tslab study results {{package_name}}.studies:example \
-    --machine machines/local.toml --out results.csv
+    --machine local --out results.csv
 ```
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
