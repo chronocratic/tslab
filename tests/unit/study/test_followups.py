@@ -18,6 +18,7 @@ from tslab.core.status import (
 )
 from tslab.study.commands import resubmit, submit
 from tslab.study.followups import queue_followups
+from tslab.study.machine import resolve_machine, write_register
 from tslab.study.records import append_job, JobRecord, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six
@@ -245,3 +246,18 @@ def test_retry_followup_needs_a_study_reference(
     assert code == 0
     assert len(records) == 1
     assert 'automatic retry follow-up is skipped' in caplog.text
+
+
+def test_followup_gets_the_absolute_path_of_a_machine_resolved_by_name(
+    project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with_followups(project=project)
+    register = project / 'register.toml'
+    monkeypatch.setenv('TSLAB_MACHINES_FILE', str(register))
+    write_register(entries={'cluster': project / 'cluster.toml'})
+    resolved = resolve_machine(machine='cluster', start=project).path
+    submit_study(project=project, machine_file=resolved.name)
+    retry = jobs_of(project=project)[1]
+    tasks = job_file_of(project=project, job_file=retry.job_file, suffix='tasks').read_text()
+    assert f'--machine {resolved.as_posix()} --auto' in tasks
+    assert resolved.is_absolute()
