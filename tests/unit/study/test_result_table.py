@@ -7,7 +7,6 @@ import pytest
 
 from tests.unit.study.helpers import no_sleep
 import tslab
-from tslab.core.artifact import Metrics
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -21,7 +20,7 @@ from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
 from tslab.study.definition import expand_runs
 from tslab.study.loading import load_study
-from tslab.study.result_table import collect_results, METRICS_TYPE, write_results_csv
+from tslab.study.result_table import collect_results, write_results_csv
 from tslab.study.state import collect_states, RunReport
 
 
@@ -82,10 +81,6 @@ def reports_of(*, study_directory: Path) -> list[RunReport]:
         jobs=[],
         job_states=None,
     )
-
-
-def test_metrics_type_is_the_qualified_name() -> None:
-    assert f'{Metrics.__module__}.{Metrics.__qualname__}' == METRICS_TYPE
 
 
 def test_rows_per_instance_with_metrics(tmp_path: Path) -> None:

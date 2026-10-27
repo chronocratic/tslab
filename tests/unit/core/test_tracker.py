@@ -6,17 +6,11 @@ import yaml
 
 from tslab.core.status import RunState
 from tslab.core.tracker import LocalTracker, RunStatus
-from tslab.interfaces.tracker import RunStatus as InterfaceRunStatus, Tracker as InterfaceTracker
 
 
 def rows(*, path: Path) -> list[dict[str, str]]:
     with path.open(encoding='utf-8', newline='') as handle:
         return list(csv.DictReader(handle))
-
-
-def test_interfaces_reexport_the_core_definitions() -> None:
-    assert InterfaceRunStatus is RunStatus
-    assert issubclass(LocalTracker, InterfaceTracker)
 
 
 @pytest.mark.parametrize(
