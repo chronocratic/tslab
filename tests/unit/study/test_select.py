@@ -35,3 +35,9 @@ def test_only_with_unknown_axis_or_value_raises(item: str) -> None:
     study = Study(name='s', grids={'c': grid()})
     with pytest.raises(ValueError, match=r'axis|has no value'):
         select_runs(study=study, runs=expand_runs(study=study), only=(item,))
+
+
+def test_only_with_two_axes_in_one_item_says_to_repeat_the_flag() -> None:
+    study = Study(name='s', grids={'c': grid()})
+    with pytest.raises(ValueError, match='one --only per axis'):
+        select_runs(study=study, runs=expand_runs(study=study), only=('dataset=Coffee,seed=42',))

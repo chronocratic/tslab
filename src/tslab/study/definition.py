@@ -568,6 +568,12 @@ def _parse_only(*, item: str, study: Study) -> tuple[str, tuple[str, ...]]:
         )
         raise ValueError(message)
     value_names = tuple(values.split(','))
+    if any('=' in name for name in value_names):
+        message = (
+            f'only item {item!r} names more than one axis; use one --only per axis, '
+            'as --only recipe=b1 --only dataset=Coffee'
+        )
+        raise ValueError(message)
     problems = match_problems(grids=study.grids, match={axis: value_names})
     if problems:
         raise ValueError('; '.join(problems))
