@@ -7,7 +7,7 @@ from typing import Any
 
 from adapter_helpers import parse
 import chronocratic.models
-from chronocratic.models.augmentation import AugmentationProducer
+from chronocratic.models.augmentation import AugmentationProducer, ViewPair
 import pytest
 from recipes import CropShiftRecipe, JitterThenScaleRecipe
 
@@ -17,8 +17,10 @@ from tslab.adapters.chronocratic.models import (
     ChronocraticModelChoice,
     model_settings,
     MODELS,
+    recipe_subcommand,
+    recipe_view_type,
 )
-from tslab.adapters.chronocratic.models.settings import entry_of, recipe_subcommand
+from tslab.adapters.chronocratic.models.settings import entry_of
 from tslab.core.fingerprint import canonicalize
 
 pytestmark = pytest.mark.chronocratic
@@ -216,6 +218,16 @@ def test_model_settings_rejects_unknown_names_and_settings() -> None:
         model_settings(choice=ModelChoice, name='tstcc', max_train_length=128)
     with pytest.raises(TypeError, match='chronocratic_model_choice'):
         model_settings(choice=int | str, name='ts2vec')
+
+
+def test_model_settings_rejects_a_recipe_of_another_view_type() -> None:
+    with pytest.raises(TypeError, match=r'JitterThenScaleRecipe.*ts2vec'):
+        model_settings(choice=ModelChoice, name='ts2vec', augmentation=JitterThenScaleRecipe())
+
+
+def test_recipe_helpers_are_exported() -> None:
+    assert recipe_subcommand(recipe=JitterThenScaleRecipe) == 'jitter-then-scale'
+    assert recipe_view_type(recipe=JitterThenScaleRecipe) is ViewPair
 
 
 def test_choice_called_twice_keeps_earlier_instances_picklable() -> None:

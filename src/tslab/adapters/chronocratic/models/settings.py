@@ -268,7 +268,8 @@ def model_settings(*, choice: Any, name: str, **values: object) -> Any:  # noqa:
         **values: Settings that differ from the defaults.
 
     Raises:
-        TypeError: If ``choice`` was not made by ``chronocratic_model_choice``.
+        TypeError: If ``choice`` was not made by ``chronocratic_model_choice``, or the
+            augmentation recipe produces a view type the model does not take.
         ValueError: If no model has this name, or the model has no such setting.
     """
     classes: dict[str, Any] = {}
@@ -286,4 +287,13 @@ def model_settings(*, choice: Any, name: str, **values: object) -> Any:  # noqa:
     if unknown:
         message = f'model {name!r} has no settings {unknown}'
         raise ValueError(message)
+    recipe = values.get('augmentation')
+    if recipe is not None:
+        model_view = _view_type(annotation=_hints(entry=MODELS[name]).get('augmentation'))
+        if recipe_view_type(recipe=type(recipe)) != model_view:
+            message = (
+                f'{type(recipe).__qualname__} does not fit model {name!r}, which takes '
+                f'{model_view!r}; choose a recipe that produces it'
+            )
+            raise TypeError(message)
     return classes[name](**values)

@@ -16,6 +16,8 @@ from tslab.adapters.chronocratic.models.settings import (
     ChronocraticModelChoice,
     model_settings,
     MODELS,
+    recipe_subcommand,
+    recipe_view_type,
 )
 
 __all__ = [
@@ -26,4 +28,6 @@ __all__ = [
     'build_chronocratic_model',
     'chronocratic_model_choice',
     'model_settings',
+    'recipe_subcommand',
+    'recipe_view_type',
 ]
