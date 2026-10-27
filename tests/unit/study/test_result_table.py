@@ -101,6 +101,8 @@ def test_rows_per_instance_with_metrics(tmp_path: Path) -> None:
     assert evaluate_row['error'] is None
     train_row = next(row for row in rows if row['instance'] == 'train[default]')
     assert train_row['metric/accuracy'] is None
+    assert isinstance(train_row['seconds'], float)
+    assert next(row for row in rows if row['instance'] is None)['seconds'] is None
 
 
 def test_runs_without_instances_get_one_row(tmp_path: Path) -> None:
