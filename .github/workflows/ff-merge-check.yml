@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
 
       - name: Check if fast-forward is possible
-        uses: sequoia-pgp/fast-forward@v1
+        uses: sequoia-pgp/fast-forward@v1.0.0
         with:
           merge: false
           comment: always
