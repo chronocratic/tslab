@@ -9,6 +9,7 @@ import pytest
 import tslab.cli.console as console_module
 from tslab.cli.console import ConsoleHandler, make_console, watch
 from tslab.cli.usage import UsageError
+from tslab.helpers.text import log_table
 
 
 @pytest.fixture
@@ -193,3 +194,34 @@ def test_watch_stops_on_keyboard_interrupt() -> None:
 
     assert code == 1
     assert shown == [0, 1]
+
+
+def _log_table(*, logger: logging.Logger, force_terminal: bool) -> str:
+    buffer = StringIO()
+    handler = ConsoleHandler(console=make_console(file=buffer, force_terminal=force_terminal))
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    logger.addHandler(handler)
+    try:
+        log_table(
+            logger=logger,
+            header=('grid', 'done', 'failed'),
+            rows=[('a', '2', '0'), ('all', '2', '0')],
+            right_align_numbers=True,
+            total=True,
+        )
+    finally:
+        logger.removeHandler(handler)
+    return buffer.getvalue()
+
+
+def test_handler_draws_a_table_on_a_terminal(logger: logging.Logger) -> None:
+    output = _log_table(logger=logger, force_terminal=True)
+
+    assert '─' in output
+    assert '\x1b[' in output
+
+
+def test_handler_writes_a_table_as_plain_lines_off_a_terminal(logger: logging.Logger) -> None:
+    output = _log_table(logger=logger, force_terminal=False)
+
+    assert output == 'grid  done  failed\na        2       0\nall      2       0\n'

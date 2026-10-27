@@ -31,7 +31,7 @@ from tslab.core.status import (
     RunStatusSnapshot,
     StatusFileError,
 )
-from tslab.core.text import format_table
+from tslab.helpers.text import log_table
 
 __all__ = ['Status']
 
@@ -162,10 +162,9 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
         for instance_id, record in selected
     ]
     _LOGGER.info('%s: %s', directory.as_posix(), run_state)
-    for line in format_table(
-        header=('instance', 'state', 'fingerprint', 'time', 'note'), rows=rows
-    ):
-        _LOGGER.info('%s', line)
+    log_table(
+        logger=_LOGGER, header=('instance', 'state', 'fingerprint', 'time', 'note'), rows=rows
+    )
     per_stage: dict[str, Counter[str]] = {}
     for instance_id, record in selected:
         counts = per_stage.setdefault(_stage_of(instance_id=instance_id), Counter())
@@ -225,8 +224,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
             )
         )
     header = ('run', 'state', *(state.value for state in _COUNTED_STATES))
-    for line in format_table(header=header, rows=rows):
-        _LOGGER.info('%s', line)
+    log_table(logger=_LOGGER, header=header, rows=rows)
     summary = ', '.join(f'{count} {state}' for state, count in sorted(totals.items()))
     _LOGGER.info('%d %s: %s', len(rows), 'run' if len(rows) == 1 else 'runs', summary)
     if totals[RunState.FAILED.value] or totals[_INTERRUPTED] or has_failed_instances:

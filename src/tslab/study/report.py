@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import logging
 import shlex
 
-from tslab.core.text import format_table
+from tslab.helpers.text import log_table
 from tslab.study.context import Context
 from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
@@ -41,8 +41,7 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
     rows = [_table_row(name=name, grid=counts[name]) for name in sorted(counts)]
     rows.append(_table_row(name='all', grid=total))
     header = ('grid', *(state.value for state in _TABLE_STATES), 'total')
-    for line in format_table(header=header, rows=rows, right_align_numbers=True):
-        _LOGGER.info('%s', line)
+    log_table(logger=_LOGGER, header=header, rows=rows, right_align_numbers=True, total=True)
     listed = [
         report
         for report in context.reports
@@ -137,19 +136,24 @@ def log_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> tuple[int
         )
         return 1, list(report.submitted)
     if not report.submitted:
+        rows = [
+            (group.job_name, str(len(group.tasks)), resources_of(slurm=group.slurm))
+            for group in groups
+        ]
+        log_table(logger=_LOGGER, header=('job', 'runs', 'resources'), rows=rows)
         for group in groups:
-            _LOGGER.info(
-                '%s: %d runs, %s', group.job_name, len(group.tasks), resources_of(slurm=group.slurm)
-            )
             if group.tasks:
-                _LOGGER.info('%s', shlex.join(group.tasks[0].command))
+                _LOGGER.info('first command of %s:', group.job_name)
+                _LOGGER.info('  %s', shlex.join(group.tasks[0].command))
         return 0, []
-    for record in report.submitted:
-        _LOGGER.info(
-            'submitted %s as %s (%d runs, indices %s)',
-            names.get(record.job_file, record.job_file),
+    rows = [
+        (
+            names.get(record.job_file, str(record.job_file)),
             record.job_id,
-            len(record.tasks),
+            str(len(record.tasks)),
             array_spec(indices=[task.index for task in record.tasks]),
         )
+        for record in report.submitted
+    ]
+    log_table(logger=_LOGGER, header=('job', 'job id', 'runs', 'indices'), rows=rows)
     return 0, list(report.submitted)
