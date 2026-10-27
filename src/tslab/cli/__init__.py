@@ -12,6 +12,7 @@ from typing import Any, cast, Protocol
 
 import tyro
 
+from tslab.cli.console import configure_logging
 from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
 from tslab.cli.status import Status
@@ -65,7 +66,7 @@ def main(args: Sequence[str] | None = None) -> None:
     Raises:
         SystemExit: Always, with the exit code of the subcommand.
     """
-    logging.basicConfig(format='%(message)s', level=logging.INFO, stream=sys.stdout)
+    configure_logging()
     argv = list(sys.argv[1:]) if args is None else list(args)
     head, extra_args = _split_pass_through(argv=argv)
     command: Command = _parse(argv=head)
