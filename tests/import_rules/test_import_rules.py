@@ -21,6 +21,8 @@ CORE_MODULES = (
     'tslab.core.seeding',
     'tslab.core.stage',
     'tslab.core.status',
+    'tslab.helpers',
+    'tslab.helpers.text',
     'tslab.interfaces',
     'tslab.stages',
     'tslab.tracking',

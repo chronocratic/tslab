@@ -241,7 +241,7 @@ def test_dry_run_prints_plan_and_records_nothing(
     assert not (project / 'runs' / 's' / '.study' / 'submissions.jsonl').exists()
     assert (project / 'runs' / 's' / '.study' / 'jobs' / '1.sbatch').is_file()
     text = ' '.join(caplog.text.split())
-    assert 'g1: 4 runs' in text
+    assert 'g1 4 partition=' in text
     assert 'toy_script.py model:small --seed 1' in text
 
 

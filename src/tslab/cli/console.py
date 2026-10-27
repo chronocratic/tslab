@@ -6,12 +6,15 @@ import sys
 import time
 from typing import ClassVar, IO, override
 
+from rich import box
 from rich.console import Console
 from rich.highlighter import RegexHighlighter
+from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
 from tslab.cli.usage import UsageError
+from tslab.helpers.text import TextTable
 
 __all__ = ['CONSOLE', 'ConsoleHandler', 'configure_logging', 'make_console', 'watch']
 
@@ -80,6 +83,10 @@ class ConsoleHandler(logging.Handler):
             if self._uses_default_console and self._stdout is not sys.stdout:
                 self._console = make_console()
                 self._stdout = sys.stdout
+            table = getattr(record, 'tslab_table', None)
+            if isinstance(table, TextTable) and self._console.is_terminal:
+                self._console.print(_rich_table(table=table))
+                return
             message = self.format(record)
             style = None
             if record.levelno >= logging.ERROR:
@@ -95,6 +102,28 @@ class ConsoleHandler(logging.Handler):
             self._console.print(text, soft_wrap=True)
         except Exception:  # noqa: BLE001 # why: logging handlers report emit failures through handleError
             self.handleError(record)
+
+
+def _rich_table(*, table: TextTable) -> Table:
+    """The Rich form of a logged table: state colors, dim zeros, a ruled total row."""
+    highlight = _StateHighlighter()
+    rich = Table(box=box.SIMPLE_HEAD, header_style='bold', pad_edge=False)
+    for position, title in enumerate(table.header):
+        numbers = table.right_align_numbers and position > 0
+        rich.add_column(highlight(Text(title)), justify='right' if numbers else 'left')
+    last = len(table.rows) - 1
+    for index, row in enumerate(table.rows):
+        cells = [
+            Text(cell, style='dim')
+            if table.right_align_numbers and cell == '0'
+            else highlight(Text(cell))
+            for cell in row
+        ]
+        total = table.total and index == last
+        rich.add_row(
+            *cells, style='bold' if total else None, end_section=table.total and index == last - 1
+        )
+    return rich
 
 
 def configure_logging() -> None:

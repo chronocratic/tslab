@@ -7,6 +7,7 @@ import pytest
 from tests.unit.study.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import finish_run, submit_study
 from tslab.cli import main
+from tslab.helpers.text import TextTable
 
 
 def run_main(*args: str) -> int:
@@ -25,10 +26,11 @@ def test_status_prints_an_aligned_table(
     with caplog.at_level('INFO'):
         code = run_main('status', 'toy_studies:study', '--machine', 'cluster.toml')
     assert code == 0
-    table = [
-        r.getMessage() for r in caplog.records if r.getMessage().startswith(('grid', 'g ', 'all'))
-    ]
-    assert len({len(line) for line in table}) == 1
+    (table,) = _tables(caplog=caplog)
+    assert table.total
+    assert table.rows[-1][0] == 'all'
+    (message,) = [r.getMessage() for r in caplog.records if r.getMessage().startswith('grid')]
+    assert len({len(line) for line in message.splitlines()}) == 1
 
 
 def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake: FakeSlurm) -> None:
@@ -84,3 +86,22 @@ def test_a_missing_study_module_says_where_to_run(
 ) -> None:
     assert run_main('status', 'no_such_module:study', '--machine', 'cluster.toml') == 2
     assert 'cannot import the study module' in caplog.text
+
+
+def _tables(*, caplog: pytest.LogCaptureFixture) -> list[TextTable]:
+    tables = [getattr(record, 'tslab_table', None) for record in caplog.records]
+    return [table for table in tables if isinstance(table, TextTable)]
+
+
+def test_dry_run_and_submit_log_tables(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('INFO'):
+        run_main('submit', 'toy_studies:study', '--machine', 'cluster.toml', '--dry-run')
+    assert [table.header for table in _tables(caplog=caplog)] == [('job', 'runs', 'resources')]
+    caplog.clear()
+    with caplog.at_level('INFO'):
+        submit_study(project=project)
+    assert [table.header for table in _tables(caplog=caplog)] == [
+        ('job', 'job id', 'runs', 'indices')
+    ]
