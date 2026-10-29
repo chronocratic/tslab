@@ -13,10 +13,13 @@ from typing import Annotated
 import tyro
 
 from tslab.cli.console import watch
+from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
 from tslab.study.commands import parse_states, resubmit, results, status, submit
 from tslab.study.context import Context, load_context, Selection
+from tslab.study.documents import status_document
 from tslab.study.machine import resolve_machine
+from tslab.study.outcome import study_exit_code
 from tslab.study.state import StudyState
 
 __all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
@@ -177,6 +180,8 @@ class Status:
             several values of one axis.
         states: Show only the runs in these states; comma separated.
         watch: Refresh every this many seconds until Ctrl-C.
+        json: Print one study-status JSON document.
+        exit_code: Return the code for the run states.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
@@ -189,9 +194,14 @@ class Status:
         tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
     ] = ()
     watch: Annotated[float | None, tyro.conf.arg(metavar='SECONDS', help_behavior_hint='')] = None
+    json: bool = False
+    exit_code: bool = False
 
     def run(self) -> int:
         """Print the table and return the exit code."""
+        if self.watch is not None and self.json:
+            message = '--watch does not combine with --json; use tslab study wait'
+            raise UsageError(message)
         states = _states_of(values=self.states)
 
         def show() -> int:
@@ -202,7 +212,10 @@ class Status:
                 only=self.only,
                 read_only=True,
             )
-            code = status(context=context, states=states)
+            if self.exit_code and not context.reports:
+                message = 'no runs match the selection; drop --grid/--only or check values'
+                raise UsageError(message)
+            status(context=context, states=states)
             _status_hints(
                 context=context,
                 study=self.study,
@@ -210,7 +223,10 @@ class Status:
                 grid=self.grid,
                 only=self.only,
             )
-            return code
+            code = study_exit_code(context=context)
+            if self.json:
+                print_json(document=status_document(context=context, exit_code=code))
+            return code if self.exit_code else 0
 
         return watch(seconds=self.watch, show=show)
 

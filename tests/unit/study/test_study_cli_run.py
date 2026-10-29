@@ -1,12 +1,15 @@
 """``tslab study <command>`` end to end through ``main``: the run bodies and usage errors."""
 
+import json
+import logging
 from pathlib import Path
 
 import pytest
 
 from tests.unit.study.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import finish_run, submit_study
+from tests.unit.study.helpers import finish_run, submit_study, write_run_status
 from tslab.cli import main
+from tslab.core.status import InstanceState, RunState
 from tslab.helpers.text import TextTable
 
 
@@ -31,6 +34,84 @@ def test_status_prints_an_aligned_table(
     assert table.rows[-1][0] == 'all'
     (message,) = [r.getMessage() for r in caplog.records if r.getMessage().startswith('grid')]
     assert len({len(line) for line in message.splitlines()}) == 1
+
+
+def test_status_json_prints_only_json(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = logging.getLogger()
+    handlers = root.handlers[:]
+    level = root.level
+    root.handlers.clear()
+    try:
+        code = run_main('status', 'toy_studies:study', '--machine', 'cluster.toml', '--json')
+    finally:
+        root.handlers[:] = handlers
+        root.setLevel(level)
+    captured = capsys.readouterr()
+    assert code == 0
+    assert json.loads(captured.out)['schema'] == 'tslab.study-status/1'
+    assert 'nothing ran yet' in captured.err
+
+
+def test_status_exits_0_without_exit_code_flag_even_with_failures(
+    project: Path, fake: FakeSlurm
+) -> None:
+    submit_study(project=project)
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FINISHED,
+        instance=InstanceState.FAILED,
+    )
+    assert run_main('status', 'toy_studies:study', '--machine', 'cluster.toml') == 0
+
+
+def test_status_exit_code_flag_returns_4_on_failure(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FINISHED,
+        instance=InstanceState.FAILED,
+    )
+    assert run_main('status', 'toy_studies:study', '--machine', 'cluster.toml', '--exit-code') == 4
+
+
+def test_status_json_carries_exit_code_without_flag(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    submit_study(project=project)
+    code = run_main('status', 'toy_studies:study', '--machine', 'cluster.toml', '--json')
+    document = json.loads(capsys.readouterr().out)
+    assert document['exit_code'] == 5
+    assert code == 0
+
+
+def test_status_exit_code_rejects_empty_selection(project: Path) -> None:
+    assert (
+        run_main(
+            'status',
+            'toy_studies:study',
+            '--machine',
+            'cluster.toml',
+            '--grid',
+            'missing',
+            '--exit-code',
+        )
+        == 2
+    )
+
+
+def test_status_rejects_watch_with_json(project: Path) -> None:
+    assert (
+        run_main(
+            'status', 'toy_studies:study', '--machine', 'cluster.toml', '--watch', '10', '--json'
+        )
+        == 2
+    )
 
 
 def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake: FakeSlurm) -> None:
