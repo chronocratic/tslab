@@ -138,6 +138,12 @@ def _check_job_values(  # noqa: PLR0913 # why: keyword-only private helper, one 
             raise ValueError(message)
 
 
+def _as_sbatch_flag(*, key: str, value: object) -> str:
+    # why: sbatch reads quotes in a directive as grouping, so a space in a value stays one value
+    flag = f'#SBATCH --{key.replace("_", "-")}'
+    return flag if value is True else f'{flag}={shlex.quote(str(value))}'
+
+
 def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per script line
     *,
     job_name: str,
@@ -182,27 +188,31 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     array = indices is not None
     lines = [
         '#!/bin/bash',
-        f'#SBATCH --job-name={job_name}',
-        f'#SBATCH --partition={slurm.partition}',
+        _as_sbatch_flag(key='job_name', value=job_name),
+        _as_sbatch_flag(key='partition', value=slurm.partition),
     ]
     if slurm.qos is not None:
-        lines.append(f'#SBATCH --qos={slurm.qos}')
-    lines += [f'#SBATCH --time={slurm.time}', f'#SBATCH --cpus-per-task={slurm.cpus_per_task}']
-    if slurm.mem_per_cpu is not None:
-        lines.append(f'#SBATCH --mem-per-cpu={slurm.mem_per_cpu}')
-    if slurm.gpus > 0:
-        lines.append(f'#SBATCH --gres=gpu:{slurm.gpus}')
-    if indices is not None:
-        lines.append(f'#SBATCH --array={array_spec(indices=indices)}%{slurm.max_concurrent}')
+        lines.append(_as_sbatch_flag(key='qos', value=slurm.qos))
     lines += [
-        f'#SBATCH --output={log_pattern}',
+        _as_sbatch_flag(key='time', value=slurm.time),
+        _as_sbatch_flag(key='cpus_per_task', value=slurm.cpus_per_task),
+    ]
+    if slurm.mem_per_cpu is not None:
+        lines.append(_as_sbatch_flag(key='mem_per_cpu', value=slurm.mem_per_cpu))
+    if slurm.gpus > 0:
+        lines.append(_as_sbatch_flag(key='gres', value=f'gpu:{slurm.gpus}'))
+    if indices is not None:
+        spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
+        lines.append(_as_sbatch_flag(key='array', value=spec))
+    lines += [
+        _as_sbatch_flag(key='output', value=log_pattern),
         '#SBATCH --open-mode=append',
         '#SBATCH --no-requeue',
     ]
     if dependency is not None:
-        lines.append(f'#SBATCH --dependency={dependency}')
+        lines.append(_as_sbatch_flag(key='dependency', value=dependency))
     if begin is not None:
-        lines.append(f'#SBATCH --begin={begin}')
+        lines.append(_as_sbatch_flag(key='begin', value=begin))
     lines += [f'#SBATCH {line}' for line in slurm.sbatch_extra]
     lines += ['set -euo pipefail', f'cd {shlex.quote(str(project_root))}']
     lines += [f'export {name}={shlex.quote(value)}' for name, value in env.items()]
