@@ -8,9 +8,16 @@ from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
-from tslab.study.records import JobRecord, read_jobs
+from tslab.study.records import JobRecord, read_jobs, submission_in_progress
 from tslab.study.slurm import query_job_states, slurm_available, SlurmError
-from tslab.study.state import collect_states, RunReport, slurm_task_ids
+from tslab.study.state import (
+    collect_states,
+    followup_job_ids,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+    RunReport,
+    slurm_task_ids,
+)
 
 __all__ = ['Context', 'Selection', 'context_for', 'load_context']
 
@@ -45,6 +52,8 @@ class Context:
         jobs: The job records of the study, in submission order.
         reports: The state of every selected run.
         job_states_known: Whether the SLURM states the reports use are real.
+        submission_in_progress: Whether another process is submitting runs.
+        followup_live: Whether a SLURM follow-up job is queued or running.
     """
 
     study: Study
@@ -57,6 +66,8 @@ class Context:
     jobs: list[JobRecord]
     reports: list[RunReport]
     job_states_known: bool
+    submission_in_progress: bool = False
+    followup_live: bool = False
 
     @property
     def study_directory(self) -> Path:
@@ -106,11 +117,17 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     job_states: dict[str, str] | None = None
     job_states_known = True
+    followup_live = False
     if machine.launcher == 'slurm':
         job_states_known = slurm_available()
         if job_states_known:
             try:
-                job_states = query_job_states(job_ids=slurm_task_ids(jobs=jobs))
+                followups = followup_job_ids(jobs=jobs)
+                job_states = query_job_states(job_ids=slurm_task_ids(jobs=jobs) + followups)
+                followup_live = any(
+                    job_states.get(job_id) in QUEUED_JOB_STATES | RUNNING_JOB_STATES
+                    for job_id in followups
+                )
             except SlurmError as error:
                 _LOGGER.warning('%s', error)
                 job_states_known = False
@@ -131,6 +148,10 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         jobs=jobs,
         reports=reports,
         job_states_known=job_states_known,
+        submission_in_progress=submission_in_progress(
+            study_folder=study_folder(machine=machine, study=study)
+        ),
+        followup_live=followup_live,
     )
 
 

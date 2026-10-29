@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from tslab.core.paths import STATUS_FILE
+from tslab.core.paths import require_path, STATUS_FILE
 from tslab.core.status import InstanceState, read_status
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     'append_job',
     'latest_tasks',
     'read_jobs',
+    'submission_in_progress',
     'submission_lock',
     'take_progress',
 ]
@@ -211,6 +212,32 @@ def submission_lock(*, study_folder: Path) -> Generator[None]:
             yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def submission_in_progress(*, study_folder: Path) -> bool:
+    """Whether another process holds the submission lock of a study.
+
+    Args:
+        study_folder: The ``.study`` folder of the study.
+
+    Returns:
+        Whether a non-blocking exclusive lock attempt found the file locked.
+    """
+    require_path(value=study_folder, parameter='study_folder')
+    lock_file = study_folder / 'submit.lock'
+    try:
+        descriptor = os.open(lock_file, os.O_RDWR)
+    except FileNotFoundError:
+        return False
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        return False
+    finally:
+        os.close(descriptor)
 
 
 def append_job(*, path: Path, record: JobRecord) -> None:

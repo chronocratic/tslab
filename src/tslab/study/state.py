@@ -21,6 +21,7 @@ __all__ = [
     'RunReport',
     'StudyState',
     'collect_states',
+    'followup_job_ids',
     'job_ended',
     'read_folder',
     'slurm_task_ids',
@@ -209,6 +210,20 @@ def slurm_task_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
         if job.launcher == 'slurm'
     }
     return sorted(ids)
+
+
+def followup_job_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
+    """The sorted SLURM ids of follow-up jobs.
+
+    Args:
+        jobs: The job records of the study, in submission order.
+
+    Returns:
+        The ids of SLURM jobs recorded as follow-ups.
+    """
+    return sorted(
+        {job.job_id for job in jobs if job.kind == 'followup' and job.launcher == 'slurm'}
+    )
 
 
 def collect_states(
