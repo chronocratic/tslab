@@ -21,6 +21,8 @@ from typing import Annotated
 import tyro
 
 from tslab.cli.console import watch
+from tslab.cli.output import print_json
+from tslab.cli.usage import UsageError
 from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
 from tslab.core.status import (
@@ -32,6 +34,8 @@ from tslab.core.status import (
     StatusFileError,
 )
 from tslab.helpers.text import log_table
+from tslab.study.outcome import states_exit_code
+from tslab.study.state import read_folder, study_state, StudyState
 
 __all__ = ['Status']
 
@@ -62,11 +66,15 @@ class Status:
         path: A run folder, or any folder above runs (for example runs/).
         stage: Count only the instances of this stage.
         watch: Refresh every this many seconds until Ctrl-C.
+        json: Print one run-status JSON document.
+        exit_code: Return the code for the run states.
     """
 
     path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
     stage: Annotated[str | None, tyro.conf.arg(metavar='STAGE', help_behavior_hint='')] = None
     watch: Annotated[float | None, tyro.conf.arg(metavar='SECONDS', help_behavior_hint='')] = None
+    json: bool = False
+    exit_code: bool = False
 
     def run(self) -> int:
         """Print the status.
@@ -76,6 +84,9 @@ class Status:
             status file of the given run is unreadable, ``2`` when ``path`` is
             not a folder.
         """
+        if self.json and self.watch is not None:
+            message = '--watch does not combine with --json'
+            raise UsageError(message)
         if not self.path.is_dir():
             _LOGGER.error('%s is not a folder', self.path.as_posix())
             return 2
@@ -89,6 +100,14 @@ class Status:
             return 1
         if snapshot is not None:
             _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
+            if self.json or self.exit_code:
+                entry, state = _run_status_entry(
+                    directory=self.path, snapshot=snapshot, stage=self.stage
+                )
+                code = states_exit_code(states=[state], live=False)
+                if self.json:
+                    print_json(document=_status_document(entries=[entry], states=[state]))
+                return code if self.exit_code else 0
             return 0
         runs = sorted(status_file.parent for status_file in self.path.rglob(STATUS_FILE))
         if not runs:
@@ -96,7 +115,64 @@ class Status:
             _LOGGER.info('a run folder holds status.json; pass it, or a folder above runs')
             return 1
         _print_runs(root=self.path, runs=runs, stage=self.stage)
+        if self.json or self.exit_code:
+            entries, states = _run_status_entries(runs=runs, stage=self.stage)
+            code = states_exit_code(states=states, live=False)
+            if self.json:
+                print_json(document=_status_document(entries=entries, states=states))
+            return code if self.exit_code else 0
         return 0
+
+
+def _run_status_entries(
+    *, runs: Sequence[Path], stage: str | None
+) -> tuple[list[dict[str, object]], list[StudyState]]:
+    entries: list[dict[str, object]] = []
+    states: list[StudyState] = []
+    for directory in runs:
+        try:
+            snapshot = read_status(path=directory / STATUS_FILE)
+        except StatusFileError:
+            continue
+        if snapshot is None:
+            continue
+        entry, state = _run_status_entry(directory=directory, snapshot=snapshot, stage=stage)
+        entries.append(entry)
+        states.append(state)
+    return entries, states
+
+
+def _run_status_entry(
+    *, directory: Path, snapshot: RunStatusSnapshot, stage: str | None
+) -> tuple[dict[str, object], StudyState]:
+    folder = read_folder(run_directory=directory)
+    state, _ = study_state(job_state=None, folder=folder)
+    run_state = run_state_shown(directory=directory, snapshot=snapshot)
+    instances = [
+        {
+            'instance': instance_id,
+            'stage': _stage_of(instance_id=instance_id),
+            'state': _instance_state_shown(record=record, run_state=run_state),
+            'fingerprint': record.fingerprint,
+            'seconds': record.seconds,
+            'error': record.error,
+        }
+        for instance_id, record in _selected(snapshot=snapshot, stage=stage)
+    ]
+    return (
+        {'directory': directory.resolve().as_posix(), 'state': state.value, 'instances': instances},
+        state,
+    )
+
+
+def _status_document(
+    *, entries: list[dict[str, object]], states: Sequence[StudyState]
+) -> dict[str, object]:
+    return {
+        'schema': 'tslab.run-status/1',
+        'exit_code': states_exit_code(states=states, live=False),
+        'runs': entries,
+    }
 
 
 def run_state_shown(*, directory: Path, snapshot: RunStatusSnapshot) -> str:

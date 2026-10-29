@@ -1,10 +1,11 @@
 """JSON documents for study commands."""
 
 from tslab.study.context import Context
+from tslab.study.definition import expand_runs, Study
 from tslab.study.outcome import counts_live
 from tslab.study.state import RunReport, StudyState
 
-__all__ = ['run_entry', 'status_document']
+__all__ = ['run_entry', 'show_document', 'status_document']
 
 
 def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
@@ -65,6 +66,36 @@ def status_document(*, context: Context, exit_code: int) -> dict[str, object]:
         'exit_code': exit_code,
         'counts': counts,
         'runs': [run_entry(report=report, context=context) for report in context.reports],
+    }
+
+
+def show_document(*, study: Study) -> dict[str, object]:
+    """The grids, axes, and run counts of a study.
+
+    Args:
+        study: The study definition to describe.
+
+    Returns:
+        The versioned study-show document.
+    """
+    runs = expand_runs(study=study)
+    grids = [
+        {
+            'name': name,
+            'short_name': grid.short_name,
+            'command': list(grid.command),
+            'axes': {axis: list(values) for axis, values in grid.axes.items()},
+            'excludes': len(grid.exclude),
+            'overrides': len(grid.overrides),
+            'runs': sum(run.grid == name for run in runs),
+        }
+        for name, grid in study.grids.items()
+    ]
+    return {
+        'schema': 'tslab.study-show/1',
+        'study': study.name,
+        'grids': grids,
+        'total_runs': len(runs),
     }
 
 

@@ -4,6 +4,8 @@ The argument dataclasses here hold only the flags of one command; the
 behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -17,12 +19,14 @@ from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
 from tslab.study.commands import parse_states, resubmit, results, status, submit
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.documents import status_document
+from tslab.study.documents import show_document, status_document
+from tslab.study.loading import load_study
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import study_exit_code
+from tslab.study.report import log_show
 from tslab.study.state import StudyState
 
-__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Status', 'Submit']
+__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Show', 'Status', 'Submit']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +40,7 @@ def _context_of(
     read_only: bool = False,
 ) -> Context:
     """The context of a study reference; a bad reference or profile is a usage error."""
-    try:
+    with _usage_errors(study=study):
         location = resolve_machine(machine=machine, start=Path.cwd())
         return load_context(
             reference=study,
@@ -45,6 +49,12 @@ def _context_of(
             project_root=location.project_root,
             read_only=read_only,
         )
+
+
+@contextmanager
+def _usage_errors(*, study: str) -> Generator[None]:
+    try:
+        yield
     except ModuleNotFoundError as error:
         module_name = study.partition(':')[0]
         message = str(error)
@@ -232,6 +242,32 @@ class Status:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Show:
+    """Show the grids, axes, and run counts of a study.
+
+    For example:
+        tslab study show my_paper.studies:example
+
+    Attributes:
+        study: The study reference, module:attribute.
+        json: Print one study-show JSON document.
+    """
+
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    json: bool = False
+
+    def run(self) -> int:
+        """Show a study without loading a machine profile."""
+        with _usage_errors(study=self.study):
+            study = load_study(reference=self.study)
+        if self.json:
+            print_json(document=show_document(study=study))
+        else:
+            log_show(study=study)
+        return 0
+
+
+@dataclass(frozen=True, kw_only=True)
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
@@ -332,4 +368,10 @@ class Results:
         return results(context=context, out=self.out)
 
 
-STUDY_COMMANDS = {'submit': Submit, 'status': Status, 'resubmit': Resubmit, 'results': Results}
+STUDY_COMMANDS = {
+    'submit': Submit,
+    'status': Status,
+    'resubmit': Resubmit,
+    'results': Results,
+    'show': Show,
+}

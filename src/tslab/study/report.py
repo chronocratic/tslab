@@ -7,6 +7,7 @@ import shlex
 
 from tslab.helpers.text import log_table
 from tslab.study.context import Context
+from tslab.study.definition import expand_runs, Study
 from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import JobGroup
@@ -14,7 +15,7 @@ from tslab.study.records import JobRecord
 from tslab.study.slurm import array_spec
 from tslab.study.state import StudyState
 
-__all__ = ['log_launch', 'log_problems', 'log_status', 'resources_of']
+__all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']
 
 _LOGGER = logging.getLogger(__name__)
 _PROBLEMS_SHOWN = 20
@@ -82,6 +83,31 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
             'or cap training with --trainer.max-training-time',
             limited,
         )
+
+
+def log_show(*, study: Study) -> None:
+    """Log the grids and axes of a study.
+
+    Args:
+        study: The study definition to show.
+
+    Returns:
+        None.
+    """
+    runs = expand_runs(study=study)
+    rows = [
+        (
+            name,
+            grid.short_name,
+            str(sum(run.grid == name for run in runs)),
+            ' '.join(f'{axis}={",".join(values)}' for axis, values in grid.axes.items()),
+        )
+        for name, grid in study.grids.items()
+    ]
+    log_table(logger=_LOGGER, header=('grid', 'short', 'runs', 'axes'), rows=rows)
+    for name, grid in study.grids.items():
+        _LOGGER.info('command of %s: %s', name, shlex.join(grid.command))
+    _LOGGER.info('select with --grid <grid> or --only <axis>=<value>')
 
 
 def _table_row(*, name: str, grid: Counter[StudyState]) -> list[str]:
