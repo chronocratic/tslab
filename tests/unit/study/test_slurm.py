@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import time
 
 import pytest
 
@@ -30,8 +31,9 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
     return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
 
 
-def write_script(tmp_path: Path, tasks_file: Path) -> Path:
-    tasks_file.write_text('\n'.join(TASKS_LINES) + '\n')
+def write_script(tmp_path: Path, tasks_file: Path, *, write_tasks: bool = True) -> Path:
+    if write_tasks:
+        tasks_file.write_text('\n'.join(TASKS_LINES) + '\n')
     script = tmp_path / 'job.sbatch'
     script.write_text(
         job_script(
@@ -47,18 +49,36 @@ def write_script(tmp_path: Path, tasks_file: Path) -> Path:
     return script
 
 
-def run_task_section(script: Path, task_id: str) -> subprocess.CompletedProcess[str]:
+def _task_section_command(script: Path) -> list[str]:
     body = [line for line in script.read_text().splitlines() if not line.startswith('#')]
+    return ['bash', '-c', '\n'.join(body)]
+
+
+def _task_section_env(task_id: str) -> dict[str, str]:
+    return {
+        **os.environ,
+        'SLURM_ARRAY_TASK_ID': task_id,
+        'SLURM_ARRAY_JOB_ID': '9',
+        'SLURM_JOB_ID': '9',
+    }
+
+
+def run_task_section(script: Path, task_id: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(  # noqa: S603 # why: run the generated script under bash
-        ['bash', '-c', '\n'.join(body)],  # noqa: S607 # why: bash is a PATH command
+        _task_section_command(script),
         check=False,
-        env={
-            **os.environ,
-            'SLURM_ARRAY_TASK_ID': task_id,
-            'SLURM_ARRAY_JOB_ID': '9',
-            'SLURM_JOB_ID': '9',
-        },
+        env=_task_section_env(task_id),
         capture_output=True,
+        text=True,
+    )
+
+
+def start_task_section(script: Path, task_id: str) -> subprocess.Popen[str]:
+    return subprocess.Popen(  # noqa: S603 # why: run the generated script under bash
+        _task_section_command(script),
+        env=_task_section_env(task_id),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
     )
 
@@ -266,3 +286,15 @@ def test_job_script_exports_pythonunbuffered_before_env(tmp_path: Path) -> None:
     assert 'export PYTHONUNBUFFERED=1' in lines
     # a value from [env] still wins
     assert lines.index('export PYTHONUNBUFFERED=1') < lines.index('export PYTHONUNBUFFERED=0')
+
+
+def test_task_section_waits_for_a_late_tasks_file(tmp_path: Path) -> None:
+    tasks_file = tmp_path / 'jobs' / '1.tasks'
+    script = write_script(tmp_path, tasks_file, write_tasks=False)
+    process = start_task_section(script, task_id='3')
+    time.sleep(2)
+    tasks_file.parent.mkdir()
+    tasks_file.write_text('\n'.join(TASKS_LINES) + '\n')
+    out, _ = process.communicate(timeout=30)
+    assert process.returncode == 0
+    assert out.splitlines()[-1] == '3'

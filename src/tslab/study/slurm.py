@@ -77,8 +77,10 @@ def _q21_block(*, array: bool) -> str:
 
 
 def _task_section(*, array: bool, tasks_file: Path) -> str:
+    # why: on shared storage the file written by the launcher can reach the node late
+    wait = f'for _ in $(seq 60); do [ -s {shlex.quote(str(tasks_file))} ] && break; sleep 1; done\n'
     if array:
-        return (
+        return wait + (
             'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" '
             + shlex.quote(str(tasks_file))
             + ')\n'
@@ -94,7 +96,7 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
             ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
             'eval "$TASK_LINE"'
         )
-    return (
+    return wait + (
         'TASK_LINE=$(sed -n 1p ' + shlex.quote(str(tasks_file)) + ')\n'
         # why: like the array section, the line starts with the index and the attempt
         'TASK_LINE=${TASK_LINE#* }\n'
