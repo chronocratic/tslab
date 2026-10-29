@@ -1,0 +1,218 @@
+"""The study wait loop, using injected clocks and sleep."""
+
+import dataclasses
+import json
+import logging
+from pathlib import Path
+
+import pytest
+
+from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import context, submit_study
+from tslab.cli import main
+from tslab.study.context import Context
+from tslab.study.state import StudyState
+from tslab.study.wait import wait_for_study
+
+
+def _with_states(
+    *, context: Context, states: tuple[StudyState, ...], job_states_known: bool | None = None
+) -> Context:
+    reports = [
+        dataclasses.replace(report, state=state, reason=None)
+        for report, state in zip(context.reports, states, strict=True)
+    ]
+    return dataclasses.replace(
+        context,
+        reports=reports,
+        job_states_known=(
+            context.job_states_known if job_states_known is None else job_states_known
+        ),
+    )
+
+
+def test_wait_returns_0_when_all_done_after_two_checks(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    prepared = iter(
+        [
+            _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports)),
+            _with_states(context=base, states=(StudyState.DONE,) * len(base.reports)),
+        ]
+    )
+    elapsed = [0.0]
+    code, last, waited = wait_for_study(
+        load=prepared.__next__,
+        interval=10,
+        timeout=None,
+        keep_going=False,
+        sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
+        clock=lambda: elapsed[0],
+    )
+    assert code == 0
+    assert all(report.state is StudyState.DONE for report in last.reports)
+    assert waited == 10
+
+
+def test_wait_stops_on_first_failure_without_keep_going(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    states = (StudyState.FAILED, StudyState.RUNNING, StudyState.DONE, StudyState.DONE)
+    code, _, waited = wait_for_study(
+        load=lambda: _with_states(context=base, states=states),
+        interval=10,
+        timeout=None,
+        keep_going=False,
+        sleep=lambda _: pytest.fail('wait stopped without sleeping'),
+        clock=lambda: 0,
+    )
+    assert code == 4
+    assert waited == 0
+
+
+def test_wait_keep_going_waits_until_nothing_live(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    prepared = iter(
+        [
+            _with_states(
+                context=base,
+                states=(StudyState.FAILED, StudyState.RUNNING, StudyState.DONE, StudyState.DONE),
+            ),
+            _with_states(
+                context=base,
+                states=(StudyState.FAILED, StudyState.DONE, StudyState.DONE, StudyState.DONE),
+            ),
+        ]
+    )
+    elapsed = [0.0]
+    code, _, waited = wait_for_study(
+        load=prepared.__next__,
+        interval=10,
+        timeout=None,
+        keep_going=True,
+        sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
+        clock=lambda: elapsed[0],
+    )
+    assert code == 4
+    assert waited == 10
+
+
+def test_wait_times_out_with_124(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
+    elapsed = [0.0]
+    code, _, waited = wait_for_study(
+        load=lambda: running,
+        interval=10,
+        timeout=15,
+        keep_going=False,
+        sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
+        clock=lambda: elapsed[0],
+    )
+    assert code == 124
+    assert waited == 10
+
+
+def test_wait_keeps_going_through_unknown_states_and_warns_once(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    base = context(project=project, machine_file='cluster.toml')
+    unknown = _with_states(
+        context=base, states=(StudyState.MISSING,) * len(base.reports), job_states_known=False
+    )
+    done = _with_states(
+        context=base, states=(StudyState.DONE,) * len(base.reports), job_states_known=True
+    )
+    prepared = iter([unknown, unknown, unknown, done])
+    elapsed = [0.0]
+    with caplog.at_level(logging.WARNING, logger='tslab.study.wait'):
+        code, _, _ = wait_for_study(
+            load=prepared.__next__,
+            interval=10,
+            timeout=None,
+            keep_going=False,
+            sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
+            clock=lambda: elapsed[0],
+        )
+    assert code == 0
+    assert caplog.text.count('SLURM job states unknown; still waiting') == 1
+
+
+def test_wait_logs_only_when_counts_change(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
+    done = _with_states(context=base, states=(StudyState.DONE,) * len(base.reports))
+    prepared = iter([running, running, done])
+    elapsed = [0.0]
+    with caplog.at_level(logging.INFO, logger='tslab.study.wait'):
+        wait_for_study(
+            load=prepared.__next__,
+            interval=10,
+            timeout=None,
+            keep_going=False,
+            sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
+            clock=lambda: elapsed[0],
+        )
+    lines = [record.getMessage() for record in caplog.records if record.name == 'tslab.study.wait']
+    assert len(lines) == 2
+    assert 'running 4' in lines[0]
+    assert 'done 4' in lines[1]
+
+
+def test_wait_rejects_interval_below_10(project: Path) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'wait',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--interval',
+                '5',
+            ]
+        )
+    assert raised.value.code == 2
+
+
+def test_wait_json_reports_timeout(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'wait',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--interval',
+                '10',
+                '--timeout',
+                '0',
+                '--json',
+            ]
+        )
+    document = json.loads(capsys.readouterr().out)
+    assert raised.value.code == 124
+    assert document['schema'] == 'tslab.study-wait/1'
+    assert document['exit_code'] == 124
+    assert document['timed_out'] is True
+
+
+def test_wait_rejects_empty_selection(project: Path, fake: FakeSlurm) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'wait',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--grid',
+                'missing',
+            ]
+        )
+    assert raised.value.code == 2
