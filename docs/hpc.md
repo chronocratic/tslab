@@ -19,7 +19,9 @@ A job killed at its time limit leaves its lock behind. The lock carries a
 heartbeat refreshed every minute, so after ten minutes without one the next
 job takes the run over, on any node. `tslab status runs/` lists such runs as
 `interrupted`. `tslab study resubmit` resubmits such runs of a study
-automatically; see [Studies and HPC](studies.md#resubmit).
+automatically; see [Studies and HPC](studies.md#resubmit). A follow-up job
+submits with the SLURM variables of its own job removed, so the new job does
+not inherit its allocation.
 
 ## Many runs
 

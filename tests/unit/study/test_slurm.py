@@ -12,6 +12,7 @@ from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.study.machine import SlurmSettings
 from tslab.study.slurm import (
     _as_sbatch_flag,
+    _sbatch_env,
     array_spec,
     job_script,
     query_job_states,
@@ -298,3 +299,36 @@ def test_task_section_waits_for_a_late_tasks_file(tmp_path: Path) -> None:
     out, _ = process.communicate(timeout=30)
     assert process.returncode == 0
     assert out.splitlines()[-1] == '3'
+
+
+def test_sbatch_env_drops_job_variables_and_keeps_slurm_conf() -> None:
+    environ = {
+        'PATH': '/bin',
+        'SLURM_JOB_ID': '1',
+        'SLURM_CONF': '/etc/slurm.conf',
+        'SBATCH_PARTITION': 'p',
+        'SRUN_X': '1',
+        'SLURMD_NODENAME': 'n',
+        'SALLOC_X': '1',
+        'RANK': '0',
+        'MASTER_ADDR': 'h',
+        'LOCAL_WORLD_SIZE': '2',
+    }
+    assert _sbatch_env(environ=environ) == {'PATH': '/bin', 'SLURM_CONF': '/etc/slurm.conf'}
+
+
+def test_sbatch_passes_the_clean_env_and_leaves_os_environ(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv('SLURM_JOB_ID', '1')
+    seen: dict[str, object] = {}
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, stdout='42;c\n', stderr='')
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+    assert sbatch(script=tmp_path / 'x.sbatch') == '42'
+    assert isinstance(seen['env'], dict)
+    assert 'SLURM_JOB_ID' not in seen['env']
+    assert os.environ['SLURM_JOB_ID'] == '1'
