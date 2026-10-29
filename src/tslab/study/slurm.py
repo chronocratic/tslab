@@ -214,7 +214,12 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if begin is not None:
         lines.append(_as_sbatch_flag(key='begin', value=begin))
     lines += [f'#SBATCH {line}' for line in slurm.sbatch_extra]
-    lines += ['set -euo pipefail', f'cd {shlex.quote(str(project_root))}']
+    lines += [
+        'set -euo pipefail',
+        f'cd {shlex.quote(str(project_root))}',
+        # why: a killed job would lose the output still held in the buffer
+        'export PYTHONUNBUFFERED=1',
+    ]
     lines += [f'export {name}={shlex.quote(value)}' for name, value in env.items()]
     if slurm.node_local_tmp:
         lines.append(_q21_block(array=array))

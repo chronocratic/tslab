@@ -259,3 +259,10 @@ def test_job_script_quotes_values_with_spaces(tmp_path: Path) -> None:
     script = _script(tmp_path, job_name='my job', log_pattern=tmp_path / 'a b' / 'x_%a.out')
     assert "#SBATCH --job-name='my job'" in script
     assert f"#SBATCH --output='{tmp_path}/a b/x_%a.out'" in script
+
+
+def test_job_script_exports_pythonunbuffered_before_env(tmp_path: Path) -> None:
+    lines = _script(tmp_path, env={'PYTHONUNBUFFERED': '0', 'A': '1'}).splitlines()
+    assert 'export PYTHONUNBUFFERED=1' in lines
+    # a value from [env] still wins
+    assert lines.index('export PYTHONUNBUFFERED=1') < lines.index('export PYTHONUNBUFFERED=0')
