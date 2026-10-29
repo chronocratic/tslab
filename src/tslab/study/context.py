@@ -54,6 +54,7 @@ class Context:
         job_states_known: Whether the SLURM states the reports use are real.
         submission_in_progress: Whether another process is submitting runs.
         followup_live: Whether a SLURM follow-up job is queued or running.
+        followup_live_job_ids: The ids of queued or running SLURM follow-up jobs.
     """
 
     study: Study
@@ -68,6 +69,7 @@ class Context:
     job_states_known: bool
     submission_in_progress: bool = False
     followup_live: bool = False
+    followup_live_job_ids: tuple[str, ...] = ()
 
     @property
     def study_directory(self) -> Path:
@@ -117,16 +119,17 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     job_states: dict[str, str] | None = None
     job_states_known = True
-    followup_live = False
+    followup_live_job_ids: tuple[str, ...] = ()
     if machine.launcher == 'slurm':
         job_states_known = slurm_available()
         if job_states_known:
             try:
                 followups = followup_job_ids(jobs=jobs)
                 job_states = query_job_states(job_ids=slurm_task_ids(jobs=jobs) + followups)
-                followup_live = any(
-                    job_states.get(job_id) in QUEUED_JOB_STATES | RUNNING_JOB_STATES
+                followup_live_job_ids = tuple(
+                    job_id
                     for job_id in followups
+                    if job_states.get(job_id) in QUEUED_JOB_STATES | RUNNING_JOB_STATES
                 )
             except SlurmError as error:
                 _LOGGER.warning('%s', error)
@@ -151,7 +154,8 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         submission_in_progress=submission_in_progress(
             study_folder=study_folder(machine=machine, study=study)
         ),
-        followup_live=followup_live,
+        followup_live=bool(followup_live_job_ids),
+        followup_live_job_ids=followup_live_job_ids,
     )
 
 
