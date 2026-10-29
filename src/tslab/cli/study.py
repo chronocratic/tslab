@@ -20,6 +20,7 @@ from tslab.cli.usage import UsageError
 from tslab.study.commands import parse_states, resubmit, results, status, submit
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.documents import show_document, status_document
+from tslab.study.failures import collect_failures, log_failures
 from tslab.study.loading import load_study
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
@@ -27,7 +28,7 @@ from tslab.study.report import log_show
 from tslab.study.state import StudyState
 from tslab.study.wait import wait_for_study
 
-__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Show', 'Status', 'Submit', 'Wait']
+__all__ = ['STUDY_COMMANDS', 'Failures', 'Resubmit', 'Results', 'Show', 'Status', 'Submit', 'Wait']
 
 _LOGGER = logging.getLogger(__name__)
 _MIN_WAIT_INTERVAL_SECONDS = 10
@@ -339,6 +340,52 @@ class Wait:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Failures:
+    """Show error details and recent logs for failed or interrupted runs.
+
+    For example:
+        tslab study failures my_paper.studies:example --machine local
+
+    Attributes:
+        study: The study reference, module:attribute.
+        machine: A machine name or profile path.
+        grid: Keep only this grid.
+        only: Keep only runs that match axis=value.
+        states: Show only runs in these states; failed and interrupted by default.
+        lines: Number of trailing lines to show from each log.
+        json: Print one study-failures JSON document.
+    """
+
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    states: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='STATE'), tyro.conf.UseAppendAction
+    ] = ()
+    lines: int = 30
+    json: bool = False
+
+    def run(self) -> int:
+        """Show failure details and return the process exit code."""
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
+        )
+        failures = collect_failures(
+            context=context, states=_states_of(values=self.states), lines=self.lines
+        )
+        if self.json:
+            print_json(document={'schema': 'tslab.study-failures/1', 'runs': failures})
+        elif failures:
+            log_failures(failures=failures)
+        else:
+            _LOGGER.info('no failed or interrupted runs')
+        return 0
+
+
+@dataclass(frozen=True, kw_only=True)
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
@@ -446,4 +493,5 @@ STUDY_COMMANDS = {
     'results': Results,
     'show': Show,
     'wait': Wait,
+    'failures': Failures,
 }
