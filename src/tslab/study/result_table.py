@@ -12,14 +12,21 @@ import json
 from pathlib import Path
 
 from tslab.core.artifact import Metrics
-from tslab.core.paths import atomic_write_text, META_FILE
+from tslab.core.paths import atomic_write_text, META_FILE, require_path
 from tslab.core.status import InstanceRecord, InstanceState
 from tslab.helpers.text import first_line
 from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
 from tslab.study.state import RunReport
 
-__all__ = ['METRICS_TYPE', 'ResultRow', 'collect_results', 'study_results', 'write_results_csv']
+__all__ = [
+    'METRICS_TYPE',
+    'ResultRow',
+    'collect_results',
+    'instance_directory',
+    'study_results',
+    'write_results_csv',
+]
 
 #: The ``meta.json`` value of a metrics instance, ``module.Class`` of ``Metrics``.
 METRICS_TYPE = f'{Metrics.__module__}.{Metrics.__qualname__}'
@@ -132,7 +139,7 @@ def _instance_row(
     if record.state is InstanceState.DONE:
         row.update(
             _metrics_of(
-                instance_directory=_instance_directory(
+                instance_directory=instance_directory(
                     run_directory=run_directory, instance_id=instance_id
                 )
             )
@@ -140,8 +147,17 @@ def _instance_row(
     return row
 
 
-def _instance_directory(*, run_directory: Path, instance_id: str) -> Path:
-    """The folder of one instance: ``stage[a/b]`` maps to ``stage/a/b``."""
+def instance_directory(*, run_directory: Path, instance_id: str) -> Path:
+    """The folder of one instance: ``stage[a/b]`` maps to ``stage/a/b``.
+
+    Args:
+        run_directory: The folder of the run.
+        instance_id: The instance name from ``status.json``.
+
+    Returns:
+        The folder that holds the instance artifacts.
+    """
+    require_path(value=run_directory, parameter='run_directory')
     stage, _, name = instance_id.partition('[')
     return run_directory.joinpath(stage, *name.rstrip(']').split('/'))
 
