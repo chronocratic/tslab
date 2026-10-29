@@ -5,6 +5,7 @@ in this project. The project was created by `tslab new` from the TSLab
 template and belongs to you: change any file here. TSLab itself is a library
 installed from PyPI; never edit it inside `.venv/`. The full TSLab guide is at
 <https://tslab.readthedocs.io>; `README.md` has the short version.
+For agent-driven study runs, follow the [TSLab skill](.agents/skills/tslab/SKILL.md).
 
 ## 1. What TSLab gives you
 
@@ -228,9 +229,12 @@ A study runs one script command over the product of its axes. See
 `studies.py` for the example.
 
 ```bash
+uv run tslab study show {{package_name}}.studies:example
 uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
 uv run tslab study submit {{package_name}}.studies:example --machine local
 uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
+uv run tslab study wait {{package_name}}.studies:example --machine local
+uv run tslab study failures {{package_name}}.studies:example --machine local
 uv run tslab study resubmit {{package_name}}.studies:example --machine local
 uv run tslab study results {{package_name}}.studies:example --machine local --out results.csv
 ```

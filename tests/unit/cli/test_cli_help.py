@@ -61,6 +61,8 @@ def test_top_help_shows_the_study_workflow(capsys: pytest.CaptureFixture[str]) -
 
     assert 'A study, step by step:' in output
     assert 'tslab study resubmit STUDY' in output
+    assert 'tslab study wait STUDY --machine local' in output
+    assert 'tslab study failures STUDY --machine local' in output
 
 
 def test_study_submit_help_names_the_positional(capsys: pytest.CaptureFixture[str]) -> None:

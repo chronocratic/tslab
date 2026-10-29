@@ -6,6 +6,9 @@ study is submitted to a laptop or to a cluster, checked with `tslab study
 status`, resubmitted after crashes, and collected with `tslab study results`
 into one table.
 
+For an agent workflow with JSON documents and exit codes, see the
+[Agent guide](agents.md).
+
 ```bash
 uv run tslab study submit my_paper.studies:example --machine cluster
 uv run tslab study status   my_paper.studies:example --machine cluster
@@ -357,6 +360,71 @@ malformed files do not stop the table: the row gets
 TSLab writes the CSV with the standard library and adds no analysis;
 `pandas.DataFrame(rows)` is one line in user code (also available in
 Python: `Study.results(*, machine)` returns the rows).
+
+Use `--out -` to write CSV to standard output. Add `--json` to write the
+versioned `tslab.study-results/1` document to a file or standard output:
+
+```bash
+uv run tslab study results my_paper.studies:example --machine cluster --out -
+uv run tslab study results my_paper.studies:example --machine cluster --out - --json
+```
+
+## Show a study
+
+`tslab study show` lists each grid, its command, axis value names, and run
+counts without needing a machine profile. Use those names to form `--grid` and
+`--only axis=value` selections. Add `--json` for the
+`tslab.study-show/1` document. See the [Agent guide](agents.md).
+
+```bash
+uv run tslab study show my_paper.studies:example --json
+```
+
+## Wait for a study
+
+`tslab study wait` checks selected runs every 60 seconds by default, and ends
+when work finishes or needs attention. The interval cannot be below 10 seconds;
+`--timeout` returns exit code 124. Use `--keep-going` to wait until every run
+stops, even after failures. It works in a background shell and supports
+`--json`. See the [Agent guide](agents.md) for exit-code actions.
+
+```bash
+uv run tslab study wait my_paper.studies:example --machine cluster --json
+```
+
+## Inspect failures
+
+`tslab study failures` shows failed and interrupted runs by default, with full
+instance errors and the last 30 lines of each job log and run log. Missing log
+files are named, not treated as command failures. Use `--states` and `--lines`
+to change the selection and tail size. The command only reads data. See the
+[Agent guide](agents.md).
+
+```bash
+uv run tslab study failures my_paper.studies:example --machine cluster --json
+```
+
+## Cancel live jobs
+
+`tslab study cancel` cancels queued and running SLURM jobs in the selected
+slice. Use `--dry-run` to inspect job ids first. It cannot stop local runs;
+those run in the foreground of `tslab study submit`. See the
+[Agent guide](agents.md).
+
+```bash
+uv run tslab study cancel my_paper.studies:example --machine cluster --dry-run --json
+```
+
+## Check a machine
+
+`tslab doctor --machine NAME [STUDY]` checks the profile, required commands,
+output storage, project, and optional study compatibility before submission.
+Warnings do not fail the command; inspect each check. It does not verify that a
+real cluster job succeeds. See the [Agent guide](agents.md).
+
+```bash
+uv run tslab doctor --machine cluster my_paper.studies:example --json
+```
 
 ## HPC environment notes
 

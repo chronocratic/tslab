@@ -45,9 +45,12 @@ A study runs one command of a script over a product of axes (see
 `machines/`:
 
 ```bash
+uv run tslab study show {{package_name}}.studies:example
 uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
 uv run tslab study submit {{package_name}}.studies:example --machine local
 uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
+uv run tslab study wait {{package_name}}.studies:example --machine local
+uv run tslab study failures {{package_name}}.studies:example --machine local
 uv run tslab study resubmit {{package_name}}.studies:example --machine local
 uv run tslab study results {{package_name}}.studies:example \
     --machine local --out results.csv

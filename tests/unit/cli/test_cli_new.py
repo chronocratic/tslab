@@ -34,6 +34,25 @@ def test_template_study_status_examples_are_one_shot(tmp_path: Path) -> None:
         assert 'add --watch 60 to refresh' in comment
 
 
+def test_template_study_commands_include_agent_workflow(tmp_path: Path) -> None:
+    project = tmp_path / 'my-paper'
+    create_project(path=project)
+
+    for name in ('README.md', 'AGENTS.md'):
+        content = (project / name).read_text(encoding='utf-8')
+        for command in ('tslab study wait', 'tslab study failures', 'tslab study show'):
+            assert command in content, (name, command)
+
+
+def test_new_copies_the_agent_skill(tmp_path: Path) -> None:
+    project = tmp_path / 'my-paper'
+    create_project(path=project)
+    skill = (project / '.agents/skills/tslab/SKILL.md').read_text(encoding='utf-8')
+    assert 'tslab study wait' in skill
+    assert '{{' not in skill
+    assert '.agents/skills/tslab/SKILL.md' in (project / 'AGENTS.md').read_text(encoding='utf-8')
+
+
 def test_name_option_overrides_the_folder_name(tmp_path: Path) -> None:
     assert create_project(path=tmp_path / 'x', name='Robust-TS') == 'robust_ts'
     assert (tmp_path / 'x' / 'src' / 'robust_ts' / 'classify.py').exists()

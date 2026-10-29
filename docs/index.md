@@ -34,11 +34,16 @@ the work already saved. See {doc}`concepts` and {doc}`resume-and-failures`.
 - **Use your own components:** {doc}`extending` for stages, trainers, encoders
   and data sources.
 
+## Guides
+
+- {doc}`agents` — drive study runs with JSON output and exit codes.
+
 ```{toctree}
 :maxdepth: 2
 :hidden:
 
 getting-started
 guide
+agents
 reference
 ```
