@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import time
 from typing import Protocol, TextIO
 from uuid import uuid4
@@ -127,15 +128,19 @@ class SlurmLauncher:
 class LocalLauncher:
     """The tasks of the group, one after another, in the foreground."""
 
-    def __init__(self, *, project_root: Path, env: Mapping[str, str]) -> None:
+    def __init__(
+        self, *, project_root: Path, env: Mapping[str, str], stream: TextIO | None = None
+    ) -> None:
         """Set up the launcher.
 
         Args:
             project_root: The directory the tasks run in.
             env: The ``[env]`` of the machine.
+            stream: Console output stream; standard output when omitted.
         """
         self._project_root = project_root
         self._env = env
+        self._stream = stream
 
     def submit(
         self,
@@ -153,6 +158,7 @@ class LocalLauncher:
         """
         job_id = f'local-{os.getpid()}-{group.job_file}'
         record(job_id)
+        stream = sys.stdout if self._stream is None else self._stream
         for task in group.tasks:
             task.log_file.parent.mkdir(parents=True, exist_ok=True)
             header = (
@@ -163,20 +169,20 @@ class LocalLauncher:
                 log.write(header)
                 log.flush()
                 try:
-                    exit_code = self._run_task(task=task, log=log)
+                    exit_code = self._run_task(task=task, log=log, stream=stream)
                 except OSError as error:
                     exit_code = None
                     line = f'=== task {task.index} could not start: {error} ===\n'
-                    print(line, end='')  # noqa: T201 # why: the console output is the design
+                    print(line, end='', file=stream)  # why: the console output is the design
                     log.write(line)
             if exit_code is not None and exit_code != 0:
                 line = f'=== task {task.index} exited with {exit_code} ===\n'
-                print(line, end='')  # noqa: T201 # why: the console output is the design
+                print(line, end='', file=stream)  # why: the console output is the design
                 with task.log_file.open('a', encoding='utf-8') as log:
                     log.write(line)
         return job_id
 
-    def _run_task(self, *, task: PlannedTask, log: TextIO) -> int:
+    def _run_task(self, *, task: PlannedTask, log: TextIO, stream: TextIO) -> int:
         process = subprocess.Popen(  # noqa: S603 # why: the run command, typed by the study
             list(task.command),  # why: its first word is the user's script command
             cwd=self._project_root,
@@ -192,7 +198,7 @@ class LocalLauncher:
             message = f'no output stream for task {task.index}'
             raise RuntimeError(message)
         for line in stdout:
-            print(line, end='')  # noqa: T201 # why: the console output is the design
+            print(line, end='', file=stream)  # why: the console output is the design
             log.write(line)
         log.flush()
         return process.wait()
