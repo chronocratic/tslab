@@ -46,34 +46,41 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
     start = clock()
     previous_counts: tuple[int, ...] | None = None
     warned_unknown = False
+    last_context: Context | None = None
+    last_code: int | None = None
     while True:
-        context = load()
-        code = study_exit_code(context=context)
-        counts = _counts(context=context)
-        if counts != previous_counts:
-            _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
-            previous_counts = counts
-        if code == EXIT_UNKNOWN:
-            if not warned_unknown:
+        try:
+            context = load()
+            code = study_exit_code(context=context)
+            last_context, last_code = context, code
+            counts = _counts(context=context)
+            if counts != previous_counts:
+                _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
+                previous_counts = counts
+            if code == EXIT_UNKNOWN and not warned_unknown:
                 _LOGGER.warning('SLURM job states unknown; still waiting')
                 warned_unknown = True
-        else:
-            warned_unknown = False
+            elif code != EXIT_UNKNOWN:
+                warned_unknown = False
 
-        waited = clock() - start
-        live = any(counts_live(report=report, context=context) for report in context.reports)
-        if keep_going:
-            if code != EXIT_UNKNOWN and not live:
+            waited = clock() - start
+            if _should_stop(context=context, code=code, keep_going=keep_going):
                 return code, context, waited
-        elif code not in (EXIT_LIVE, EXIT_UNKNOWN):
-            return code, context, waited
 
-        if timeout is not None and waited + interval > timeout:
-            return EXIT_TIMEOUT, context, waited
-        try:
+            if timeout is not None and waited + interval > timeout:
+                return EXIT_TIMEOUT, context, waited
             sleep(interval)
         except KeyboardInterrupt:
-            return code, context, clock() - start
+            if last_context is None or last_code is None:
+                raise
+            return last_code, last_context, clock() - start
+
+
+def _should_stop(*, context: Context, code: int, keep_going: bool) -> bool:
+    if keep_going:
+        live = any(counts_live(report=report, context=context) for report in context.reports)
+        return code != EXIT_UNKNOWN and not live
+    return code not in (EXIT_LIVE, EXIT_UNKNOWN)
 
 
 def _counts(*, context: Context) -> tuple[int, ...]:

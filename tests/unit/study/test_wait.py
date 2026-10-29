@@ -136,6 +136,31 @@ def test_wait_keeps_going_through_unknown_states_and_warns_once(
     assert caplog.text.count('SLURM job states unknown; still waiting') == 1
 
 
+def test_wait_returns_last_state_when_reload_is_interrupted(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
+    checks = iter([running])
+
+    def load() -> Context:
+        try:
+            return next(checks)
+        except StopIteration as error:
+            raise KeyboardInterrupt from error
+
+    code, last, waited = wait_for_study(
+        load=load,
+        interval=10,
+        timeout=None,
+        keep_going=False,
+        sleep=lambda _: None,
+        clock=lambda: 0,
+    )
+
+    assert code == 3
+    assert last is running
+    assert waited == 0
+
+
 def test_wait_logs_only_when_counts_change(
     project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
 ) -> None:

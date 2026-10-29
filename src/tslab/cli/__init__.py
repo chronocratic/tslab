@@ -110,6 +110,9 @@ def main(args: Sequence[str] | None = None) -> None:
         raise
     except UsageError as error:
         failure = error  # logged below, without a traceback: it is a usage error
+    except Exception as error:  # why: JSON commands need a document for every failure
+        _print_error_document(json_mode=json_mode, exit_code=1, message=str(error))
+        raise
     else:
         _print_error_document(
             json_mode=json_mode, exit_code=code, message=f'command exited with code {code}'

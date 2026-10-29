@@ -1,5 +1,6 @@
 """JSON output for commands that support agent use."""
 
+from collections.abc import Sequence
 import json
 import logging
 from pathlib import Path
@@ -59,3 +60,27 @@ def test_json_usage_error_prints_error_document(
     code = run_main_raw('study', 'status', 'nope:study', '--machine', 'local', '--json')
     assert code == 2
     assert json.loads(capsys.readouterr().out)['exit_code'] == 2
+
+
+def test_json_command_exception_prints_error_document(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class FailingCommand:
+        def run(self) -> int:
+            message = 'unexpected command failure'
+            raise RuntimeError(message)
+
+    def parse_command(*, argv: Sequence[str]) -> FailingCommand:
+        del argv
+        return FailingCommand()
+
+    monkeypatch.setattr('tslab.cli._parse', parse_command)
+    with pytest.raises(RuntimeError, match='unexpected command failure'):
+        main(args=['study', 'show', 'toy_studies:study', '--json'])
+
+    document = json.loads(capsys.readouterr().out)
+    assert document == {
+        'schema': 'tslab.error/1',
+        'exit_code': 1,
+        'message': 'unexpected command failure',
+    }

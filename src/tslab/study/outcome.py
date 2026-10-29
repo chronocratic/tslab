@@ -62,10 +62,15 @@ def counts_live(*, report: RunReport, context: Context) -> bool:
     if report.state in (StudyState.QUEUED, StudyState.RUNNING):
         return True
     if (
-        report.state is StudyState.MISSING
-        and report.task is not None
+        report.task is not None
         and context.submission_in_progress
-        and not (context.study_directory / report.run.run_path).is_dir()
+        and (
+            report.state is StudyState.INTERRUPTED
+            or (
+                report.state is StudyState.MISSING
+                and not (context.study_directory / report.run.run_path).is_dir()
+            )
+        )
     ):
         return True
     return report.state is StudyState.INTERRUPTED and context.followup_live

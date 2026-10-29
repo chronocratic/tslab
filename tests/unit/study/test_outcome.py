@@ -134,6 +134,53 @@ def test_interrupted_run_is_live_while_followup_queued(project: Path, fake: Fake
     )
 
 
+def test_interrupted_runs_are_live_while_resubmit_holds_lock(
+    project: Path, fake: FakeSlurm
+) -> None:
+    submit_study(project=project)
+    job = jobs_of(project=project)[0]
+    for task in job.tasks:
+        _, model, seed = task.run_path.split('/')
+        write_run_status(
+            project=project,
+            model=model,
+            seed=int(seed),
+            run_state=RunState.RUNNING,
+            instance=InstanceState.RUNNING,
+        )
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': ''.join(f'{job.job_id}_{task.index}|TIMEOUT\n' for task in job.tasks),
+            }
+        ],
+    )
+    lock_file = study_directory(project=project) / '.study' / 'submit.lock'
+    code = (
+        'import fcntl, sys, time\n'
+        'with open(sys.argv[1], "r+") as lock:\n'
+        '    fcntl.flock(lock, fcntl.LOCK_EX)\n'
+        '    print("ready", flush=True)\n'
+        '    time.sleep(30)\n'
+    )
+    process = subprocess.Popen(  # noqa: S603 # why: fixed test code locks tmp_path file
+        [sys.executable, '-c', code, str(lock_file)], stdout=subprocess.PIPE, text=True
+    )
+    assert process.stdout is not None
+    assert process.stdout.readline() == 'ready\n'
+    try:
+        assert (
+            study_exit_code(context=context(project=project, machine_file='cluster.toml'))
+            == EXIT_LIVE
+        )
+    finally:
+        process.terminate()
+        process.wait(timeout=5)
+        process.stdout.close()
+
+
 def test_submission_in_progress_false_without_lock_file(tmp_path: Path) -> None:
     assert submission_in_progress(study_folder=tmp_path) is False
     assert not (tmp_path / 'submit.lock').exists()
