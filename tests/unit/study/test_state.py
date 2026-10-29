@@ -1,5 +1,6 @@
 """Study states: the decision over folders and SLURM job states."""
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ from tslab.study.state import (
     FolderFacts,
     job_ended,
     read_folder,
+    RunReport,
     slurm_task_ids,
     study_state,
     StudyState,
@@ -209,3 +211,65 @@ def test_a_job_has_ended_unless_it_is_unknown_queued_or_running() -> None:
     assert job_ended('FAILED')
     assert not job_ended(None)
     assert not job_ended('RUNNING')
+
+
+def _write_status(folder: Path, run_state: RunState, instance_state: InstanceState) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=run_state,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=instance_state)},
+        ),
+    )
+
+
+def _collect_after_completion(
+    tmp_path: Path, *, job_state: str, sleep: Callable[[float], None]
+) -> list[RunReport]:
+    jobs = [job('7', (task(index=0, run_path='g/a/1', attempt=1),))]
+    return collect_states(
+        study_directory=tmp_path,
+        runs=[run('g/a/1')],
+        jobs=jobs,
+        job_states={'7_0': job_state},
+        sleep=sleep,
+    )
+
+
+def test_grace_wait_rereads_a_completed_run_until_status_settles(tmp_path: Path) -> None:
+    folder = tmp_path / 'g' / 'a' / '1'
+    _write_status(folder, RunState.RUNNING, InstanceState.RUNNING)
+    calls: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        calls.append(seconds)
+        if len(calls) == 3:
+            _write_status(folder, RunState.FINISHED, InstanceState.DONE)
+
+    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=sleep)
+    assert reports[0].state is StudyState.DONE
+    assert calls == [1, 1, 1]
+
+
+def test_grace_wait_gives_up_after_15_seconds(tmp_path: Path) -> None:
+    _write_status(tmp_path / 'g' / 'a' / '1', RunState.RUNNING, InstanceState.RUNNING)
+    calls: list[float] = []
+    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=calls.append)
+    assert len(calls) == 15
+    assert reports[0].state is StudyState.INTERRUPTED
+
+
+def test_grace_wait_skips_other_ended_states(tmp_path: Path) -> None:
+    _write_status(tmp_path / 'g' / 'a' / '1', RunState.RUNNING, InstanceState.RUNNING)
+    calls: list[float] = []
+    _collect_after_completion(tmp_path, job_state='TIMEOUT', sleep=calls.append)
+    assert calls == []
+
+
+def test_grace_wait_survives_a_missing_run_folder(tmp_path: Path) -> None:
+    calls: list[float] = []
+    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=calls.append)
+    assert len(calls) == 30
+    assert reports[0].state is StudyState.MISSING

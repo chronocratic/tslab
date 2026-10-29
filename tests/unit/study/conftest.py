@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,6 +21,12 @@ def _clean_study_imports() -> Iterator[None]:
     for name in _TOY_MODULES:
         sys.modules.pop(name, None)
     sys.path[:] = path
+
+
+@pytest.fixture(autouse=True)
+def _no_grace_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the wait for a late ``status.json`` instant; only ``tslab.study.state`` sees it."""
+    monkeypatch.setattr('tslab.study.state.time', SimpleNamespace(sleep=lambda _seconds: None))
 
 
 @pytest.fixture
