@@ -256,3 +256,34 @@ def test_sbatch_extra_rejects_newlines(tmp_path: Path) -> None:
     text += 'sbatch_extra = ["--x=1\\nrm -rf x"]\n'
     with pytest.raises(MachineProfileError, match='sbatch_extra'):
         load_machine(path=_write(tmp_path, text))
+
+
+def _typo_profile(tmp_path: Path, text: str) -> Path:
+    if '[' not in text:
+        return _write(tmp_path, BASE_SLURM + text + '\n[slurm]\npartition = "p"\n')
+    base = BASE_SLURM
+    if '[slurm]' not in text:
+        base += '[slurm]\npartition = "p"\ntime = "1-00:00:00"\n'
+    return _write(tmp_path, base + text)
+
+
+@pytest.mark.parametrize(
+    ('text', 'expected'),
+    [
+        ('[slurm]\npartition = "p"\ngpu = 1', "slurm.gpu: unknown key; did you mean 'gpus'?"),
+        ('outptu_root = "x"', "outptu_root: unknown key; did you mean 'output_root'?"),
+        (
+            '[followup]\nauto_retries = true',
+            "followup.auto_retries: unknown key; did you mean 'auto_retry'?",
+        ),
+        (
+            '[[overrides]]\nmatch = { grid = "g" }\nslurm = { gpu = 1 }',
+            "overrides[0].slurm.gpu: unknown key; did you mean 'gpus'?",
+        ),
+    ],
+)
+def test_machine_profile_typo_suggests_the_key(tmp_path: Path, text: str, expected: str) -> None:
+    with pytest.raises(MachineProfileError) as raised:
+        load_machine(path=_typo_profile(tmp_path, text))
+    assert expected in str(raised.value)
+    assert 'Valid keys:' in str(raised.value)

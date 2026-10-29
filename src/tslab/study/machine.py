@@ -18,6 +18,7 @@ from typing import cast, Literal
 
 from tslab.core.config import ConfigFileError, decode_dataclass
 from tslab.core.paths import atomic_write_text
+from tslab.helpers.text import unknown_key_message
 from tslab.study.expansion import expand_variables
 from tslab.study.settings import SettingValue
 
@@ -277,7 +278,8 @@ def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
 def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool) -> MachineProfile:
     unknown = [name for name in table if name not in _TOP_LEVEL_KEYS]
     if unknown:
-        message = f'{path}: {unknown[0]} is not a known top-level key'
+        problem = unknown_key_message(location='', key=unknown[0], valid=_TOP_LEVEL_KEYS)
+        message = f'{path}: {problem}'
         raise MachineProfileError(message)
     launcher = _string_field(table=table, name='launcher', path=path)
     if launcher not in {'slurm', 'local'}:
@@ -462,7 +464,8 @@ def _check_keys(*, cls: type, table: dict[str, object], location: str, path: Pat
     known = {item.name for item in dataclasses.fields(cls)}  # ty: ignore[invalid-argument-type]
     unknown = [name for name in table if name not in known]
     if unknown:
-        message = f'{path}: {location}.{unknown[0]} is not a known key of {cls.__name__}'
+        problem = unknown_key_message(location=location, key=unknown[0], valid=known)
+        message = f'{path}: {problem}'
         raise MachineProfileError(message)
 
 

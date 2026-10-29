@@ -1,10 +1,11 @@
 """Text helpers: first lines and aligned tables, plain enough for log files."""
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+import difflib
 import logging
 
-__all__ = ['TextTable', 'first_line', 'format_table', 'log_table']
+__all__ = ['TextTable', 'first_line', 'format_table', 'log_table', 'unknown_key_message']
 
 
 def first_line(*, text: str) -> str:
@@ -15,6 +16,24 @@ def first_line(*, text: str) -> str:
     """
     lines = text.splitlines()
     return lines[0] if lines else ''
+
+
+def unknown_key_message(*, location: str, key: str, valid: Iterable[str]) -> str:
+    """Return a message for an unknown key: the close valid key, then all valid keys.
+
+    Args:
+        location: Where the key was found, for example ``slurm``; empty for the top level.
+        key: The key that is not valid.
+        valid: The keys that are valid at that place.
+
+    Returns:
+        A one-line message that names the key and lists the valid keys.
+    """
+    names = sorted(valid)
+    where = f'{location}.{key}' if location else key
+    close = difflib.get_close_matches(key, names, n=1)
+    hint = f"; did you mean '{close[0]}'?" if close else '.'
+    return f'{where}: unknown key{hint} Valid keys: {", ".join(names)}'
 
 
 def format_table(
