@@ -13,7 +13,8 @@ from typing import Annotated, Any, cast, Protocol, Union
 
 import tyro
 
-from tslab.cli.console import configure_logging
+from tslab.cli import output
+from tslab.cli.console import configure_logging, use_stderr
 from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
 from tslab.cli.status import Status
@@ -70,9 +71,27 @@ def main(args: Sequence[str] | None = None) -> None:
     configure_logging()
     argv = list(sys.argv[1:]) if args is None else list(args)
     head, extra_args = _split_pass_through(argv=argv)
-    command: Command = _parse(argv=head)
+    json_mode = '--json' in head
+    output.reset_document_state()
+    if json_mode:
+        use_stderr()
+    try:
+        command: Command = _parse(argv=head)
+    except SystemExit as error:
+        code = _system_exit_code(error=error)
+        _print_error_document(
+            json_mode=json_mode,
+            exit_code=code,
+            message=f'command argument parsing failed with exit code {code}',
+        )
+        raise
     if extra_args and not _takes_pass_through(command=command):
         _LOGGER.error('this command does not take arguments after --')
+        _print_error_document(
+            json_mode=json_mode,
+            exit_code=2,
+            message='this command does not take arguments after --',
+        )
         raise SystemExit(2)
     if extra_args:
         # ty: ignore[unsound-assignment]
@@ -80,12 +99,35 @@ def main(args: Sequence[str] | None = None) -> None:
         command = dataclasses.replace(cast('Any', command), extra_args=extra_args)
     try:
         code = command.run()
+    except SystemExit as error:
+        exit_code = _system_exit_code(error=error)
+        _print_error_document(
+            json_mode=json_mode,
+            exit_code=exit_code,
+            message=f'command exited with code {exit_code}',
+        )
+        raise
     except UsageError as error:
         failure = error  # logged below, without a traceback: it is a usage error
     else:
+        _print_error_document(
+            json_mode=json_mode, exit_code=code, message=f'command exited with code {code}'
+        )
         raise SystemExit(code)
     _LOGGER.error('%s', failure)
+    _print_error_document(json_mode=json_mode, exit_code=2, message=str(failure))
     raise SystemExit(2)
+
+
+def _system_exit_code(*, error: SystemExit) -> int:
+    if isinstance(error.code, int):
+        return error.code
+    return 0 if error.code is None else 1
+
+
+def _print_error_document(*, json_mode: bool, exit_code: int, message: str) -> None:
+    if json_mode and exit_code != 0 and not output.has_printed_document():
+        output.print_json(document=output.error_document(exit_code=exit_code, message=message))
 
 
 def _split_pass_through(*, argv: Sequence[str]) -> tuple[list[str], tuple[str, ...]]:

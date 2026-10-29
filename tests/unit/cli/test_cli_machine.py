@@ -1,5 +1,6 @@
 """``tslab machine add | list | remove``."""
 
+import json
 import logging
 from pathlib import Path
 
@@ -93,6 +94,38 @@ def test_list_shows_project_profiles_above_the_working_folder(
         assert _run('machine', 'list') == 0
     lines = caplog.text.splitlines()
     assert any('local' in line and 'project' in line for line in lines)
+
+
+def test_machine_list_json_lists_project_and_registered(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project_profile = tmp_path / 'machines' / 'project.toml'
+    project_profile.parent.mkdir()
+    project_profile.write_text(PROFILE, encoding='utf-8')
+    registered_profile = tmp_path / 'registered.toml'
+    registered_profile.write_text(PROFILE, encoding='utf-8')
+    (tmp_path / 'home' / 'machines.toml').parent.mkdir()
+    (tmp_path / 'home' / 'machines.toml').write_text(
+        f'registered = "{registered_profile.as_posix()}"\n', encoding='utf-8'
+    )
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv('TSLAB_MACHINES_FILE', str(tmp_path / 'home' / 'machines.toml'))
+        assert _run('machine', 'list', '--json') == 0
+    document = json.loads(capsys.readouterr().out)
+    machines = {entry['name']: entry for entry in document['machines']}
+    assert machines['project'] == {
+        'name': 'project',
+        'source': 'project',
+        'profile': project_profile.resolve().as_posix(),
+        'note': '',
+    }
+    assert machines['registered'] == {
+        'name': 'registered',
+        'source': 'registered',
+        'profile': registered_profile.resolve().as_posix(),
+        'note': '',
+    }
 
 
 def test_list_without_machines_says_how_to_add_one(

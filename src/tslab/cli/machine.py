@@ -12,6 +12,7 @@ from typing import Annotated
 
 import tyro
 
+from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
 from tslab.helpers.text import log_table
 from tslab.study.machine import (
@@ -64,7 +65,12 @@ class MachineList:
 
     For example:
         tslab machine list
+
+    Attributes:
+        json: Print one machine-list JSON document.
     """
+
+    json: bool = False
 
     def run(self) -> int:
         """Print a table of names and return the exit code."""
@@ -76,6 +82,30 @@ class MachineList:
         if not project and not registered:
             _LOGGER.info('no machines: none in machines/ above this folder, none registered')
             _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
+            if self.json:
+                print_json(document={'schema': 'tslab.machine-list/1', 'machines': []})
+            return 0
+        if self.json:
+            machines = [
+                {
+                    'name': name,
+                    'source': 'project',
+                    'profile': file.resolve().as_posix(),
+                    'note': '',
+                }
+                for name, file in project.items()
+            ]
+            machines.extend(
+                {
+                    'name': name,
+                    'source': 'registered',
+                    'profile': file.resolve().as_posix(),
+                    'note': _register_note(name=name, file=file, project=project),
+                }
+                for name, file in sorted(registered.items())
+            )
+            print_json(document={'schema': 'tslab.machine-list/1', 'machines': machines})
+            _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
             return 0
         rows = [(name, 'project', os.path.relpath(file), '') for name, file in project.items()]
         rows += [
