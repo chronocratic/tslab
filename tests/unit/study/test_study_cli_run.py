@@ -195,6 +195,50 @@ def test_results_writes_the_csv(project: Path, fake: FakeSlurm, tmp_path: Path) 
     assert out.read_text().splitlines()[0].startswith('grid,')
 
 
+def test_results_out_dash_writes_csv_to_stdout(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = logging.getLogger()
+    handlers = root.handlers[:]
+    level = root.level
+    root.handlers.clear()
+    try:
+        code = run_main('results', 'toy_studies:study', '--machine', 'local.toml', '--out', '-')
+    finally:
+        root.handlers[:] = handlers
+        root.setLevel(level)
+    captured = capsys.readouterr()
+    assert code == 0
+    assert captured.out.splitlines()[0].startswith('grid,')
+    assert 'wrote 4 rows' in captured.err
+
+
+def test_results_json_to_stdout(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        run_main('results', 'toy_studies:study', '--machine', 'local.toml', '--out', '-', '--json')
+        == 0
+    )
+    document = json.loads(capsys.readouterr().out)
+    assert document['schema'] == 'tslab.study-results/1'
+    assert len(document['rows']) == 4
+
+
+def test_results_json_to_file(
+    project: Path, fake: FakeSlurm, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / 'rows.json'
+    assert (
+        run_main(
+            'results', 'toy_studies:study', '--machine', 'local.toml', '--out', str(out), '--json'
+        )
+        == 0
+    )
+    assert capsys.readouterr().out == ''
+    assert json.loads(out.read_text(encoding='utf-8'))['schema'] == 'tslab.study-results/1'
+
+
 @pytest.mark.parametrize(
     'args',
     [

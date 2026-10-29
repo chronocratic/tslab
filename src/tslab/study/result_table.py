@@ -23,6 +23,7 @@ __all__ = [
     'METRICS_TYPE',
     'ResultRow',
     'collect_results',
+    'format_results_csv',
     'instance_directory',
     'study_results',
     'write_results_csv',
@@ -207,13 +208,25 @@ def write_results_csv(*, rows: Sequence[ResultRow], path: Path) -> None:
             the metric columns sorted by name.
         path: The CSV file to write.
     """
+    atomic_write_text(path=path, text=format_results_csv(rows=rows))
+
+
+def format_results_csv(*, rows: Sequence[ResultRow]) -> str:
+    """Format result rows as CSV text.
+
+    Args:
+        rows: The rows to format; the header is their union of columns.
+
+    Returns:
+        CSV text with a trailing newline.
+    """
     header = _header_of(rows=rows)
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator='\n')
     writer.writerow(header)
     for row in rows:
         writer.writerow(['' if row.get(column) is None else row.get(column) for column in header])
-    atomic_write_text(path=path, text=buffer.getvalue())
+    return buffer.getvalue()
 
 
 def _header_of(*, rows: Sequence[ResultRow]) -> list[str]:

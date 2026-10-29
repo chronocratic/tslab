@@ -6,12 +6,14 @@ functions, so the behavior is testable without the command line.
 """
 
 from collections.abc import Callable, Mapping, Sequence
+import json
 import logging
 from pathlib import Path
+import sys
 import time
 from typing import TextIO
 
-from tslab.core.paths import LOCK_FILE
+from tslab.core.paths import atomic_write_text, LOCK_FILE
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
 from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
@@ -26,7 +28,7 @@ from tslab.study.plan import (
 )
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_lock, take_progress
 from tslab.study.report import log_launch, log_problems, log_status
-from tslab.study.result_table import collect_results, write_results_csv
+from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
 from tslab.study.slurm import scancel, SlurmError
 from tslab.study.state import job_ended, RunReport, StudyState
 
@@ -272,12 +274,13 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     return max(code, followup_code)
 
 
-def results(*, context: Context, out: Path) -> int:
-    """Write the results table of the runs of the context to ``out`` as CSV.
+def results(*, context: Context, out: Path, as_json: bool = False) -> int:
+    """Write the results table of the runs as CSV or JSON.
 
     Args:
         context: The context of the command.
-        out: The CSV file to write.
+        out: The output file, or ``Path('-')`` for standard output.
+        as_json: Write rows as a versioned JSON document.
 
     Returns:
         ``0``.
@@ -285,7 +288,19 @@ def results(*, context: Context, out: Path) -> int:
     rows = collect_results(
         study=context.study, study_directory=context.study_directory, reports=context.reports
     )
-    write_results_csv(rows=rows, path=out)
+    if out == Path('-'):
+        text = (
+            json.dumps({'schema': 'tslab.study-results/1', 'rows': rows}, indent=2)
+            if as_json
+            else format_results_csv(rows=rows)
+        )
+        sys.stdout.write(f'{text}\n' if as_json else text)
+    elif as_json:
+        atomic_write_text(
+            path=out, text=json.dumps({'schema': 'tslab.study-results/1', 'rows': rows}, indent=2)
+        )
+    else:
+        write_results_csv(rows=rows, path=out)
     _LOGGER.info('wrote %d rows to %s', len(rows), out.as_posix())
     return 0
 

@@ -20,7 +20,7 @@ from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
 from tslab.study.definition import expand_runs
 from tslab.study.loading import load_study
-from tslab.study.result_table import collect_results, write_results_csv
+from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
 from tslab.study.state import collect_states, RunReport
 
 
@@ -154,6 +154,25 @@ def test_columns_and_csv(tmp_path: Path) -> None:
     )
     assert header == expected_header
     assert line == 'g,1,g/1,done,e[default],done,,1.0,2.0'
+
+
+def test_format_results_csv_matches_file(tmp_path: Path) -> None:
+    rows = [
+        {
+            'grid': 'g',
+            'seed': '1',
+            'run_path': 'g/1',
+            'study_state': 'done',
+            'instance': 'e[default]',
+            'instance_state': 'done',
+            'error': None,
+            'metric/b': 2.0,
+            'metric/a': 1.0,
+        }
+    ]
+    path = tmp_path / 'rows.csv'
+    write_results_csv(rows=rows, path=path)
+    assert format_results_csv(rows=rows) == path.read_text(encoding='utf-8')
 
 
 @pytest.mark.slow
