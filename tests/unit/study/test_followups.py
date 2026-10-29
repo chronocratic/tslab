@@ -62,7 +62,9 @@ def job_file_of(*, project: Path, job_file: int, suffix: str) -> Path:
     return project / 'runs' / 's' / '.study' / 'jobs' / f'{job_file}.{suffix}'
 
 
-def bump_attempts(*, project: Path, run_path: str, index: int, up_to: int) -> None:
+def bump_attempts(
+    *, project: Path, run_path: str, index: int, up_to: int, uncounted: tuple[int, int] = (0, 0)
+) -> None:
     """More attempts of one run, recorded like real submissions."""
     for attempt in range(2, up_to + 1):
         record = JobRecord(
@@ -82,6 +84,8 @@ def bump_attempts(*, project: Path, run_path: str, index: int, up_to: int) -> No
                     resources={},
                     attempt=attempt,
                     progress=ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None),
+                    uncounted_attempts=uncounted[0],
+                    uncounted_in_row=uncounted[1],
                 ),
             ),
         )
@@ -181,6 +185,96 @@ def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(
     assert 'stuck: g/small/3 (attempt 1, no progress)' in caplog.text
     assert 'gave up: g/large/2 after 3 attempts' in caplog.text
     assert len(fake.calls('sbatch')) == 2
+
+
+def _write_progress(project: Path) -> None:
+    folder = project / 'runs' / 's' / 'g/large/2'
+    folder.mkdir(parents=True)
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.DONE)},
+        ),
+    )
+
+
+def _resubmit_large_2(  # noqa: PLR0913 # why: keyword-only test helper, one argument per scenario knob
+    *,
+    project: Path,
+    fake: FakeSlurm,
+    up_to: int,
+    uncounted: tuple[int, int],
+    job_state: str,
+    with_progress: bool,
+) -> list[TaskRecord]:
+    submit_study(project=project)
+    if with_progress:
+        _write_progress(project)
+    bump_attempts(project=project, run_path='g/large/2', index=4, up_to=up_to, uncounted=uncounted)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': f'200{up_to}_4|{job_state}\n'}])
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
+    )
+    assert code == 0
+    last = jobs_of(project=project)[-1]
+    return [t for t in last.tasks if t.attempt > up_to]
+
+
+def test_auto_retries_a_preempted_run_past_the_cap_without_progress(
+    project: Path, fake: FakeSlurm
+) -> None:
+    [retried] = _resubmit_large_2(
+        project=project,
+        fake=fake,
+        up_to=3,
+        uncounted=(0, 0),
+        job_state='PREEMPTED',
+        with_progress=False,
+    )
+    assert (retried.attempt, retried.uncounted_attempts, retried.uncounted_in_row) == (4, 1, 1)
+
+
+def test_preempted_attempts_do_not_count_toward_the_cap(project: Path, fake: FakeSlurm) -> None:
+    [retried] = _resubmit_large_2(
+        project=project,
+        fake=fake,
+        up_to=3,
+        uncounted=(1, 1),
+        job_state='TIMEOUT',
+        with_progress=True,
+    )
+    assert retried.attempt == 4
+
+
+def test_auto_gives_up_after_20_preemptions_in_a_row(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('INFO'):
+        retried = _resubmit_large_2(
+            project=project,
+            fake=fake,
+            up_to=2,
+            uncounted=(20, 20),
+            job_state='PREEMPTED',
+            with_progress=False,
+        )
+    assert retried == []
+    assert 'in a row' in caplog.text
+
+
+def test_a_counted_attempt_resets_the_in_row_counter(project: Path, fake: FakeSlurm) -> None:
+    [retried] = _resubmit_large_2(
+        project=project,
+        fake=fake,
+        up_to=2,
+        uncounted=(3, 3),
+        job_state='TIMEOUT',
+        with_progress=True,
+    )
+    assert (retried.uncounted_attempts, retried.uncounted_in_row) == (3, 0)
 
 
 def test_followup_chain_stops_when_nothing_is_resubmitted(project: Path, fake: FakeSlurm) -> None:

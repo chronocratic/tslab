@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -29,7 +30,7 @@ from tslab.study.records import (
 
 
 def task(**changes: object) -> TaskRecord:
-    values: dict[str, object] = {
+    values: dict[str, Any] = {
         'index': 0,
         'grid': 'g',
         'run_path': 'g/a/1',
@@ -40,7 +41,7 @@ def task(**changes: object) -> TaskRecord:
         'progress': ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None),
     }
     values.update(changes)
-    return TaskRecord(**values)  # type: ignore[arg-type]
+    return TaskRecord(**values)
 
 
 def job(**changes: object) -> JobRecord:
@@ -147,3 +148,16 @@ def test_submission_lock_excludes_a_second_holder(tmp_path: Path) -> None:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     with (tmp_path / 'submit.lock').open('a') as other:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def test_task_record_without_counters_reads_as_zero() -> None:
+    document = task().to_json()
+    del document['uncounted_attempts'], document['uncounted_in_row']
+    record = TaskRecord.from_json(document=document)
+    assert (record.uncounted_attempts, record.uncounted_in_row) == (0, 0)
+    assert TaskRecord.from_json(document=record.to_json()) == record
+
+
+def test_task_record_counters_round_trip() -> None:
+    record = task(uncounted_attempts=2, uncounted_in_row=1)
+    assert TaskRecord.from_json(document=record.to_json()) == record

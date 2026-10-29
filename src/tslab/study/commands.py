@@ -305,13 +305,47 @@ def results(*, context: Context, out: Path, as_json: bool = False) -> int:
     return 0
 
 
+#: Ended SLURM states that say nothing about the run: the node or the queue failed it.
+_UNCOUNTED_JOB_STATES = frozenset({'PREEMPTED', 'NODE_FAIL'})
+
+#: Preempted or node-failed attempts in a row after which the run is left alone.
+_MAX_UNCOUNTED_IN_ROW = 20
+
+
+def _uncounted(*, report: RunReport) -> tuple[int, int]:
+    """The counters of the next attempt: ``(uncounted attempts, uncounted in a row)``."""
+    attempts, in_row = (
+        (report.task.uncounted_attempts, report.task.uncounted_in_row)
+        if report.task is not None
+        else (0, 0)
+    )
+    if report.job_state in _UNCOUNTED_JOB_STATES:
+        return attempts + 1, in_row + 1
+    return attempts, 0
+
+
 def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[RunReport]:
-    """The reports that may retry: under the cap, and one step further on."""
+    """The reports that may retry: under the cap, and one step further on.
+
+    An attempt that ended ``PREEMPTED`` or ``NODE_FAIL`` does not count toward the
+    cap and needs no progress, until 20 of them follow one another.
+    """
     max_attempts = context.machine.followup.max_attempts
     retried: list[RunReport] = []
     for report in reports:
-        if report.attempt >= max_attempts:
-            _LOGGER.info('gave up: %s after %d attempts', report.run.run_path, report.attempt)
+        if report.job_state in _UNCOUNTED_JOB_STATES:
+            if _uncounted(report=report)[1] > _MAX_UNCOUNTED_IN_ROW:
+                _LOGGER.info(
+                    'gave up: %s preempted or node failed %d times in a row',
+                    report.run.run_path,
+                    _MAX_UNCOUNTED_IN_ROW,
+                )
+                continue
+            retried.append(report)
+            continue
+        counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
+        if counted >= max_attempts:
+            _LOGGER.info('gave up: %s after %d attempts', report.run.run_path, counted)
             continue
         if not _made_progress(report=report, context=context):
             _LOGGER.info('stuck: %s (attempt %d, no progress)', report.run.run_path, report.attempt)
@@ -431,6 +465,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             indices=assign_indices(runs=runs, jobs=jobs),
             extra_args=extra_args,
             attempts={report.run.run_path: report.attempt for report in reports},
+            uncounted={report.run.run_path: _uncounted(report=report) for report in reports},
             first_job_file=next_job_file(study_folder=folder),
         )
         problems = validate_jobs(study=context.study, groups=groups)

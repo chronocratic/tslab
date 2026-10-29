@@ -259,6 +259,8 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
                 ),
                 attempt=task.attempt,
                 progress=take_progress(run_directory=study_directory / task.resolved.run.run_path),
+                uncounted_attempts=task.uncounted_attempts,
+                uncounted_in_row=task.uncounted_in_row,
             )
             for task in group.tasks
         )

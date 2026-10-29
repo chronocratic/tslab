@@ -325,7 +325,9 @@ resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
   `missing` (startup failures and code errors, including out-of-memory, stay
   manual);
 - a run is not retried once its attempt number reaches `max_attempts`
-  (default 3);
+  (default 3); attempts whose job ended `PREEMPTED` or `NODE_FAIL` do not
+  count and skip the progress rule below, but after 20 of them in a row the
+  run is left alone;
 - **progress rule:** a run is retried only if it made progress during its
   last attempt — more `done` instances than the snapshot taken when that
   attempt was submitted, or a newer `last.ckpt` in the run folder.
