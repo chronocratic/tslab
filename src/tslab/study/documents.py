@@ -1,11 +1,13 @@
 """JSON documents for study commands."""
 
+from collections.abc import Sequence
+
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.outcome import counts_live
 from tslab.study.state import RunReport, StudyState
 
-__all__ = ['run_entry', 'show_document', 'status_document']
+__all__ = ['cancel_document', 'run_entry', 'show_document', 'status_document']
 
 
 def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
@@ -96,6 +98,27 @@ def show_document(*, study: Study) -> dict[str, object]:
         'study': study.name,
         'grids': grids,
         'total_runs': len(runs),
+    }
+
+
+def cancel_document(
+    *, cancelled: Sequence[str], dry_run: bool, exit_code: int
+) -> dict[str, object]:
+    """The JSON document for a study cancellation.
+
+    Args:
+        cancelled: The job ids cancelled or selected for cancellation.
+        dry_run: Whether cancellation was only previewed.
+        exit_code: The command exit code.
+
+    Returns:
+        The versioned study-cancel document.
+    """
+    return {
+        'schema': 'tslab.study-cancel/1',
+        'cancelled': list(cancelled),
+        'dry_run': dry_run,
+        'exit_code': exit_code,
     }
 
 

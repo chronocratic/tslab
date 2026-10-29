@@ -22,7 +22,16 @@ from tslab.study.result_table import collect_results, write_results_csv
 from tslab.study.slurm import scancel, SlurmError
 from tslab.study.state import job_ended, RunReport, StudyState
 
-__all__ = ['LIVE_STATES', 'parse_states', 'resubmit', 'results', 'status', 'submit', 'submit_runs']
+__all__ = [
+    'LIVE_STATES',
+    'cancel',
+    'parse_states',
+    'resubmit',
+    'results',
+    'status',
+    'submit',
+    'submit_runs',
+]
 
 #: The states of a run that is queued or running; submit and resubmit leave them alone.
 LIVE_STATES = (StudyState.QUEUED, StudyState.RUNNING)
@@ -117,6 +126,40 @@ def status(*, context: Context, states: tuple[StudyState, ...] = ()) -> int:
     """
     log_status(context=context, states=states)
     return 0
+
+
+def cancel(*, context: Context, dry_run: bool) -> tuple[int, list[str]]:
+    """Cancel queued and running SLURM jobs of the selected study runs.
+
+    Args:
+        context: The study context containing selected run reports.
+        dry_run: Log the job ids without cancelling them.
+
+    Returns:
+        The process exit code and the job ids cancelled or selected for cancellation.
+    """
+    if context.machine.launcher != 'slurm':
+        message = 'local runs run in the foreground of tslab study submit; stop that process'
+        _LOGGER.error('%s', message)
+        return 1, []
+    live = [
+        report
+        for report in context.reports
+        if report.state in LIVE_STATES and report.job_id is not None
+    ]
+    job_ids = [report.job_id for report in live if report.job_id is not None]
+    if not job_ids:
+        _LOGGER.info('nothing to cancel')
+        return 0, []
+    if dry_run:
+        _LOGGER.info('would cancel %s', ', '.join(job_ids))
+        return 0, job_ids
+    try:
+        _cancel_live(reports=live, launcher=context.machine.launcher)
+    except SlurmError as error:
+        _LOGGER.error('%s', error)  # noqa: TRY400 # why: cancellation failures need no traceback
+        return 1, []
+    return 0, job_ids
 
 
 def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
