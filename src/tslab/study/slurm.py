@@ -306,13 +306,29 @@ def slurm_available() -> bool:
     return all(shutil.which(name) is not None for name in ('sbatch', 'scancel', 'squeue', 'sacct'))
 
 
+_COMPRESSED_ARRAY_KEY = re.compile(r'(?P<job>\d+)_\[(?P<ranges>[\d,-]+)(?:%\d+)?\]')
+
+
+def _expand_array_key(*, key: str) -> list[str]:
+    # why: sacct prints pending array tasks as one range, for example ``123_[4-7,9%10]``
+    match = _COMPRESSED_ARRAY_KEY.fullmatch(key)
+    if match is None:
+        return [key]
+    keys: list[str] = []
+    for part in match['ranges'].split(','):
+        first, _, last = part.partition('-')
+        keys += [f'{match["job"]}_{index}' for index in range(int(first), int(last or first) + 1)]
+    return keys
+
+
 def _pipe_lines(*, stdout: str) -> dict[str, str]:
     states: dict[str, str] = {}
     for line in stdout.splitlines():
         key, _, state = (part.strip() for part in line.partition('|'))
         if not key or not state:
             continue
-        states[key] = state.split()[0]
+        for expanded in _expand_array_key(key=key):
+            states[expanded] = state.split()[0]
     return states
 
 
