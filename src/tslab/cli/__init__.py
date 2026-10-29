@@ -15,6 +15,7 @@ import tyro
 
 from tslab.cli import output
 from tslab.cli.console import configure_logging, use_stderr
+from tslab.cli.doctor import Doctor
 from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
 from tslab.cli.status import Status
@@ -164,6 +165,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
     return _cli(
         commands={
             'machine': _Machine,
+            'doctor': Doctor,
             'new': New,
             'status': Status,
             'study': _Study,
