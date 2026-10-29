@@ -102,6 +102,9 @@ class TaskRecord:
             locally.
         attempt: The attempt number of this submission.
         progress: How far the run had gotten before this submission.
+        uncounted_attempts: Earlier attempts of the run whose job ended ``PREEMPTED``
+            or ``NODE_FAIL``; they do not count toward ``max_attempts``.
+        uncounted_in_row: How many of the latest attempts in a row ended that way.
     """
 
     index: int
@@ -112,6 +115,8 @@ class TaskRecord:
     resources: Mapping[str, object]
     attempt: int
     progress: ProgressSnapshot
+    uncounted_attempts: int = 0
+    uncounted_in_row: int = 0
 
     def to_json(self) -> dict[str, object]:
         """The JSON form of the record."""
@@ -124,6 +129,8 @@ class TaskRecord:
             'resources': dict(self.resources),
             'attempt': self.attempt,
             'progress': self.progress.to_json(),
+            'uncounted_attempts': self.uncounted_attempts,
+            'uncounted_in_row': self.uncounted_in_row,
         }
 
     @classmethod
@@ -138,6 +145,8 @@ class TaskRecord:
             resources=dict(document['resources']),
             attempt=int(document['attempt']),
             progress=ProgressSnapshot.from_json(document=document['progress']),
+            uncounted_attempts=int(document.get('uncounted_attempts', 0)),
+            uncounted_in_row=int(document.get('uncounted_in_row', 0)),
         )
 
 

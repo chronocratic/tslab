@@ -274,6 +274,8 @@ class PlannedTask:
         attempt: The attempt number of this submission.
         error: A planning problem, e.g. an index past ``max_array_size``;
             the task is still planned, but ``validate_jobs`` reports it.
+        uncounted_attempts: Earlier attempts that ended ``PREEMPTED`` or ``NODE_FAIL``.
+        uncounted_in_row: How many of the latest attempts in a row ended that way.
     """
 
     resolved: ResolvedRun
@@ -283,6 +285,8 @@ class PlannedTask:
     extra_args: tuple[str, ...]
     attempt: int
     error: str | None = None
+    uncounted_attempts: int = 0
+    uncounted_in_row: int = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -365,6 +369,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     extra_args: Mapping[str, tuple[str, ...]],
     attempts: Mapping[str, int],
     first_job_file: int,
+    uncounted: Mapping[str, tuple[int, int]] | None = None,
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
@@ -381,6 +386,8 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             command.
         attempts: The run path to attempts already made; 0 when absent.
         first_job_file: The first job file number to number groups from.
+        uncounted: The run path to ``(uncounted attempts, uncounted in a row)``,
+            see ``TaskRecord``; ``(0, 0)`` when absent.
 
     Returns:
         The groups, numbered from ``first_job_file`` in first-appearance
@@ -393,6 +400,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
     env = expansion_env(machine=machine)
+    counters = uncounted or {}
     for run in resolved:
         grid = study.grids[run.run.grid]
         key = (run.run.grid, run.slurm)
@@ -446,6 +454,8 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             extra_args=args,
             attempt=attempts.get(run.run.run_path, 0) + 1,
             error=error_text,
+            uncounted_attempts=counters.get(run.run.run_path, (0, 0))[0],
+            uncounted_in_row=counters.get(run.run.run_path, (0, 0))[1],
         )
         tasks_of[lookup[key]].append(task)
     return [
