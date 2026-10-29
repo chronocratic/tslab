@@ -9,7 +9,14 @@ import pytest
 
 from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.study.machine import SlurmSettings
-from tslab.study.slurm import array_spec, job_script, query_job_states, sbatch, SlurmError
+from tslab.study.slurm import (
+    _as_sbatch_flag,
+    array_spec,
+    job_script,
+    query_job_states,
+    sbatch,
+    SlurmError,
+)
 
 TASKS_LINES = [
     '3 1 ' + shlex.join(['python3', '-c', 'print(3)']),
@@ -239,3 +246,16 @@ def test_missing_task_message_survives_a_hostile_path(tmp_path: Path) -> None:
     assert str(tasks_file) in result.stderr
     assert not (tmp_path / 'pwned').exists()
     assert not Path('pwned').exists()
+
+
+def test_as_sbatch_flag() -> None:
+    assert _as_sbatch_flag(key='cpus_per_task', value=4) == '#SBATCH --cpus-per-task=4'
+    assert _as_sbatch_flag(key='exclusive', value=True) == '#SBATCH --exclusive'
+    value = '/a b/x_%a.out'
+    assert _as_sbatch_flag(key='output', value=value) == "#SBATCH --output='/a b/x_%a.out'"
+
+
+def test_job_script_quotes_values_with_spaces(tmp_path: Path) -> None:
+    script = _script(tmp_path, job_name='my job', log_pattern=tmp_path / 'a b' / 'x_%a.out')
+    assert "#SBATCH --job-name='my job'" in script
+    assert f"#SBATCH --output='{tmp_path}/a b/x_%a.out'" in script
