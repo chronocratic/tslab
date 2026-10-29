@@ -12,6 +12,7 @@ from tests.unit.study.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.study.machine import SlurmSettings
 from tslab.study.slurm import (
     _as_sbatch_flag,
+    _expand_array_key,
     _sbatch_env,
     array_spec,
     job_script,
@@ -332,3 +333,22 @@ def test_sbatch_passes_the_clean_env_and_leaves_os_environ(
     assert isinstance(seen['env'], dict)
     assert 'SLURM_JOB_ID' not in seen['env']
     assert os.environ['SLURM_JOB_ID'] == '1'
+
+
+@pytest.mark.parametrize(
+    ('key', 'expected'),
+    [
+        ('123_[4-7,9%10]', ['123_4', '123_5', '123_6', '123_7', '123_9']),
+        ('123_[5]', ['123_5']),
+        ('123_4', ['123_4']),
+        ('123', ['123']),
+    ],
+)
+def test_expand_array_key(key: str, expected: list[str]) -> None:
+    assert _expand_array_key(key=key) == expected
+
+
+def test_query_job_states_expands_pending_arrays_from_sacct(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'stdout': '123_[4-5%2]|PENDING\n'}])
+    states = query_job_states(job_ids=['123_4', '123_5'])
+    assert states == {'123_4': 'PENDING', '123_5': 'PENDING'}
