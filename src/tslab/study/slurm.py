@@ -1,6 +1,7 @@
 """SLURM job scripts and scheduler calls for study jobs."""
 
 from collections.abc import Callable, Mapping, Sequence
+import os
 from pathlib import Path
 import re
 import shlex
@@ -229,11 +230,28 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     return '\n'.join(lines) + '\n'
 
 
-def _run(command: list[str]) -> subprocess.CompletedProcess[str]:
+_JOB_PREFIXES = ('SLURM_', 'SLURMD_', 'SRUN_', 'SBATCH_', 'SALLOC_')
+_JOB_NAMES = frozenset(
+    {'MASTER_ADDR', 'MASTER_PORT', 'RANK', 'WORLD_SIZE', 'LOCAL_RANK', 'LOCAL_WORLD_SIZE'}
+)
+
+
+def _sbatch_env(*, environ: Mapping[str, str]) -> dict[str, str]:
+    # why: a follow-up job submitted from inside a job would inherit the allocation of that job
+    return {
+        name: value
+        for name, value in environ.items()
+        if name == 'SLURM_CONF' or not (name.startswith(_JOB_PREFIXES) or name in _JOB_NAMES)
+    }
+
+
+def _run(
+    command: list[str], *, env: Mapping[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     try:
         # why: fixed scheduler command on PATH; the exit code is checked by the caller
         return subprocess.run(  # noqa: S603
-            command, check=False, capture_output=True, text=True
+            command, check=False, capture_output=True, text=True, env=env
         )
     except FileNotFoundError as error:
         message = f'{command[0]} is not on PATH; is this a machine with SLURM?'
@@ -255,7 +273,7 @@ def sbatch(*, script: Path, sleep: Callable[[float], None] = time.sleep) -> str:
     """
     delay = 10.0
     while True:
-        completed = _run(['sbatch', '--parsable', str(script)])
+        completed = _run(['sbatch', '--parsable', str(script)], env=_sbatch_env(environ=os.environ))
         if completed.returncode == 0:
             return completed.stdout.split(';', 1)[0].strip()
         output = completed.stdout + completed.stderr
