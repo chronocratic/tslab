@@ -1,13 +1,18 @@
 """JSON documents for study commands."""
 
 from collections.abc import Sequence
+import shlex
 
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
+from tslab.study.launch import LaunchReport
 from tslab.study.outcome import counts_live
+from tslab.study.plan import JobGroup
+from tslab.study.report import resources_of
+from tslab.study.slurm import array_spec
 from tslab.study.state import RunReport, StudyState
 
-__all__ = ['cancel_document', 'run_entry', 'show_document', 'status_document']
+__all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
 
 
 def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
@@ -118,6 +123,52 @@ def cancel_document(
         'schema': 'tslab.study-cancel/1',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
+        'exit_code': exit_code,
+    }
+
+
+def launch_document(
+    *,
+    report: LaunchReport | None,
+    groups: Sequence[JobGroup],
+    dry_run: bool,
+    cancelled: Sequence[str],
+    exit_code: int,
+) -> dict[str, object]:
+    """The JSON document for a submit or resubmit launch.
+
+    Args:
+        report: The result of the launch, or ``None`` when nothing was launched.
+        groups: The groups planned for this launch.
+        dry_run: Whether the launch only wrote its plan.
+        cancelled: The cancelled job ids, for resubmit.
+        exit_code: The command exit code.
+
+    Returns:
+        The versioned study-launch document.
+    """
+    jobs = []
+    if report is not None:
+        records = {record.job_file: record for record in report.submitted}
+        for group in groups:
+            record = records.get(group.job_file)
+            if not dry_run and record is None:
+                continue
+            jobs.append(
+                {
+                    'job_name': group.job_name,
+                    'job_id': None if dry_run else record.job_id if record is not None else None,
+                    'runs': len(group.tasks),
+                    'indices': array_spec(indices=[task.index for task in group.tasks]),
+                    'resources': resources_of(slurm=group.slurm),
+                    'first_command': shlex.join(group.tasks[0].command) if group.tasks else None,
+                }
+            )
+    return {
+        'schema': 'tslab.study-launch/1',
+        'dry_run': dry_run,
+        'jobs': jobs,
+        'cancelled': list(cancelled),
         'exit_code': exit_code,
     }
 

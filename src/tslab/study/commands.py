@@ -9,13 +9,21 @@ from collections.abc import Callable, Mapping, Sequence
 import logging
 from pathlib import Path
 import time
+from typing import TextIO
 
 from tslab.core.paths import LOCK_FILE
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
-from tslab.study.launch import launch, Launcher, LocalLauncher, SlurmLauncher
+from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
 from tslab.study.machine import MachineProfile
-from tslab.study.plan import assign_indices, next_job_file, plan_jobs, study_folder, validate_jobs
+from tslab.study.plan import (
+    assign_indices,
+    JobGroup,
+    next_job_file,
+    plan_jobs,
+    study_folder,
+    validate_jobs,
+)
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_lock, take_progress
 from tslab.study.report import log_launch, log_problems, log_status
 from tslab.study.result_table import collect_results, write_results_csv
@@ -43,13 +51,15 @@ _LOGGER = logging.getLogger(__name__)
 _RESTART_DELAY_SECONDS = 660
 
 
-def submit(
+def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     context: Context,
     include_done: bool,
     dry_run: bool,
     extra_args: tuple[str, ...],
     sleep: Callable[[float], None] = time.sleep,
+    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    task_stream: TextIO | None = None,
 ) -> int:
     """Submit the runs that need submitting, on the machine of the context.
 
@@ -63,6 +73,8 @@ def submit(
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The pass-through arguments, appended to every run.
         sleep: What waits out the submission pause of the cluster.
+        on_launch: Called once with the launch result and groups, including dry runs.
+        task_stream: Stream for task output on a local machine.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -82,6 +94,8 @@ def submit(
         dry_run=dry_run,
         extra_args={report.run.run_path: extra_args for report in to_submit},
         sleep=sleep,
+        on_launch=on_launch,
+        task_stream=task_stream,
     )
     followup_code, _ = queue_followups(
         context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
@@ -171,6 +185,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     extra_args: tuple[str, ...] | None = None,
     auto: bool = False,
     sleep: Callable[[float], None] = time.sleep,
+    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    task_stream: TextIO | None = None,
 ) -> int:
     """Submit the runs in the given states again, one attempt further on.
 
@@ -192,6 +208,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
             ``followup.max_attempts`` of the machine; the rest are logged and left alone,
             and ``cancel_live`` is ignored.
         sleep: What waits out the submission pause of the cluster.
+        on_launch: Called once with the launch result and groups, including dry runs.
+        task_stream: Stream for task output on a local machine.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -245,6 +263,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         sleep=sleep,
         begin=f'now+{_RESTART_DELAY_SECONDS}' if live else None,
         before_launch=before_launch,
+        on_launch=on_launch,
+        task_stream=task_stream,
     )
     followup_code, _ = queue_followups(
         context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
@@ -335,11 +355,15 @@ def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) 
 
 
 def _launcher_of(
-    *, machine: MachineProfile, project_root: Path, sleep: Callable[[float], None]
+    *,
+    machine: MachineProfile,
+    project_root: Path,
+    sleep: Callable[[float], None],
+    task_stream: TextIO | None = None,
 ) -> Launcher:
     if machine.launcher == 'slurm':
         return SlurmLauncher(sleep=sleep)
-    return LocalLauncher(project_root=project_root, env=machine.env)
+    return LocalLauncher(project_root=project_root, env=machine.env, stream=task_stream)
 
 
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
@@ -351,6 +375,8 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     sleep: Callable[[float], None],
     begin: str | None = None,
     before_launch: Callable[[], None] | None = None,
+    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    task_stream: TextIO | None = None,
 ) -> tuple[int, list[JobRecord]]:
     """Plan, validate and launch the given runs; the shared tail of the commands.
 
@@ -368,6 +394,8 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         before_launch: Called once the plan is valid and before the first job
             is submitted, never on a dry run; a ``SlurmError`` from it stops
             the command with exit code 1.
+        on_launch: Called once with the launch result and groups, including dry runs.
+        task_stream: Stream for task output on a local machine.
 
     Returns:
         The exit code and the submitted run jobs; empty records on a dry
@@ -404,7 +432,12 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             _LOGGER.error('%s', failure)
             return 1, []
         report = launch(
-            launcher=_launcher_of(machine=machine, project_root=context.project_root, sleep=sleep),
+            launcher=_launcher_of(
+                machine=machine,
+                project_root=context.project_root,
+                sleep=sleep,
+                task_stream=task_stream,
+            ),
             machine=machine,
             study=context.study,
             groups=groups,
@@ -412,4 +445,6 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             dry_run=dry_run,
             begin=begin,
         )
+        if on_launch is not None:
+            on_launch(report, groups)
     return log_launch(report=report, groups=groups)

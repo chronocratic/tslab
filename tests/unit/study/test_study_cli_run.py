@@ -3,6 +3,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -122,6 +123,69 @@ def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake: FakeSlurm) -> 
         'resubmit', 'toy_studies:study', '--machine', 'cluster.toml', '--states', 'missing,failed'
     )
     assert code == 0
+
+
+def test_submit_dry_run_json_lists_jobs(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = run_main(
+        'submit', 'toy_studies:study', '--machine', 'cluster.toml', '--dry-run', '--json'
+    )
+    document = json.loads(capsys.readouterr().out)
+    jobs = cast('list[dict[str, object]]', document['jobs'])
+    assert code == 0
+    assert document['schema'] == 'tslab.study-launch/1'
+    assert jobs[0]['job_id'] is None
+    assert sum(cast('int', job['runs']) for job in jobs) == 4
+
+
+def test_resubmit_json_lists_cancelled_ids(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n1000_1|PENDING\n'}])
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|COMPLETED\n'}])
+    code = run_main(
+        'resubmit',
+        'toy_studies:study',
+        '--machine',
+        'cluster.toml',
+        '--states',
+        'missing',
+        '--cancel-live',
+        '--json',
+    )
+    document = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert document['cancelled'] == ['1000_0', '1000_1']
+    assert fake.calls('scancel') == [['1000_0', '1000_1']]
+
+
+def test_local_submit_json_keeps_task_output_off_stdout(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    study_file = project / 'toy_studies.py'
+    source = study_file.read_text(encoding='utf-8')
+    source = source.replace(
+        "command=(sys.executable, 'toy_script.py'),",
+        "command=(sys.executable, '-c', 'print(\"TASK-OUTPUT\")'),",
+    )
+    study_file.write_text(source, encoding='utf-8')
+    code = run_main(
+        'submit',
+        'toy_studies:study',
+        '--machine',
+        'local.toml',
+        '--only',
+        'model=small',
+        '--only',
+        'seed=1',
+        '--json',
+    )
+    captured = capsys.readouterr()
+    assert code == 0
+    assert json.loads(captured.out)['schema'] == 'tslab.study-launch/1'
+    assert 'TASK-OUTPUT' in captured.err
 
 
 def test_results_writes_the_csv(project: Path, fake: FakeSlurm, tmp_path: Path) -> None:

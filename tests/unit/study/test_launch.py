@@ -1,5 +1,6 @@
 """Launching study jobs on SLURM or locally: files, submission, records."""
 
+from io import StringIO
 from pathlib import Path
 import sys
 
@@ -179,6 +180,27 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         dry_run=False,
     )
     assert log.read_text().count('=== tslab attempt') == 2
+
+
+def test_local_launcher_writes_to_given_stream(machine: MachineProfile, tmp_path: Path) -> None:
+    local_machine = MachineProfile(
+        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+    )
+    script = tmp_path / 'echo.py'
+    script.write_text("print('TASK-OUTPUT')")
+    study = Study(
+        name='s', grids={'g': grid(short_name='g1', command=(sys.executable, str(script)))}
+    )
+    stream = StringIO()
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, stream=stream),
+        machine=local_machine,
+        study=study,
+        groups=groups_of(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    assert 'TASK-OUTPUT' in stream.getvalue()
 
 
 def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_command(

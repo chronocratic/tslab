@@ -4,12 +4,13 @@ The argument dataclasses here hold only the flags of one command; the
 behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 import logging
 from pathlib import Path
 import shlex
+import sys
 from typing import Annotated
 
 import tyro
@@ -17,13 +18,23 @@ import tyro
 from tslab.cli.console import watch
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
-from tslab.study.commands import cancel, parse_states, resubmit, results, status, submit
+from tslab.study.commands import (
+    cancel,
+    LIVE_STATES,
+    parse_states,
+    resubmit,
+    results,
+    status,
+    submit,
+)
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.documents import cancel_document, show_document, status_document
+from tslab.study.documents import cancel_document, launch_document, show_document, status_document
 from tslab.study.failures import collect_failures, log_failures
+from tslab.study.launch import LaunchReport
 from tslab.study.loading import load_study
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
+from tslab.study.plan import JobGroup
 from tslab.study.report import log_show
 from tslab.study.state import StudyState
 from tslab.study.wait import wait_for_study
@@ -151,6 +162,7 @@ class Submit:
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The arguments after --, appended to every run.
+        json: Print one study-launch JSON document.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
@@ -162,6 +174,7 @@ class Submit:
     include_done: bool = False
     dry_run: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
+    json: bool = False
 
     def run(self) -> int:
         """Submit and return the exit code."""
@@ -169,11 +182,19 @@ class Submit:
             study=self.study, machine=self.machine, grid=self.grid, only=self.only
         )
         _warn_no_runs(context=context)
+
+        launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
+
+        def remember_launch(report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+            launches.append((report, groups))
+
         code = submit(
             context=context,
             include_done=self.include_done,
             dry_run=self.dry_run,
             extra_args=self.extra_args,
+            on_launch=remember_launch if self.json else None,
+            task_stream=sys.stderr if self.json else None,
         )
         if code == 0:
             if self.dry_run:
@@ -183,6 +204,13 @@ class Submit:
                     study=self.study, machine=self.machine, grid=self.grid, only=self.only
                 )
                 _LOGGER.info('follow progress: tslab study status %s', selection)
+        if self.json and (code == 0 or launches):
+            report, groups = launches[0] if launches else (None, ())
+            print_json(
+                document=launch_document(
+                    report=report, groups=groups, dry_run=self.dry_run, cancelled=(), exit_code=code
+                )
+            )
         return code
 
 
@@ -463,6 +491,7 @@ class Resubmit:
             The follow-up jobs pass this.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
+        json: Print one study-launch JSON document.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
@@ -478,6 +507,7 @@ class Resubmit:
     dry_run: bool = False
     auto: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
+    json: bool = False
 
     def run(self) -> int:
         """Resubmit and return the exit code."""
@@ -486,6 +516,20 @@ class Resubmit:
             study=self.study, machine=self.machine, grid=self.grid, only=self.only
         )
         _warn_no_runs(context=context)
+        launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
+
+        def remember_launch(report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+            launches.append((report, groups))
+
+        cancelled = [
+            report.job_id
+            for report in context.reports
+            if self.cancel_live
+            and not self.auto
+            and context.machine.launcher == 'slurm'
+            and report.state in LIVE_STATES
+            and report.job_id is not None
+        ]
         code = resubmit(
             context=context,
             states=states,
@@ -493,6 +537,8 @@ class Resubmit:
             dry_run=self.dry_run,
             extra_args=self.extra_args or None,
             auto=self.auto,
+            on_launch=remember_launch if self.json else None,
+            task_stream=sys.stderr if self.json else None,
         )
         if code == 0:
             if self.dry_run:
@@ -502,6 +548,17 @@ class Resubmit:
                     study=self.study, machine=self.machine, grid=self.grid, only=self.only
                 )
                 _LOGGER.info('follow progress: tslab study status %s', selection)
+        if self.json and (code == 0 or launches):
+            report, groups = launches[0] if launches else (None, ())
+            print_json(
+                document=launch_document(
+                    report=report,
+                    groups=groups,
+                    dry_run=self.dry_run,
+                    cancelled=cancelled,
+                    exit_code=code,
+                )
+            )
         return code
 
 
