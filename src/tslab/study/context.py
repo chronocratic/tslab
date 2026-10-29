@@ -13,6 +13,7 @@ from tslab.study.slurm import query_job_states, slurm_available, SlurmError
 from tslab.study.state import (
     collect_states,
     followup_job_ids,
+    job_ended,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
     RunReport,
@@ -85,6 +86,7 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     project_root: Path,
     reference: str = '',
     read_only: bool = False,
+    ended_states: dict[str, str] | None = None,
 ) -> Context:
     """The machine, runs, job records and states of one study.
 
@@ -102,6 +104,9 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
             automatic retry follow-up off.
         read_only: For commands that never launch a job: an unset ``${VAR}``
             in the ``[env]`` of the profile is tolerated.
+        ended_states: A cache of final SLURM states by job id, kept by a caller that
+            loads the context again and again. Ids in it are not queried; ids that
+            ended in this query are added to it. ``None`` queries every id.
 
     Returns:
         The context of the study.
@@ -125,7 +130,9 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if job_states_known:
             try:
                 followups = followup_job_ids(jobs=jobs)
-                job_states = query_job_states(job_ids=slurm_task_ids(jobs=jobs) + followups)
+                job_states = _query_states(
+                    job_ids=slurm_task_ids(jobs=jobs) + followups, ended_states=ended_states
+                )
                 followup_live_job_ids = tuple(
                     job_id
                     for job_id in followups
@@ -159,13 +166,23 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
 
 
-def load_context(
+def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) -> dict[str, str]:
+    if ended_states is None:
+        return query_job_states(job_ids=job_ids)
+    queried = query_job_states(job_ids=[item for item in job_ids if item not in ended_states])
+    # why: a failed query raised above, so the cache only ever holds states SLURM reported
+    ended_states.update({item: state for item, state in queried.items() if job_ended(state)})
+    return {**ended_states, **queried}
+
+
+def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     reference: str,
     machine_path: Path,
     selection: Selection,
     project_root: Path,
     read_only: bool = False,
+    ended_states: dict[str, str] | None = None,
 ) -> Context:
     """The context of a study loaded from a ``module:attribute`` reference.
 
@@ -176,6 +193,7 @@ def load_context(
         project_root: The folder the command was called from; the jobs
             ``cd`` into it.
         read_only: See ``context_for``.
+        ended_states: See ``context_for``.
 
     Returns:
         The context of the command.
@@ -192,4 +210,5 @@ def load_context(
         project_root=project_root,
         reference=reference,
         read_only=read_only,
+        ended_states=ended_states,
     )
