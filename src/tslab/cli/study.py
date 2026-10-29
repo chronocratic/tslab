@@ -22,13 +22,15 @@ from tslab.study.context import Context, load_context, Selection
 from tslab.study.documents import show_document, status_document
 from tslab.study.loading import load_study
 from tslab.study.machine import resolve_machine
-from tslab.study.outcome import study_exit_code
+from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
 from tslab.study.report import log_show
 from tslab.study.state import StudyState
+from tslab.study.wait import wait_for_study
 
-__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Show', 'Status', 'Submit']
+__all__ = ['STUDY_COMMANDS', 'Resubmit', 'Results', 'Show', 'Status', 'Submit', 'Wait']
 
 _LOGGER = logging.getLogger(__name__)
+_MIN_WAIT_INTERVAL_SECONDS = 10
 
 
 def _context_of(
@@ -268,6 +270,75 @@ class Show:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Wait:
+    """Wait for selected runs to finish or need attention.
+
+    For example:
+        tslab study wait my_paper.studies:example --machine local
+
+    Attributes:
+        study: The study reference, module:attribute.
+        machine: A machine name or profile path.
+        grid: Keep only this grid.
+        only: Keep only runs that match axis=value.
+        interval: Seconds between checks; at least 10.
+        timeout: Stop after this many seconds.
+        keep_going: Wait until no run is live, even after a failure.
+        json: Print one study-wait JSON document.
+    """
+
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    interval: Annotated[float, tyro.conf.arg(metavar='SECONDS')] = 60.0
+    timeout: Annotated[float | None, tyro.conf.arg(metavar='SECONDS')] = None
+    keep_going: bool = False
+    json: bool = False
+
+    def run(self) -> int:
+        """Wait for the study and return its final state code."""
+        if self.interval < _MIN_WAIT_INTERVAL_SECONDS:
+            message = '--interval takes at least 10 seconds'
+            raise UsageError(message)
+
+        def load() -> Context:
+            context = _context_of(
+                study=self.study,
+                machine=self.machine,
+                grid=self.grid,
+                only=self.only,
+                read_only=True,
+            )
+            if not context.reports:
+                message = 'no runs match the selection; drop --grid/--only or check values'
+                raise UsageError(message)
+            return context
+
+        code, context, waited = wait_for_study(
+            load=load, interval=self.interval, timeout=self.timeout, keep_going=self.keep_going
+        )
+        if self.json:
+            document = status_document(context=context, exit_code=code)
+            document['schema'] = 'tslab.study-wait/1'
+            document['waited_seconds'] = waited
+            document['timed_out'] = code == EXIT_TIMEOUT
+            print_json(document=document)
+        else:
+            status(context=context)
+            _status_hints(
+                context=context,
+                study=self.study,
+                machine=self.machine,
+                grid=self.grid,
+                only=self.only,
+            )
+        return code
+
+
+@dataclass(frozen=True, kw_only=True)
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
@@ -374,4 +445,5 @@ STUDY_COMMANDS = {
     'resubmit': Resubmit,
     'results': Results,
     'show': Show,
+    'wait': Wait,
 }
