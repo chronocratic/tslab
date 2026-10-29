@@ -1,9 +1,10 @@
 """The state of each study run, decided from its folder and its SLURM job."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+import time
 
 from tslab.core.paths import STATUS_FILE
 from tslab.core.run import is_run_active
@@ -226,14 +227,55 @@ def followup_job_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
     )
 
 
+def _pause(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+def _needs_grace(*, job_state: str | None, folder: FolderFacts) -> bool:
+    # why: on shared storage the final ``status.json`` of a completed job can reach this
+    # node after the SLURM state does
+    if job_state != 'COMPLETED':
+        return False
+    if folder.snapshot is None:
+        return folder.read_error is None
+    return folder.snapshot.run_state is RunState.RUNNING
+
+
+def _grace_wait(
+    *, directories: dict[str, Path], facts: dict[str, FolderFacts], sleep: Callable[[float], None]
+) -> None:
+    """Re-read the listed folders until each settles, at most 15 rounds (30 after a chmod error)."""
+    limit = 15
+    pending = dict(directories)
+    rounds = 0
+    while pending and rounds < limit:
+        for directory in pending.values():
+            try:
+                # why: a chmod to the same mode makes a network file system refresh its cache
+                directory.chmod(directory.stat().st_mode)
+            except OSError:
+                limit = 30
+        sleep(1)
+        rounds += 1
+        for key, directory in list(pending.items()):
+            facts[key] = read_folder(run_directory=directory)
+            if not _needs_grace(job_state='COMPLETED', folder=facts[key]):
+                del pending[key]
+
+
 def collect_states(
     *,
     study_directory: Path,
     runs: Sequence[StudyRun],
     jobs: Sequence[JobRecord],
     job_states: Mapping[str, str] | None,
+    sleep: Callable[[float], None] = _pause,
 ) -> list[RunReport]:
     """The state report of every run of one study.
+
+    A run whose job completed but whose folder does not say so yet is read again
+    for up to 15 seconds (30 if the folder cannot be refreshed), then decided with
+    what is there.
 
     Args:
         study_directory: The ``<output_root>/<study>`` directory.
@@ -241,14 +283,18 @@ def collect_states(
         jobs: The job records of the study, in submission order.
         job_states: The SLURM states per task id, or ``None`` when SLURM is
             unavailable.
+        sleep: The wait between two reads; injected for the tests.
 
     Returns:
         One report per run, in the order of ``runs``.
     """
     latest = latest_tasks(jobs=jobs)
-    reports: list[RunReport] = []
+    entries = []
+    folders: dict[str, FolderFacts] = {}
+    waiting: dict[str, Path] = {}
     for run in runs:
-        folder = read_folder(run_directory=study_directory / run.run_path)
+        directory = study_directory / run.run_path
+        folders[run.run_path] = read_folder(run_directory=directory)
         job, task = latest.get(run.run_path, (None, None))
         job_id = None
         task_id = None
@@ -256,6 +302,13 @@ def collect_states(
             task_id = f'{job.job_id}_{task.index}' if job.launcher == 'slurm' else job.job_id
             job_id = task_id
         job_state = None if job_states is None or task_id is None else job_states.get(task_id)
+        entries.append((run, job_id, job_state, task))
+        if _needs_grace(job_state=job_state, folder=folders[run.run_path]):
+            waiting[run.run_path] = directory
+    _grace_wait(directories=waiting, facts=folders, sleep=sleep)
+    reports: list[RunReport] = []
+    for run, job_id, job_state, task in entries:
+        folder = folders[run.run_path]
         state, reason = study_state(job_state=job_state, folder=folder)
         reports.append(
             RunReport(
