@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 import time
+from typing import cast
 
 import pytest
 
@@ -128,6 +129,40 @@ def test_live_run_is_running(tmp_path: Path, caplog: pytest.LogCaptureFixture) -
 def test_nothing_to_show(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     assert shown(caplog=caplog, path=tmp_path)[0] == 1
     assert shown(caplog=caplog, path=tmp_path / 'missing')[0] == 2
+
+
+def test_folder_status_exit_code_maps_failed_to_4(tmp_path: Path) -> None:
+    make_run(root=tmp_path, relative_path=Path('failed'), factors=(-1,))
+    assert Status(path=tmp_path, exit_code=True).run() == 4
+
+
+def test_folder_status_defaults_to_today_codes(tmp_path: Path) -> None:
+    make_run(root=tmp_path, relative_path=Path('failed'), factors=(-1,))
+    assert Status(path=tmp_path).run() == 0
+
+
+def test_folder_status_json_lists_instances(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('failed'), factors=(1, -1))
+    assert Status(path=tmp_path / 'failed', json=True).run() == 0
+    document = json.loads(capsys.readouterr().out)
+    runs = cast('list[dict[str, object]]', document['runs'])
+    assert document['schema'] == 'tslab.run-status/1'
+    assert document['exit_code'] == 4
+    assert runs[0]['directory'] == (tmp_path / 'failed').resolve().as_posix()
+    assert runs[0]['state'] == 'failed'
+    instances = cast('list[dict[str, object]]', runs[0]['instances'])
+    by_name = {str(instance['instance']): instance for instance in instances}
+    assert by_name['scale[f1]']['stage'] == 'scale'
+    assert by_name['scale[f1]']['state'] == 'done'
+    assert by_name['scale[f-1]']['error'] == 'ValueError: negative factor\nsecond line'
+
+
+def test_folder_status_rejects_watch_with_json(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(args=['status', str(tmp_path), '--watch', '10', '--json'])
+    assert raised.value.code == 2
 
 
 def test_failed_instance_points_at_its_error_file(
