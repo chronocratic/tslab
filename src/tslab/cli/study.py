@@ -55,13 +55,14 @@ _LOGGER = logging.getLogger(__name__)
 _MIN_WAIT_INTERVAL_SECONDS = 10
 
 
-def _context_of(
+def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag of the command
     *,
     study: str,
     machine: str,
     grid: tuple[str, ...],
     only: tuple[str, ...],
     read_only: bool = False,
+    ended_states: dict[str, str] | None = None,
 ) -> Context:
     """The context of a study reference; a bad reference or profile is a usage error."""
     with _usage_errors(study=study):
@@ -72,6 +73,7 @@ def _context_of(
             selection=Selection(grids=grid, only=only),
             project_root=location.project_root,
             read_only=read_only,
+            ended_states=ended_states,
         )
 
 
@@ -343,6 +345,8 @@ class Wait:
             message = '--interval takes at least 10 seconds'
             raise UsageError(message)
 
+        ended_states: dict[str, str] = {}
+
         def load() -> Context:
             context = _context_of(
                 study=self.study,
@@ -350,6 +354,7 @@ class Wait:
                 grid=self.grid,
                 only=self.only,
                 read_only=True,
+                ended_states=ended_states,
             )
             if not context.reports:
                 message = 'no runs match the selection; drop --grid/--only or check values'

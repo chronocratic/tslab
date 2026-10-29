@@ -8,10 +8,11 @@ from pathlib import Path
 import pytest
 
 from tests.unit.study.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, submit_study
+from tests.unit.study.helpers import context, jobs_of, submit_study
 from tslab.cli import main
-from tslab.study.context import Context
-from tslab.study.state import StudyState
+from tslab.study.context import Context, context_for, load_context, Selection
+from tslab.study.loading import load_study
+from tslab.study.state import slurm_task_ids, StudyState
 from tslab.study.wait import wait_for_study
 
 
@@ -241,3 +242,45 @@ def test_wait_rejects_empty_selection(project: Path, fake: FakeSlurm) -> None:
             ]
         )
     assert raised.value.code == 2
+
+
+def _query_ids(call: list[str]) -> list[str]:
+    return call[call.index('--jobs') + 1].split(',')
+
+
+def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    ids = slurm_task_ids(jobs=jobs_of(project=project))
+    first = '\n'.join(f'{item}|{"COMPLETED" if item == ids[0] else "RUNNING"}' for item in ids)
+    second = '\n'.join(f'{item}|COMPLETED' for item in ids)
+    prior = len(fake.calls('sacct'))
+    fake.set_answers(
+        'sacct', [{'stdout': first + '\n'}] * (prior + 1) + [{'stdout': second + '\n'}]
+    )
+    ended: dict[str, str] = {}
+    for _ in range(2):
+        load_context(
+            reference='toy_studies:study',
+            machine_path=project / 'cluster.toml',
+            selection=Selection(),
+            project_root=Path.cwd(),
+            ended_states=ended,
+        )
+    queries = fake.calls('sacct')[prior:]
+    assert _query_ids(queries[0]) == ids
+    assert _query_ids(queries[1]) == ids[1:]
+    assert ended == dict.fromkeys(ids, 'COMPLETED')
+
+
+def test_failed_query_leaves_the_cache_unchanged(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    fake.set_answers('sacct', [{'exit': 1, 'stderr': 'down'}])
+    ended: dict[str, str] = {}
+    context_for(
+        study=load_study(reference='toy_studies:study'),
+        machine_path=project / 'cluster.toml',
+        selection=Selection(),
+        project_root=Path.cwd(),
+        ended_states=ended,
+    )
+    assert ended == {}
