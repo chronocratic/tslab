@@ -16,7 +16,7 @@ from rich.theme import Theme
 from tslab.cli.usage import UsageError
 from tslab.helpers.text import TextTable
 
-__all__ = ['CONSOLE', 'ConsoleHandler', 'configure_logging', 'make_console', 'watch']
+__all__ = ['CONSOLE', 'ConsoleHandler', 'configure_logging', 'make_console', 'use_stderr', 'watch']
 
 _LOGGER = logging.getLogger(__name__)
 _THEME = Theme(
@@ -71,11 +71,26 @@ class ConsoleHandler(logging.Handler):
 
         Args:
             console: Console used to render each log record.
+
+        Returns:
+            None.
         """
         super().__init__()
         self._console = console
         self._uses_default_console = console is CONSOLE
         self._stdout: IO[str] | None = None
+
+    def use_console(self, *, console: Console) -> None:
+        """Use a fixed console instead of rebinding to standard output.
+
+        Args:
+            console: Console used to render each log record.
+
+        Returns:
+            None.
+        """
+        self._console = console
+        self._uses_default_console = False
 
     @override
     def emit(self, record: logging.LogRecord) -> None:
@@ -135,6 +150,18 @@ def configure_logging() -> None:
     handler.setFormatter(logging.Formatter('%(message)s'))
     root.addHandler(handler)
     root.setLevel(logging.INFO)
+
+
+def use_stderr() -> None:
+    """Send root console-handler output to plain standard error.
+
+    Returns:
+        None.
+    """
+    console = make_console(file=sys.stderr, force_terminal=False)
+    for handler in logging.getLogger().handlers:
+        if isinstance(handler, ConsoleHandler):
+            handler.use_console(console=console)
 
 
 def watch(
