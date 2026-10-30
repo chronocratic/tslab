@@ -142,6 +142,24 @@ def test_cpus_placeholder_is_the_cpus_per_task_of_the_run(study: Study, tmp_path
     assert _epochs_by_recipe(_plan(study, machine)) == {'ts2vec-paper': '6', 'cost-paper': '8'}
 
 
+def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -> None:
+    machine = _local(
+        tmp_path,
+        launcher='slurm',
+        slurm=SlurmSettings(partition='p', sbatch_extra=(('account', 'X'), ('constraint', 'v100'))),
+        overrides=(
+            MachineOverride(
+                match={'recipe': ('cost-paper',)}, slurm={'sbatch_extra': (('constraint', 'a100'),)}
+            ),
+        ),
+    )
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    cost = next(run for run in resolved if run.run.values['recipe'] == 'cost-paper')
+    assert cost.slurm is not None
+    assert cost.slurm.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
+
+
 def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
     study: Study, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

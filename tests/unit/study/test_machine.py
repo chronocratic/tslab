@@ -29,7 +29,6 @@ mem_per_cpu = "16G"
 gpus = 0
 max_concurrent = 100
 max_array_size = 1000
-sbatch_extra = []
 node_local_tmp = true
 submit_pause_seconds = 0.5
 
@@ -196,6 +195,40 @@ def test_machine_profile_rejects_negative_signal_seconds(tmp_path: Path) -> None
         load_machine(path=_write(tmp_path, BASE_SLURM + text))
 
 
+def test_sbatch_extra_table_is_read_and_normalised(tmp_path: Path) -> None:
+    text = (
+        BASE_SLURM
+        + SLURM_TABLE
+        + '[slurm.sbatch_extra]\naccount = "X"\nexclusive = true\n"mail-type" = "END"\n'
+    )
+    profile = load_machine(path=_write(tmp_path, text))
+    assert profile.slurm is not None
+    assert profile.slurm.sbatch_extra == (
+        ('account', 'X'),
+        ('exclusive', True),
+        ('mail_type', 'END'),
+    )
+
+
+def test_sbatch_extra_list_fails_with_the_table_form(tmp_path: Path) -> None:
+    text = BASE_SLURM + SLURM_TABLE + 'sbatch_extra = ["--exclude=login02", "--exclusive"]\n'
+    with pytest.raises(MachineProfileError) as raised:
+        load_machine(path=_write(tmp_path, text))
+    assert '[slurm.sbatch_extra]' in str(raised.value)
+    assert 'exclude = "login02"' in str(raised.value)
+    assert 'exclusive = true' in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ('entry', 'message'),
+    [('"bad key" = "value"', 'key'), ('value = 1.5', 'string, integer, or boolean')],
+)
+def test_sbatch_extra_rejects_invalid_entries(tmp_path: Path, entry: str, message: str) -> None:
+    text = BASE_SLURM + SLURM_TABLE + '[slurm.sbatch_extra]\n' + entry + '\n'
+    with pytest.raises(MachineProfileError, match=message):
+        load_machine(path=_write(tmp_path, text))
+
+
 def test_missing_file_names_the_file(tmp_path: Path) -> None:
     with pytest.raises(MachineProfileError, match=r'nope\.toml'):
         load_machine(path=tmp_path / 'nope.toml')
@@ -271,9 +304,8 @@ def test_slurm_strings_reject_newlines(tmp_path: Path, field: str) -> None:
         load_machine(path=_write(tmp_path, text))
 
 
-def test_sbatch_extra_rejects_newlines(tmp_path: Path) -> None:
-    text = 'launcher = "slurm"\noutput_root = "r"\n' + SLURM_TABLE
-    text += 'sbatch_extra = ["--x=1\\nrm -rf x"]\n'
+def test_sbatch_extra_table_rejects_newlines(tmp_path: Path) -> None:
+    text = BASE_SLURM + SLURM_TABLE + '[slurm.sbatch_extra]\nx = "a\\nrm -rf x"\n'
     with pytest.raises(MachineProfileError, match='sbatch_extra'):
         load_machine(path=_write(tmp_path, text))
 

@@ -192,7 +192,8 @@ get the absolute path of the profile, so the compute nodes need no register.
 many seconds before the time limit; `0` disables it),
 `max_concurrent = 100` (the `%N` of `--array`), `max_array_size = 1000`
 (array indices must stay below the MaxArraySize of the cluster),
-`sbatch_extra = []` (raw `#SBATCH` lines), `node_local_tmp = true` (points
+`[slurm.sbatch_extra]` (optional sbatch long names; replaces matching default
+lines, with `false` removing a line), `node_local_tmp = true` (points
 `TMPDIR`, `WANDB_CACHE_DIR`, `WANDB_CONFIG_DIR` at node-local scratch),
 `submit_pause_seconds = 0.5`.
 

@@ -28,9 +28,13 @@ setup = [] # shell lines run before each task, e.g. ["module load cuda"]
 signal_seconds = 120 # USR2 this many seconds before the time limit; 0 turns it off
 max_concurrent = 100 # the %N of --array
 max_array_size = 1000 # array indices stay below the MaxArraySize of the cluster
-sbatch_extra = [] # raw lines, e.g. ["--exclude=login02"]
 node_local_tmp = true # put TMPDIR and the W&B folders on node-local scratch
 submit_pause_seconds = 0.5
+
+[slurm.sbatch_extra] # sbatch long names; matching defaults are replaced
+# account = "CHANGE_ME"
+# exclude = "login02"
+# exclusive = true
 
 [followup] # the small helper jobs TSLab submits for a study
 auto_retry = false

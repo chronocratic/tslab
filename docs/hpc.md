@@ -17,6 +17,11 @@ Machine profiles can run site setup commands before each task with
 `[slurm] setup = ["module load cuda"]`. Set `gpu_type = "a100"` to request
 `--gres=gpu:a100:<count>` when `gpus` is greater than zero.
 
+Add site-specific options under `[slurm.sbatch_extra]`, using sbatch long
+names. For example, `account = "project"` or `exclusive = true`. An entry
+such as `time = "04:00:00"` replaces the normal time line; `no_requeue = false`
+removes that line. The old list form is not accepted.
+
 ## Resubmitting
 
 A job killed at its time limit leaves its lock behind. The lock carries a
