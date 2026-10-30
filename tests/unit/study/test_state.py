@@ -207,6 +207,17 @@ def test_time_limit_beats_a_failing_job_state() -> None:
     assert study_state(job_state='CANCELLED', folder=folder)[0] is StudyState.INTERRUPTED
 
 
+@pytest.mark.parametrize('job_state', ['FAILED', 'TIMEOUT', 'CANCELLED', None])
+def test_job_time_limit_signal_is_interrupted(job_state: str | None) -> None:
+    folder = facts(
+        run_state='crashed',
+        instances={'train': ('failed', 'JobTimeLimitSignal: SIGUSR2 before the time limit')},
+    )
+    state, reason = study_state(job_state=job_state, folder=folder)
+    assert state is StudyState.INTERRUPTED
+    assert reason == 'JobTimeLimitSignal: SIGUSR2 before the time limit'
+
+
 def test_a_job_has_ended_unless_it_is_unknown_queued_or_running() -> None:
     assert job_ended('FAILED')
     assert not job_ended(None)
