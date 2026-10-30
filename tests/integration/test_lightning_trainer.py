@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 from integration_helpers import run_in
+from lightning.pytorch.plugins.environments import SLURMEnvironment
 from lightning_toy import FAST, ToyData, ToyDataModule, ToyInfo, ToyRegressor
 from mlflow.tracking.client import MlflowClient
 import pytest
@@ -10,11 +11,43 @@ import torch
 
 from tslab.core.artifact import Checkpoint
 from tslab.lightning import LightningDataSource, LightningTrainer, TrainingTimeLimitReached
+from tslab.lightning.config import LightningTrainerConfig
 from tslab.tracking.mlflow_tracker import MLflowTracker
 
 
 def trainer(**changes: object) -> LightningTrainer:
     return LightningTrainer(config=dataclasses.replace(FAST, **changes))
+
+
+@pytest.mark.slow
+def test_trainer_turns_off_auto_requeue_under_slurm(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    for key, value in {
+        'SLURM_JOB_ID': '4242',
+        'SLURM_NTASKS': '1',
+        'SLURM_JOB_NAME': 'tslab-test',
+        'SLURM_NODELIST': 'localhost',
+        'SLURM_PROCID': '0',
+        'SLURM_LOCALID': '0',
+        'SLURM_NODEID': '0',
+    }.items():
+        monkeypatch.setenv(key, value)
+    with run_in(root=tmp_path) as run:
+        built = trainer()._build_trainer(  # noqa: SLF001 # why: inspect the selected plugin without fitting
+            run=run,
+            checkpoint_directory=run.directory / 'train',
+            has_validation=False,
+            max_time=None,
+        )
+        environment = built._accelerator_connector.cluster_environment  # noqa: SLF001 # why: Lightning stores the plugin here
+    assert isinstance(environment, SLURMEnvironment)
+    assert environment.auto_requeue is False
+
+
+def test_extra_trainer_kwargs_cannot_set_plugins() -> None:
+    with pytest.raises(ValueError, match='plugins'):
+        LightningTrainer(config=LightningTrainerConfig(extra_trainer_kwargs={'plugins': 'env'}))
 
 
 @pytest.mark.slow
