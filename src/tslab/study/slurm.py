@@ -95,7 +95,7 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
             'TASK_LINE=${TASK_LINE#* }\n'
             'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
             ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
-            'eval "$TASK_LINE"'
+            'srun --unbuffered --kill-on-bad-exit=1 bash -c "exec $TASK_LINE"'
         )
     return wait + (
         'TASK_LINE=$(sed -n 1p ' + shlex.quote(str(tasks_file)) + ')\n'
@@ -103,7 +103,7 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
         'TASK_LINE=${TASK_LINE#* }\n'
         'TASK_LINE=${TASK_LINE#* }\n'
         'echo "=== tslab job ${SLURM_JOB_ID} | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
-        'eval "$TASK_LINE"'
+        'srun --unbuffered --kill-on-bad-exit=1 bash -c "exec $TASK_LINE"'
     )
 
 
@@ -194,7 +194,12 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     options: dict[str, object] = {'job_name': job_name, 'partition': slurm.partition}
     if slurm.qos is not None:
         options['qos'] = slurm.qos
-    options.update(time=slurm.time, cpus_per_task=slurm.cpus_per_task)
+    options.update(
+        time=slurm.time,
+        nodes=1,
+        ntasks_per_node=max(slurm.gpus, 1),
+        cpus_per_task=slurm.cpus_per_task,
+    )
     if slurm.mem_per_cpu is not None:
         options['mem_per_cpu'] = slurm.mem_per_cpu
     if slurm.gpus > 0:
@@ -206,6 +211,8 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
         options['array'] = spec
     options.update(output=log_pattern, open_mode='append', no_requeue=True)
+    if slurm.signal_seconds > 0:
+        options['signal'] = f'USR2@{slurm.signal_seconds}'
     if dependency is not None:
         options['dependency'] = dependency
     if begin is not None:

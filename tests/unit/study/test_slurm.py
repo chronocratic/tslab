@@ -56,9 +56,15 @@ def _task_section_command(script: Path) -> list[str]:
     return ['bash', '-c', '\n'.join(body)]
 
 
-def _task_section_env(task_id: str) -> dict[str, str]:
+def _task_section_env(*, script: Path, task_id: str) -> dict[str, str]:
+    bin_dir = script.parent / 'bin'
+    bin_dir.mkdir(exist_ok=True)
+    srun = bin_dir / 'srun'
+    srun.write_text('#!/bin/sh\nwhile [ "${1#--}" != "$1" ]; do shift; done\nexec "$@"\n')
+    srun.chmod(0o755)
     return {
         **os.environ,
+        'PATH': f'{bin_dir}:{os.environ["PATH"]}',
         'SLURM_ARRAY_TASK_ID': task_id,
         'SLURM_ARRAY_JOB_ID': '9',
         'SLURM_JOB_ID': '9',
@@ -69,7 +75,7 @@ def run_task_section(script: Path, task_id: str) -> subprocess.CompletedProcess[
     return subprocess.run(  # noqa: S603 # why: run the generated script under bash
         _task_section_command(script),
         check=False,
-        env=_task_section_env(task_id),
+        env=_task_section_env(script=script, task_id=task_id),
         capture_output=True,
         text=True,
     )
@@ -78,7 +84,7 @@ def run_task_section(script: Path, task_id: str) -> subprocess.CompletedProcess[
 def start_task_section(script: Path, task_id: str) -> subprocess.Popen[str]:
     return subprocess.Popen(  # noqa: S603 # why: run the generated script under bash
         _task_section_command(script),
-        env=_task_section_env(task_id),
+        env=_task_section_env(script=script, task_id=task_id),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -158,6 +164,33 @@ def test_sbatch_extra_rejects_a_line_break_in_a_value(tmp_path: Path) -> None:
     slurm = SlurmSettings(partition='p', sbatch_extra=(('comment', 'a\nb'),))
     with pytest.raises(ValueError, match='sbatch_extra'):
         _script(tmp_path, slurm=slurm)
+
+
+def test_job_script_requests_one_task_per_gpu_on_one_node(tmp_path: Path) -> None:
+    lines = _script(tmp_path, slurm=SlurmSettings(partition='p', gpus=4)).splitlines()
+    assert '#SBATCH --nodes=1' in lines
+    assert '#SBATCH --ntasks-per-node=4' in lines
+
+
+def test_job_script_without_gpus_runs_one_task(tmp_path: Path) -> None:
+    lines = _script(tmp_path, slurm=SlurmSettings(partition='p')).splitlines()
+    assert '#SBATCH --ntasks-per-node=1' in lines
+
+
+def test_job_script_signals_usr2_before_the_time_limit(tmp_path: Path) -> None:
+    lines = _script(tmp_path, slurm=SlurmSettings(partition='p')).splitlines()
+    assert '#SBATCH --signal=USR2@120' in lines
+
+
+def test_job_script_without_signal_when_signal_seconds_is_zero(tmp_path: Path) -> None:
+    lines = _script(tmp_path, slurm=SlurmSettings(partition='p', signal_seconds=0)).splitlines()
+    assert not any(line.startswith('#SBATCH --signal=') for line in lines)
+
+
+def test_task_runs_through_srun(tmp_path: Path) -> None:
+    text = _script(tmp_path, slurm=SlurmSettings(partition='p'))
+    assert 'srun --unbuffered --kill-on-bad-exit=1 bash -c "exec $TASK_LINE"' in text
+    assert 'eval "$TASK_LINE"' not in text
 
 
 def test_task_line_round_trips_through_bash(tmp_path: Path) -> None:
