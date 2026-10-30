@@ -123,6 +123,11 @@ def is_writer_process() -> bool:
     return all(os.environ.get(variable, '0') == '0' for variable in _RANK_VARIABLES)
 
 
+def slurm_task_count() -> int:
+    """Return the number of tasks in this SLURM job, or one off SLURM."""
+    return int(os.environ.get('SLURM_NTASKS', '1'))
+
+
 class Run:
     """One execution of a user script with one config, bound to one folder.
 
@@ -193,6 +198,7 @@ class Run:
         ) = None
         self._time_limit_signalled = False
         self._executing = False
+        self._called_single_rank = False
         self._lock_nonce: str | None = None
         self._heartbeat: _Heartbeat | None = None
         self._entered = False
@@ -243,6 +249,20 @@ class Run:
     def end_execution(self) -> None:
         """Mark a stage no longer executing."""
         self._executing = False
+
+    def note_stage_call(self, *, all_ranks: bool) -> bool:
+        """Return whether a single-rank stage was previously called in this run.
+
+        Args:
+            all_ranks: Whether the current stage runs on every rank.
+
+        Returns:
+            Whether an earlier stage runs only on rank zero.
+        """
+        previous = self._called_single_rank
+        if not all_ranks:
+            self._called_single_rank = True
+        return previous
 
     def instance_directory(self, *, stage_name: str, instance_name: InstanceName | None) -> Path:
         """Return the folder of a stage instance.
