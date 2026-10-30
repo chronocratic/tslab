@@ -17,6 +17,11 @@ Machine profiles can run site setup commands before each task with
 `[slurm] setup = ["module load cuda"]`. Set `gpu_type = "a100"` to request
 `--gres=gpu:a100:<count>` when `gpus` is greater than zero.
 
+Every study job runs through `srun` on one node. `gpus = 4` runs four tasks,
+one per GPU; `cpus_per_task = 8` allocates eight CPUs per task, 32 total.
+The default `signal_seconds = 120` sends `SIGUSR2` before the time limit.
+Set `signal_seconds = 0` to turn off this warning.
+
 Add site-specific options under `[slurm.sbatch_extra]`, using sbatch long
 names. For example, `account = "project"` or `exclusive = true`. An entry
 such as `time = "04:00:00"` replaces the normal time line; `no_requeue = false`
