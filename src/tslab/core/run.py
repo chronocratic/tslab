@@ -51,7 +51,15 @@ from tslab.core.status import (
 )
 from tslab.core.tracker import LocalTracker, RunStatus, Tracker
 
-__all__ = ['LOCK_FILE', 'Run', 'RunLockedError', 'RunOptions', 'is_run_active', 'is_writer_process']
+__all__ = [
+    'LOCK_FILE',
+    'JobTimeLimitSignal',
+    'Run',
+    'RunLockedError',
+    'RunOptions',
+    'is_run_active',
+    'is_writer_process',
+]
 
 _LOGGER = logging.getLogger(__name__)
 _RANK_VARIABLES = ('RANK', 'SLURM_PROCID', 'LOCAL_RANK')
@@ -99,6 +107,10 @@ class RunOptions:
 
 class RunLockedError(RuntimeError):
     """Raised when another live process owns the run folder."""
+
+
+class JobTimeLimitSignal(SystemExit):
+    """The SLURM time limit is near; resubmit the run to resume."""
 
 
 def is_writer_process() -> bool:
@@ -176,6 +188,11 @@ class Run:
         self._previous_root_level: int | None = None
         self._previous_tslab_level: int | None = None
         self._previous_sigterm: signal.Handlers | None = None
+        self._previous_sigusr2: (
+            signal.Handlers | Callable[[int, FrameType | None], object] | int | None
+        ) = None
+        self._time_limit_signalled = False
+        self._executing = False
         self._lock_nonce: str | None = None
         self._heartbeat: _Heartbeat | None = None
         self._entered = False
@@ -206,6 +223,26 @@ class Run:
     def writes_files(self) -> bool:
         """Return ``True`` if this process may write (rank 0 and not a dry run)."""
         return self._writer and not self._options.dry_run
+
+    @property
+    def time_limit_signalled(self) -> bool:
+        """Whether this process received the SLURM time-limit signal."""
+        return self._time_limit_signalled
+
+    def begin_execution(self) -> None:
+        """Mark a stage executing, or stop if the signal arrived between stages.
+
+        Raises:
+            JobTimeLimitSignal: If ``SIGUSR2`` arrived before this stage started.
+        """
+        self._executing = True
+        if self._time_limit_signalled:
+            message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
+            raise JobTimeLimitSignal(message)
+
+    def end_execution(self) -> None:
+        """Mark a stage no longer executing."""
+        self._executing = False
 
     def instance_directory(self, *, stage_name: str, instance_name: InstanceName | None) -> Path:
         """Return the folder of a stage instance.
@@ -374,6 +411,7 @@ class Run:
         try:
             self._configure_logging()
             self._install_sigterm_handler()
+            self._install_sigusr2_handler()
             seed_everything(seed=self._seed)
             if self.writes_files:
                 self._directory.mkdir(parents=True, exist_ok=True)
@@ -443,8 +481,34 @@ class Run:
         previous = signal.getsignal(signal.SIGTERM)
         if previous is not signal.SIG_DFL:
             return
-        signal.signal(signal.SIGTERM, _exit_on_sigterm)
+        signal.signal(signal.SIGTERM, self._on_sigterm)
         self._previous_sigterm = previous
+
+    def _install_sigusr2_handler(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return
+        previous = signal.getsignal(signal.SIGUSR2)
+        if previous is not signal.SIG_DFL:
+            _LOGGER.warning('replacing an existing SIGUSR2 handler for this run')
+        signal.signal(signal.SIGUSR2, self._on_sigusr2)
+        self._previous_sigusr2 = previous
+
+    def _on_sigusr2(self, signal_number: int, frame: FrameType | None) -> None:
+        del signal_number, frame
+        if not self._writer:
+            _LOGGER.info('SIGUSR2 received on a non-zero rank; rank 0 stops the run')
+            return
+        self._time_limit_signalled = True
+        if self._executing:
+            message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
+            raise JobTimeLimitSignal(message)
+
+    def _on_sigterm(self, signal_number: int, frame: FrameType | None) -> None:
+        del signal_number, frame
+        if self._time_limit_signalled:
+            _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
+            return
+        raise SystemExit(_SIGTERM_EXIT_CODE)
 
     def _configure_logging(self) -> None:
         level = logging.getLevelNamesMapping()[self._options.log_level]
@@ -553,6 +617,9 @@ class Run:
         if self._previous_sigterm is not None:
             signal.signal(signal.SIGTERM, self._previous_sigterm)
             self._previous_sigterm = None
+        if self._previous_sigusr2 is not None:
+            signal.signal(signal.SIGUSR2, self._previous_sigusr2)
+            self._previous_sigusr2 = None
         root_logger = logging.getLogger()
         for handler in self._log_handlers:
             root_logger.removeHandler(handler)
@@ -606,11 +673,6 @@ def _flatten(*, value: object, prefix: str) -> dict[str, object]:
             flat.update(_flatten(value=item, prefix=f'{prefix}/{key}' if prefix else str(key)))
         return flat
     return {prefix: value}
-
-
-def _exit_on_sigterm(signal_number: int, frame: FrameType | None) -> None:
-    del signal_number, frame
-    raise SystemExit(_SIGTERM_EXIT_CODE)
 
 
 def _project_directory() -> Path:

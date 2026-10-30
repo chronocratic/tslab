@@ -13,6 +13,7 @@ from typing import override
 
 import pytest
 
+import tslab
 from tslab.core.meta import hostname
 from tslab.core.run import (
     _acquire_lock,
@@ -347,6 +348,25 @@ def test_sigterm_ends_the_run_as_crashed(tmp_path: Path) -> None:
     assert status['run_state'] == 'crashed'
     assert not (tmp_path / 'a' / '.lock').exists()
     assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_usr2_on_a_non_zero_rank_only_logs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+    monkeypatch.setenv('SLURM_PROCID', '1')
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
+        signal.raise_signal(signal.SIGUSR2)
+        assert not run.time_limit_signalled
+    assert 'SIGUSR2' in caplog.text
+
+
+def test_usr2_handler_is_restored_after_the_run(tmp_path: Path) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+    before = signal.getsignal(signal.SIGUSR2)
+    with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
+        pass
+    assert signal.getsignal(signal.SIGUSR2) is before
 
 
 def test_logger_levels_are_restored(tmp_path: Path) -> None:
