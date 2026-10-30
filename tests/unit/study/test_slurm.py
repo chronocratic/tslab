@@ -115,6 +115,31 @@ def test_job_script_header_and_task(tmp_path: Path) -> None:
     assert "export A='x y'" in lines
 
 
+def test_job_script_writes_gpu_type(tmp_path: Path) -> None:
+    script = _script(tmp_path, slurm=SlurmSettings(partition='p', gpus=2, gpu_type='a100'))
+    assert '#SBATCH --gres=gpu:a100:2' in script.splitlines()
+
+
+def test_job_script_ignores_gpu_type_without_gpus(tmp_path: Path) -> None:
+    script = _script(tmp_path, slurm=SlurmSettings(partition='p', gpu_type='a100'))
+    assert 'gres' not in script
+
+
+def test_job_script_writes_setup_after_env_before_tasks(tmp_path: Path) -> None:
+    slurm = SlurmSettings(partition='p', setup=('module load cuda', 'source /x/env.sh'))
+    lines = _script(tmp_path, slurm=slurm, env={'A': 'b'}).splitlines()
+    assert lines.index('module load cuda') == lines.index('export A=b') + 1
+    assert lines.index('source /x/env.sh') < next(
+        index for index, line in enumerate(lines) if line.startswith('for _ in')
+    )
+
+
+def test_job_script_rejects_a_line_break_in_setup(tmp_path: Path) -> None:
+    slurm = SlurmSettings(partition='p', setup=('a\nb',))
+    with pytest.raises(ValueError, match='setup'):
+        _script(tmp_path, slurm=slurm)
+
+
 def test_task_line_round_trips_through_bash(tmp_path: Path) -> None:
     script = write_script(tmp_path, tmp_path / '3.tasks')
     result = run_task_section(script, task_id='17')

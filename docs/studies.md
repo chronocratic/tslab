@@ -188,6 +188,8 @@ get the absolute path of the profile, so the compute nodes need no register.
 
 `[slurm]` keys and defaults: `partition` (required), `qos = null`,
 `time = "2-00:00:00"`, `cpus_per_task = 1`, `mem_per_cpu = null`, `gpus = 0`,
+`gpu_type = null`, `setup = []`, `signal_seconds = 120` (send `SIGUSR2` this
+many seconds before the time limit; `0` disables it),
 `max_concurrent = 100` (the `%N` of `--array`), `max_array_size = 1000`
 (array indices must stay below the MaxArraySize of the cluster),
 `sbatch_extra = []` (raw `#SBATCH` lines), `node_local_tmp = true` (points
