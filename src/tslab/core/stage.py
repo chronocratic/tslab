@@ -43,7 +43,7 @@ from tslab.core.paths import (
     replace_directory,
     validate_stage_name,
 )
-from tslab.core.run import Run
+from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
@@ -263,6 +263,7 @@ class Stage[Out: Artifact](ABC):
             ),
         )
         try:
+            run.begin_execution()
             work_directory = self._prepare_work_directory(
                 run=run, directory=directory, resume=resume, instance_id=instance_id
             )
@@ -289,6 +290,14 @@ class Stage[Out: Artifact](ABC):
                     ),
                 )
                 self._publish(work_directory=work_directory, directory=directory)
+        except JobTimeLimitSignal as error:
+            self._record_failure(
+                execution=execution,
+                error=error,
+                started_at=started_at,
+                seconds=time.perf_counter() - start,
+            )
+            raise
         # why: any stage error is recorded; fail_fast re-raises
         except Exception as error:  # noqa: BLE001
             return self._record_failure(
@@ -297,6 +306,8 @@ class Stage[Out: Artifact](ABC):
                 started_at=started_at,
                 seconds=time.perf_counter() - start,
             )
+        finally:
+            run.end_execution()
         bind_identity(
             artifact=artifact,
             identity=ArtifactIdentity(
@@ -351,7 +362,12 @@ class Stage[Out: Artifact](ABC):
         return work_directory
 
     def _record_failure(
-        self, *, execution: _Execution, error: Exception, started_at: str, seconds: float
+        self,
+        *,
+        execution: _Execution,
+        error: Exception | JobTimeLimitSignal,
+        started_at: str,
+        seconds: float,
     ) -> Artifact:
         run, instance_id, directory = execution.run, execution.instance_id, execution.directory
         error_line = describe_error(error=error)
@@ -381,7 +397,7 @@ class Stage[Out: Artifact](ABC):
                 traceback_file=traceback_file,
             ),
         )
-        if run.options.fail_fast:
+        if run.options.fail_fast or isinstance(error, JobTimeLimitSignal):
             raise error
         _LOGGER.error('failed %s: %s', instance_id, error_line, exc_info=error)
         return UnavailableArtifact(

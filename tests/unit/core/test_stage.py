@@ -1,12 +1,15 @@
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
+import signal
 from typing import Annotated, override
 
 import pytest
 import torch
 
 import tslab
+from tslab.core.status import read_status
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -330,3 +333,73 @@ def test_var_positional_is_reported_by_name() -> None:
         tslab.stage(name='varargs', output=tslab.Json)(
             lambda *args, run: tslab.Json(data={})  # noqa: ARG005
         )
+
+
+def test_usr2_in_a_stage_fails_it_as_signalled_and_exits(tmp_path: Path) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+
+    @tslab.stage(name='slow', output=tslab.Json)
+    def slow(*, run: tslab.Run) -> tslab.Json:
+        os.kill(os.getpid(), signal.SIGUSR2)
+        return tslab.Json(data={})
+
+    with pytest.raises(tslab.JobTimeLimitSignal), open_run(tmp_path) as run:
+        slow(run=run)
+    status = read_status(path=tmp_path / 'r' / 'status.json')
+    assert status is not None
+    assert status.instances['slow[default]'].state is tslab.InstanceState.FAILED
+    assert (status.instances['slow[default]'].error or '').startswith('JobTimeLimitSignal:')
+    assert status.run_state is tslab.RunState.CRASHED
+    assert 'JobTimeLimitSignal' in (tmp_path / 'r' / 'slow' / 'default' / 'error.txt').read_text()
+
+
+def test_usr2_between_stages_fails_the_next_stage_as_signalled(tmp_path: Path) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+
+    @tslab.stage(name='first', output=tslab.Json)
+    def first(*, run: tslab.Run) -> tslab.Json:
+        return tslab.Json(data={})
+
+    @tslab.stage(name='second', output=tslab.Json)
+    def second(*, run: tslab.Run) -> tslab.Json:
+        return tslab.Json(data={})
+
+    with (  # noqa: PT012 # why: the signal must arrive between two stage calls
+        pytest.raises(tslab.JobTimeLimitSignal),
+        open_run(tmp_path) as run,
+    ):
+        first(run=run)
+        os.kill(os.getpid(), signal.SIGUSR2)
+        second(run=run)
+    status = read_status(path=tmp_path / 'r' / 'status.json')
+    assert status is not None
+    assert status.instances['first[default]'].state is tslab.InstanceState.DONE
+    assert (status.instances['second[default]'].error or '').startswith('JobTimeLimitSignal:')
+
+
+def test_usr2_after_the_last_stage_finishes_the_run(tmp_path: Path) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+    with open_run(tmp_path):
+        os.kill(os.getpid(), signal.SIGUSR2)
+    status = read_status(path=tmp_path / 'r' / 'status.json')
+    assert status is not None
+    assert status.run_state is tslab.RunState.FINISHED
+
+
+def test_sigterm_after_usr2_is_ignored(tmp_path: Path) -> None:
+    assert hasattr(tslab, 'JobTimeLimitSignal')
+
+    @tslab.stage(name='slow', output=tslab.Json)
+    def slow(*, run: tslab.Run) -> tslab.Json:
+        try:
+            os.kill(os.getpid(), signal.SIGUSR2)
+        except tslab.JobTimeLimitSignal:
+            os.kill(os.getpid(), signal.SIGTERM)
+            raise
+        return tslab.Json(data={})
+
+    with pytest.raises(tslab.JobTimeLimitSignal), open_run(tmp_path) as run:
+        slow(run=run)
+    status = read_status(path=tmp_path / 'r' / 'status.json')
+    assert status is not None
+    assert (status.instances['slow[default]'].error or '').startswith('JobTimeLimitSignal:')
