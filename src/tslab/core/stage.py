@@ -16,7 +16,7 @@ from pathlib import Path
 import shutil
 import time
 import traceback
-from typing import Any, cast, ClassVar, get_type_hints, override
+from typing import Any, cast, ClassVar, get_type_hints, override, Protocol, runtime_checkable
 import uuid
 
 from tslab.core.artifact import (
@@ -43,7 +43,7 @@ from tslab.core.paths import (
     replace_directory,
     validate_stage_name,
 )
-from tslab.core.run import JobTimeLimitSignal, Run
+from tslab.core.run import is_writer_process, JobTimeLimitSignal, Run, slurm_task_count
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
@@ -53,12 +53,20 @@ from tslab.core.status import (
 )
 from tslab.core.text import describe_error, qualified_name
 
-__all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'Stage', 'stage']
+__all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'RankAgreement', 'Stage', 'stage']
 
 _LOGGER = logging.getLogger(__name__)
 INSTANCE_META_FORMAT_VERSION = 1
 _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
+
+
+@runtime_checkable
+class RankAgreement(Protocol):
+    """Broadcast a stage decision from rank zero to the other ranks."""
+
+    def agree_across_ranks(self, *, key: str, value: bool) -> bool:
+        """Return the decision of rank zero, waiting for it on other ranks."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -71,6 +79,7 @@ class _Execution:
     fingerprint: str
     settings: dict[str, object]
     inputs: Mapping[str, Artifact]
+    agreement: RankAgreement | None = None
 
 
 class Stage[Out: Artifact](ABC):
@@ -85,12 +94,14 @@ class Stage[Out: Artifact](ABC):
             instance folder (``run.instance_directory(...)``) and an unfinished
             folder is kept for resuming. Used by the ready ``train`` stage, so an
             interrupted training resumes from its last checkpoint.
+        all_ranks: Run on every rank in a multi-rank job; other stages run only on rank zero.
     """
 
     name: str
     version: int = 1
     output_type: type[Out]
     in_place: bool = False
+    all_ranks: bool = False
     # ``FunctionStage`` sets name and output_type per instance, not on the class.
     _configured_in_init: ClassVar[bool] = False
 
@@ -144,6 +155,13 @@ class Stage[Out: Artifact](ABC):
         if not isinstance(run, Run):
             message = f'stage {self.name!r} must be called with run=<tslab.Run>'
             raise TypeError(message)
+        if not is_writer_process() and not self.all_ranks:
+            _LOGGER.info(
+                'rank %s leaves before %s: only rank 0 runs stages after training',
+                os.environ.get('SLURM_PROCID', os.environ.get('LOCAL_RANK', '?')),
+                self.name,
+            )
+            raise SystemExit(0)
         stage_name = validate_stage_name(name=self.name)
         raw_name = arguments.get('name')
         if raw_name is not None and not isinstance(raw_name, str | tuple):
@@ -151,6 +169,14 @@ class Stage[Out: Artifact](ABC):
             raise TypeError(message)
         name_parts = normalize_instance_name(name=raw_name)
         instance_id = format_instance_id(stage_name=stage_name, name_parts=name_parts)
+        called_single_rank = run.note_stage_call(all_ranks=self.all_ranks)
+        if called_single_rank and self.all_ranks and slurm_task_count() > 1:
+            # why: other ranks already exited, so training now would hang waiting for DDP peers
+            message = (
+                f'{instance_id}: training stages must come before other stages in a multi-GPU '
+                'job; rank 1+ already left'
+            )
+            raise RuntimeError(message)
         # 1. Claim the name (duplicate and nesting checks).
         run.claim_instance(stage_name=stage_name, name_parts=name_parts)
         directory = run.instance_directory(stage_name=stage_name, instance_name=name_parts)
@@ -198,11 +224,20 @@ class Stage[Out: Artifact](ABC):
             return _plan_dry_run(
                 run=run, instance_id=instance_id, directory=directory, stale_reason=stale_reason
             )
-        if stale_reason is None:
-            loaded = self._try_load(directory=directory, instance_id=instance_id)
-            if loaded is not None:
-                return loaded
-        else:
+        agreement = (
+            next((value for value in arguments.values() if isinstance(value, RankAgreement)), None)
+            if self.all_ranks
+            else None
+        )
+        loaded = self._cached_result(
+            directory=directory,
+            instance_id=instance_id,
+            stale_reason=stale_reason,
+            agreement=agreement,
+        )
+        if loaded is not None:
+            return loaded
+        if stale_reason is not None:
             _LOGGER.info('run %s (%s)', instance_id, stale_reason)
         # 5. Execute, save, record.
         execution = _Execution(
@@ -212,6 +247,7 @@ class Stage[Out: Artifact](ABC):
             fingerprint=fingerprint,
             settings=settings,
             inputs=inputs,
+            agreement=agreement,
         )
         return self._execute_and_save(
             execution=execution,
@@ -220,6 +256,31 @@ class Stage[Out: Artifact](ABC):
             and invalidation is None
             and _can_resume(record=record, fingerprint=fingerprint),
         )
+
+    def _cached_result(
+        self,
+        *,
+        directory: Path,
+        instance_id: str,
+        stale_reason: str | None,
+        agreement: RankAgreement | None,
+    ) -> Artifact | None:
+        loaded = (
+            self._try_load(directory=directory, instance_id=instance_id)
+            if stale_reason is None and (agreement is None or is_writer_process())
+            else None
+        )
+        if agreement is None:
+            return loaded
+        use_cache = agreement.agree_across_ranks(
+            key=f'{instance_id}:cache', value=stale_reason is None and loaded is not None
+        )
+        if use_cache and loaded is None:
+            loaded = self._try_load(directory=directory, instance_id=instance_id)
+            if loaded is None:
+                message = f'{instance_id}: rank 0 chose the cache but this rank cannot load it'
+                raise RuntimeError(message)
+        return loaded if use_cache else None
 
     def _canonical_settings(
         self, *, arguments: Mapping[str, object], instance_id: str
@@ -267,6 +328,8 @@ class Stage[Out: Artifact](ABC):
             work_directory = self._prepare_work_directory(
                 run=run, directory=directory, resume=resume, instance_id=instance_id
             )
+            if execution.agreement is not None:
+                execution.agreement.agree_across_ranks(key=f'{instance_id}:prepared', value=True)
             artifact = self.execute(**arguments)
             if not isinstance(artifact, self.output_type):
                 message = (
@@ -577,7 +640,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
 
     _configured_in_init: ClassVar[bool] = True
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 # why: one keyword for each stage setting
         self,
         *,
         function: Callable[P, Out],
@@ -585,6 +648,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
         output: type[Out],
         version: int,
         in_place: bool,
+        all_ranks: bool,
     ) -> None:
         """Wrap ``function``. Use ``@stage`` instead of calling this directly."""
         qualname = getattr(function, '__qualname__', repr(function))
@@ -610,6 +674,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
         self.version = version
         self.output_type = output
         self.in_place = in_place
+        self.all_ranks = all_ranks
         self.__doc__ = function.__doc__
         self.__wrapped__ = function
 
@@ -643,7 +708,12 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
 
 
 def stage[**P, Out: Artifact](
-    *, name: str, output: type[Out], version: int = 1, in_place: bool = False
+    *,
+    name: str,
+    output: type[Out],
+    version: int = 1,
+    in_place: bool = False,
+    all_ranks: bool = False,
 ) -> Callable[[Callable[P, Out]], FunctionStage[P, Out]]:
     """Turn a function into a ``Stage``.
 
@@ -664,6 +734,7 @@ def stage[**P, Out: Artifact](
         version: Bump to invalidate cached results after a code change.
         in_place: Write directly into the final folder and resume unfinished
             work (see ``Stage.in_place``).
+        all_ranks: Run on every rank in a multi-rank job (for DDP training).
 
     Returns:
         A decorator producing a ``FunctionStage``.
@@ -671,7 +742,12 @@ def stage[**P, Out: Artifact](
 
     def decorate(function: Callable[P, Out]) -> FunctionStage[P, Out]:
         return FunctionStage(
-            function=function, name=name, output=output, version=version, in_place=in_place
+            function=function,
+            name=name,
+            output=output,
+            version=version,
+            in_place=in_place,
+            all_ranks=all_ranks,
         )
 
     return decorate

@@ -11,7 +11,7 @@ __all__ = ['train']
 STAGE_NAME = 'train'
 
 
-@stage(name=STAGE_NAME, output=Checkpoint, in_place=True)
+@stage(name=STAGE_NAME, output=Checkpoint, in_place=True, all_ranks=True)
 def train[M](
     *,
     run: Run,

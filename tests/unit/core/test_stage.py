@@ -403,3 +403,74 @@ def test_sigterm_after_usr2_is_ignored(tmp_path: Path) -> None:
     status = read_status(path=tmp_path / 'r' / 'status.json')
     assert status is not None
     assert (status.instances['slow[default]'].error or '').startswith('JobTimeLimitSignal:')
+
+
+def test_non_zero_rank_leaves_at_a_single_rank_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('SLURM_PROCID', '1')
+    with pytest.raises(SystemExit) as raised, open_run(tmp_path) as run:
+        count(run=run, value=2)
+    assert raised.value.code == 0
+    assert not (tmp_path / 'r').exists()
+
+
+def test_non_zero_rank_runs_an_all_ranks_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('SLURM_PROCID', '1')
+
+    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
+    def everywhere(*, run: tslab.Run) -> tslab.Json:
+        return tslab.Json(data={'executed': True})
+
+    with open_run(tmp_path) as run:
+        result = everywhere(run=run)
+    assert result.data == {'executed': True}
+    assert not (tmp_path / 'r').exists()
+
+
+class FakeAgreement:
+    def __init__(self, *, cache: bool | None = None) -> None:
+        self.cache = cache
+        self.keys: list[str] = []
+
+    def agree_across_ranks(self, *, key: str, value: bool) -> bool:
+        self.keys.append(key)
+        return self.cache if key.endswith(':cache') and self.cache is not None else value
+
+
+def test_all_ranks_stage_after_a_single_rank_stage_fails_in_a_multi_rank_job(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('SLURM_NTASKS', '2')
+
+    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
+    def everywhere(
+        *, run: tslab.Run, agreement: Annotated[FakeAgreement, tslab.NotFingerprinted]
+    ) -> tslab.Json:
+        return tslab.Json(data={})
+
+    with open_run(tmp_path) as run:
+        count(run=run, value=2)
+        with pytest.raises(RuntimeError, match='must come before'):
+            everywhere(run=run, agreement=FakeAgreement())
+
+
+def test_all_ranks_stage_follows_the_agreed_cache_decision(tmp_path: Path) -> None:
+    executed: list[int] = []
+
+    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
+    def everywhere(
+        *, run: tslab.Run, agreement: Annotated[FakeAgreement, tslab.NotFingerprinted]
+    ) -> tslab.Json:
+        executed.append(1)
+        return tslab.Json(data={'value': len(executed)})
+
+    with open_run(tmp_path) as run:
+        everywhere(run=run, agreement=FakeAgreement())
+    agreement = FakeAgreement(cache=False)
+    with open_run(tmp_path) as run:
+        result = everywhere(run=run, agreement=agreement)
+    assert result.data == {'value': 2}
+    assert agreement.keys == ['everywhere[default]:cache', 'everywhere[default]:prepared']
