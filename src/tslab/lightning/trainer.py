@@ -11,15 +11,18 @@ from typing import Any, override, TYPE_CHECKING
 import lightning
 from lightning import LightningModule
 from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Timer
+from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
 from tslab.core.artifact import Checkpoint
 from tslab.core.paths import require_path
+from tslab.core.run import slurm_task_count
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
 from tslab.lightning.callbacks import build_callbacks
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
+from tslab.lightning.ranks import agree
 from tslab.lightning.resume import choose_resume_checkpoint
 from tslab.lightning.slurm import resolve_training_time
 from tslab.tracking.lightning_bridge import lightning_loggers
@@ -31,7 +34,9 @@ __all__ = ['LightningTrainer', 'TrainingTimeLimitReached']
 
 _LOGGER = logging.getLogger(__name__)
 # Arguments that TSLab owns: replacing them would break the trackers, the time limit or resume.
-_RESERVED_TRAINER_KWARGS = frozenset({'callbacks', 'logger', 'max_time', 'default_root_dir'})
+_RESERVED_TRAINER_KWARGS = frozenset(
+    {'callbacks', 'logger', 'max_time', 'default_root_dir', 'plugins'}
+)
 
 
 class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API name from the spec
@@ -78,6 +83,20 @@ class LightningTrainer(Trainer[LightningModule]):
     def fingerprint_settings(self) -> LightningTrainerConfig:
         """Return the settings; ``NotFingerprinted`` fields are left out of fingerprints."""
         return self._config
+
+    def agree_across_ranks(self, *, key: str, value: bool) -> bool:
+        """Broadcast the cache decision of rank zero to every SLURM task.
+
+        Args:
+            key: The stage decision key.
+            value: The proposed decision on this rank.
+
+        Returns:
+            The decision chosen by rank zero.
+        """
+        if slurm_task_count() <= 1:
+            return value
+        return agree(key=key, value=value, environment=os.environ)
 
     @override
     def fit(
@@ -200,6 +219,8 @@ class LightningTrainer(Trainer[LightningModule]):
             'logger': loggers,
             'default_root_dir': checkpoint_directory,
         }
+        if SLURMEnvironment.detect():
+            arguments['plugins'] = [SLURMEnvironment(auto_requeue=False)]
         # Applied last, so that the escape hatch can override the other arguments.
         arguments.update(config.extra_trainer_kwargs)
         return lightning.Trainer(**arguments)
