@@ -42,6 +42,7 @@ INTERRUPTING_JOB_STATES = frozenset({'TIMEOUT', 'NODE_FAIL', 'PREEMPTED'})
 
 #: Ended SLURM states that read as a failed run.
 FAILING_JOB_STATES = frozenset({'OUT_OF_MEMORY', 'FAILED', 'CANCELLED', 'BOOT_FAIL', 'DEADLINE'})
+_INTERRUPTED_ERROR_PREFIXES = ('TrainingTimeLimitReached:', 'JobTimeLimitSignal:')
 
 
 class StudyState(StrEnum):
@@ -164,7 +165,7 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
     # if the lock is live, the function already returned RUNNING
     time_limited = snapshot is not None and any(
         record.state is InstanceState.FAILED
-        and (record.error or '').startswith('TrainingTimeLimitReached:')
+        and (record.error or '').startswith(_INTERRUPTED_ERROR_PREFIXES)
         for record in snapshot.instances.values()
     )
     stale_running = snapshot is not None and snapshot.run_state in (
