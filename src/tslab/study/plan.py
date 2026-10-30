@@ -9,6 +9,7 @@ import logging
 import os
 from pathlib import Path
 import sys
+from typing import cast
 
 import tslab
 from tslab.study.definition import (
@@ -191,7 +192,17 @@ def _slurm_for(
         matches=[override.match for override in overrides], grid_name=grid_name, values=values
     )
     for position in order:
-        merged.update(overrides[position].slurm)
+        update = overrides[position].slurm
+        if 'sbatch_extra' in update:
+            # why: the base is a SlurmSettings field; profile overrides decode to the same type
+            base_extra = cast('tuple[tuple[str, str | int | bool], ...]', merged['sbatch_extra'])
+            override_extra = cast(
+                'tuple[tuple[str, str | int | bool], ...]', update['sbatch_extra']
+            )
+            merged['sbatch_extra'] = tuple(
+                sorted((dict(base_extra) | dict(override_extra)).items())
+            )
+        merged.update({key: value for key, value in update.items() if key != 'sbatch_extra'})
     return SlurmSettings(**merged)  # ty: ignore[invalid-argument-type]
 
 

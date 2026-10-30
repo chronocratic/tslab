@@ -91,7 +91,7 @@ def test_job_script_header_and_task(tmp_path: Path) -> None:
         time='1:00:00',
         qos='normal',
         gpus=1,
-        sbatch_extra=('--exclude=n1',),
+        sbatch_extra=(('exclude', 'n1'),),
         node_local_tmp=False,
     )
     text = job_script(
@@ -137,6 +137,26 @@ def test_job_script_writes_setup_after_env_before_tasks(tmp_path: Path) -> None:
 def test_job_script_rejects_a_line_break_in_setup(tmp_path: Path) -> None:
     slurm = SlurmSettings(partition='p', setup=('a\nb',))
     with pytest.raises(ValueError, match='setup'):
+        _script(tmp_path, slurm=slurm)
+
+
+def test_sbatch_extra_replaces_and_removes_tslab_lines(tmp_path: Path) -> None:
+    slurm = SlurmSettings(
+        partition='p',
+        time='1:00:00',
+        sbatch_extra=(('no_requeue', False), ('time', '2:00:00'), ('exclusive', True)),
+    )
+    lines = _script(tmp_path, slurm=slurm).splitlines()
+    assert [line for line in lines if line.startswith('#SBATCH --time')] == [
+        '#SBATCH --time=2:00:00'
+    ]
+    assert '#SBATCH --no-requeue' not in lines
+    assert '#SBATCH --exclusive' in lines
+
+
+def test_sbatch_extra_rejects_a_line_break_in_a_value(tmp_path: Path) -> None:
+    slurm = SlurmSettings(partition='p', sbatch_extra=(('comment', 'a\nb'),))
+    with pytest.raises(ValueError, match='sbatch_extra'):
         _script(tmp_path, slurm=slurm)
 
 
@@ -269,7 +289,7 @@ def _script(tmp_path: Path, **changes: object) -> str:
         {'dependency': 'afterok:1\nrm -rf x'},
         {'begin': 'now\nrm'},
         {'slurm': SlurmSettings(partition='p\nrm', time='1:00:00')},
-        {'slurm': SlurmSettings(partition='p', time='1:00:00', sbatch_extra=('--x\nrm',))},
+        {'slurm': SlurmSettings(partition='p', time='1:00:00', sbatch_extra=(('x', 'a\nrm'),))},
     ],
 )
 def test_job_script_rejects_line_breaks(tmp_path: Path, changes: dict[str, object]) -> None:

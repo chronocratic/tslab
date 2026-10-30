@@ -39,6 +39,7 @@ __all__ = [
 ]
 
 _ENV_NAME_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
+_SBATCH_NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 
 # why: the smallest value each numeric key accepts; the keys are unique across the tables
 _MINIMUMS: dict[str, float] = {
@@ -70,7 +71,7 @@ class SlurmSettings:
         gpu_type: The GPU type for the GRES request, when set.
         max_concurrent: The maximum number of concurrent array jobs.
         max_array_size: The maximum number of tasks in an array.
-        sbatch_extra: Additional raw ``#SBATCH`` options.
+        sbatch_extra: Additional ``#SBATCH`` options, keyed by long name.
         node_local_tmp: Whether to use node-local temporary folders.
         submit_pause_seconds: Delay between job submissions.
         setup: Shell lines run before each task.
@@ -86,7 +87,7 @@ class SlurmSettings:
     gpu_type: str | None = None
     max_concurrent: int = 100
     max_array_size: int = 1000
-    sbatch_extra: tuple[str, ...] = ()
+    sbatch_extra: tuple[tuple[str, str | int | bool], ...] = ()
     node_local_tmp: bool = True
     submit_pause_seconds: float = 0.5
     setup: tuple[str, ...] = ()
@@ -467,6 +468,16 @@ def _from_table[T](
     if cls is MachineOverride:
         return cast('T', _override_from_table(table=table, location=location, path=path))
     _check_keys(cls=cls, table=table, location=location, path=path)
+    if cls is SlurmSettings and 'sbatch_extra' in table:
+        table = {
+            **table,
+            'sbatch_extra': [
+                list(pair)
+                for pair in _sbatch_extra(
+                    value=table['sbatch_extra'], location=f'{location}.sbatch_extra', path=path
+                )
+            ],
+        }
     instance = _decode(data=table, cls=cls, location=location, path=path)
     for key in table:
         _check_range(key=key, value=getattr(instance, key), location=f'{location}.{key}', path=path)
@@ -488,6 +499,45 @@ def _check_keys(*, cls: type, table: dict[str, object], location: str, path: Pat
         problem = unknown_key_message(location=location, key=unknown[0], valid=known)
         message = f'{path}: {problem}'
         raise MachineProfileError(message)
+
+
+def _sbatch_extra(
+    *, value: object, location: str, path: Path
+) -> tuple[tuple[str, str | int | bool], ...]:
+    if isinstance(value, list):
+        converted = []
+        for line in value:
+            if isinstance(line, str) and line.startswith('--'):
+                name, separator, argument = line[2:].partition('=')
+                if _SBATCH_NAME_PATTERN.fullmatch(name):
+                    converted.append(
+                        f'{name.replace("-", "_")} = {json.dumps(argument)}'
+                        if separator
+                        else f'{name.replace("-", "_")} = true'
+                    )
+                    continue
+            converted.append(f'# could not convert: {line}')
+        hint = '\n'.join(('[slurm.sbatch_extra]', *converted))
+        message = f'{path}: {location} must be a table, not a list; use:\n{hint}'
+        raise MachineProfileError(message)
+    if not isinstance(value, dict):
+        message = f'{path}: {location} must be a table'
+        raise MachineProfileError(message)
+    entries: dict[str, str | int | bool] = {}
+    for key, item in value.items():
+        if not _SBATCH_NAME_PATTERN.fullmatch(key):
+            message = f'{path}: {location} key {key!r} must be an sbatch long name'
+            raise MachineProfileError(message)
+        if not isinstance(item, str | int | bool):
+            message = f'{path}: {location}.{key} must be a string, integer, or boolean'
+            raise MachineProfileError(message)
+        _check_range(key=key, value=item, location=f'{location}.{key}', path=path)
+        name = key.replace('-', '_')
+        if name in entries:
+            message = f'{path}: {location} repeats {name!r} with both - and _'
+            raise MachineProfileError(message)
+        entries[name] = item
+    return tuple(sorted(entries.items()))
 
 
 def _override_from_table(*, table: dict[str, object], location: str, path: Path) -> MachineOverride:
@@ -531,6 +581,18 @@ def _slurm_overrides(*, table: object, location: str, path: Path) -> dict[str, o
         message = f'{path}: {location}.slurm must be a table'
         raise MachineProfileError(message)
     _check_keys(cls=SlurmSettings, table=table, location=f'{location}.slurm', path=path)
+    if 'sbatch_extra' in table:
+        table = {
+            **table,
+            'sbatch_extra': [
+                list(pair)
+                for pair in _sbatch_extra(
+                    value=table['sbatch_extra'],
+                    location=f'{location}.slurm.sbatch_extra',
+                    path=path,
+                )
+            ],
+        }
     # why: decode against the full class; the partition of the probe is never read back
     probe = _decode(
         data={'partition': 'probe', **table},
