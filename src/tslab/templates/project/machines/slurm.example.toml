@@ -23,6 +23,9 @@ time = "2-00:00:00"
 cpus_per_task = 2
 mem_per_cpu = "16G"
 gpus = 0
+# gpu_type = "a100" # set a GPU type when gpus is greater than zero
+setup = [] # shell lines run before each task, e.g. ["module load cuda"]
+signal_seconds = 120 # USR2 this many seconds before the time limit; 0 turns it off
 max_concurrent = 100 # the %N of --array
 max_array_size = 1000 # array indices stay below the MaxArraySize of the cluster
 sbatch_extra = [] # raw lines, e.g. ["--exclude=login02"]

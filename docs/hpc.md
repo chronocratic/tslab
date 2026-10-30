@@ -13,6 +13,10 @@
 Training stopped by the time limit is unfinished: submit the same command
 again and it resumes from its last checkpoint.
 
+Machine profiles can run site setup commands before each task with
+`[slurm] setup = ["module load cuda"]`. Set `gpu_type = "a100"` to request
+`--gres=gpu:a100:<count>` when `gpus` is greater than zero.
+
 ## Resubmitting
 
 A job killed at its time limit leaves its lock behind. The lock carries a

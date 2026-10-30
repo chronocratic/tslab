@@ -176,6 +176,26 @@ def test_slurm_time_has_the_documented_default(tmp_path: Path) -> None:
     )
 
 
+def test_machine_profile_reads_the_new_slurm_keys(tmp_path: Path) -> None:
+    text = (
+        'launcher = "slurm"\noutput_root = "r"\n[slurm]\npartition = "p"\n'
+        'gpu_type = "a100"\nsetup = ["module load cuda"]\nsignal_seconds = 0\n'
+    )
+    profile = load_machine(path=_write(tmp_path, text))
+    assert profile.slurm is not None
+    assert (profile.slurm.gpu_type, profile.slurm.setup, profile.slurm.signal_seconds) == (
+        'a100',
+        ('module load cuda',),
+        0,
+    )
+
+
+def test_machine_profile_rejects_negative_signal_seconds(tmp_path: Path) -> None:
+    text = SLURM_TABLE + 'signal_seconds = -1\n'
+    with pytest.raises(MachineProfileError, match='signal_seconds must be at least 0'):
+        load_machine(path=_write(tmp_path, BASE_SLURM + text))
+
+
 def test_missing_file_names_the_file(tmp_path: Path) -> None:
     with pytest.raises(MachineProfileError, match=r'nope\.toml'):
         load_machine(path=tmp_path / 'nope.toml')

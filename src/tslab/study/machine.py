@@ -44,6 +44,7 @@ _ENV_NAME_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 _MINIMUMS: dict[str, float] = {
     'cpus_per_task': 1,
     'gpus': 0,
+    'signal_seconds': 0,
     'max_concurrent': 1,
     'max_array_size': 1,
     'submit_pause_seconds': 0,
@@ -57,7 +58,24 @@ class MachineProfileError(ValueError):
 
 @dataclass(frozen=True, kw_only=True)
 class SlurmSettings:
-    """The ``[slurm]`` table: the resources of one sbatch job."""
+    """The ``[slurm]`` table: the resources and setup of one sbatch job.
+
+    Attributes:
+        partition: The required SLURM partition.
+        time: The job time limit.
+        qos: The quality of service, when set.
+        cpus_per_task: CPUs allocated to each task.
+        mem_per_cpu: Memory allocated to each CPU, when set.
+        gpus: GPUs allocated to each task.
+        gpu_type: The GPU type for the GRES request, when set.
+        max_concurrent: The maximum number of concurrent array jobs.
+        max_array_size: The maximum number of tasks in an array.
+        sbatch_extra: Additional raw ``#SBATCH`` options.
+        node_local_tmp: Whether to use node-local temporary folders.
+        submit_pause_seconds: Delay between job submissions.
+        setup: Shell lines run before each task.
+        signal_seconds: Seconds before the time limit to send ``SIGUSR2``; zero disables it.
+    """
 
     partition: str
     time: str = '2-00:00:00'
@@ -65,11 +83,14 @@ class SlurmSettings:
     cpus_per_task: int = 1
     mem_per_cpu: str | None = None
     gpus: int = 0
+    gpu_type: str | None = None
     max_concurrent: int = 100
     max_array_size: int = 1000
     sbatch_extra: tuple[str, ...] = ()
     node_local_tmp: bool = True
     submit_pause_seconds: float = 0.5
+    setup: tuple[str, ...] = ()
+    signal_seconds: int = 120
 
 
 @dataclass(frozen=True, kw_only=True)

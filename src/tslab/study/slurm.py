@@ -129,10 +129,12 @@ def _check_job_values(  # noqa: PLR0913 # why: keyword-only private helper, one 
         ('qos', slurm.qos or ''),
         ('time', slurm.time),
         ('mem_per_cpu', slurm.mem_per_cpu or ''),
+        ('gpu_type', slurm.gpu_type or ''),
         ('log_pattern', log_pattern),
         ('dependency', dependency or ''),
         ('begin', begin or ''),
         *(('sbatch_extra', line) for line in slurm.sbatch_extra),
+        *(('setup', line) for line in slurm.setup),
     ):
         _check_text(value=value, what=what)
     for name in env:
@@ -203,7 +205,10 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if slurm.mem_per_cpu is not None:
         lines.append(_as_sbatch_flag(key='mem_per_cpu', value=slurm.mem_per_cpu))
     if slurm.gpus > 0:
-        lines.append(_as_sbatch_flag(key='gres', value=f'gpu:{slurm.gpus}'))
+        gpu = f'gpu:{slurm.gpus}'
+        if slurm.gpu_type is not None:
+            gpu = f'gpu:{slurm.gpu_type}:{slurm.gpus}'
+        lines.append(_as_sbatch_flag(key='gres', value=gpu))
     if indices is not None:
         spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
         lines.append(_as_sbatch_flag(key='array', value=spec))
@@ -224,6 +229,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         'export PYTHONUNBUFFERED=1',
     ]
     lines += [f'export {name}={shlex.quote(value)}' for name, value in env.items()]
+    lines += list(slurm.setup)
     if slurm.node_local_tmp:
         lines.append(_q21_block(array=array))
     lines.append(_task_section(array=array, tasks_file=tasks_file))
