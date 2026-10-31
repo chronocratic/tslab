@@ -234,8 +234,9 @@ they have to read.
    5. **Null Objects instead of `None` checks that repeat.**
       `UnavailableArtifact` stands in for an artifact that could not be made,
       so callers do not test for `None` at every step.
-   6. **`match` for the shape of data**, when each case is flat. A `case` body
-      follows the same rule.
+   6. **`match` for the shape of data** (class patterns), when each case is
+      flat. A switch over kinds, names, states or reasons is a variant
+      switch (rule 50), never a `match`. A `case` body follows the same rule.
 
 7. More than two levels of blocks (loops, `with`, `try`, `if`) in one
    function means a helper is missing.
@@ -364,3 +365,11 @@ they have to read.
 47. A module holds one concept. Above about 400 lines, check whether it
     holds more than one, and split it by concept if so. Line count alone is
     no reason to split: a long module with one concept stays whole.
+
+## 13. Variants
+
+50. Never branch on which variant you handle: no `if`/`elif` chain or `match`
+   over kinds, names, states or reasons. Give each variant its own object or
+   function, in its own module when it is a backend, and pick it once from a
+   `Mapping` (Strategy), or call a method on the object you were given.
+   `if kind == 'slurm': ... elif kind == 'local': ...` is never allowed.
