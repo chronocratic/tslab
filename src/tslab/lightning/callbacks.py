@@ -2,8 +2,9 @@
 
 import logging
 from pathlib import Path
+from threading import Event
 import time
-from typing import override
+from typing import Any, override
 
 from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import (
@@ -14,6 +15,7 @@ from lightning.pytorch.callbacks import (
 )
 import torch
 
+from tslab.core.run import is_writer_process, JobTimeLimitSignal, Run
 from tslab.lightning.config import LightningTrainerConfig
 
 __all__ = [
@@ -25,6 +27,29 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 _STATE_KEY = 'timer_callback_state'
+
+
+class _SignalStop(Callback):
+    def __init__(self, *, run: Run, signal_received: Event, checkpoint_directory: Path) -> None:
+        super().__init__()
+        self._run = run
+        self._signal_received = signal_received
+        self._checkpoint_directory = checkpoint_directory
+
+    @override
+    def on_train_batch_end(
+        self, trainer: Trainer, pl_module: LightningModule, outputs: Any, batch: Any, batch_idx: int
+    ) -> None:
+        del pl_module, outputs, batch, batch_idx
+        signalled = self._signal_received.is_set() or self._run.time_limit_signalled
+        stop = trainer.strategy.reduce_boolean_decision(decision=signalled, all=False)
+        if not stop:
+            return
+        trainer.save_checkpoint(filepath=self._checkpoint_directory / 'last.ckpt')
+        if is_writer_process():
+            message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
+            raise JobTimeLimitSignal(message)
+        raise SystemExit(0)
 
 
 class AccumulatingTimerCallback(Callback):
