@@ -9,6 +9,10 @@ _SOURCE = _ROOT / 'src'
 _TESTS = _ROOT / 'tests'
 _JOBS_SOURCE = _SOURCE / 'tslab' / 'jobs'
 _JOBS_TESTS = _TESTS / 'unit' / 'jobs'
+_JOBS_PACKAGE_DESCRIPTION = (
+    'General helpers to run jobs on SLURM and on local machines, with no TSLab '
+    'dependency; planned to move to its own distribution.'
+)
 
 
 def _python_files(*, root: Path) -> list[Path]:
@@ -69,10 +73,22 @@ def test_jobs_package_imports_only_stdlib_and_itself() -> None:
     assert not violations, '\n'.join(violations)
 
 
-def test_jobs_package_never_says_tslab() -> None:
+def test_jobs_package_only_mentions_tslab_in_required_docstring() -> None:
     violations = []
     for path in _python_files(root=_JOBS_SOURCE):
-        text = path.read_text().replace('tslab.jobs', '')
+        text = path.read_text()
+        if path == _JOBS_SOURCE / '__init__.py':
+            module = ast.parse(text)
+            assert ast.get_docstring(module) == _JOBS_PACKAGE_DESCRIPTION
+            docstring = module.body[0]
+            docstring_end = docstring.end_lineno
+            assert docstring_end is not None
+            text = ''.join(
+                line
+                for number, line in enumerate(text.splitlines(keepends=True), start=1)
+                if not docstring.lineno <= number <= docstring_end
+            )
+        text = text.replace('tslab.jobs', '')
         violations.extend(
             f'{path.relative_to(_ROOT)}:{line}:tslab'
             for line, content in enumerate(text.splitlines(), start=1)
