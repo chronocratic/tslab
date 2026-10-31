@@ -144,15 +144,19 @@ def status(*, context: Context, states: tuple[StudyState, ...] = ()) -> int:
     return 0
 
 
-def cancel(*, context: Context, dry_run: bool) -> tuple[int, list[str]]:
-    """Cancel queued and running SLURM jobs of the selected study runs.
+def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tuple[int, list[str]]:
+    """Cancel or signal the queued and running SLURM jobs of selected runs.
 
     Args:
         context: The study context containing selected run reports.
-        dry_run: Log the job ids without cancelling them.
+        dry_run: Log the job ids without cancelling or signalling them.
+        signal: Send this signal to the running jobs instead of cancelling
+            them, so the runs save and end on their own; queued runs are
+            skipped because a pending job has no step to signal.
 
     Returns:
-        The process exit code and the job ids cancelled or selected for cancellation.
+        The process exit code and the job ids cancelled, signalled, or
+        selected for either.
     """
     if context.machine.launcher != 'slurm':
         message = 'local runs run in the foreground of tslab study submit; stop that process'
@@ -163,15 +167,31 @@ def cancel(*, context: Context, dry_run: bool) -> tuple[int, list[str]]:
         for report in context.reports
         if report.state in LIVE_STATES and report.job_id is not None
     ]
+    if signal is not None:
+        queued = [
+            report.job_id
+            for report in live
+            if report.state is StudyState.QUEUED and report.job_id is not None
+        ]
+        if queued:
+            _LOGGER.info('skipped queued runs: %s', ', '.join(queued))
+        live = [report for report in live if report.state is StudyState.RUNNING]
     job_ids = [report.job_id for report in live if report.job_id is not None]
     if not job_ids:
         _LOGGER.info('nothing to cancel')
         return 0, []
     if dry_run:
-        _LOGGER.info('would cancel %s', ', '.join(job_ids))
+        if signal is not None:
+            _LOGGER.info(
+                'would signal %s with %s; the jobs save and end on their own',
+                ', '.join(job_ids),
+                signal,
+            )
+        else:
+            _LOGGER.info('would cancel %s', ', '.join(job_ids))
         return 0, job_ids
     try:
-        _cancel_live(reports=live, launcher=context.machine.launcher)
+        _cancel_live(reports=live, launcher=context.machine.launcher, signal=signal)
     except SlurmError as error:
         _LOGGER.error('%s', error)  # noqa: TRY400 # why: cancellation failures need no traceback
         return 1, []
@@ -372,8 +392,8 @@ def _made_progress(*, report: RunReport, context: Context) -> bool:
     )
 
 
-def _cancel_live(*, reports: Sequence[RunReport], launcher: str) -> None:
-    """Cancel the SLURM jobs of the live reports.
+def _cancel_live(*, reports: Sequence[RunReport], launcher: str, signal: str | None = None) -> None:
+    """Cancel the SLURM jobs of the live reports, or send their steps a signal.
 
     Raises:
         SlurmError: If ``scancel`` fails.
@@ -385,8 +405,13 @@ def _cancel_live(*, reports: Sequence[RunReport], launcher: str) -> None:
         return
     ids = [report.job_id for report in reports if report.job_id is not None]
     if ids:
-        scancel(job_ids=ids)
-        _LOGGER.info('cancelled %s', ', '.join(ids))
+        scancel(job_ids=ids, signal=signal)
+        if signal is not None:
+            _LOGGER.info(
+                'signalled %s with %s; the jobs save and end on their own', ', '.join(ids), signal
+            )
+        else:
+            _LOGGER.info('cancelled %s', ', '.join(ids))
 
 
 def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) -> None:

@@ -107,7 +107,7 @@ def show_document(*, study: Study) -> dict[str, object]:
 
 
 def cancel_document(
-    *, cancelled: Sequence[str], dry_run: bool, exit_code: int
+    *, cancelled: Sequence[str], dry_run: bool, exit_code: int, signal: str | None = None
 ) -> dict[str, object]:
     """The JSON document for a study cancellation.
 
@@ -115,6 +115,8 @@ def cancel_document(
         cancelled: The job ids cancelled or selected for cancellation.
         dry_run: Whether cancellation was only previewed.
         exit_code: The command exit code.
+        signal: The signal sent to the running jobs, or ``None`` when the
+            jobs were cancelled or left untouched.
 
     Returns:
         The versioned study-cancel document.
@@ -123,6 +125,7 @@ def cancel_document(
         'schema': 'tslab.study-cancel/1',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
+        'signal': signal,
         'exit_code': exit_code,
     }
 

@@ -442,6 +442,8 @@ class Cancel:
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
         dry_run: Show job ids without cancelling them.
+        signal: Send USR2 to the running jobs instead of cancelling them, to test
+            that runs save and resubmit; the jobs then end on their own.
         json: Print one study-cancel JSON document.
     """
 
@@ -452,6 +454,7 @@ class Cancel:
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
     ] = ()
     dry_run: bool = False
+    signal: bool = False
     json: bool = False
 
     def run(self) -> int:
@@ -459,7 +462,8 @@ class Cancel:
         context = _context_of(
             study=self.study, machine=self.machine, grid=self.grid, only=self.only
         )
-        code, cancelled = cancel(context=context, dry_run=self.dry_run)
+        signal = 'USR2' if self.signal else None
+        code, cancelled = cancel(context=context, dry_run=self.dry_run, signal=signal)
         if code == 0 and cancelled and not self.dry_run:
             selection = _selection_args(
                 study=self.study, machine=self.machine, grid=self.grid, only=self.only
@@ -467,7 +471,9 @@ class Cancel:
             _LOGGER.info('follow progress: tslab study status %s', selection)
         if self.json:
             print_json(
-                document=cancel_document(cancelled=cancelled, dry_run=self.dry_run, exit_code=code)
+                document=cancel_document(
+                    cancelled=cancelled, dry_run=self.dry_run, exit_code=code, signal=signal
+                )
             )
         return code
 

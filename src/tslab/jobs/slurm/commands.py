@@ -94,11 +94,13 @@ def sbatch(*, script: Path, sleep: Callable[[float], None] = time.sleep) -> str:
         delay = min(delay * 2, 900.0)
 
 
-def scancel(*, job_ids: Sequence[str]) -> None:
-    """Cancel jobs; a non-zero exit raises.
+def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
+    """Cancel jobs, or send their steps a signal; a non-zero exit raises.
 
     Args:
         job_ids: The job ids to cancel; nothing is called for an empty list.
+        signal: Send this signal (such as ``USR2``) to the steps of the jobs
+            instead of cancelling them, like ``--signal=USR2`` without ``B:``.
 
     Returns:
         None.
@@ -108,9 +110,14 @@ def scancel(*, job_ids: Sequence[str]) -> None:
     """
     if not job_ids:
         return
-    completed = _run(command=['scancel', *job_ids])
+    command = ['scancel']
+    if signal is not None:
+        command.append(f'--signal={signal}')
+    command += list(job_ids)
+    completed = _run(command=command)
     if completed.returncode != 0:
-        message = f'scancel failed for {list(job_ids)}:\n{completed.stdout}{completed.stderr}'
+        name = f'scancel --signal={signal}' if signal is not None else 'scancel'
+        message = f'{name} failed for {list(job_ids)}:\n{completed.stdout}{completed.stderr}'
         raise SlurmError(message)
 
 
