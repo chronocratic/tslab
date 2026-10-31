@@ -19,11 +19,13 @@ from typing import cast, Literal
 from tslab.core.config import ConfigFileError, decode_dataclass
 from tslab.core.paths import atomic_write_text
 from tslab.helpers.text import unknown_key_message
+from tslab.jobs.slurm import parse_slurm_duration
 from tslab.study.expansion import expand_variables
 from tslab.study.settings import SettingValue
 
 __all__ = [
     'FollowupSettings',
+    'LocalSettings',
     'MachineLocation',
     'MachineOverride',
     'MachineProfile',
@@ -34,6 +36,7 @@ __all__ = [
     'read_register',
     'register_file',
     'resolve_machine',
+    'timeout_seconds',
     'validate_machine_name',
     'write_register',
 ]
@@ -50,6 +53,8 @@ _MINIMUMS: dict[str, float] = {
     'max_array_size': 1,
     'submit_pause_seconds': 0,
     'max_attempts': 1,
+    'max_parallel': 1,
+    'tasks_per_gpu': 1,
 }
 
 
@@ -95,6 +100,30 @@ class SlurmSettings:
 
 
 @dataclass(frozen=True, kw_only=True)
+class LocalSettings:
+    """The ``[local]`` table: how a local machine runs the tasks of a launch.
+
+    Attributes:
+        timeout: The per-task time limit, in sbatch duration format, when set.
+        signal_seconds: Seconds before the limit to send ``SIGUSR2``; zero disables it.
+        gpus: The GPU ids the machine may use (NVIDIA ids, or the Apple GPU
+            ``"mps"`` standing alone), or ``"auto"`` to find them at launch.
+        skip_busy_gpus: Whether to leave out GPUs with running compute processes.
+        max_parallel: Tasks at once when the resolved GPU list is empty.
+        tasks_per_gpu: Tasks that share one GPU id at once.
+        keep_awake: Whether to keep the machine awake while a launch runs.
+    """
+
+    timeout: str | None = None
+    signal_seconds: int = 120
+    gpus: tuple[int | Literal['mps'], ...] | Literal['auto'] = ()
+    skip_busy_gpus: bool = False
+    max_parallel: int = 1
+    tasks_per_gpu: int = 1
+    keep_awake: bool = True
+
+
+@dataclass(frozen=True, kw_only=True)
 class FollowupSettings:
     """The ``[followup]`` table: the small helper jobs of a study."""
 
@@ -124,6 +153,7 @@ class MachineProfile:
     settings: dict[str, SettingValue] = field(default_factory=dict)
     env: dict[str, str] = field(default_factory=dict)
     slurm: SlurmSettings | None = None
+    local: LocalSettings | None = None
     followup: FollowupSettings = FollowupSettings()
     overrides: tuple[MachineOverride, ...] = ()
 
@@ -297,6 +327,20 @@ def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
     return _machine_profile(path=path, table=table, lenient_env=lenient_env)
 
 
+def timeout_seconds(*, local: LocalSettings) -> float | None:
+    """The per-task time limit of a local launch, in seconds.
+
+    Args:
+        local: The ``[local]`` table of a local machine profile.
+
+    Returns:
+        The limit in seconds, or ``None`` when the table has no ``timeout``.
+    """
+    if local.timeout is None:
+        return None
+    return parse_slurm_duration(text=local.timeout).total_seconds()
+
+
 def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool) -> MachineProfile:
     unknown = [name for name in table if name not in _TOP_LEVEL_KEYS]
     if unknown:
@@ -311,6 +355,9 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
     env = _expand_env(table=table, path=path, lenient=lenient_env)
     if launcher == 'local':
         _reject_slurm(table=table, path=path)
+        _reject_local_followups(table=table, path=path)
+    else:
+        _reject_local(table=table, path=path)
     slurm = _from_table(
         cls=SlurmSettings,
         table=table.get('slurm'),
@@ -318,6 +365,15 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         path=path,
         required=launcher == 'slurm',
     )
+    local = _from_table(
+        cls=LocalSettings, table=table.get('local'), location='local', path=path, required=False
+    )
+    if launcher == 'local':
+        local = local or LocalSettings()
+        # why: _from_table raised when the local table is not a dict
+        _check_local(
+            local=local, table=cast('Mapping[str, object]', table.get('local') or {}), path=path
+        )
     followup = _from_table(
         cls=FollowupSettings,
         table=table.get('followup'),
@@ -358,6 +414,7 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         settings=_settings_of(table=table, location='settings', path=path),
         env=env,
         slurm=slurm,
+        local=(local or LocalSettings()) if launcher == 'local' else None,
         followup=followup or FollowupSettings(),
         overrides=overrides,
     )
@@ -377,6 +434,82 @@ def _reject_slurm(*, table: dict[str, object], path: Path) -> None:
                 f'{path}: overrides[{position}].slurm is not used by launcher "local"; remove it'
             )
             raise MachineProfileError(message)
+
+
+def _reject_local(*, table: dict[str, object], path: Path) -> None:
+    """A SLURM launcher has no local settings: [local] tables would be silently half-applied."""
+    if 'local' in table:
+        message = f'{path}: local is not used by launcher "slurm"; remove the [local] table'
+        raise MachineProfileError(message)
+    entries = table.get('overrides')
+    if not isinstance(entries, list):
+        return
+    for position, entry in enumerate(entries):
+        if isinstance(entry, dict) and 'local' in entry:
+            message = (
+                f'{path}: overrides[{position}].local is not used by launcher "slurm"; remove it'
+            )
+            raise MachineProfileError(message)
+
+
+def _reject_local_followups(*, table: dict[str, object], path: Path) -> None:
+    """wandb_sync and time queue SLURM jobs; a local launch has no scheduler to queue them on."""
+    followup = table.get('followup')
+    if not isinstance(followup, dict):
+        return
+    for key in ('wandb_sync', 'time'):
+        if key in followup:
+            message = f'{path}: followup.{key} is SLURM only; remove it'
+            raise MachineProfileError(message)
+
+
+def _check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path) -> None:
+    """The [local] rules that span several keys or the raw table."""
+    if local.timeout is not None:
+        try:
+            parse_slurm_duration(text=local.timeout)
+        except ValueError as error:
+            message = f'{path}: local.timeout: {error}'
+            raise MachineProfileError(message) from error
+    if isinstance(table.get('gpus'), list) and 'max_parallel' in table:
+        message = (
+            f'{path}: local.gpus is a list, so local.max_parallel is unused; remove max_parallel'
+        )
+        raise MachineProfileError(message)
+    if local.gpus == () and local.tasks_per_gpu > 1:
+        message = f'{path}: local.tasks_per_gpu needs local.gpus; remove tasks_per_gpu or set gpus'
+        raise MachineProfileError(message)
+    if local.gpus in ((), ('mps',)) and local.skip_busy_gpus:
+        message = (
+            f'{path}: local.skip_busy_gpus reads nvidia-smi and needs NVIDIA gpus; '
+            'remove skip_busy_gpus or set gpus'
+        )
+        raise MachineProfileError(message)
+
+
+def _local_gpus(*, value: object, location: str, path: Path) -> list[int | str] | Literal['auto']:
+    if value == 'auto':
+        return 'auto'
+    if value == ['mps']:
+        return cast('list[int | str]', value)
+    if isinstance(value, list):
+        if 'mps' in value:
+            message = (
+                f'{path}: {location} must not hold "mps" next to ids: '
+                'MPS is the only GPU on a Mac, so it must stand alone'
+            )
+            raise MachineProfileError(message)
+        if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in value):
+            message = (
+                f'{path}: {location} must be "auto", a list of non-negative integers, '
+                'or exactly ["mps"]'
+            )
+            raise MachineProfileError(message)
+        return cast('list[int | str]', value)
+    message = (
+        f'{path}: {location} must be "auto", a list of non-negative integers, or exactly ["mps"]'
+    )
+    raise MachineProfileError(message)
 
 
 def _string_field(*, table: dict[str, object], name: str, path: Path) -> str:
@@ -477,6 +610,11 @@ def _from_table[T](
                     value=table['sbatch_extra'], location=f'{location}.sbatch_extra', path=path
                 )
             ],
+        }
+    if cls is LocalSettings and 'gpus' in table:
+        table = {
+            **table,
+            'gpus': _local_gpus(value=table['gpus'], location=f'{location}.gpus', path=path),
         }
     instance = _decode(data=table, cls=cls, location=location, path=path)
     for key in table:
