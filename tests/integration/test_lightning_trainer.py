@@ -1,6 +1,8 @@
 import dataclasses
 import logging
 from pathlib import Path
+import time
+from typing import override
 
 from integration_helpers import run_in
 from lightning.pytorch.plugins.environments import SLURMEnvironment
@@ -10,7 +12,7 @@ import pytest
 import torch
 
 from tslab.core.artifact import Checkpoint
-from tslab.lightning import LightningDataSource, LightningTrainer, TrainingTimeLimitReached
+from tslab.lightning import LightningDataSource, LightningTrainer, TrainingPaused
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.tracking.mlflow_tracker import MLflowTracker
 
@@ -98,18 +100,64 @@ def test_without_validation_last_is_best(tmp_path: Path, caplog: pytest.LogCaptu
 
 
 @pytest.mark.slow
-def test_time_limit_raises_and_resubmission_resumes(tmp_path: Path) -> None:
+def test_job_time_share_pauses_and_the_next_job_resumes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     directory = tmp_path / 'r' / 'train'
-    # A zero limit stops after the first batch, like a job whose time ran out.
-    with pytest.raises(TrainingTimeLimitReached, match='resubmit'), run_in(root=tmp_path) as run:
-        trainer(max_training_time='00:00:00').fit(
-            run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory
-        )
+    monkeypatch.setenv('SLURM_JOB_END_TIME', '0')
+    with pytest.raises(TrainingPaused, match='resubmit'), run_in(root=tmp_path) as run:
+        trainer().fit(run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory)
+    assert (directory / 'last.ckpt').is_file()
+    monkeypatch.delenv('SLURM_JOB_END_TIME')
     with run_in(root=tmp_path) as run:
         checkpoint = trainer().fit(
             run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory
         )
-    assert checkpoint.last_path.is_file()
+    state = torch.load(checkpoint.last_path, weights_only=False)
+    assert state['epoch'] == FAST.max_epochs - 1
+
+
+@pytest.mark.slow
+def test_max_training_time_finishes_and_last_holds_the_stop_step(tmp_path: Path) -> None:
+    with run_in(root=tmp_path) as run:
+        checkpoint = trainer(
+            max_epochs=500, max_training_time='00:00:00', early_stopping_patience=300
+        ).fit(
+            run=run,
+            model=ToyRegressor(),
+            data=ToyData(),
+            checkpoint_directory=run.directory / 'train',
+        )
+    state = torch.load(checkpoint.last_path, weights_only=False)
+    assert 0 < state['global_step'] < 8
+
+
+@pytest.mark.slow
+def test_max_training_time_counts_earlier_jobs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    config_changes = {
+        'max_epochs': 500,
+        'max_training_time': '00:00:01',
+        'early_stopping_patience': 300,
+    }
+    directory = tmp_path / 'r' / 'train'
+    monkeypatch.setenv('SLURM_JOB_END_TIME', '0')
+    with pytest.raises(TrainingPaused), run_in(root=tmp_path) as run:
+        trainer(**config_changes).fit(
+            run=run,
+            model=_SlowToyRegressor(sleep_seconds=1.1),
+            data=ToyData(),
+            checkpoint_directory=directory,
+        )
+    first_step = torch.load(directory / 'last.ckpt', weights_only=False)['global_step']
+    monkeypatch.delenv('SLURM_JOB_END_TIME')
+    with run_in(root=tmp_path) as run:
+        checkpoint = trainer(**config_changes).fit(
+            run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory
+        )
+    resumed_step = torch.load(checkpoint.last_path, weights_only=False)['global_step']
+    assert resumed_step <= first_step + 1
 
 
 @pytest.mark.slow
@@ -190,6 +238,18 @@ def test_lightning_data_source_sets_up_lazily_and_once(tmp_path: Path) -> None:
     data.train_loader()
     data.test_loader()
     assert datamodule.calls == ['prepare', 'setup:fit', 'setup:test']
+
+
+class _SlowToyRegressor(ToyRegressor):
+    def __init__(self, *, sleep_seconds: float) -> None:
+        super().__init__()
+        self.sleep_seconds = sleep_seconds
+
+    @override
+    def training_step(self, batch: list[torch.Tensor], batch_idx: int) -> torch.Tensor:
+        loss = super().training_step(batch, batch_idx)
+        time.sleep(self.sleep_seconds)
+        return loss
 
 
 @pytest.mark.slow

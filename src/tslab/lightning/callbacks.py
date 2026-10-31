@@ -15,10 +15,10 @@ from lightning.pytorch.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
-import torch
 
-from tslab.core.run import is_writer_process, JobTimeLimitSignal
+from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.lightning.config import LightningTrainerConfig
+from tslab.lightning.exceptions import TrainingPaused
 
 __all__ = [
     'AccumulatingTimerCallback',
@@ -32,10 +32,19 @@ _STATE_KEY = 'timer_callback_state'
 
 
 class _SignalStop(Callback):
-    def __init__(self, *, checkpoint_directory: Path, signal_received: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        run: Run,
+        checkpoint_directory: Path,
+        deadline: float | None,
+        signal_received: bool = False,
+    ) -> None:
         super().__init__()
+        self._writer = run.writes_files
         self._signal_received = signal_received
         self._checkpoint_directory = checkpoint_directory
+        self._deadline = deadline
         self._sigterm_filter_installed = False
 
     @property
@@ -81,7 +90,7 @@ class _SignalStop(Callback):
         self, trainer: Trainer, pl_module: LightningModule, outputs: Any, batch: Any, batch_idx: int
     ) -> None:
         del pl_module, outputs, batch, batch_idx
-        self._stop_at_safe_point(trainer=trainer)
+        self._stop_at_safe_point(trainer=trainer, check_deadline=True)
 
     @override
     def on_validation_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
@@ -93,14 +102,23 @@ class _SignalStop(Callback):
         del pl_module
         self._stop_at_safe_point(trainer=trainer)
 
-    def _stop_at_safe_point(self, *, trainer: Trainer) -> None:
-        stop = trainer.strategy.reduce_boolean_decision(decision=self.signalled, all=False)
+    def _stop_at_safe_point(self, *, trainer: Trainer, check_deadline: bool = False) -> None:
+        paused = check_deadline and self._deadline is not None and time.time() >= self._deadline
+        stop = trainer.strategy.reduce_boolean_decision(
+            decision=self.signalled or paused, all=False
+        )
         if not stop:
             return
         trainer.save_checkpoint(filepath=self._checkpoint_directory / 'last.ckpt')
-        if is_writer_process():
-            message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
-            raise JobTimeLimitSignal(message)
+        if self._writer:
+            if self.signalled:
+                message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
+                raise JobTimeLimitSignal(message)
+            message = (
+                'training paused at the job_time_share deadline; resubmit to resume from '
+                f'{self._checkpoint_directory.as_posix()}'
+            )
+            raise TrainingPaused(message)
         raise SystemExit(0)
 
 
@@ -132,7 +150,7 @@ class AccumulatingTimerCallback(Callback):
     @override
     def on_train_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
         self._record_session()
-        self._refresh_last_checkpoint(trainer=trainer)
+        self._save_last_checkpoint(trainer=trainer)
         _LOGGER.info(
             'trained for %d session(s), %.2f s in total; per session: %s',
             self.sessions_count,
@@ -168,20 +186,19 @@ class AccumulatingTimerCallback(Callback):
     def _state(self) -> dict[str, object]:
         return {'sessions_count': self.sessions_count, 'sessions_times': dict(self.sessions_times)}
 
-    def _refresh_last_checkpoint(self, *, trainer: Trainer) -> None:
-        """Store the final session time in ``last.ckpt``, which was written before it ended."""
+    def _save_last_checkpoint(self, *, trainer: Trainer) -> None:
+        """Write the final model state to ``last.ckpt``, including a mid-epoch stop."""
         callback = trainer.checkpoint_callback
         if not trainer.is_global_zero or not isinstance(callback, ModelCheckpoint):
             return
-        if not callback.last_model_path or not Path(callback.last_model_path).is_file():
+        if callback.last_model_path:
+            path = Path(callback.last_model_path)
+        elif callback.dirpath is not None:
+            path = Path(callback.dirpath) / 'last.ckpt'
+        else:
             return
-        path = Path(callback.last_model_path)
-        # why: the file was written by this training a moment ago
-        checkpoint = torch.load(path, map_location='cpu', weights_only=False)
-        checkpoint[_STATE_KEY] = self._state()
-        temporary = path.with_name(f'{path.name}.tmp')
-        torch.save(checkpoint, temporary)
-        temporary.replace(path)
+        trainer.save_checkpoint(filepath=path)
+        callback.last_model_path = str(path)
 
     def _record_session(self) -> None:
         if self.start_time is not None:

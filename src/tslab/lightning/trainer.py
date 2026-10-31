@@ -15,7 +15,7 @@ from typing import Any, override
 
 import lightning
 from lightning import LightningModule
-from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint, Timer
+from lightning.pytorch.callbacks import Callback, ModelCheckpoint
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
@@ -27,12 +27,13 @@ from tslab.interfaces.trainer import Trainer
 from tslab.lightning.callbacks import _SignalStop, build_callbacks
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
+from tslab.lightning.exceptions import TrainingPaused
 from tslab.lightning.ranks import agree
 from tslab.lightning.resume import choose_resume_checkpoint
-from tslab.lightning.slurm import resolve_training_time
+from tslab.lightning.slurm import job_training_deadline, parse_slurm_duration
 from tslab.tracking.lightning_bridge import lightning_loggers
 
-__all__ = ['LightningTrainer', 'TrainingTimeLimitReached']
+__all__ = ['LightningTrainer', 'TrainingPaused']
 
 _LOGGER = logging.getLogger(__name__)
 # Arguments that TSLab owns: replacing them would break the trackers, the time limit or resume.
@@ -74,14 +75,6 @@ def _defer_time_limit_signals(*, run: Run, signal_stop: _SignalStop) -> Generato
     finally:
         signal.signal(signal.SIGTERM, previous_sigterm)
         signal.signal(sigusr2, previous_sigusr2)
-
-
-class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API name from the spec
-    """Training stopped at its time limit before it finished.
-
-    The checkpoint folder holds the state to resume from: running the same
-    command again continues the training.
-    """
 
 
 class LightningTrainer(Trainer[LightningModule]):
@@ -147,20 +140,22 @@ class LightningTrainer(Trainer[LightningModule]):
         """Train ``model``, resuming from the checkpoints already in ``checkpoint_directory``.
 
         Raises:
-            TrainingTimeLimitReached: If the time limit stopped training before it finished.
+            TrainingPaused: If the job time share paused training; resubmit to resume.
         """
         require_path(value=checkpoint_directory, parameter='checkpoint_directory')
         checkpoint_directory.mkdir(parents=True, exist_ok=True)
         config = self._config
-        max_time = resolve_training_time(
-            explicit=config.max_training_time,
-            fraction=config.slurm_time_fraction,
-            environment=os.environ,
-            now=time.time(),
+        max_time = (
+            None
+            if config.max_training_time is None
+            else parse_slurm_duration(text=config.max_training_time)
+        )
+        deadline = job_training_deadline(
+            share=config.job_time_share, environment=os.environ, now=time.time()
         )
         if max_time is not None and config.min_epochs > 0:
             _LOGGER.warning(
-                'a training time limit (%s) is active, but Lightning honors it only after '
+                'max_training_time (%s) is active, but Lightning honors it only after '
                 'min_epochs=%d epochs; if one epoch can exceed the limit, pass '
                 '--trainer.min-epochs 0',
                 max_time,
@@ -173,7 +168,10 @@ class LightningTrainer(Trainer[LightningModule]):
             val_loader = data.val_loader()
             has_validation = val_loader is not None
         signal_stop = _SignalStop(
-            checkpoint_directory=checkpoint_directory, signal_received=run.time_limit_signalled
+            run=run,
+            checkpoint_directory=checkpoint_directory,
+            signal_received=run.time_limit_signalled,
+            deadline=deadline,
         )
         with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
             trainer = self._build_trainer(
@@ -195,13 +193,6 @@ class LightningTrainer(Trainer[LightningModule]):
                     val_dataloaders=val_loader,
                     ckpt_path=resume_from,
                 )
-        if _stopped_by_time_limit(trainer=trainer):
-            message = (
-                f'stopped by the training time limit ({max_time}) after '
-                f'{trainer.current_epoch} epoch(s); resubmit the same command to resume '
-                f'from {checkpoint_directory.as_posix()}'
-            )
-            raise TrainingTimeLimitReached(message)
         return _checkpoint_from(
             trainer=trainer, directory=checkpoint_directory, has_validation=has_validation
         )
@@ -270,25 +261,6 @@ class LightningTrainer(Trainer[LightningModule]):
         # Applied last, so that the escape hatch can override the other arguments.
         arguments.update(config.extra_trainer_kwargs)
         return lightning.Trainer(**arguments)
-
-
-def _stopped_by_time_limit(*, trainer: lightning.Trainer) -> bool:
-    """Return whether the ``Timer`` stopped training before it finished."""
-    # Lightning sets `Trainer.callbacks` on the instance and types it as None,
-    # so getattr keeps the static checkers from flagging the read.
-    callbacks = getattr(trainer, 'callbacks')  # noqa: B009 # why: untyped on the class
-    timers = [callback for callback in callbacks if isinstance(callback, Timer)]
-    if not timers:
-        return False
-    remaining = timers[0].time_remaining()
-    if remaining is None or remaining > 0:
-        return False
-    early_stopped = any(
-        isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0 for callback in callbacks
-    )
-    max_epochs = trainer.max_epochs
-    finished = max_epochs is not None and 0 <= max_epochs <= trainer.current_epoch
-    return not early_stopped and not finished
 
 
 def _checkpoint_from(

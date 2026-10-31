@@ -3,12 +3,12 @@
 from tslab.lightning.callbacks import AccumulatingTimerCallback
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
-from tslab.lightning.trainer import LightningTrainer, TrainingTimeLimitReached
+from tslab.lightning.trainer import LightningTrainer, TrainingPaused
 
 __all__ = [
     'AccumulatingTimerCallback',
     'LightningDataSource',
     'LightningTrainer',
     'LightningTrainerConfig',
-    'TrainingTimeLimitReached',
+    'TrainingPaused',
 ]

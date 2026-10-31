@@ -1,4 +1,4 @@
-"""Training time limit from the trainer settings and the SLURM job end time.
+"""Training deadline from the SLURM job end time.
 
 SLURM exports the end of the job as a Unix timestamp in ``SLURM_JOB_END_TIME``;
 training gets a fraction of the time left, so the rest of the job can still run the
@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from datetime import timedelta
 import logging
 
-__all__ = ['parse_slurm_duration', 'resolve_training_time']
+__all__ = ['job_training_deadline', 'parse_slurm_duration']
 
 _LOGGER = logging.getLogger(__name__)
 _END_TIME_VARIABLE = 'SLURM_JOB_END_TIME'
@@ -74,42 +74,26 @@ def _remaining_job_seconds(*, environment: Mapping[str, str], now: float) -> flo
     return max(0.0, end_time - now)
 
 
-def resolve_training_time(
-    *, explicit: str | None, fraction: float, environment: Mapping[str, str], now: float
-) -> timedelta | None:
-    """Return the training time limit, or ``None`` for no limit.
+def job_training_deadline(
+    *, share: float, environment: Mapping[str, str], now: float
+) -> float | None:
+    """Return the deadline for training in the current SLURM job.
 
     Args:
-        explicit: ``max_training_time`` from the settings, in sbatch format.
-        fraction: Share of the remaining SLURM job time used for training.
+        share: Fraction of the remaining SLURM job time used for training.
         environment: Environment variables, usually ``os.environ``.
         now: Current Unix time, usually ``time.time()``.
 
     Returns:
-        The explicit limit if it fits in the job; otherwise ``fraction`` of the
-        remaining job time under SLURM; otherwise ``None``.
+        ``now`` plus ``share`` of the remaining job time, or ``None`` outside SLURM.
 
     Raises:
-        ValueError: If ``fraction`` is not in ``(0, 1]`` or ``explicit`` is malformed.
+        ValueError: If ``share`` is not in ``(0, 1]``.
     """
-    if not 0 < fraction <= 1:
-        message = f'slurm_time_fraction must be in (0, 1], got {fraction}'
+    if not 0 < share <= 1:
+        message = f'job_time_share must be in (0, 1], got {share}'
         raise ValueError(message)
     remaining = _remaining_job_seconds(environment=environment, now=now)
-    if explicit is not None:
-        requested = parse_slurm_duration(text=explicit)
-        if remaining is None or requested.total_seconds() <= remaining:
-            return requested
-        fallback = timedelta(seconds=int(fraction * remaining))
-        _LOGGER.warning(
-            'max_training_time %s exceeds the remaining SLURM job time (%.0f s); '
-            'training for %.0f%% of it instead (%s)',
-            explicit,
-            remaining,
-            fraction * 100,
-            fallback,
-        )
-        return fallback
     if remaining is None:
         return None
-    return timedelta(seconds=int(fraction * remaining))
+    return now + share * remaining
