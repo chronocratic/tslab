@@ -11,6 +11,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import signal as signal_module
 import subprocess
 import sys
 import time
@@ -32,7 +33,7 @@ from tslab.study.launch import (
     SIGNAL_EXIT_BASE,
     SlurmLauncher,
 )
-from tslab.study.local_launch import hold_launch, LocalLaunchError
+from tslab.study.local_launch import hold_launch, launch_is_live, LocalLaunchError, read_launch
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import (
     assign_indices,
@@ -182,8 +183,35 @@ def status(
     return 0
 
 
+def _cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tuple[int, list[str]]:
+    if signal is not None:
+        _LOGGER.error('cancel --signal is SLURM only')
+        return 2, []
+    launch = read_launch(study_folder=study_folder(machine=context.machine, study=context.study))
+    if launch is None or not launch_is_live(launch=launch):
+        _LOGGER.info('nothing to cancel')
+        return 0, []
+    selected = {report.job_id for report in context.reports}
+    missed = [key for key, state in launch.tasks if state != 'ended' and key not in selected]
+    if missed:
+        _LOGGER.error(
+            'a local launch is cancelled as one unit; the selection misses its tasks: %s',
+            ', '.join(missed),
+        )
+        return 2, []
+    if dry_run:
+        _LOGGER.info('would stop local launch %s', launch.pid)
+        return 0, [str(launch.pid)]
+    os.kill(launch.pid, signal_module.SIGTERM)
+    _LOGGER.info('sent SIGTERM to local launch %s', launch.pid)
+    return 0, [str(launch.pid)]
+
+
 def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tuple[int, list[str]]:
     """Cancel or signal the queued and running SLURM jobs of selected runs.
+
+    On a local machine it stops the live local launch with a SIGTERM; the
+    selection must cover every live task, because the launch is one unit.
 
     Args:
         context: The study context containing selected run reports.
@@ -197,9 +225,7 @@ def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tup
         selected for either.
     """
     if context.machine.launcher != 'slurm':
-        message = 'local runs run in the foreground of tslab study submit; stop that process'
-        _LOGGER.error('%s', message)
-        return 1, []
+        return _cancel_local(context=context, dry_run=dry_run, signal=signal)
     live = [
         report
         for report in context.reports
