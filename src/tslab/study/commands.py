@@ -20,7 +20,7 @@ from tslab.study.context import Context
 from tslab.study.followups import queue_followups
 from tslab.study.job_script import foreground_script
 from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
-from tslab.study.machine import MachineProfile
+from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import (
     assign_indices,
     JobGroup,
@@ -542,7 +542,12 @@ def _launcher_of(
 ) -> Launcher:
     if machine.launcher == 'slurm':
         return SlurmLauncher(sleep=sleep)
-    return LocalLauncher(project_root=project_root, env=machine.env, stream=task_stream)
+    return LocalLauncher(
+        project_root=project_root,
+        env=machine.env,
+        local=machine.local or LocalSettings(),  # why: loaded local profiles always carry the table
+        stream=task_stream,
+    )
 
 
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below

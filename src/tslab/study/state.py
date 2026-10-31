@@ -300,7 +300,7 @@ def collect_states(
         job_id = None
         task_id = None
         if job is not None and task is not None:
-            task_id = f'{job.job_id}_{task.index}' if job.launcher == 'slurm' else job.job_id
+            task_id = f'{job.job_id}_{task.index}'
             job_id = task_id
         job_state = None if job_states is None or task_id is None else job_states.get(task_id)
         entries.append((run, job_id, job_state, task))
