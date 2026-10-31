@@ -7,13 +7,15 @@ from pathlib import Path
 
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY, require_path
 from tslab.core.status import InstanceState
+from tslab.jobs.slurm import format_slurm_memory, query_job_usage, SlurmError, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.documents import run_entry
 from tslab.study.plan import study_folder
 from tslab.study.result_table import instance_directory
 from tslab.study.state import RunReport, StudyState
+from tslab.study.usage import _requested_memory
 
-__all__ = ['collect_failures', 'log_failures', 'tail_lines']
+__all__ = ['collect_failures', 'failure_hint', 'log_failures', 'tail_lines']
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_STATES = (StudyState.FAILED, StudyState.INTERRUPTED)
@@ -51,14 +53,82 @@ def collect_failures(
         One failure document per matching run, in report order.
     """
     selected_states = states or _DEFAULT_STATES
+    reports = [report for report in context.reports if report.state in selected_states]
+    usage = _usage_of(context=context, reports=reports)
     return [
-        _failure_entry(context=context, report=report, lines=lines)
-        for report in context.reports
-        if report.state in selected_states
+        _failure_entry(
+            context=context,
+            report=report,
+            lines=lines,
+            usage=usage.get(report.job_id) if report.job_id is not None else None,
+        )
+        for report in reports
     ]
 
 
-def _failure_entry(*, context: Context, report: RunReport, lines: int) -> dict[str, object]:
+def _usage_of(*, context: Context, reports: Sequence[RunReport]) -> dict[str, SlurmJobUsage]:
+    """The accounting usage of the selected out-of-memory runs; no numbers on failure."""
+    if context.machine.launcher != 'slurm':
+        return {}
+    oom_ids = [
+        report.job_id
+        for report in reports
+        if report.job_state == 'OUT_OF_MEMORY' and report.job_id is not None
+    ]
+    if not oom_ids:
+        return {}
+    try:
+        return query_job_usage(job_ids=oom_ids)
+    except SlurmError as error:
+        _LOGGER.warning('%s', error)
+        return {}
+
+
+def failure_hint(
+    *, report: RunReport, usage: SlurmJobUsage | None, requested_memory: int | None
+) -> str | None:
+    """One hint for a failed or interrupted run; first match wins.
+
+    Args:
+        report: The state report for the run.
+        usage: The accounting usage of the run, when queried.
+        requested_memory: The memory requested by the run in bytes, when set.
+
+    Returns:
+        The hint text, or ``None`` when the error is in the code.
+    """
+    reason = report.reason or ''
+    if reason.startswith('JobTimeLimitSignal:'):
+        hint = 'stopped before the time limit; resubmit continues it, or raise time'
+    elif reason.startswith('TrainingPaused:'):
+        hint = (
+            'training used its share of the job (job_time_share); '
+            'resubmit continues it, or raise time to train longer per job'
+        )
+    elif report.job_state == 'OUT_OF_MEMORY':
+        if usage is not None and usage.max_rss is not None and requested_memory is not None:
+            hint = (
+                'raise mem_per_cpu; peak '
+                f'{format_slurm_memory(size=usage.max_rss)} '
+                f'of {format_slurm_memory(size=requested_memory)} requested'
+            )
+        else:
+            hint = 'raise mem_per_cpu'
+    elif report.job_state == 'TIMEOUT':
+        hint = (
+            'raise time, or check that the timeout signal is on (signal_seconds), '
+            'or lower job_time_share so the stages after training fit'
+        )
+    elif report.job_state in {'PREEMPTED', 'NODE_FAIL'}:
+        hint = 'not caused by the code; resubmit'
+    else:
+        hint = None
+    return hint
+
+
+def _failure_entry(
+    *, context: Context, report: RunReport, lines: int, usage: SlurmJobUsage | None
+) -> dict[str, object]:
     run_directory = context.study_directory / report.run.run_path
     snapshot = report.folder.snapshot
     errors = []
@@ -96,13 +166,20 @@ def _failure_entry(*, context: Context, report: RunReport, lines: int) -> dict[s
             'log_tail': log_tail,
             'run_log': run_log_path.resolve().as_posix(),
             'run_log_tail': tail_lines(path=run_log_path, lines=lines),
+            'hint': failure_hint(
+                report=report,
+                usage=usage,
+                requested_memory=_requested_memory(
+                    slurm=context.resolved[report.run.run_path].slurm
+                ),
+            ),
         }
     )
     return entry
 
 
 def log_failures(*, failures: Sequence[Mapping[str, object]]) -> None:
-    """Log status, errors, and log tails for each failed run.
+    """Log status, hints, errors, and log tails for each failed run.
 
     Args:
         failures: Failure entries returned by ``collect_failures``.
@@ -112,6 +189,9 @@ def log_failures(*, failures: Sequence[Mapping[str, object]]) -> None:
     """
     for failure in failures:
         _log_status_line(failure=failure)
+        hint = failure.get('hint')
+        if isinstance(hint, str) and hint:
+            _LOGGER.info('hint: %s', hint)
         errors = failure.get('errors')
         if isinstance(errors, Sequence):
             for error in errors:

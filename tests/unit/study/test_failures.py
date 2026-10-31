@@ -1,5 +1,6 @@
-"""Failure details and bounded log tails."""
+"""Failure details, hints, and bounded log tails."""
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import cast
@@ -7,7 +8,13 @@ from typing import cast
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, finish_run, study_directory, submit_study
+from tests.unit.study.helpers import (
+    context,
+    finish_run,
+    study_directory,
+    submit_study,
+    write_run_status,
+)
 from tslab.cli import main
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import (
@@ -18,10 +25,11 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.jobs.slurm import parse_slurm_memory, SlurmJobUsage
 from tslab.study.context import Context
-from tslab.study.failures import collect_failures, log_failures
+from tslab.study.failures import collect_failures, failure_hint, log_failures
 from tslab.study.result_table import instance_directory
-from tslab.study.state import StudyState
+from tslab.study.state import RunReport, StudyState
 
 
 def _failed_context(project: Path, fake: FakeSlurm) -> Context:
@@ -103,3 +111,144 @@ def test_failures_json_shape(
     assert raised.value.code == 0
     assert document['schema'] == 'tslab.study-failures/1'
     assert len(document['runs']) == 1
+
+
+def _report(project: Path, fake: FakeSlurm) -> RunReport:
+    ctx = context(project=project, machine_file='cluster.toml')
+    return ctx.reports[0]
+
+
+def _oom_usage(*, max_rss: int | None) -> SlurmJobUsage:
+    return SlurmJobUsage(
+        state='OUT_OF_MEMORY',
+        elapsed=None,
+        time_limit=None,
+        total_cpu=None,
+        max_rss=max_rss,
+        alloc_cpus=None,
+        gpus=0,
+    )
+
+
+def test_hint_for_signal_stop(project: Path, fake: FakeSlurm) -> None:
+    report = dataclasses.replace(
+        _report(project, fake),
+        reason='JobTimeLimitSignal: step 1000_0 received signal USR2',
+        job_state='COMPLETED',
+    )
+    assert failure_hint(report=report, usage=None, requested_memory=None) == (
+        'stopped before the time limit; resubmit continues it, or raise time'
+    )
+
+
+def test_hint_for_paused_training(project: Path, fake: FakeSlurm) -> None:
+    report = dataclasses.replace(
+        _report(project, fake),
+        reason='TrainingPaused: job time share reached',
+        job_state='COMPLETED',
+    )
+    assert failure_hint(report=report, usage=None, requested_memory=None) == (
+        'training used its share of the job (job_time_share); '
+        'resubmit continues it, or raise time to train longer per job'
+    )
+
+
+def test_hint_for_oom_with_numbers(project: Path, fake: FakeSlurm) -> None:
+    report = dataclasses.replace(_report(project, fake), job_state='OUT_OF_MEMORY')
+    hint = failure_hint(
+        report=report,
+        usage=_oom_usage(max_rss=parse_slurm_memory(text='3G')),
+        requested_memory=parse_slurm_memory(text='2G'),
+    )
+    assert hint == 'raise mem_per_cpu; peak 3072M of 2048M requested'
+
+
+def test_hint_for_timeout(project: Path, fake: FakeSlurm) -> None:
+    report = dataclasses.replace(_report(project, fake), job_state='TIMEOUT')
+    assert failure_hint(report=report, usage=None, requested_memory=None) == (
+        'raise time, or check that the timeout signal is on (signal_seconds), '
+        'or lower job_time_share so the stages after training fit'
+    )
+
+
+def test_hint_for_preempted_and_node_fail(project: Path, fake: FakeSlurm) -> None:
+    for job_state in ('PREEMPTED', 'NODE_FAIL'):
+        report = dataclasses.replace(_report(project, fake), job_state=job_state)
+        assert failure_hint(report=report, usage=None, requested_memory=None) == (
+            'not caused by the code; resubmit'
+        )
+
+
+def test_no_hint_for_python_error(project: Path, fake: FakeSlurm) -> None:
+    report = dataclasses.replace(
+        _report(project, fake), reason='ValueError: bad', job_state='FAILED'
+    )
+    assert failure_hint(report=report, usage=None, requested_memory=None) is None
+
+
+def test_failures_json_has_hint(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    submit_study(project=project)
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FAILED,
+        instance=InstanceState.FAILED,
+        error='TrainingPaused: job time share reached',
+    )
+    with pytest.raises(SystemExit) as raised:
+        main(args=['study', 'failures', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
+    document = json.loads(capsys.readouterr().out)
+    assert raised.value.code == 0
+    runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
+    assert runs['g/small/1']['hint'] == (
+        'training used its share of the job (job_time_share); '
+        'resubmit continues it, or raise time to train longer per job'
+    )
+    assert 'g/small/2' not in runs
+
+
+def test_oom_hint_without_numbers_when_sacct_fails(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': (
+                    '1000_0|OUT_OF_MEMORY\n1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'
+                ),
+            },
+            {'exit': 1, 'stderr': 'sacct: error: down'},
+        ],
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    with caplog.at_level('WARNING', logger='tslab.study.failures'):
+        failures = collect_failures(context=ctx, states=(), lines=30)
+    assert 'sacct' in caplog.text
+    (failure,) = failures
+    assert failure['state'] == StudyState.FAILED.value
+    assert failure['hint'] == 'raise mem_per_cpu'
+
+
+def test_failures_log_has_hint(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FAILED,
+        instance=InstanceState.FAILED,
+        error='TrainingPaused: job time share reached',
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    failures = collect_failures(context=ctx, states=(), lines=30)
+    with caplog.at_level('INFO', logger='tslab.study.failures'):
+        log_failures(failures=failures)
+    assert 'hint: training used its share of the job (job_time_share)' in caplog.text
