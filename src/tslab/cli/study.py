@@ -18,6 +18,7 @@ import tyro
 from tslab.cli.console import use_stderr, watch
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
+from tslab.jobs.slurm import SlurmError
 from tslab.study.commands import (
     cancel,
     LIVE_STATES,
@@ -37,6 +38,7 @@ from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
 from tslab.study.plan import JobGroup
 from tslab.study.report import log_show
 from tslab.study.state import StudyState
+from tslab.study.usage import log_usage, usage_document
 from tslab.study.wait import wait_for_study
 
 __all__ = [
@@ -48,6 +50,7 @@ __all__ = [
     'Show',
     'Status',
     'Submit',
+    'Usage',
     'Wait',
 ]
 
@@ -480,6 +483,50 @@ class Cancel:
 
 
 @dataclass(frozen=True, kw_only=True)
+class Usage:
+    """Show what each run used, and the sizes to suggest for the next jobs.
+
+    For example:
+        tslab study usage my_paper.studies:example --machine cluster
+
+    Attributes:
+        study: The study reference, module:attribute.
+        machine: A machine name or profile path.
+        grid: Keep only this grid.
+        only: Keep only runs that match axis=value.
+        json: Print one study-usage JSON document.
+    """
+
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    json: bool = False
+
+    def run(self) -> int:
+        """Show the usage of the selected runs and return the process exit code."""
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
+        )
+        if context.machine.launcher != 'slurm':
+            message = 'study usage reads SLURM accounting; this machine is local'
+            _LOGGER.error('%s', message)
+            return 1
+        try:
+            document = usage_document(context=context)
+        except SlurmError as error:
+            _LOGGER.error('%s', error)  # noqa: TRY400 # why: scheduler errors are shown, not raised
+            return 1
+        if self.json:
+            print_json(document=document)
+        else:
+            log_usage(document=document)
+        return 0
+
+
+@dataclass(frozen=True, kw_only=True)
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
@@ -622,4 +669,5 @@ STUDY_COMMANDS = {
     'wait': Wait,
     'failures': Failures,
     'cancel': Cancel,
+    'usage': Usage,
 }

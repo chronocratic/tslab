@@ -63,8 +63,14 @@ def jobs_of(*, project: Path) -> list[JobRecord]:
     return read_jobs(path=study_directory(project=project) / '.study' / 'submissions.jsonl')
 
 
-def write_run_status(
-    *, project: Path, model: str, seed: int, run_state: RunState, instance: InstanceState
+def write_run_status(  # noqa: PLR0913 # why: one flag per status field, all keyword-only
+    *,
+    project: Path,
+    model: str,
+    seed: int,
+    run_state: RunState,
+    instance: InstanceState,
+    error: str | None = None,
 ) -> Path:
     """Write a ``status.json`` for one toy run and return its folder."""
     folder = study_directory(project=project) / f'g/{model}/{seed}'
@@ -74,7 +80,7 @@ def write_run_status(
         snapshot=RunStatusSnapshot(
             run_state=run_state,
             updated_at=utc_now_iso(),
-            instances={'train': InstanceRecord(state=instance)},
+            instances={'train': InstanceRecord(state=instance, error=error)},
         ),
     )
     return folder
