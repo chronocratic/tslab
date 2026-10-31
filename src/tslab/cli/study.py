@@ -437,7 +437,7 @@ class Failures:
 
 @dataclass(frozen=True, kw_only=True)
 class Cancel:
-    """Cancel queued and running SLURM jobs of selected study runs.
+    """Cancel queued and running SLURM jobs, or stop the live local launch.
 
     For example:
         tslab study cancel my_paper.studies:example --machine cluster
