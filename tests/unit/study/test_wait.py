@@ -10,8 +10,10 @@ import pytest
 from tests.unit.jobs.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, submit_study
 from tslab.cli import main
+from tslab.cli.study import Wait
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.loading import load_study
+from tslab.study.outcome import EXIT_TIMEOUT
 from tslab.study.state import slurm_task_ids, StudyState
 from tslab.study.wait import wait_for_study
 
@@ -30,6 +32,37 @@ def _with_states(
             context.job_states_known if job_states_known is None else job_states_known
         ),
     )
+
+
+def _wait(
+    *,
+    base: Context,
+    sequence: tuple[tuple[StudyState, ...], ...],
+    interval: float,
+    timeout: float | None = None,
+    keep_going: bool = False,
+) -> tuple[int, Context, float, list[float]]:
+    """Run wait_for_study over the states of each check, recording the sleeps."""
+    elapsed = [0.0]
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        elapsed[0] += seconds
+
+    code, last, waited = wait_for_study(
+        load=iter(_sequence(base=base, sequence=sequence)).__next__,
+        interval=interval,
+        timeout=timeout,
+        keep_going=keep_going,
+        sleep=fake_sleep,
+        clock=lambda: elapsed[0],
+    )
+    return code, last, waited, sleeps
+
+
+def _sequence(*, base: Context, sequence: tuple[tuple[StudyState, ...], ...]) -> list[Context]:
+    return [_with_states(context=base, states=states) for states in sequence]
 
 
 def test_wait_returns_0_when_all_done_after_two_checks(project: Path, fake: FakeSlurm) -> None:
@@ -183,6 +216,56 @@ def test_wait_logs_only_when_counts_change(
     assert len(lines) == 2
     assert 'running 4' in lines[0]
     assert 'done 4' in lines[1]
+
+
+def test_wait_gap_doubles_up_to_interval(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = (StudyState.RUNNING,) * len(base.reports)
+    done = (StudyState.DONE,) * len(base.reports)
+    code, _, waited, sleeps = _wait(base=base, sequence=(running,) * 6 + (done,), interval=300)
+    assert code == 0
+    assert sleeps == [30, 60, 120, 240, 300, 300]
+    assert waited == 1050
+
+
+def test_wait_gap_resets_when_counts_change(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = (StudyState.RUNNING,) * len(base.reports)
+    one_done = (StudyState.DONE, *running[1:])
+    done = (StudyState.DONE,) * len(base.reports)
+    code, _, waited, sleeps = _wait(
+        base=base, sequence=(running, running, running, one_done, one_done, done), interval=300
+    )
+    assert code == 0
+    assert sleeps == [30, 60, 120, 30, 60]
+    assert waited == 300
+
+
+def test_wait_gap_never_exceeds_small_interval(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = (StudyState.RUNNING,) * len(base.reports)
+    done = (StudyState.DONE,) * len(base.reports)
+    code, _, waited, sleeps = _wait(
+        base=base, sequence=(running, running, running, done), interval=10
+    )
+    assert code == 0
+    assert sleeps == [10, 10, 10]
+    assert waited == 30
+
+
+def test_wait_timeout_uses_current_gap(project: Path, fake: FakeSlurm) -> None:
+    base = context(project=project, machine_file='local.toml')
+    running = (StudyState.RUNNING,) * len(base.reports)
+    code, _, waited, sleeps = _wait(
+        base=base, sequence=(running, running, running), interval=300, timeout=100
+    )
+    assert code == EXIT_TIMEOUT
+    assert sleeps == [30, 60]
+    assert waited == 90
+
+
+def test_wait_cli_default_interval_is_300() -> None:
+    assert Wait(study='s', machine='m').interval == 300.0
 
 
 def test_wait_rejects_interval_below_10(project: Path) -> None:
