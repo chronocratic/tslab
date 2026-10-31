@@ -27,6 +27,7 @@ from tslab.study.launch import (
     LaunchReport,
     LocalLauncher,
     resolve_local_gpus,
+    SIGNAL_EXIT_BASE,
     SlurmLauncher,
 )
 from tslab.study.machine import LocalSettings, MachineProfile
@@ -63,6 +64,20 @@ _SELECTION_SHOWN = 20
 
 _LOGGER = logging.getLogger(__name__)
 
+
+def _finish_launch(
+    *, code: int, submitted: Sequence[JobRecord], context: Context, sleep: Callable[[float], None]
+) -> int:
+    """The exit code of a launch, with its follow-ups queued when it was not stopped by a signal."""
+    if code >= SIGNAL_EXIT_BASE:
+        # why: the launch was stopped by a signal; resubmit continues it
+        return code
+    followup_code, _ = queue_followups(
+        context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
+    )
+    return max(code, followup_code)
+
+
 # why: a cancelled job leaves its lock until the heartbeat is stale; the restart
 # waits this many seconds (the stale-lock limit of the run engine plus a minute)
 _RESTART_DELAY_SECONDS = 660
@@ -95,7 +110,8 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
-        ``1`` when a run does not parse or a submission failed.
+        ``1`` when a run does not parse or a submission failed;
+        ``128 + N`` when the local launch was stopped by signal N.
     """
     to_submit = [
         report
@@ -114,10 +130,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         on_launch=on_launch,
         task_stream=task_stream,
     )
-    followup_code, _ = queue_followups(
-        context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
-    )
-    return max(code, followup_code)
+    return _finish_launch(code=code, submitted=submitted, context=context, sleep=sleep)
 
 
 def parse_states(*, values: Sequence[str]) -> tuple[StudyState, ...]:
@@ -257,7 +270,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
-        ``1`` when a run does not parse or a submission failed.
+        ``1`` when a run does not parse or a submission failed;
+        ``128 + N`` when the local launch was stopped by signal N.
     """
     if auto:
         # why: auto is the path of the follow-up job: it retries interrupted runs
@@ -310,10 +324,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         on_launch=on_launch,
         task_stream=task_stream,
     )
-    followup_code, _ = queue_followups(
-        context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
-    )
-    return max(code, followup_code)
+    return _finish_launch(code=code, submitted=submitted, context=context, sleep=sleep)
 
 
 def _run_in_terminal(args: list[str]) -> int:

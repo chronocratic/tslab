@@ -9,7 +9,7 @@ from tslab.helpers.text import log_table
 from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launch import LaunchReport
+from tslab.study.launch import LaunchReport, SIGNAL_EXIT_BASE
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
@@ -163,10 +163,16 @@ def log_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> tuple[int
         groups: The groups the launch was given.
 
     Returns:
-        ``1`` with the jobs sent so far when the launch failed, else ``0``
-        with the submitted jobs (none on a dry run).
+        ``1`` with the jobs sent so far when the launch failed,
+        ``128 + N`` with the submitted jobs when it was stopped by signal N,
+        else ``0`` with the submitted jobs (none on a dry run).
     """
     names = {group.job_file: group.job_name for group in groups}
+    if report.stopped_signal is not None:
+        _LOGGER.info(
+            'stopped by signal %d; resubmit continues the stopped runs', report.stopped_signal
+        )
+        return SIGNAL_EXIT_BASE + report.stopped_signal, list(report.submitted)
     if report.error is not None:
         _LOGGER.error('%s', report.error)
         _LOGGER.info(

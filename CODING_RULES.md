@@ -202,6 +202,7 @@ they have to read.
                   return len(job.tasks)
           return 0
 
+
       # This
       def remaining(*, job: JobRecord) -> int:
           if job.launcher != 'slurm' or not job.tasks:
@@ -220,6 +221,7 @@ they have to read.
           (lambda report: report.job_state == 'TIMEOUT', 'raise time'),
           (lambda report: report.job_state in {'PREEMPTED', 'NODE_FAIL'}, 'resubmit'),
       )
+
 
       def failure_hint(*, report: RunReport) -> str | None:
           return next((hint for matches, hint in _HINTS if matches(report)), None)

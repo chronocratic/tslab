@@ -3,8 +3,11 @@
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
+import threading
+import time
 
 import pytest
 
@@ -65,6 +68,58 @@ study = Study(
     },
 )
 """
+
+# why: the plain toy run ends before a signal could reach it; this one stays
+# open in the run context, so a stop signal records the run as crashed.
+KEEP_OPEN_SCRIPT = '''
+"""A toy run that stays open until a signal arrives."""
+
+import time
+
+import tyro
+
+import tslab
+
+import toy_script
+
+
+def main() -> None:
+    config = tyro.cli(toy_script.ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
+    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+        time.sleep(10)
+
+
+if __name__ == '__main__':
+    main()
+'''
+
+KEEP_OPEN_STUDIES = '''
+"""The toy study with runs that stay open until a signal arrives."""
+
+import sys
+
+import toy_script
+from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+
+study = Study(
+    name='s',
+    grids={
+        'g': Grid(
+            short_name='g1',
+            command=(sys.executable, 'toy_keep_open.py'),
+            config=toy_script.ToyConfig,
+            axes={
+                'model': {
+                    'small': {'model': 'small'},
+                    'large': {'model': 'large'},
+                },
+                'seed': {'1': {'seed': 1}, '2': {'seed': 2}},
+            },
+            run_settings={**DEFAULT_RUN_SETTINGS, 'data': 'data'},
+        )
+    },
+)
+'''
 
 
 def run_toy(*, project: Path, model: str, seed: int) -> None:
@@ -466,6 +521,36 @@ def test_keep_awake_false_starts_no_helper(
     )
     assert code == 0
     assert not args.exists()
+
+
+def _kill_when_a_run_starts(*, project: Path) -> None:
+    """Send this process a SIGTERM as soon as the first toy run writes its status."""
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if next(iter(project.glob('runs/s/g/*/*/status.json')), None) is not None:
+            os.kill(os.getpid(), signal.SIGTERM)
+            return
+        time.sleep(0.01)
+
+
+def test_submit_returns_128_plus_signal(project: Path) -> None:
+    (project / 'toy_keep_open.py').write_text(KEEP_OPEN_SCRIPT.lstrip('\n'))
+    (project / 'toy_studies.py').write_text(KEEP_OPEN_STUDIES.lstrip('\n'))
+    watcher = threading.Thread(
+        target=_kill_when_a_run_starts, kwargs={'project': project}, daemon=True
+    )
+    watcher.start()
+    code = submit(
+        context=context(project=project, machine_file='local.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+    watcher.join(timeout=10)
+    assert code == 128 + signal.SIGTERM
+    reports = context(project=project, machine_file='local.toml').reports
+    assert StudyState.INTERRUPTED in {report.state for report in reports}
 
 
 @pytest.mark.slow
