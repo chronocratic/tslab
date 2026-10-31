@@ -7,11 +7,17 @@ from typing import cast
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, submit_study, write_run_status
+from tests.unit.study.helpers import (
+    context,
+    record_local_job,
+    study_directory,
+    submit_study,
+    write_run_status,
+)
 from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
 from tslab.study.context import Context
-from tslab.study.usage import usage_document
+from tslab.study.usage import log_usage, usage_document
 
 USAGE_MACHINE = """\
 launcher = "slurm"
@@ -108,15 +114,6 @@ def test_usage_cli_json_schema(
     assert document['schema'] == 'tslab.study-usage/1'
 
 
-def test_usage_on_local_machine_exits_1(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
-) -> None:
-    with caplog.at_level('ERROR', logger='tslab.cli.study'), pytest.raises(SystemExit) as raised:
-        main(args=['study', 'usage', 'toy_studies:study', '--machine', 'local.toml', '--json'])
-    assert raised.value.code == 1
-    assert 'study usage reads SLURM accounting; this machine is local' in caplog.text
-
-
 def test_usage_sacct_failure_exits_1(project: Path, fake: FakeSlurm) -> None:
     _write_usage_machine(project=project)
     submit_study(project=project, machine_file='usage.toml')
@@ -126,3 +123,75 @@ def test_usage_sacct_failure_exits_1(project: Path, fake: FakeSlurm) -> None:
     with pytest.raises(SystemExit) as raised:
         main(args=['study', 'usage', 'toy_studies:study', '--machine', 'usage.toml'])
     assert raised.value.code == 1
+
+
+def _write_local_usage(
+    *, project: Path, index: int, elapsed: float, rss: int, gpu_id: str | None
+) -> None:
+    """Write the usage file of local task ``index`` of the recorded job, as the launcher does."""
+    logs = study_directory(project=project) / '.study' / 'logs'
+    logs.mkdir(parents=True, exist_ok=True)
+    (logs / f'g1_{index}.out.usage.json').write_text(
+        json.dumps(
+            {
+                'schema': 'tslab.local-usage/1',
+                'attempt': 1,
+                'job_id': 'local-1-1',
+                'exit_code': 0,
+                'elapsed_seconds': elapsed,
+                'cpu_seconds': 90.5,
+                'max_rss_bytes': rss,
+                'gpu_id': gpu_id,
+                'timeout': None,
+                'timed_out': False,
+            }
+        )
+    )
+
+
+def _local_usage_context(*, project: Path) -> Context:
+    """Two recorded local runs with usage files, and two that left none."""
+    record_local_job(project=project)
+    _write_local_usage(project=project, index=0, elapsed=3600, rss=2 * 1024**3, gpu_id='0')
+    _write_local_usage(project=project, index=1, elapsed=1800, rss=1024**3, gpu_id=None)
+    return context(project=project, machine_file='local.toml')
+
+
+def test_local_usage_document_reads_usage_files(project: Path) -> None:
+    document = usage_document(context=_local_usage_context(project=project))
+    assert document['launcher'] == 'local'
+    runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
+    first = runs['g/small/1']
+    assert first['elapsed'] == '1:00:00'
+    assert first['max_rss'] == 2 * 1024**3
+    assert first['total_cpu_seconds'] == 90
+    assert (first['gpus'], first['gpu_id']) == (1, '0')
+    assert first['time_limit'] is None
+    assert (runs['g/small/2']['gpus'], runs['g/small/2']['gpu_id']) == (0, None)
+    never = runs['g/large/1']
+    assert never['elapsed'] is None
+    assert never['max_rss'] is None
+    assert never['total_cpu_seconds'] is None
+    (group,) = cast('list[dict[str, object]]', document['groups'])
+    assert group['suggested_time'] == '1:12:00'
+    assert group['suggested_mem_per_cpu'] is None
+
+
+def test_local_usage_log_shows_no_limit_and_dash(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    document = usage_document(context=_local_usage_context(project=project))
+    with caplog.at_level('INFO', logger='tslab.study.usage'):
+        log_usage(document=document)
+    assert '1:00:00/no limit' in caplog.text
+    assert 'local: suggest timeout=1:12:00' in caplog.text
+    assert '-/no limit' in caplog.text
+
+
+def test_usage_cli_local_json(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _local_usage_context(project=project)
+    with pytest.raises(SystemExit) as raised:
+        main(args=['study', 'usage', 'toy_studies:study', '--machine', 'local.toml', '--json'])
+    document = json.loads(capsys.readouterr().out)
+    assert raised.value.code == 0
+    assert document['launcher'] == 'local'
