@@ -61,6 +61,15 @@ def main() -> None:
     config = tyro.cli(ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
     with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         time.sleep(float(os.environ.get('TOY_SLEEP', '0')))
+        succeed_on = int(os.environ.get('TOY_SUCCEED_ON', '0'))
+        if succeed_on:
+            folder = config.output_root / config.run_path
+            counter = folder / 'attempts'
+            attempt = int(counter.read_text()) + 1 if counter.exists() else 1
+            counter.write_text(str(attempt))
+            (folder / 'last.ckpt').write_text('checkpoint')
+            if attempt < succeed_on:
+                raise tslab.JobTimeLimitSignal('time limit near')
 
 
 if __name__ == '__main__':
