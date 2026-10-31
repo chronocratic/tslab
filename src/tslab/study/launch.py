@@ -17,10 +17,10 @@ from tslab.core.paths import atomic_write_text
 from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
+from tslab.study.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
 from tslab.study.plan import JobGroup, next_job_file, PlannedTask, study_folder
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
-from tslab.study.slurm import job_script
 
 __all__ = [
     'LaunchReport',

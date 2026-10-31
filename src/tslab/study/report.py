@@ -6,13 +6,13 @@ import logging
 import shlex
 
 from tslab.helpers.text import log_table
+from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.slurm import array_spec
 from tslab.study.state import StudyState
 
 __all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']

@@ -2,62 +2,25 @@
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-import re
 import shlex
 
+from tslab.jobs.slurm import (
+    array_spec,
+    check_script_text,
+    export_lines,
+    node_local_tmp_lines,
+    sbatch_directives,
+    srun_command,
+    wait_for_file_line,
+)
 from tslab.study.machine import SlurmSettings
 
-__all__ = ['array_spec', 'job_script']
-
-_EMPTY_INDICES = 'indices must not be empty'
-_CONTROL_PATTERN = re.compile(r'[\x00-\x1f\x7f]')
-_ENV_NAME_PATTERN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
-
-
-def array_spec(*, indices: Sequence[int]) -> str:
-    """A SLURM array spec: sorted, deduplicated, consecutive indices as ranges.
-
-    Args:
-        indices: The array indices of one job, in any order.
-
-    Returns:
-        For example ``'0-3,7,9-10'``.
-
-    Raises:
-        ValueError: If ``indices`` is empty.
-    """
-    ordered = sorted(set(indices))
-    if not ordered:
-        raise ValueError(_EMPTY_INDICES)
-    parts: list[str] = []
-    start = previous = ordered[0]
-    for index in ordered[1:]:
-        if index == previous + 1:
-            previous = index
-            continue
-        parts.append(f'{start}-{previous}' if previous > start else str(start))
-        start = previous = index
-    parts.append(f'{start}-{previous}' if previous > start else str(start))
-    return ','.join(parts)
-
-
-def _q21_block(*, array: bool) -> str:
-    job_id = '${SLURM_JOB_ID}'
-    if array:
-        job_id = '${SLURM_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
-    return (
-        f'TMPDIR=/tmp/tslab-{job_id}\n'
-        'mkdir -p "$TMPDIR"\n'
-        'trap \'rm -rf "$TMPDIR"\' EXIT\n'
-        'export TMPDIR\n'
-        'export WANDB_CACHE_DIR=$TMPDIR/wandb-cache\n'
-        'export WANDB_CONFIG_DIR=$TMPDIR/wandb-config'
-    )
+__all__ = ['job_script']
 
 
 def _task_section(*, array: bool, tasks_file: Path) -> str:
     # why: on shared storage the file written by the launcher can reach the node late
-    wait = f'for _ in $(seq 60); do [ -s {shlex.quote(str(tasks_file))} ] && break; sleep 1; done\n'
+    wait = f'{wait_for_file_line(path=tasks_file, seconds=60)}\n'
     if array:
         return wait + (
             'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" '
@@ -73,7 +36,7 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
             'TASK_LINE=${TASK_LINE#* }\n'
             'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
             ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
-            'srun --unbuffered --kill-on-bad-exit=1 bash -c "exec $TASK_LINE"'
+            + srun_command(variable='TASK_LINE')
         )
     return wait + (
         'TASK_LINE=$(sed -n 1p ' + shlex.quote(str(tasks_file)) + ')\n'
@@ -81,25 +44,17 @@ def _task_section(*, array: bool, tasks_file: Path) -> str:
         'TASK_LINE=${TASK_LINE#* }\n'
         'TASK_LINE=${TASK_LINE#* }\n'
         'echo "=== tslab job ${SLURM_JOB_ID} | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
-        'srun --unbuffered --kill-on-bad-exit=1 bash -c "exec $TASK_LINE"'
+        + srun_command(variable='TASK_LINE')
     )
 
 
-def _check_text(*, value: object, what: str) -> None:
-    """Reject a line break or other control character: it would start a new script line."""
-    if _CONTROL_PATTERN.search(str(value)):
-        message = f'{what} must not hold a line break or other control character: {value!r}'
-        raise ValueError(message)
-
-
-def _check_job_values(  # noqa: PLR0913 # why: keyword-only private helper, one per checked value
+def _check_job_values(  # why: keyword-only private helper, one per checked value
     *,
     job_name: str,
     slurm: SlurmSettings,
     log_pattern: Path,
     dependency: str | None,
     begin: str | None,
-    env: Mapping[str, str],
 ) -> None:
     for what, value in (
         ('job_name', job_name),
@@ -114,17 +69,7 @@ def _check_job_values(  # noqa: PLR0913 # why: keyword-only private helper, one 
         *((f'sbatch_extra.{key}', value) for key, value in slurm.sbatch_extra),
         *(('setup', line) for line in slurm.setup),
     ):
-        _check_text(value=value, what=what)
-    for name in env:
-        if _ENV_NAME_PATTERN.fullmatch(name) is None:
-            message = f'{name!r} is not a valid environment variable name'
-            raise ValueError(message)
-
-
-def _as_sbatch_flag(*, key: str, value: object) -> str:
-    # why: sbatch reads quotes in a directive as grouping, so a space in a value stays one value
-    flag = f'#SBATCH --{key.replace("_", "-")}'
-    return flag if value is True else f'{flag}={shlex.quote(str(value))}'
+        check_script_text(value=value, what=what)
 
 
 def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per script line
@@ -161,12 +106,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
             shell variable name.
     """
     _check_job_values(
-        job_name=job_name,
-        slurm=slurm,
-        log_pattern=log_pattern,
-        dependency=dependency,
-        begin=begin,
-        env=env,
+        job_name=job_name, slurm=slurm, log_pattern=log_pattern, dependency=dependency, begin=begin
     )
     array = indices is not None
     options: dict[str, object] = {'job_name': job_name, 'partition': slurm.partition}
@@ -196,23 +136,22 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if begin is not None:
         options['begin'] = begin
     options.update((key.replace('-', '_'), value) for key, value in slurm.sbatch_extra)
-    lines = [
-        '#!/bin/bash',
-        *(
-            _as_sbatch_flag(key=key, value=value)
-            for key, value in options.items()
-            if value is not False
-        ),
-    ]
+    lines = ['#!/bin/bash', *sbatch_directives(options=options)]
     lines += [
         'set -euo pipefail',
         f'cd {shlex.quote(str(project_root))}',
         # why: a killed job would lose the output still held in the buffer
         'export PYTHONUNBUFFERED=1',
     ]
-    lines += [f'export {name}={shlex.quote(value)}' for name, value in env.items()]
+    lines += export_lines(env=env)
     lines += list(slurm.setup)
     if slurm.node_local_tmp:
-        lines.append(_q21_block(array=array))
+        lines += node_local_tmp_lines(prefix='tslab', array=array)
+        lines.extend(
+            [
+                'export WANDB_CACHE_DIR=$TMPDIR/wandb-cache',
+                'export WANDB_CONFIG_DIR=$TMPDIR/wandb-config',
+            ]
+        )
     lines.append(_task_section(array=array, tasks_file=tasks_file))
     return '\n'.join(lines) + '\n'
