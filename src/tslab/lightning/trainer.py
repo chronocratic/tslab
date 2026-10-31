@@ -1,34 +1,36 @@
 """``LightningTrainer``: the ready ``Trainer`` for ``LightningModule`` models."""
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from datetime import timedelta
 import logging
 import os
 from pathlib import Path
 import pickle
+import signal
+from threading import Event
 import time
-from typing import Any, override, TYPE_CHECKING
+from types import FrameType
+from typing import Any, override
 
 import lightning
 from lightning import LightningModule
-from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint, Timer
+from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint, Timer
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
 from tslab.core.artifact import Checkpoint
 from tslab.core.paths import require_path
-from tslab.core.run import slurm_task_count
+from tslab.core.run import JobTimeLimitSignal, Run, slurm_task_count
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
-from tslab.lightning.callbacks import build_callbacks
+from tslab.lightning.callbacks import _SignalStop, build_callbacks
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
 from tslab.lightning.ranks import agree
 from tslab.lightning.resume import choose_resume_checkpoint
 from tslab.lightning.slurm import resolve_training_time
 from tslab.tracking.lightning_bridge import lightning_loggers
-
-if TYPE_CHECKING:
-    from tslab.core.run import Run
 
 __all__ = ['LightningTrainer', 'TrainingTimeLimitReached']
 
@@ -37,6 +39,37 @@ _LOGGER = logging.getLogger(__name__)
 _RESERVED_TRAINER_KWARGS = frozenset(
     {'callbacks', 'logger', 'max_time', 'default_root_dir', 'plugins'}
 )
+
+
+@contextmanager
+def _defer_time_limit_signals(*, run: Run, signal_received: Event) -> Generator[None, None, None]:
+    previous_sigusr2 = signal.getsignal(signal.SIGUSR2)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def defer_sigusr2(signal_number: int, frame: FrameType | None) -> None:
+        signal_received.set()
+        if callable(previous_sigusr2):
+            try:
+                previous_sigusr2(signal_number, frame)
+            except JobTimeLimitSignal:
+                return
+
+    def defer_sigterm(signal_number: int, frame: FrameType | None) -> None:
+        if signal_received.is_set() or run.time_limit_signalled:
+            _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
+            return
+        if callable(previous_sigterm):
+            previous_sigterm(signal_number, frame)
+        elif previous_sigterm is not signal.SIG_IGN:
+            raise SystemExit(128 + signal_number)
+
+    signal.signal(signal.SIGUSR2, defer_sigusr2)
+    try:
+        signal.signal(signal.SIGTERM, defer_sigterm)
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        signal.signal(signal.SIGUSR2, previous_sigusr2)
 
 
 class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API name from the spec
@@ -102,7 +135,7 @@ class LightningTrainer(Trainer[LightningModule]):
     def fit(
         self,
         *,
-        run: 'Run',
+        run: Run,
         model: LightningModule,
         data: DataSource[object],
         checkpoint_directory: Path,
@@ -135,24 +168,32 @@ class LightningTrainer(Trainer[LightningModule]):
         else:
             val_loader = data.val_loader()
             has_validation = val_loader is not None
-        trainer = self._build_trainer(
-            run=run,
-            checkpoint_directory=checkpoint_directory,
-            has_validation=has_validation,
-            max_time=max_time,
+        signal_received = Event()
+        if run.time_limit_signalled:
+            signal_received.set()
+        signal_stop = _SignalStop(
+            run=run, signal_received=signal_received, checkpoint_directory=checkpoint_directory
         )
-        resume_from = choose_resume_checkpoint(
-            directory=checkpoint_directory, monitor=config.monitor
-        )
-        if isinstance(data, LightningDataSource):
-            trainer.fit(model=model, datamodule=data.datamodule, ckpt_path=resume_from)
-        else:
-            trainer.fit(
-                model=model,
-                train_dataloaders=data.train_loader(),
-                val_dataloaders=val_loader,
-                ckpt_path=resume_from,
+        with _defer_time_limit_signals(run=run, signal_received=signal_received):
+            trainer = self._build_trainer(
+                run=run,
+                checkpoint_directory=checkpoint_directory,
+                has_validation=has_validation,
+                max_time=max_time,
+                signal_stop=signal_stop,
             )
+            resume_from = choose_resume_checkpoint(
+                directory=checkpoint_directory, monitor=config.monitor
+            )
+            if isinstance(data, LightningDataSource):
+                trainer.fit(model=model, datamodule=data.datamodule, ckpt_path=resume_from)
+            else:
+                trainer.fit(
+                    model=model,
+                    train_dataloaders=data.train_loader(),
+                    val_dataloaders=val_loader,
+                    ckpt_path=resume_from,
+                )
         if _stopped_by_time_limit(trainer=trainer):
             message = (
                 f'stopped by the training time limit ({max_time}) after '
@@ -198,9 +239,18 @@ class LightningTrainer(Trainer[LightningModule]):
         checkpoint_directory: Path,
         has_validation: bool,
         max_time: timedelta | None,
+        signal_stop: Callback | None = None,
     ) -> lightning.Trainer:
         config = self._config
         loggers = lightning_loggers(trackers=run.trackers)
+        callbacks = build_callbacks(
+            config=config,
+            checkpoint_directory=checkpoint_directory,
+            has_validation=has_validation,
+            has_logger=bool(loggers),
+        )
+        if signal_stop is not None:
+            callbacks.append(signal_stop)
         arguments: dict[str, Any] = {
             'max_epochs': config.max_epochs,
             'min_epochs': config.min_epochs,
@@ -210,12 +260,7 @@ class LightningTrainer(Trainer[LightningModule]):
             'log_every_n_steps': config.log_every_n_steps,
             'enable_progress_bar': config.enable_progress_bar,
             'max_time': max_time,
-            'callbacks': build_callbacks(
-                config=config,
-                checkpoint_directory=checkpoint_directory,
-                has_validation=has_validation,
-                has_logger=bool(loggers),
-            ),
+            'callbacks': callbacks,
             'logger': loggers,
             'default_root_dir': checkpoint_directory,
         }

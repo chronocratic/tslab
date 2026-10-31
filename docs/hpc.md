@@ -13,6 +13,11 @@
 Training stopped by the time limit is unfinished: submit the same command
 again and it resumes from its last checkpoint.
 
+SLURM also sends `SIGUSR2` before the job time limit. Training saves
+`last.ckpt` at the next batch boundary, then the run is marked `interrupted`.
+Other stages stop without a checkpoint. Resubmit the study to resume training;
+set `[slurm] signal_seconds = 0` to disable the signal.
+
 Machine profiles can run site setup commands before each task with
 `[slurm] setup = ["module load cuda"]`. Set `gpu_type = "a100"` to request
 `--gres=gpu:a100:<count>` when `gpus` is greater than zero.
