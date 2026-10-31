@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from tslab.study.job_script import job_script
+from tslab.study.job_script import foreground_script, job_script
 from tslab.study.machine import SlurmSettings
 
 TASKS_LINES = [
@@ -329,3 +329,66 @@ def test_task_section_waits_for_a_late_tasks_file(tmp_path: Path) -> None:
     out, _ = process.communicate(timeout=30)
     assert process.returncode == 0
     assert out.splitlines()[-1] == '3'
+
+
+def test_foreground_script_has_env_and_setup_but_no_srun(tmp_path: Path) -> None:
+    text = foreground_script(
+        slurm=SlurmSettings(partition='p', setup=('module load x',)),
+        project_root=tmp_path,
+        env={'A': '1'},
+        command=('python', '-m', 'm', '--x', 'a b'),
+    )
+    assert 'module load x' in text
+    assert 'export A=1' in text
+    assert text.rstrip().endswith("exec python -m m --x 'a b'")
+    assert 'srun' not in text
+    assert '#SBATCH' not in text
+    assert 'TMPDIR' not in text
+
+
+def test_foreground_script_orders_like_the_job_script(tmp_path: Path) -> None:
+    text = foreground_script(
+        slurm=SlurmSettings(partition='p', setup=('module load x',)),
+        project_root=Path('/p q'),
+        env={'A': 'b c'},
+        command=('python', 'x.py'),
+    )
+    lines = text.splitlines()
+    assert lines[0] == '#!/bin/bash'
+    assert lines[1] == 'set -euo pipefail'
+    assert lines[2] == "cd '/p q'"
+    assert lines[3] == 'export PYTHONUNBUFFERED=1'
+    assert lines[4] == "export A='b c'"
+    assert lines[5] == 'module load x'
+    assert lines[6] == 'exec python x.py'
+    assert len(lines) == 7
+
+
+def test_foreground_script_without_slurm_has_no_setup(tmp_path: Path) -> None:
+    lines = foreground_script(
+        slurm=None, project_root=tmp_path, env={}, command=('python', 'x.py')
+    ).splitlines()
+    assert lines == [
+        '#!/bin/bash',
+        'set -euo pipefail',
+        f'cd {shlex.quote(str(tmp_path))}',
+        'export PYTHONUNBUFFERED=1',
+        'exec python x.py',
+    ]
+
+
+def test_foreground_script_rejects_a_line_break_in_setup(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match='setup'):
+        foreground_script(
+            slurm=SlurmSettings(partition='p', setup=('a\nb',)),
+            project_root=tmp_path,
+            env={},
+            command=('python', 'x.py'),
+        )
+
+
+def test_foreground_script_rejects_bad_env_names(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match='environment variable name'):
+        foreground_script(
+            slurm=None, project_root=tmp_path, env={'A B': 'v'}, command=('python', 'x.py')
+        )

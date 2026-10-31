@@ -15,7 +15,51 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.machine import SlurmSettings
 
-__all__ = ['job_script']
+__all__ = ['foreground_script', 'job_script']
+
+
+def foreground_script(
+    *,
+    slurm: SlurmSettings | None,
+    project_root: Path,
+    env: Mapping[str, str],
+    command: Sequence[str],
+) -> str:
+    """The shell script that runs one study run in the foreground.
+
+    The same pieces and order as ``job_script``, without the ``#SBATCH``
+    lines, the srun task section, and the node-local temporary folder: the
+    command runs as the one process of the terminal.
+
+    Args:
+        slurm: The resource settings of the machine, for its ``setup`` lines;
+            ``None`` off SLURM.
+        project_root: The directory the command runs in.
+        env: Variables to export before the command.
+        command: The command to run; it replaces the script via ``exec``.
+
+    Returns:
+        The script text.
+
+    Raises:
+        ValueError: If a ``setup`` line holds a line break or other control
+            character, or a name in ``env`` is not a shell variable name.
+    """
+    if slurm is not None:
+        for line in slurm.setup:
+            check_script_text(value=line, what='setup')
+    lines = [
+        '#!/bin/bash',
+        'set -euo pipefail',
+        f'cd {shlex.quote(str(project_root))}',
+        # why: a killed run would lose the output still held in the buffer
+        'export PYTHONUNBUFFERED=1',
+    ]
+    lines += export_lines(env=env)
+    if slurm is not None:
+        lines += list(slurm.setup)
+    lines.append(f'exec {shlex.join(command)}')
+    return '\n'.join(lines) + '\n'
 
 
 def _task_section(*, array: bool, tasks_file: Path) -> str:

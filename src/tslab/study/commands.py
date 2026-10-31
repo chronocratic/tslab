@@ -9,6 +9,7 @@ from collections.abc import Callable, Mapping, Sequence
 import json
 import logging
 from pathlib import Path
+import subprocess
 import sys
 import time
 from typing import TextIO
@@ -17,6 +18,7 @@ from tslab.core.paths import atomic_write_text, LOCK_FILE
 from tslab.jobs.slurm import scancel, SlurmError
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
+from tslab.study.job_script import foreground_script
 from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
 from tslab.study.machine import MachineProfile
 from tslab.study.plan import (
@@ -38,6 +40,7 @@ __all__ = [
     'parse_states',
     'resubmit',
     'results',
+    'run_one',
     'status',
     'submit',
     'submit_runs',
@@ -45,6 +48,9 @@ __all__ = [
 
 #: The states of a run that is queued or running; submit and resubmit leave them alone.
 LIVE_STATES = (StudyState.QUEUED, StudyState.RUNNING)
+
+# why: a selection error lists this many run paths before counting the rest
+_SELECTION_SHOWN = 20
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -299,6 +305,98 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
     )
     return max(code, followup_code)
+
+
+def _run_in_terminal(args: list[str]) -> int:
+    """The exit code of the command with the inherited standard streams."""
+    # why: inherited streams, so breakpoint() and prompts reach the terminal
+    return subprocess.run(args, check=False).returncode  # noqa: S603 # why: the run command, typed by the study
+
+
+def run_one(
+    *,
+    context: Context,
+    extra_args: tuple[str, ...] | None,
+    run_process: Callable[[list[str]], int] = _run_in_terminal,
+) -> int:
+    """Run the one selected run in the foreground of this terminal.
+
+    SLURM is never called, and nothing is recorded: the study folder is left
+    untouched, so the run of the foreground does not become an attempt of the
+    study. Inside a ``salloc`` allocation, ``job_time_share`` still pauses the
+    training; pass ``-- --trainer.job-time-share 1`` to train for the whole
+    allocation.
+
+    Args:
+        context: The context with the runs selected; exactly one is needed.
+        extra_args: The pass-through arguments; taken from the latest
+            submission of the run when ``None``.
+        run_process: What runs the script; by default a subprocess with the
+            inherited standard streams, so ``breakpoint()`` reaches the
+            terminal.
+
+    Returns:
+        The exit code of the command; ``1`` when the run is live or the plan
+        has problems, without starting anything.
+
+    Raises:
+        ValueError: When zero or more than one run is selected.
+    """
+    reports = list(context.reports)
+    if not reports:
+        message = 'no runs match the selection; drop --grid/--only or check values'
+        raise ValueError(message)
+    if len(reports) > 1:
+        paths = [report.run.run_path for report in reports]
+        shown = ', '.join(paths[:_SELECTION_SHOWN])
+        more = (
+            f', and {len(paths) - _SELECTION_SHOWN} more' if len(paths) > _SELECTION_SHOWN else ''
+        )
+        message = f'{len(paths)} runs match the selection: {shown}{more}; narrow with --only'
+        raise ValueError(message)
+    (report,) = reports
+    if report.state in LIVE_STATES:
+        message = (
+            f'{report.run.run_path} is {report.state.value} (job {report.job_id}); '
+            'wait for it or cancel it first'
+        )
+        _LOGGER.error('%s', message)
+        return 1
+    run = report.run
+    resolved = context.resolved[run.run_path]
+    if extra_args is not None:
+        args = extra_args
+    else:
+        args = _reused_args(path=run.run_path, context=context)
+    groups = plan_jobs(
+        study=context.study,
+        machine=context.machine,
+        resolved=[resolved],
+        indices=assign_indices(runs=[run], jobs=context.jobs),
+        extra_args={run.run_path: args},
+        attempts={run.run_path: report.attempt},
+        first_job_file=0,
+    )
+    problems = validate_jobs(study=context.study, groups=groups)
+    if problems:
+        log_problems(problems=problems)
+        return 1
+    (task,) = groups[0].tasks
+    if resolved.slurm is not None and resolved.slurm.gpus > 1:
+        _LOGGER.info('study run starts one process; the job would start %d', resolved.slurm.gpus)
+    script = foreground_script(
+        slurm=resolved.slurm,
+        project_root=context.project_root,
+        env=context.machine.env,
+        command=task.command,
+    )
+    return run_process(['bash', '-c', script])
+
+
+def _reused_args(*, path: str, context: Context) -> tuple[str, ...]:
+    """The extra args of the latest submission of one run, or none."""
+    task = latest_tasks(jobs=context.jobs).get(path)
+    return () if task is None else task[1].extra_args
 
 
 def results(*, context: Context, out: Path, as_json: bool = False) -> int:
