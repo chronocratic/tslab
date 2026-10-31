@@ -36,7 +36,7 @@ instances run again.
 pyproject.toml                  dependencies (tslab with the chronocratic extras) and tool settings
 README.md                       quick start for humans
 machines/
-  local.toml                    machine profile: run study tasks one after another, here
+  local.toml                    machine profile: run study tasks on this machine
   slurm.example.toml            machine profile template for a SLURM cluster (copy, fill CHANGE_ME)
 src/{{package_name}}/
   classify.py                   script: train, encode, SVM probe; noisy-test robustness check
@@ -231,13 +231,14 @@ A study runs one script command over the product of its axes. See
 ```bash
 uv run tslab study show {{package_name}}.studies:example
 uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
-uv run tslab study submit {{package_name}}.studies:example --machine local
+uv run tslab study submit {{package_name}}.studies:example --machine local --detach  # background launch; never submit in the foreground
 uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
 uv run tslab study wait {{package_name}}.studies:example --machine local
 uv run tslab study failures {{package_name}}.studies:example --machine local
 uv run tslab study run {{package_name}}.studies:example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
-uv run tslab study usage {{package_name}}.studies:example --machine local  # per-run and per-group accounting, SLURM only
+uv run tslab study usage {{package_name}}.studies:example --machine local  # per-run and per-group accounting
 uv run tslab study resubmit {{package_name}}.studies:example --machine local
+uv run tslab study cancel {{package_name}}.studies:example --machine local  # stops the live local launch
 uv run tslab study results {{package_name}}.studies:example --machine local --out results.csv
 ```
 

@@ -53,8 +53,7 @@ Priority is 6, then 4, then 3, then 5, then 0. An empty selection is a usage
 error (2), not success. `study wait` treats unknown SLURM state (6) as live and
 keeps checking; it warns once. A timeout returns 124.
 
-`study usage` returns 0 on success, 1 when the machine is local or the
-accounting query fails. `study run` returns the exit code of the command it
+`study usage` returns 0 on success, 1 when the accounting query fails. `study run` returns the exit code of the command it
 runs, 1 when the run is queued or running or the plan has problems, and 2
 when the selection does not name exactly one run.
 
@@ -79,6 +78,16 @@ and resources. Then submit the requested selection:
 
 ```bash
 uv run tslab study submit "$STUDY" --machine "$MACHINE" --json
+```
+
+On a local machine, submit with `--detach` and never run `submit` in the
+foreground: a foreground submit blocks until every task ends. `--detach` starts
+the launch in the background and returns once it runs; its output goes to
+`.study/local-launch.log`. Then use `wait`, `status`, `failures`, `usage` and
+`cancel` as below.
+
+```bash
+uv run tslab study submit "$STUDY" --machine "$MACHINE" --detach
 ```
 
 Run wait in a background shell and retain its process exit code and JSON output:
@@ -124,6 +133,10 @@ of the group plus a 20 percent margin:
 uv run tslab study usage "$STUDY" --machine "$MACHINE" --json
 ```
 
+On a local machine, `study usage` reads the usage file of each task, and
+`study cancel` stops the live local launch with `SIGTERM`; the runs read as
+`interrupted`, and `--signal` is for SLURM only.
+
 To test the timeout path without waiting for the time limit, send the signal
 to the running jobs: the runs save a checkpoint and end on their own as
 `interrupted`, and queued jobs are skipped:
@@ -146,7 +159,8 @@ uv run tslab study results "$STUDY" --machine "$MACHINE" --out - --json
 - `--include-done` belongs to `study submit`, not `study resubmit`. It selects
   every non-live run in the chosen slice, including failed, interrupted, and
   missing runs. Check that scope before submitting; ask if it exceeds the request.
-- Never run `tslab study cancel` unless the researcher asks. Use `--dry-run` to
+- Never run `tslab study cancel` unless the researcher asks. On a local machine
+  it stops the whole launch, not a slice. Use `--dry-run` to
   inspect selected job ids first. With `--signal`, the command sends `USR2` to
   the running jobs instead of cancelling them: the runs save and end on their
   own, so the command never stops a job hard.

@@ -227,6 +227,72 @@ Rules:
   editing the profile and resubmitting moves runs to another partition or
   time limit.
 
+## Local machines
+
+A profile with `launcher = "local"` runs the tasks of a submit on the machine
+that calls `tslab`. The optional `[local]` table sets how:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `timeout` | none | Time limit of one task, in sbatch duration format; a task that passes it is stopped |
+| `signal_seconds` | `120` | Seconds before the limit to send `SIGUSR2`, so training saves a checkpoint; `0` disables it |
+| `gpus` | `[]` | GPU ids the launch may use: a list of NVIDIA ids, `["mps"]`, or `"auto"` to find them at launch |
+| `skip_busy_gpus` | `false` | Leave out NVIDIA GPUs that already run a compute process |
+| `max_parallel` | `1` | Tasks at once when the resolved GPU list is empty; an error with an explicit `gpus` list |
+| `tasks_per_gpu` | `1` | Tasks that share one GPU id at once |
+| `keep_awake` | `true` | Keep the machine awake while a launch runs |
+
+- **Tasks.** Without GPUs the launch runs `max_parallel` tasks at once. With
+  GPUs it runs `tasks_per_gpu` tasks on each GPU, and each task sees one GPU
+  through `CUDA_VISIBLE_DEVICES`. A task that fails does not stop the others.
+  With one slot the console shows the output of each task; with more slots it
+  shows one line when a task starts and one when it ends. The full output of
+  every task goes to its log file in `.study/logs/`.
+- **Apple GPU.** On Apple Silicon the GPU is one device with the id `mps`. Set
+  `gpus = ["mps"]` or let `"auto"` find it. `skip_busy_gpus` does not apply to
+  it, and `mps` cannot be listed next to NVIDIA ids.
+- **GPU locks.** A task takes a lock on its GPU before it starts, so two
+  studies that run on the same machine never share a GPU by accident. The lock
+  files live in a folder of the current user, so other users do not see them.
+  A task waits for a free GPU, and the console says so.
+- **Time limit.** With `timeout`, a task gets `SIGUSR2` at
+  `timeout - signal_seconds`, then `SIGTERM`, and `SIGKILL` if it is still
+  running a little later.
+- **Stopping.** `Ctrl-C`, `SIGTERM` and `SIGHUP` to `tslab` stop the launch:
+  running tasks get `SIGTERM`, then `SIGKILL`, and no new task starts. The
+  command exits with `128 + N` for signal N. Resubmit to resume. A hard kill
+  (`SIGKILL`) of `tslab` cannot clean up and may leave tasks running; stop
+  them by hand.
+- **`--detach`.** `tslab study submit --detach` (and `resubmit --detach`)
+  starts the launch in the background and returns once it runs. The output goes
+  to `.study/local-launch.log`, and `.study/local-launch.json` names the
+  process while it runs. Follow it with `tslab study wait` or `status`. It is
+  an error on a SLURM machine, and a second launch of the same study fails
+  while one is live.
+- **Cancel.** `tslab study cancel` sends `SIGTERM` to the live local launch.
+  A launch is one unit, so the selection must cover all of its live tasks, and
+  `--signal` is for SLURM only. The stopped runs read as `interrupted`.
+- **Usage.** `tslab study usage` reads the usage file each task writes next to
+  its log: the elapsed time, the peak memory, the CPU time and the GPU id. A
+  run without a limit shows `no limit`. The suggestion line is
+  `local: suggest timeout=<value>`.
+- **Automatic retry.** With `[followup] auto_retry = true`, the launch submits
+  the interrupted runs that made progress again when it ends, up to
+  `max_attempts` attempts each, in the same process. `wandb_sync` is for SLURM
+  machines.
+
+## Training stop rules
+
+Training ends by one of three rules: `max_epochs`, `early_stopping`, or
+`max_training_time`. The ready train stage writes `training.json` next to the
+checkpoints with the rule that stopped it (`stop_reason`), the epochs and the
+steps. A run stopped by `max_training_time` logs a warning.
+
+- `max_epochs` is reproducible from the seed.
+- `max_training_time` keeps a run in a time budget, but the number of epochs
+  depends on the speed of the hardware, so the result is not reproducible from
+  the seed. Use `max_epochs` for results that must be.
+
 ## Submit
 
 ```bash
@@ -456,8 +522,9 @@ of the time suggestion, their memory still counting.
 One line per resource group (the runs that share the resolved `[slurm]`
 settings) suggests a `time` and a `mem_per_cpu` that fit the largest run of
 the group with a 20 percent margin; that is the value to put in the machine
-profile. `--json` prints the `tslab.study-usage/1` document. The command is
-for SLURM machines: on a local machine it exits 1.
+profile. `--json` prints the `tslab.study-usage/1` document. On a local machine
+it reads the usage files of the tasks instead of `sacct` (see
+[Local machines](#local-machines)).
 
 ```bash
 uv run tslab study usage my_paper.studies:example --machine cluster
@@ -471,8 +538,9 @@ the running jobs instead of cancelling them; the runs save a checkpoint and
 end on their own, and read as `interrupted`. It is a way to test the timeout
 path without waiting for the time limit; queued runs are skipped, because a
 pending job has no step to signal. See [HPC and SLURM](hpc.md#time-limits)
-for the test. It cannot stop local runs; those run in the foreground of
-`tslab study submit`. See the [Agent guide](agents.md).
+for the test. On a local machine it stops the live local launch (see
+[Local machines](#local-machines)); `--signal` is for SLURM only. See the
+[Agent guide](agents.md).
 
 ```bash
 uv run tslab study cancel my_paper.studies:example --machine cluster --dry-run --json
