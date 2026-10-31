@@ -6,12 +6,15 @@ from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
+import sys
 import threading
+import time
 from typing import cast
 
 from tslab.core.meta import hostname
 from tslab.core.paths import atomic_write_json, read_json_object
 from tslab.core.status import utc_now_iso
+from tslab.jobs.local import start_detached
 from tslab.study.state import LOCAL_ENDED
 
 __all__ = [
@@ -19,6 +22,7 @@ __all__ = [
     'LAUNCH_LOG',
     'LocalLaunch',
     'LocalLaunchError',
+    'detach_launch',
     'hold_launch',
     'launch_is_live',
     'local_job_states',
@@ -182,3 +186,62 @@ def local_job_states(*, study_folder: Path) -> dict[str, str]:
     if launch is None or not launch_is_live(launch=launch):
         return {}
     return {key: _JOB_STATES[state] for key, state in launch.tasks if state in _JOB_STATES}
+
+
+def _log_tail(*, path: Path, lines: int = 20) -> str:
+    try:
+        return '\n'.join(path.read_text(encoding='utf-8', errors='replace').splitlines()[-lines:])
+    except OSError:
+        return ''
+
+
+def detach_launch(  # why: keyword-only public API; each option is documented below
+    *,
+    study_folder: Path,
+    arguments: Sequence[str],
+    project_root: Path,
+    wait_command: str,
+    timeout_seconds: float = 10.0,
+) -> int:
+    """Start ``tslab`` with the arguments in a new session and wait until it holds the pid file.
+
+    Args:
+        study_folder: The ``.study`` folder of the study.
+        arguments: The ``tslab`` arguments of the launch, without ``--detach``.
+        project_root: The folder the process runs in.
+        wait_command: The command shown to follow the launch.
+        timeout_seconds: How long to wait for the pid file.
+
+    Returns:
+        0 once the process holds the pid file; its exit code if it ended first;
+        1 on a launch file problem, a start failure or a timeout.
+    """
+    try:
+        _check_free(study_folder=study_folder)
+        study_folder.mkdir(parents=True, exist_ok=True)
+        log_path = study_folder / LAUNCH_LOG
+        process = start_detached(
+            command=[sys.executable, '-m', 'tslab', *arguments],
+            cwd=project_root,
+            environment=os.environ,
+            log_path=log_path,
+        )
+    except (LocalLaunchError, OSError) as error:
+        _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch problem is shown, not raised
+        return 1
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        launch = read_launch(study_folder=study_folder)
+        if launch is not None and launch.pid == process.pid:
+            _LOGGER.info('local launch %s running; log: %s', process.pid, log_path)
+            _LOGGER.info('next: %s', wait_command)
+            return 0
+        code = process.poll()
+        if code is not None:
+            _LOGGER.error('the launch ended with exit code %s:\n%s', code, _log_tail(path=log_path))
+            return code
+        time.sleep(0.1)
+    _LOGGER.error(
+        'the launch did not start in %s seconds:\n%s', timeout_seconds, _log_tail(path=log_path)
+    )
+    return 1
