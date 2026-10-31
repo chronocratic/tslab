@@ -49,7 +49,7 @@ slurm = { time = "5-00:00:00", gpus = 1, partition = "CHANGE_ME_GPU" }
 [[overrides]]
 match = { grid = "forecasting" }
 slurm = { time = "14-00:00:00" }
-settings = { "trainer.max_training_time" = "4:00:00" }
+settings = { "trainer.job_time_share" = 0.9 }
 """
 
 BASE_SLURM = 'launcher = "slurm"\noutput_root = "runs"\n'
@@ -83,7 +83,7 @@ def test_full_example_loads(cluster_toml: Path, monkeypatch: pytest.MonkeyPatch)
         'recipe': ('ts2vec-paper',),
         'dataset': ('EigenWorms', 'Wallet'),
     }
-    assert profile.overrides[2].settings == {'trainer.max_training_time': '4:00:00'}
+    assert profile.overrides[2].settings == {'trainer.job_time_share': 0.9}
     assert profile.tslab_command == ('uv', 'run', 'tslab')
 
 
