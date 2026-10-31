@@ -1,17 +1,19 @@
 """Launching study jobs on SLURM or locally: files, submission, records."""
 
 from io import StringIO
+import json
 from pathlib import Path
+import subprocess
 import sys
 
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
-from tslab.study import Study
+from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
 from tslab.study.launch import launch, LocalLauncher, SlurmLauncher
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
 from tslab.study.records import read_jobs
 
@@ -146,7 +148,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
     )
     assert len(groups) == 1
     report = launch(
-        launcher=LocalLauncher(project_root=tmp_path, env={}),
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
         machine=machine,
         study=study,
         groups=groups,
@@ -172,7 +174,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         first_job_file=2,
     )
     launch(
-        launcher=LocalLauncher(project_root=tmp_path, env={}),
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
         machine=machine,
         study=study,
         groups=groups2,
@@ -193,7 +195,7 @@ def test_local_launcher_writes_to_given_stream(machine: MachineProfile, tmp_path
     )
     stream = StringIO()
     launch(
-        launcher=LocalLauncher(project_root=tmp_path, env={}, stream=stream),
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings(), stream=stream),
         machine=local_machine,
         study=study,
         groups=groups_of(study, local_machine),
@@ -220,7 +222,7 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
         first_job_file=1,
     )
     report = launch(
-        launcher=LocalLauncher(project_root=tmp_path, env={}),
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
         machine=machine,
         study=study,
         groups=groups,
@@ -232,3 +234,290 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
     assert len(read_jobs(path=folder / 'submissions.jsonl')) == len(groups)
     logs = ''.join(path.read_text() for path in (folder / 'logs').glob('*.out'))
     assert logs.count('could not start') == sum(len(group.tasks) for group in groups)
+
+
+def _local_groups(study: Study, machine: MachineProfile) -> list[JobGroup]:
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    return plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolved,
+        indices=assign_indices(runs=runs, jobs=[]),
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+    )
+
+
+def _times_script(tmp_path: Path) -> Path:
+    script = tmp_path / 'times.py'
+    script.write_text(
+        'import hashlib\n'
+        'import os\n'
+        'import sys\n'
+        'import time\n'
+        'args = sys.argv[1:]\n'
+        'run_path = args[args.index("--run-path") + 1]\n'
+        'key = hashlib.sha1(run_path.encode()).hexdigest()[:12]\n'
+        'cuda = os.environ.get("CUDA_VISIBLE_DEVICES", "none")\n'
+        'path = os.path.join(os.environ["TIMES_DIR"], key + ".times")\n'
+        'with open(path, "w") as f:\n'
+        '    f.write(f"{time.time()}\\n{cuda}\\n")\n'
+        'time.sleep(1)\n'
+        'with open(path, "a") as f:\n'
+        '    f.write(f"{time.time()}\\n")\n'
+    )
+    return script
+
+
+def _local_machine(machine: MachineProfile) -> MachineProfile:
+    return MachineProfile(
+        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+    )
+
+
+def test_local_max_parallel_three_overlaps_at_most_three(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_machine = _local_machine(machine)
+    times = tmp_path / 'times'
+    times.mkdir()
+    monkeypatch.setenv('TIMES_DIR', str(times))
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(_times_script(tmp_path))),
+                axes={'seed': setting_axis(path='seed', values=(0, 1, 2, 3, 4))},
+            )
+        },
+    )
+    local = LocalSettings(max_parallel=3)
+    report = launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=local),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    assert len(report.submitted) == 1
+    folder = study_folder(machine=local_machine, study=study)
+    files = sorted(times.glob('*.times'))
+    assert len(files) == 5
+    events: list[tuple[float, int]] = []
+    for path in files:
+        start, _cuda, end = path.read_text().splitlines()
+        events += [(float(start), 1), (float(end), -1)]
+    events.sort(key=lambda event: (event[0], event[1]))
+    peak = current = 0
+    for _, delta in events:
+        current += delta
+        peak = max(peak, current)
+    assert peak == 3
+    usages = [json.loads(path.read_text()) for path in (folder / 'logs').glob('*.usage.json')]
+    assert len(usages) == 5
+    assert all(usage['exit_code'] == 0 for usage in usages)
+
+
+def test_local_gpu_ids_reach_tasks(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_machine = _local_machine(machine)
+    times = tmp_path / 'times'
+    times.mkdir()
+    monkeypatch.setenv('TIMES_DIR', str(times))
+    monkeypatch.setenv('XDG_RUNTIME_DIR', str(tmp_path / 'xdg'))
+    study = Study(
+        name='s',
+        grids={'g': grid(short_name='g1', command=(sys.executable, str(_times_script(tmp_path))))},
+    )
+    local = LocalSettings(gpus=(0, 1), tasks_per_gpu=2)
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=local, gpu_ids=('0', '1')),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=local_machine, study=study)
+    files = sorted(times.glob('*.times'))
+    assert len(files) == 4
+    for path in files:
+        _start, cuda, _end = path.read_text().splitlines()
+        assert cuda in ('0', '1')
+    headers = [path.read_text().splitlines()[0] for path in (folder / 'logs').glob('*.out')]
+    assert len(headers) == 4
+    assert all('| gpus 0,1' in header for header in headers)
+
+
+def test_local_two_launchers_never_share_a_gpu(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('XDG_RUNTIME_DIR', str(tmp_path / 'xdg'))
+    worker = (
+        'import sys\n'
+        'from pathlib import Path\n'
+        'from tslab.study.definition import StudyRun\n'
+        'from tslab.study.launch import LocalLauncher\n'
+        'from tslab.study.machine import LocalSettings\n'
+        'from tslab.study.plan import JobGroup, PlannedTask, ResolvedRun\n'
+        'root = Path(sys.argv[1])\n'
+        'index = sys.argv[2]\n'
+        'inner = (\n'
+        '    "import os, sys, time; base = os.path.join(sys.argv[1], sys.argv[2]); "\n'
+        "    \"open(base + '.s', 'w').write(str(time.time())); time.sleep(2); \"\n"
+        "    \"open(base + '.e', 'w').write(str(time.time()))\"\n"
+        ')\n'
+        'task = PlannedTask(\n'
+        '    resolved=ResolvedRun(\n'
+        '        run=StudyRun(grid="g", values={}, run_path="p", settings={}),\n'
+        '        settings={},\n'
+        '        slurm=None,\n'
+        '    ),\n'
+        '    index=1,\n'
+        '    log_file=root / ("task" + index + ".log"),\n'
+        '    command=(sys.executable, "-c", inner, str(root), index),\n'
+        '    extra_args=(),\n'
+        '    attempt=1,\n'
+        ')\n'
+        'group = JobGroup(grid="g", job_name="g", slurm=None, job_file=1, tasks=(task,))\n'
+        'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",)).submit(\n'
+        '    group=group, study_folder=root, record=lambda job_id: None\n'
+        ')\n'
+    )
+    procs = [
+        subprocess.Popen(  # noqa: S603 # why: the command is fixed by the test
+            [sys.executable, '-c', worker, str(tmp_path), str(index)]
+        )
+        for index in ('1', '2')
+    ]
+    for proc in procs:
+        assert proc.wait(timeout=60) == 0
+    intervals = sorted(
+        (float((tmp_path / f'{index}.s').read_text()), float((tmp_path / f'{index}.e').read_text()))
+        for index in ('1', '2')
+    )
+    assert intervals[0][1] <= intervals[1][0]
+
+
+def test_local_timeout_sends_usr2_and_logs_steps(machine: MachineProfile, tmp_path: Path) -> None:
+    local_machine = _local_machine(machine)
+    script = tmp_path / 'usr2.py'
+    script.write_text(
+        'import signal\n'
+        'import sys\n'
+        'import time\n'
+        'def done(signum, frame):\n'
+        '    sys.exit(0)\n'
+        'signal.signal(signal.SIGUSR2, done)\n'
+        'while True:\n'
+        '    time.sleep(0.05)\n'
+    )
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(script)),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            )
+        },
+    )
+    local = LocalSettings(timeout='0:03', signal_seconds=1)
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=local),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=local_machine, study=study)
+    log = (folder / 'logs' / 'g1_0.out').read_text()
+    assert 'sent USR2' in log
+    usage = json.loads((folder / 'logs' / 'g1_0.out.usage.json').read_text())
+    assert usage['exit_code'] == 0
+    assert usage['timed_out'] is False
+    assert usage['timeout'] == 3.0
+
+
+def test_local_parallel_console_shows_one_line_per_start_and_end(
+    machine: MachineProfile, tmp_path: Path
+) -> None:
+    local_machine = _local_machine(machine)
+    script = tmp_path / 'echo.py'
+    script.write_text("print('TASK-OUTPUT')\nimport time\ntime.sleep(0.5)\n")
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(script)),
+                axes={'seed': setting_axis(path='seed', values=(0, 1))},
+            )
+        },
+    )
+    stream = StringIO()
+    local = LocalSettings(max_parallel=2)
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=local, stream=stream),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    console = stream.getvalue()
+    assert 'TASK-OUTPUT' not in console
+    assert console.count(' started |') == 2
+    assert console.count(' ended |') == 2
+    assert 'gpu none' in console
+    assert 'exit 0' in console
+
+
+def test_local_usage_file_and_footer(machine: MachineProfile, tmp_path: Path) -> None:
+    local_machine = _local_machine(machine)
+    script = tmp_path / 'alloc.py'
+    script.write_text(
+        'import sys\n'
+        'import time\n'
+        'args = sys.argv[1:]\n'
+        "run_path = args[args.index('--run-path') + 1]\n"
+        'held = bytearray(100 * 1024 * 1024) if run_path.endswith("/100") else bytearray(1024)\n'
+        'time.sleep(1)\n'
+        'del held\n'
+    )
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(script)),
+                axes={'seed': setting_axis(path='seed', values=(100, 1))},
+            )
+        },
+    )
+    local = LocalSettings()
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=local),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=local_machine, study=study)
+    usages = sorted(
+        (json.loads(path.read_text()) for path in (folder / 'logs').glob('*.usage.json')),
+        key=lambda usage: usage['max_rss_bytes'],
+    )
+    assert len(usages) == 2
+    assert all(usage['elapsed_seconds'] >= 1 for usage in usages)
+    assert usages[1]['max_rss_bytes'] >= 100 * 1024 * 1024
+    assert usages[1]['max_rss_bytes'] > usages[0]['max_rss_bytes']
+    for log in (folder / 'logs').glob('*.out'):
+        assert log.read_text().strip().splitlines()[-1].startswith('=== task')

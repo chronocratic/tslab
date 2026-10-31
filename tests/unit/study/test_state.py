@@ -187,7 +187,8 @@ def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
     report = collect_states(
         study_directory=tmp_path, runs=[run('g/a/1')], jobs=[local_job], job_states=None
     )[0]
-    assert report.job_id == 'local-1-0'
+    # the local task id carries the task index, like the SLURM task ids
+    assert report.job_id == 'local-1-0_0'
     assert report.attempt == 1
 
 
@@ -286,3 +287,26 @@ def test_grace_wait_survives_a_missing_run_folder(tmp_path: Path) -> None:
     reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=calls.append)
     assert len(calls) == 30
     assert reports[0].state is StudyState.MISSING
+
+
+def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:
+    record = JobRecord(
+        kind='run',
+        submission_id='s1',
+        time=utc_now_iso(),
+        launcher='local',
+        job_id='local-1-1',
+        job_file=1,
+        tasks=(
+            task(index=1, run_path='g/a/1', attempt=1),
+            task(index=2, run_path='g/a/2', attempt=1),
+        ),
+    )
+    reports = collect_states(
+        study_directory=tmp_path,
+        runs=[run('g/a/1'), run('g/a/2')],
+        jobs=[record],
+        job_states={'local-1-1_1': 'RUNNING', 'local-1-1_2': 'PENDING'},
+    )
+    assert [report.job_id for report in reports] == ['local-1-1_1', 'local-1-1_2']
+    assert [report.job_state for report in reports] == ['RUNNING', 'PENDING']
