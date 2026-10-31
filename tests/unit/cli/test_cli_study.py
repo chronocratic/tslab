@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from tests.unit.study.fake_slurm import install_fake_slurm
+from tests.unit.jobs.fake_slurm import install_fake_slurm
 from tests.unit.study.helpers import finish_run, submit_study
 from tests.unit.study.project import write_toy_project
 from tslab.cli import main

@@ -1,4 +1,4 @@
-"""Fake SLURM executables for the study tests.
+"""Fake SLURM executables for the jobs tests.
 
 Each fake command records ``{"command", "args", "stdin"}`` to ``calls.jsonl``
 and answers from ``answers.json``: per command, a list of

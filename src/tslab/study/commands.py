@@ -14,6 +14,7 @@ import time
 from typing import TextIO
 
 from tslab.core.paths import atomic_write_text, LOCK_FILE
+from tslab.jobs import scancel, SlurmError
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
 from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
@@ -29,7 +30,6 @@ from tslab.study.plan import (
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_lock, take_progress
 from tslab.study.report import log_launch, log_problems, log_status
 from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
-from tslab.study.slurm import scancel, SlurmError
 from tslab.study.state import job_ended, RunReport, StudyState
 
 __all__ = [

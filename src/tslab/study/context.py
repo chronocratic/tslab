@@ -4,12 +4,12 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
+from tslab.jobs import query_job_states, slurm_available, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
 from tslab.study.records import JobRecord, read_jobs, submission_in_progress
-from tslab.study.slurm import query_job_states, slurm_available, SlurmError
 from tslab.study.state import (
     collect_states,
     followup_job_ids,
