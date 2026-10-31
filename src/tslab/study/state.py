@@ -42,7 +42,7 @@ INTERRUPTING_JOB_STATES = frozenset({'TIMEOUT', 'NODE_FAIL', 'PREEMPTED'})
 
 #: Ended SLURM states that read as a failed run.
 FAILING_JOB_STATES = frozenset({'OUT_OF_MEMORY', 'FAILED', 'CANCELLED', 'BOOT_FAIL', 'DEADLINE'})
-_INTERRUPTED_ERROR_PREFIXES = ('TrainingTimeLimitReached:', 'JobTimeLimitSignal:')
+_INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
 
 class StudyState(StrEnum):

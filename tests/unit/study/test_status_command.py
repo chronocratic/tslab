@@ -1,5 +1,6 @@
 """``tslab study status``: the state table and the lines of the runs not done."""
 
+import dataclasses
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status
+from tslab.study.report import log_status
 from tslab.study.state import StudyState
 
 
@@ -92,6 +94,24 @@ def test_time_limit_hint(project: Path, fake: FakeSlurm, caplog: pytest.LogCaptu
         '1 runs stopped at a time limit: raise time in a machine override, '
         'or cap training with --trainer.max-training-time' in text
     )
+
+
+def test_training_paused_displays_time_limit_hint(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    loaded = context(project=project, machine_file='cluster.toml')
+    report = dataclasses.replace(
+        loaded.reports[0],
+        state=StudyState.INTERRUPTED,
+        reason='TrainingPaused: job time share reached',
+        job_state=None,
+    )
+    loaded = dataclasses.replace(loaded, reports=[report])
+
+    with caplog.at_level('INFO'):
+        log_status(context=loaded)
+
+    assert '1 runs stopped at a time limit:' in normalized(caplog.text)
 
 
 def test_unknown_job_states_are_said_once(

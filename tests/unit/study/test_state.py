@@ -93,10 +93,7 @@ def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
         ('TIMEOUT', facts(), StudyState.INTERRUPTED),
         (
             None,
-            facts(
-                run_state='finished',
-                instances={'train': ('failed', 'TrainingTimeLimitReached: 23:30')},
-            ),
+            facts(run_state='finished', instances={'train': ('failed', 'TrainingPaused: 23:30')}),
             StudyState.INTERRUPTED,
         ),
         (None, facts(run_state='failed'), StudyState.FAILED),
@@ -201,10 +198,15 @@ def test_failing_job_state_beats_a_stale_running_file(job_state: str) -> None:
 
 
 def test_time_limit_beats_a_failing_job_state() -> None:
-    folder = facts(
-        run_state='running', instances={'train': ('failed', 'TrainingTimeLimitReached: 1h')}
-    )
+    folder = facts(run_state='running', instances={'train': ('failed', 'TrainingPaused: 1h')})
     assert study_state(job_state='CANCELLED', folder=folder)[0] is StudyState.INTERRUPTED
+
+
+def test_old_training_time_limit_prefix_is_not_interrupted() -> None:
+    folder = facts(
+        run_state='finished', instances={'train': ('failed', 'TrainingTimeLimitReached: 1h')}
+    )
+    assert study_state(job_state=None, folder=folder)[0] is StudyState.FAILED
 
 
 @pytest.mark.parametrize('job_state', ['FAILED', 'TIMEOUT', 'CANCELLED', None])
