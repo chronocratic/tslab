@@ -18,8 +18,10 @@ the code rules reviewers hold every change to.
 
 Run every check listed in `CONTRIBUTING.md` and report failures as they are;
 never claim a check passed without running it. Slow tests are skipped by
-default: run `uv run pytest -m ""` when you touch training, resume, the
-template or the study launcher. `uv run ruff check --fix . && uv run ruff format .`
+default, and CI runs them. Never run the whole slow suite (`uv run pytest -m ""`)
+locally. When you add or edit a slow test, or change the code it covers, run only
+that test by node id: `uv run pytest -m slow tests/path/test_file.py::test_name`.
+`uv run ruff check --fix . && uv run ruff format .`
 fixes most lint and format problems.
 
 ## 2. How the repository is split
