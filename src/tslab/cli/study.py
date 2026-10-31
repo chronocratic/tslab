@@ -581,10 +581,6 @@ class Usage:
         context = _context_of(
             study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
         )
-        if context.machine.launcher != 'slurm':
-            message = 'study usage reads SLURM accounting; this machine is local'
-            _LOGGER.error('%s', message)
-            return 1
         try:
             document = usage_document(context=context)
         except SlurmError as error:

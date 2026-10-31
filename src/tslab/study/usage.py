@@ -4,8 +4,10 @@ from collections.abc import Mapping, Sequence
 from datetime import timedelta
 import logging
 import math
+from pathlib import Path
 from typing import cast
 
+from tslab.core.paths import read_json_object
 from tslab.helpers.text import log_table
 from tslab.jobs.slurm import (
     format_slurm_duration,
@@ -15,7 +17,9 @@ from tslab.jobs.slurm import (
     SlurmJobUsage,
 )
 from tslab.study.context import Context
+from tslab.study.launch import usage_file
 from tslab.study.machine import SlurmSettings
+from tslab.study.plan import log_file_of, study_folder
 from tslab.study.report import resources_of
 from tslab.study.state import RunReport
 
@@ -42,23 +46,76 @@ def usage_document(*, context: Context) -> dict[str, object]:
     Raises:
         SlurmError: If the ``sacct`` usage query fails.
     """
-    usage = _usage_of(context=context)
+    local = context.machine.launcher == 'local'
+    usage, gpu_ids = _local_usage_of(context=context) if local else (_usage_of(context=context), {})
     selected = [
         (report, usage.get(report.job_id))
         for report in context.reports
         if report.job_id is not None
     ]
     runs = [
-        _run_entry(context=context, report=report, usage=usage_item)
+        _run_entry(
+            context=context, report=report, usage=usage_item, gpu_id=gpu_ids.get(report.job_id)
+        )
         for report, usage_item in selected
     ]
     return {
         'schema': 'tslab.study-usage/1',
+        'launcher': context.machine.launcher,
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'runs': runs,
         'groups': _groups(context=context, selected=selected),
     }
+
+
+def _local_usage_of(*, context: Context) -> tuple[dict[str, SlurmJobUsage], dict[str, str | None]]:
+    """The usage of the latest task of every local run, read from its usage file.
+
+    A missing or unreadable file gives a usage with no numbers.
+    """
+    folder = study_folder(machine=context.machine, study=context.study)
+    usage: dict[str, SlurmJobUsage] = {}
+    gpu_ids: dict[str, str | None] = {}
+    for report in context.reports:
+        if report.job_id is None or report.task is None:
+            continue
+        grid = context.study.grids[report.run.grid]
+        log_file = log_file_of(folder=folder, short_name=grid.short_name, index=report.task.index)
+        document = _read_usage_file(path=usage_file(log_file=log_file))
+        usage[report.job_id] = _local_job_usage(document=document, state=report.state.value)
+        gpu_ids[report.job_id] = _gpu_id_of(document=document)
+    return usage, gpu_ids
+
+
+def _read_usage_file(*, path: Path) -> dict[str, object]:
+    try:
+        return read_json_object(path=path)
+    except (OSError, ValueError):
+        return {}
+
+
+def _seconds_of(*, document: Mapping[str, object], key: str) -> timedelta | None:
+    value = document.get(key)
+    return timedelta(seconds=value) if isinstance(value, int | float) else None
+
+
+def _gpu_id_of(*, document: Mapping[str, object]) -> str | None:
+    value = document.get('gpu_id')
+    return None if value is None else str(value)
+
+
+def _local_job_usage(*, document: Mapping[str, object], state: str) -> SlurmJobUsage:
+    rss = document.get('max_rss_bytes')
+    return SlurmJobUsage(
+        state=state,
+        elapsed=_seconds_of(document=document, key='elapsed_seconds'),
+        time_limit=_seconds_of(document=document, key='timeout'),
+        total_cpu=_seconds_of(document=document, key='cpu_seconds'),
+        max_rss=rss if isinstance(rss, int) else None,
+        alloc_cpus=None,
+        gpus=0 if _gpu_id_of(document=document) is None else 1,
+    )
 
 
 def _usage_of(*, context: Context) -> dict[str, SlurmJobUsage]:
@@ -77,7 +134,12 @@ def _groups(
             members[slurm] = []
             order.append(slurm)
         members[slurm].append((report, usage))
-    return [_group_entry(slurm=slurm, members=members[slurm]) for slurm in order]
+    entries = [_group_entry(slurm=slurm, members=members[slurm]) for slurm in order]
+    if context.machine.launcher == 'local':
+        # why: a local run has no memory request to size; only the time limit is suggested
+        for entry in entries:
+            entry['suggested_mem_per_cpu'] = None
+    return entries
 
 
 def _group_entry(
@@ -105,7 +167,7 @@ def _group_entry(
 
 
 def _run_entry(
-    *, context: Context, report: RunReport, usage: SlurmJobUsage | None
+    *, context: Context, report: RunReport, usage: SlurmJobUsage | None, gpu_id: str | None
 ) -> dict[str, object]:
     slurm = context.resolved[report.run.run_path].slurm
     return {
@@ -123,6 +185,7 @@ def _run_entry(
         ),
         'alloc_cpus': usage.alloc_cpus if usage is not None else None,
         'gpus': usage.gpus if usage is not None else 0,
+        'gpu_id': gpu_id,
         'paused': _is_paused(report=report),
     }
 
@@ -150,6 +213,7 @@ def log_usage(*, document: Mapping[str, object]) -> None:
         document: The study-usage document from ``usage_document``.
     """
     runs = _mappings(document.get('runs'))
+    local = document.get('launcher') == 'local'
     log_table(
         logger=_LOGGER,
         header=('run', 'job', 'state', 'elapsed/limit', 'peak/requested', 'cpu time', 'gpus'),
@@ -158,7 +222,7 @@ def log_usage(*, document: Mapping[str, object]) -> None:
                 str(run['run_path']),
                 str(run['job_id']),
                 str(run['state']),
-                _pair(run['elapsed'], run['time_limit']),
+                _pair(run['elapsed'], run['time_limit'], missing='no limit' if local else '-'),
                 _pair(_memory(value=run['max_rss']), _memory(value=run['requested_memory'])),
                 _text(_seconds(value=run['total_cpu_seconds'])),
                 str(run['gpus']),
@@ -170,6 +234,9 @@ def log_usage(*, document: Mapping[str, object]) -> None:
         if run.get('paused'):
             _LOGGER.info('  %s paused: needs more than one job', run['run_path'])
     for group in _mappings(document.get('groups')):
+        if local:
+            _LOGGER.info('local: suggest timeout=%s', group['suggested_time'])
+            continue
         _LOGGER.info(
             '%s: suggest time=%s mem_per_cpu=%s',
             group['slurm'],
@@ -184,8 +251,8 @@ def _mappings(value: object) -> list[Mapping[str, object]]:
     return [item for item in value if isinstance(item, Mapping)]
 
 
-def _pair(first: object, second: object) -> str:
-    return f'{_text(first)}/{_text(second)}'
+def _pair(first: object, second: object, *, missing: str = '-') -> str:
+    return f'{_text(first)}/{missing if second is None else second}'
 
 
 def _memory(*, value: object) -> str | None:

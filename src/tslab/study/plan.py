@@ -33,6 +33,7 @@ __all__ = [
     'assign_indices',
     'check_machine',
     'expansion_env',
+    'log_file_of',
     'next_job_file',
     'plan_jobs',
     'resolve_runs',
@@ -351,6 +352,11 @@ def study_folder(*, machine: MachineProfile, study: Study) -> Path:
     return machine.output_root / study.name / '.study'
 
 
+def log_file_of(*, folder: Path, short_name: str, index: int) -> Path:
+    """The log file of one task: ``<folder>/logs/<short name>_<index>.out``."""
+    return folder / 'logs' / f'{short_name}_{index}.out'
+
+
 def next_job_file(*, study_folder: Path) -> int:
     """The next job file number: one past the largest on disk, else 1."""
     numbers = 1
@@ -430,7 +436,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             next_file += 1
         index = indices[run.run.run_path]
         args = extra_args.get(run.run.run_path, ())
-        log_file = folder / 'logs' / f'{grid.short_name}_{index}.out'
+        log_file = log_file_of(folder=folder, short_name=grid.short_name, index=index)
         try:
             arguments = run_arguments(
                 grid=grid,
