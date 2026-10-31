@@ -11,16 +11,16 @@ import signal
 from threading import current_thread, main_thread
 import time
 from types import FrameType
-from typing import Any, override
+from typing import Any, cast, override, Protocol
 
 import lightning
 from lightning import LightningModule
-from lightning.pytorch.callbacks import Callback, ModelCheckpoint
+from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint, Timer
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
 from tslab.core.artifact import Checkpoint
-from tslab.core.paths import require_path
+from tslab.core.paths import atomic_write_json, require_path
 from tslab.core.run import JobTimeLimitSignal, Run, slurm_task_count
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
@@ -139,6 +139,10 @@ class LightningTrainer(Trainer[LightningModule]):
     ) -> Checkpoint:
         """Train ``model``, resuming from the checkpoints already in ``checkpoint_directory``.
 
+        When the training finishes, the checkpoint directory receives a ``training.json``
+        that records which rule stopped the training: ``max_epochs``, ``early_stopping``
+        or ``max_training_time``.
+
         Raises:
             TrainingPaused: If the job time share paused training; resubmit to resume.
         """
@@ -193,6 +197,7 @@ class LightningTrainer(Trainer[LightningModule]):
                     val_dataloaders=val_loader,
                     ckpt_path=resume_from,
                 )
+        _write_training_record(trainer=trainer, directory=checkpoint_directory)
         return _checkpoint_from(
             trainer=trainer, directory=checkpoint_directory, has_validation=has_validation
         )
@@ -274,3 +279,62 @@ def _checkpoint_from(
     last = Path(callback.last_model_path).name
     best = Path(callback.best_model_path).name if has_validation else ''
     return Checkpoint(directory=directory, best=best or last, last=last)
+
+
+class _TrainerCallbacks(Protocol):
+    """The trainer attributes read after ``fit``: the registered callbacks.
+
+    ``lightning.Trainer`` gets ``callbacks`` from its connector, not from the class
+    body, so it has no static type for it; the cast in ``_training_stop_reason`` is
+    safe because it only runs after ``fit`` returned normally.
+    """
+
+    callbacks: list[Callback]
+
+
+def _training_stop_reason(*, trainer: lightning.Trainer) -> str:
+    """Name the rule that stopped a normal training.
+
+    Args:
+        trainer: The trainer after ``fit`` returned normally.
+
+    Returns:
+        ``'time_limit'`` if the training timer ran out, ``'early_stopping'`` if an
+        early-stopping callback stopped the training, otherwise ``'max_epochs'``.
+    """
+    callbacks = cast('_TrainerCallbacks', trainer).callbacks
+    for callback in callbacks:
+        if isinstance(callback, Timer):
+            remaining = callback.time_remaining()
+            if remaining is not None and remaining <= 0:
+                return 'time_limit'
+    for callback in callbacks:
+        if isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0:
+            return 'early_stopping'
+    return 'max_epochs'
+
+
+def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> None:
+    """Write ``training.json`` next to the checkpoints of a normal training.
+
+    Args:
+        trainer: The trainer after ``fit`` returned normally.
+        directory: The checkpoint directory that receives the record.
+    """
+    stop_reason = _training_stop_reason(trainer=trainer)
+    if stop_reason == 'time_limit':
+        _LOGGER.warning(
+            'training stopped at max_training_time after %d epochs; the result depends on '
+            'hardware speed and is not reproducible from the seed; use max_epochs for '
+            'reproducible results',
+            trainer.current_epoch,
+        )
+    atomic_write_json(
+        path=directory / 'training.json',
+        document={
+            'schema': 'tslab.training/1',
+            'stop_reason': stop_reason,
+            'epochs': trainer.current_epoch,
+            'steps': trainer.global_step,
+        },
+    )
