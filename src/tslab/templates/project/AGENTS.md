@@ -259,6 +259,14 @@ Writing a study:
 - `${VAR}` in a string expands from the machine `[env]`, then the shell
   environment. `{output_root}`, `{study}`, `{run_path}`, `{log_file}`, `{cpus}` expand per run;
   `{cpus}` is `cpus_per_task` on SLURM and the usable CPUs on a local machine.
+- SLURM jobs run through `srun`; `gpus` means one task per GPU. `cpus_per_task` applies to each
+  task, so 4 GPUs with 8 CPUs per task request 32 CPUs.
+- `[slurm] setup` lists shell lines that run before tasks. `gpu_type` selects the GPU type for the
+  GRES request. `signal_seconds` sends `SIGUSR2` before the time limit; `0` disables it.
+- Training saves `last.ckpt` at the next batch boundary after `SIGUSR2`; the run is marked
+  interrupted. Other stages stop without a checkpoint. Resubmit the study to resume training.
+- `[slurm.sbatch_extra]` maps sbatch long names to values. Entries replace matching defaults;
+  `false` removes an option. The old list form is rejected.
 - A study holds data, not logic: no computation or branching on results.
   Every path is checked against the config class at import, and every run is
   parsed at submit, so typos fail before anything runs.

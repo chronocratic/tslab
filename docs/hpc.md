@@ -62,5 +62,8 @@ error files and explain interrupted runs; folder hints suggest opening one run.
 
 ## Distributed training
 
-Only rank 0 writes TSLab files; the other ranks read. Stages other than
-`train` run in one process.
+SLURM jobs use one node and run through `srun`. The `gpus` setting requests one
+task per GPU. For example, `gpus = 4` with `cpus_per_task = 8` starts four
+training tasks and allocates 32 CPUs. All ranks train together, then ranks
+other than rank 0 leave. Only rank 0 writes TSLab files. Stages other than
+`train` run on rank 0 alone.
