@@ -46,8 +46,7 @@ class LightningTrainerConfig:
 
     Attributes:
         max_epochs: Upper bound on training epochs.
-        min_epochs: Epochs trained before any stop signal is honored, including
-            early stopping and the time limit.
+        min_epochs: Epochs trained before early stopping or ``max_training_time`` is honored.
         accelerator: Lightning accelerator (``'auto'``, ``'cpu'``, ``'gpu'``, ...).
         devices: Number of devices, or ``'auto'``.
         check_val_every_n_epoch: Validation interval in epochs.
@@ -60,11 +59,10 @@ class LightningTrainerConfig:
         early_stopping_patience: Validation checks without improvement before
             stopping; ``None`` computes ``max(1, max_epochs // (10 * check_val_every_n_epoch))``.
         early_stopping_min_delta: Smallest change of ``monitor`` that counts as improvement.
-        max_training_time: Time limit in sbatch ``--time`` format (``"M"``, ``"M:S"``,
-            ``"H:M:S"``, ``"D-H"``, ``"D-H:M"`` or ``"D-H:M:S"``). Under SLURM it is capped by the
-            remaining job time.
-        slurm_time_fraction: Fraction of the remaining SLURM job time used for
-            training when ``max_training_time`` is unset or too long.
+        max_training_time: Total training limit in sbatch ``--time`` format. It counts across
+            resumed jobs and ends training when reached.
+        job_time_share: Fraction of the remaining SLURM job time used by each job before
+            training pauses.
         extra_trainer_kwargs: Further ``lightning.Trainer`` arguments, for example
             ``{'gradient_clip_val': 1.0}``. Fingerprinted, because their effect is unknown.
     """
@@ -80,8 +78,8 @@ class LightningTrainerConfig:
     checkpoint_save_top_k: Annotated[int, NotFingerprinted] = 3
     early_stopping_patience: int | None = None
     early_stopping_min_delta: float = 0.001
-    max_training_time: Annotated[str | None, NotFingerprinted] = None
-    slurm_time_fraction: Annotated[float, NotFingerprinted] = 0.5
+    max_training_time: str | None = None
+    job_time_share: Annotated[float, NotFingerprinted] = 0.5
     extra_trainer_kwargs: Mapping[str, bool | int | float | str] = field(
         default_factory=FrozenKwargs
     )

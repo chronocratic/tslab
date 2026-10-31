@@ -1,10 +1,16 @@
 import dataclasses
+from datetime import timedelta
+from pathlib import Path
 import pickle
 
+import lightning
+from lightning.pytorch.callbacks import Callback, ModelCheckpoint, Timer
 import pytest
+import torch
 
 from tslab.core.config import config_from_yaml, config_to_yaml
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.core.run import Run
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.trainer import LightningTrainer
 
@@ -24,10 +30,73 @@ def test_settings_that_cannot_change_weights_are_not_fingerprinted() -> None:
         log_every_n_steps=1,
         enable_progress_bar=False,
         checkpoint_save_top_k=1,
-        max_training_time='01:00:00',
-        slurm_time_fraction=0.9,
+        job_time_share=0.9,
     )
     assert fingerprint(config=unchanged) == fingerprint(config=base)
+
+
+def test_max_training_time_changes_the_fingerprint() -> None:
+    base = LightningTrainerConfig()
+    changed = dataclasses.replace(base, max_training_time='01:00:00')
+    assert fingerprint(config=changed) != fingerprint(config=base)
+
+
+def test_job_time_share_does_not_change_the_fingerprint() -> None:
+    base = LightningTrainerConfig()
+    changed = dataclasses.replace(base, job_time_share=0.9)
+    assert fingerprint(config=changed) == fingerprint(config=base)
+
+
+def test_job_time_share_does_not_set_lightning_max_time(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv('SLURM_JOB_END_TIME', '4102444800')
+    config = LightningTrainerConfig(
+        max_epochs=1, min_epochs=0, accelerator='auto', devices='auto', enable_progress_bar=False
+    )
+    trainer = LightningTrainer(config=config)
+    run = Run(config=config, root=tmp_path, relative_path=Path('run'))
+    checkpoint_directory = tmp_path / 'train'
+    built_trainers: list[lightning.Trainer] = []
+    build_trainer = trainer._build_trainer  # noqa: SLF001 # why: capture the trainer built by fit
+
+    def capture_build(
+        *,
+        run: Run,
+        checkpoint_directory: Path,
+        has_validation: bool,
+        max_time: timedelta | None,
+        signal_stop: Callback | None = None,
+    ) -> lightning.Trainer:
+        built = build_trainer(
+            run=run,
+            checkpoint_directory=checkpoint_directory,
+            has_validation=has_validation,
+            max_time=max_time,
+            signal_stop=signal_stop,
+        )
+        built_trainers.append(built)
+        return built
+
+    def skip_fit(built: lightning.Trainer, **_: object) -> None:
+        checkpoint = built.checkpoint_callback
+        assert isinstance(checkpoint, ModelCheckpoint)
+        last = checkpoint_directory / 'last.ckpt'
+        last.touch()
+        checkpoint.last_model_path = str(last)
+        checkpoint.best_model_path = str(last)
+
+    monkeypatch.setattr(trainer, '_build_trainer', capture_build)
+    monkeypatch.setattr(lightning.Trainer, 'fit', skip_fit)
+    trainer.fit(
+        run=run,
+        model=lightning.LightningModule(),
+        data=_EmptyData(),
+        checkpoint_directory=checkpoint_directory,
+    )
+    assert len(built_trainers) == 1
+    callbacks = getattr(built_trainers[0], 'callbacks')  # noqa: B009 # why: Lightning stores callbacks at runtime
+    assert not any(isinstance(callback, Timer) for callback in callbacks)
 
 
 def test_settings_that_change_weights_are_fingerprinted() -> None:
@@ -71,3 +140,18 @@ def test_extra_trainer_kwargs_are_read_only_hashable_and_picklable() -> None:
     assert hash(config) == hash(
         LightningTrainerConfig(extra_trainer_kwargs={'gradient_clip_val': 1.0})
     )
+
+
+class _EmptyData:
+    @property
+    def info(self) -> object:
+        return object()
+
+    def train_loader(self) -> list[torch.Tensor]:
+        return []
+
+    def val_loader(self) -> None:
+        return None
+
+    def test_loader(self) -> list[torch.Tensor]:
+        return []

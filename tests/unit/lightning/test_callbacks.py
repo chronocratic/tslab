@@ -20,7 +20,7 @@ from tslab.lightning.callbacks import (
     resolve_early_stopping_patience,
 )
 from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.trainer import _defer_time_limit_signals
+from tslab.lightning.trainer import _defer_time_limit_signals, TrainingPaused
 
 
 @pytest.mark.parametrize(
@@ -126,7 +126,7 @@ def test_timer_ignores_checkpoints_without_its_state() -> None:
 
 def test_defer_time_limit_signals_is_safe_in_a_worker_thread(tmp_path: Path) -> None:
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
-    signal_stop = _SignalStop(checkpoint_directory=tmp_path)
+    signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
     errors: list[BaseException] = []
 
     def defer() -> None:
@@ -147,13 +147,14 @@ def test_defer_time_limit_signals_is_safe_without_sigusr2(
 ) -> None:
     monkeypatch.delattr(signal, 'SIGUSR2', raising=False)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
-    signal_stop = _SignalStop(checkpoint_directory=tmp_path)
+    signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
     with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
         pass
 
 
 def test_signal_stop_callback_can_be_pickled(tmp_path: Path) -> None:
-    callback = _SignalStop(checkpoint_directory=tmp_path)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
     pickle.dumps(callback)
 
 
@@ -172,11 +173,64 @@ def test_signal_stop_saves_at_validation_safe_points(tmp_path: Path, hook_name: 
         def save_checkpoint(self, filepath: Path) -> None:
             self.saved.append(filepath)
 
-    callback = _SignalStop(checkpoint_directory=tmp_path, signal_received=True)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(
+        run=run, checkpoint_directory=tmp_path, signal_received=True, deadline=None
+    )
     trainer = FakeTrainer()
 
     with pytest.raises(JobTimeLimitSignal):
         getattr(callback, hook_name)(trainer, LightningModule())
+    assert trainer.saved == [tmp_path / 'last.ckpt']
+
+
+def test_job_deadline_on_one_rank_stops_all_ranks(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    strategy = _FakeStrategy(result=True)
+    trainer = _FakeTrainer(strategy=strategy)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=100.0)
+    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+
+    with pytest.raises(TrainingPaused, match='resubmit'):
+        callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)
+
+    assert strategy.decisions == [(True, False)]
+    assert trainer.saved == [tmp_path / 'last.ckpt']
+
+
+def test_job_deadline_stops_non_writer_rank(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv('RANK', '1')
+    strategy = _FakeStrategy(result=True)
+    trainer = _FakeTrainer(strategy=strategy)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=100.0)
+    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+
+    with pytest.raises(SystemExit) as error:
+        callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)
+
+    assert error.value.code == 0
+    assert strategy.decisions == [(True, False)]
+    assert trainer.saved == [tmp_path / 'last.ckpt']
+
+
+def test_signal_wins_over_job_deadline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    strategy = _FakeStrategy(result=True)
+    trainer = _FakeTrainer(strategy=strategy)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(
+        run=run, checkpoint_directory=tmp_path, signal_received=True, deadline=100.0
+    )
+    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+
+    with pytest.raises(JobTimeLimitSignal):
+        callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)
+
+    assert strategy.decisions == [(True, False)]
     assert trainer.saved == [tmp_path / 'last.ckpt']
 
 
@@ -189,7 +243,8 @@ def test_signal_stop_suppresses_lightning_sigterm_after_usr2(tmp_path: Path) -> 
         calls.append(signal_number)
 
     signal.signal(signal.SIGTERM, lightning_handler)
-    callback = _SignalStop(checkpoint_directory=tmp_path)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
     callback.request_stop()
     try:
         callback.on_sanity_check_start(cast('Trainer', object()), LightningModule())
@@ -199,18 +254,51 @@ def test_signal_stop_suppresses_lightning_sigterm_after_usr2(tmp_path: Path) -> 
         signal.signal(signal.SIGTERM, previous)
 
 
-def test_training_end_stores_the_final_session_time_in_last_checkpoint(tmp_path: Path) -> None:
+def test_training_end_saves_last_checkpoint_at_latest_step(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     checkpoint = ModelCheckpoint(dirpath=tmp_path, save_last=True)
     trainer = lightning.Trainer(
         logger=False, callbacks=[checkpoint], enable_progress_bar=False, max_epochs=1
     )
     last = tmp_path / 'last.ckpt'
-    torch.save({'timer_callback_state': {'sessions_count': 1, 'sessions_times': {1: 0.0}}}, last)
-    checkpoint.last_model_path = str(last)
+    saved: list[Path] = []
     timer = AccumulatingTimerCallback()
+    module = LightningModule()
+
+    def save_checkpoint(*, filepath: Path) -> None:
+        saved.append(filepath)
+        state: dict[str, object] = {'global_step': 42}
+        timer.on_save_checkpoint(trainer, module, state)
+        torch.save(state, filepath)
+
+    monkeypatch.setattr(trainer, 'save_checkpoint', save_checkpoint)
     timer.sessions_count = 1
     timer.start_time = 0.0
-    timer.on_train_end(trainer, LightningModule())
-    state = torch.load(last, weights_only=False)['timer_callback_state']
-    assert state['sessions_times'][1] > 0.0
+    timer.on_train_end(trainer, module)
+    state = torch.load(last, weights_only=False)
+    assert saved == [last]
+    assert state['global_step'] == 42
+    timer_state = state['timer_callback_state']
+    assert timer_state['sessions_count'] == 1
+    assert timer_state['sessions_times'][1] > 0.0
     assert not list(tmp_path.glob('*.tmp'))
+
+
+class _FakeStrategy:
+    def __init__(self, *, result: bool) -> None:
+        self.result = result
+        self.decisions: list[tuple[bool, bool]] = []
+
+    def reduce_boolean_decision(self, *, decision: bool, **options: bool) -> bool:
+        self.decisions.append((decision, options['all']))
+        return self.result
+
+
+class _FakeTrainer:
+    def __init__(self, *, strategy: _FakeStrategy) -> None:
+        self.strategy = strategy
+        self.saved: list[Path] = []
+
+    def save_checkpoint(self, *, filepath: Path) -> None:
+        self.saved.append(filepath)

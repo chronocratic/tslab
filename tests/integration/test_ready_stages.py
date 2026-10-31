@@ -90,14 +90,13 @@ def test_forecasting_runs_end_to_end_on_both_paths(tmp_path: Path) -> None:
         assert all(0.0 <= error < 1.0 for error in errors.values())
 
 
-def test_a_time_limit_fails_train_and_the_rerun_resumes(tmp_path: Path) -> None:
-    def pipeline(*, time_limit: str | None) -> tuple[tslab.Metrics, dict[str, InstanceState]]:
-        # One second, the minimum granularity of the limit: a zero limit fires before the
-        # validation of the first epoch, so Lightning writes no checkpoint to resume from.
-        # The large epoch budget plus patience keeps the 1 s cut before early stopping.
+def test_job_time_share_interrupts_train_and_the_rerun_resumes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def pipeline() -> tuple[tslab.Metrics, dict[str, InstanceState]]:
         trainer = LightningTrainer(
             config=dataclasses.replace(
-                FAST, max_training_time=time_limit, max_epochs=500, early_stopping_patience=300
+                FAST, job_time_share=0.5, max_epochs=500, early_stopping_patience=300
             )
         )
         model = ToySequenceModel(in_channels=1, num_classes=2)
@@ -118,11 +117,13 @@ def test_a_time_limit_fails_train_and_the_rerun_resumes(tmp_path: Path) -> None:
             states = {key: record.state for key, record in run.status().instances.items()}
         return metrics, states
 
-    _, states = pipeline(time_limit='00:00:01')
+    monkeypatch.setenv('SLURM_JOB_END_TIME', '0')
+    _, states = pipeline()
     assert states['train[default]'] is InstanceState.FAILED
     assert states['encode[default]'] is InstanceState.SKIPPED
     assert (tmp_path / 'r' / 'train' / 'default' / '.incomplete').is_file()
-    metrics, states = pipeline(time_limit=None)
+    monkeypatch.delenv('SLURM_JOB_END_TIME')
+    metrics, states = pipeline()
     assert set(states.values()) == {InstanceState.DONE}
     last = torch.load(
         f=tmp_path / 'r' / 'train' / 'default' / 'last.ckpt', map_location='cpu', weights_only=False
