@@ -11,6 +11,7 @@ import time
 __all__ = [
     'QOS_LIMIT_MARKERS',
     'SlurmError',
+    'query_expected_starts',
     'query_job_states',
     'sbatch',
     'scancel',
@@ -151,6 +152,45 @@ def _pipe_lines(*, stdout: str) -> dict[str, str]:
         for expanded in _expand_array_key(key=key):
             states[expanded] = state.split()[0]
     return states
+
+
+def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
+    """Return the estimated start time of each job, as ``squeue --start`` prints it.
+
+    Args:
+        job_ids: Array or single job ids; empty means no calls and ``{}``.
+
+    Returns:
+        ``{task id: start text or None}`` with task ids ``<job>_<index>`` or
+        ``<job>``; ``N/A`` and an empty value become ``None``, other values are
+        returned as printed.
+
+    Raises:
+        SlurmError: If ``squeue`` exits non-zero (squeue not knowing a purged
+            job id is not an error).
+    """
+    if not job_ids:
+        return {}
+    ids = ','.join(job_ids)
+    squeue = _run(
+        command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S']
+    )
+    if squeue.returncode != 0 and _UNKNOWN_JOB not in squeue.stderr:
+        message = f'squeue --start failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
+        raise SlurmError(message)
+    return _pipe_start_lines(stdout=squeue.stdout)
+
+
+def _pipe_start_lines(*, stdout: str) -> dict[str, str | None]:
+    starts: dict[str, str | None] = {}
+    for line in stdout.splitlines():
+        key, _, value = (part.strip() for part in line.partition('|'))
+        if not key:
+            continue
+        start = None if value in ('', 'N/A') else value
+        for expanded in _expand_array_key(key=key):
+            starts[expanded] = start
+    return starts
 
 
 def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:

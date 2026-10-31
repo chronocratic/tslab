@@ -1,6 +1,6 @@
 """JSON documents for study commands."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import shlex
 
 from tslab.jobs.slurm import array_spec
@@ -15,12 +15,16 @@ from tslab.study.state import RunReport, StudyState
 __all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
 
 
-def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
+def run_entry(
+    *, report: RunReport, context: Context, starts: Mapping[str, str | None] | None = None
+) -> dict[str, object]:
     """The JSON fields for one selected run.
 
     Args:
         report: The state report for the run.
         context: The study context containing its folder and live-work state.
+        starts: When given, the entry gains an ``expected_start`` field with the
+            expected start of the run's job, or ``None``.
 
     Returns:
         The run entry with absolute paths.
@@ -32,7 +36,7 @@ def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
         elif report.state is StudyState.INTERRUPTED:
             job_id = context.followup_live_job_ids[0] if context.followup_live_job_ids else None
             reason = 'auto retry queued' if job_id is None else f'auto retry queued (job {job_id})'
-    return {
+    entry: dict[str, object] = {
         'run_path': report.run.run_path,
         'grid': report.run.grid,
         'values': dict(report.run.values),
@@ -43,14 +47,21 @@ def run_entry(*, report: RunReport, context: Context) -> dict[str, object]:
         'attempt': report.attempt,
         'directory': (context.study_directory / report.run.run_path).resolve().as_posix(),
     }
+    if starts is not None:
+        entry['expected_start'] = starts.get(report.job_id) if report.job_id is not None else None
+    return entry
 
 
-def status_document(*, context: Context, exit_code: int) -> dict[str, object]:
+def status_document(
+    *, context: Context, exit_code: int, starts: Mapping[str, str | None] | None = None
+) -> dict[str, object]:
     """The JSON document for the status of selected study runs.
 
     Args:
         context: The study context containing selected runs and machine details.
         exit_code: The status code to report, regardless of CLI opt-in.
+        starts: When given, every run entry gains an ``expected_start`` field
+            with the expected start of its job, or ``null``.
 
     Returns:
         The versioned status document.
@@ -72,7 +83,9 @@ def status_document(*, context: Context, exit_code: int) -> dict[str, object]:
         'job_states_known': context.job_states_known,
         'exit_code': exit_code,
         'counts': counts,
-        'runs': [run_entry(report=report, context=context) for report in context.reports],
+        'runs': [
+            run_entry(report=report, context=context, starts=starts) for report in context.reports
+        ],
     }
 
 

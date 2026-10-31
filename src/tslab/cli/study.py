@@ -27,7 +27,7 @@ from tslab.study.commands import (
     status,
     submit,
 )
-from tslab.study.context import Context, load_context, Selection
+from tslab.study.context import Context, expected_starts, load_context, Selection
 from tslab.study.documents import cancel_document, launch_document, show_document, status_document
 from tslab.study.failures import collect_failures, log_failures
 from tslab.study.launch import LaunchReport
@@ -268,7 +268,8 @@ class Status:
             if self.exit_code and not context.reports:
                 message = 'no runs match the selection; drop --grid/--only or check values'
                 raise UsageError(message)
-            status(context=context, states=states)
+            starts = expected_starts(context=context)
+            status(context=context, states=states, starts=starts)
             _status_hints(
                 context=context,
                 study=self.study,
@@ -278,7 +279,7 @@ class Status:
             )
             code = study_exit_code(context=context)
             if self.json:
-                print_json(document=status_document(context=context, exit_code=code))
+                print_json(document=status_document(context=context, exit_code=code, starts=starts))
             return code if self.exit_code else 0
 
         return watch(seconds=self.watch, show=show)

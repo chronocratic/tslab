@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from tslab.jobs.slurm import query_job_states, slurm_available, SlurmError
+from tslab.jobs.slurm import query_expected_starts, query_job_states, slurm_available, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile
@@ -18,9 +18,10 @@ from tslab.study.state import (
     RUNNING_JOB_STATES,
     RunReport,
     slurm_task_ids,
+    StudyState,
 )
 
-__all__ = ['Context', 'Selection', 'context_for', 'load_context']
+__all__ = ['Context', 'Selection', 'context_for', 'expected_starts', 'load_context']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +77,33 @@ class Context:
     def study_directory(self) -> Path:
         """The ``<output_root>/<study>`` folder that holds the runs."""
         return self.machine.output_root / self.study.name
+
+
+def expected_starts(*, context: Context) -> dict[str, str | None] | None:
+    """The expected start times of the queued runs, keyed by job id.
+
+    Args:
+        context: The context to read the queued runs from.
+
+    Returns:
+        The expected start of every queued run, keyed by its SLURM job id;
+        ``None`` on a local machine, when no run is queued, or when the
+        scheduler call fails (a failed call is logged as a warning).
+    """
+    if context.machine.launcher != 'slurm':
+        return None
+    queued = [
+        report.job_id
+        for report in context.reports
+        if report.state is StudyState.QUEUED and report.job_id is not None
+    ]
+    if not queued:
+        return None
+    try:
+        return query_expected_starts(job_ids=queued)
+    except SlurmError as error:
+        _LOGGER.warning('%s', error)
+        return None
 
 
 def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below

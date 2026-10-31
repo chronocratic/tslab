@@ -2,6 +2,7 @@
 
 from tslab.jobs.slurm.commands import (
     QOS_LIMIT_MARKERS,
+    query_expected_starts,
     query_job_states,
     sbatch,
     scancel,
@@ -28,6 +29,7 @@ __all__ = [
     'export_lines',
     'node_local_tmp_lines',
     'parse_slurm_duration',
+    'query_expected_starts',
     'query_job_states',
     'remaining_job_seconds',
     'sbatch',
