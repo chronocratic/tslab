@@ -293,8 +293,11 @@ Job states come from `squeue` and `sacct`. When those commands are not
 available (a laptop looking at a copied run folder) the job state is unknown
 and the output says so once; the folder-based states still work. The output
 lists per-grid counts by state, totals, then one line per non-`done` run:
-run path, state, the first line of the error, job id. The exit code is 0
-always: a status report is not a failure.
+run path, state, the first line of the error, job id. A queued run ends its
+line with `starts <time>`, the estimate of the start of the job from the
+scheduler; `--json` adds `expected_start` to the runs, `null` when the
+estimate is unknown. The exit code is 0 always: a status report is not a
+failure.
 
 ## Resubmit
 
@@ -387,8 +390,10 @@ uv run tslab study show my_paper.studies:example --json
 
 ## Wait for a study
 
-`tslab study wait` checks selected runs every 60 seconds by default, and ends
-when work finishes or needs attention. The interval cannot be below 10 seconds;
+`tslab study wait` ends when work finishes or needs attention. The first check
+runs at once; later checks start 30 seconds apart, the gap doubles while
+nothing changes and goes back to 30 seconds when a run changes state.
+`--interval SECONDS` sets the longest gap (default 300, at least 10).
 `--timeout` returns exit code 124. Use `--keep-going` to wait until every run
 stops, even after failures. It works in a background shell and supports
 `--json`. See the [Agent guide](agents.md) for exit-code actions.
@@ -400,21 +405,74 @@ uv run tslab study wait my_paper.studies:example --machine cluster --json
 ## Inspect failures
 
 `tslab study failures` shows failed and interrupted runs by default, with full
-instance errors and the last 30 lines of each job log and run log. Missing log
-files are named, not treated as command failures. Use `--states` and `--lines`
-to change the selection and tail size. The command only reads data. See the
+instance errors and the last 30 lines of each job log and run log. Each run
+gets a `hint:` line with what the data shows: the peak and the requested
+memory for an out-of-memory run, a pointer to `time` or `job_time_share` for a
+run stopped by a limit, or a plain resubmit for a preemption or node failure.
+A Python error in the code gets no hint; the traceback is the answer.
+`--json` adds the `hint` field to the runs. Missing log files are named, not
+treated as command failures. Use `--states` and `--lines` to change the
+selection and tail size. The command only reads data. See the
 [Agent guide](agents.md).
 
 ```bash
 uv run tslab study failures my_paper.studies:example --machine cluster --json
 ```
 
+## Run one task in the foreground
+
+`tslab study run` runs exactly one run of the study in the current terminal:
+the command of the run with the `[env]` exports and the `[slurm] setup` lines
+of the machine, standard output and error to the terminal, and the exit code
+of the command. It is a debugging step, not a submission: nothing is recorded
+in the study folder, and SLURM is never called. A done run runs again with the
+cached stages loaded at once; a queued or running run is refused (exit 1),
+because two writers on one run folder clash.
+
+The selection must name exactly one run; zero or several matches are a usage
+error (exit 2) that lists the paths. Arguments after `--` replace the
+pass-through arguments of the latest submission of the run; without them,
+those are reused. The command starts one process; for a multi-GPU job it says
+how many tasks the job would start.
+
+```bash
+uv run tslab study run my_paper.studies:example --machine cluster \
+    --grid classification --only dataset=Coffee --only seed=42
+```
+
+Inside an interactive `salloc` allocation the machine still applies
+`job_time_share` to the training; pass `-- --trainer.job-time-share 1` to
+train for the whole allocation.
+
+## Usage
+
+`tslab study usage` reads the accounting of the selected runs from `sacct`
+and shows what each run used: the state, the elapsed time against the time
+limit, the peak memory against the requested memory, the CPU time, and the
+GPUs. Runs that ended paused or signalled are marked `paused: needs more than
+one job`; they use their share of the time limit by design and are left out
+of the time suggestion, their memory still counting.
+
+One line per resource group (the runs that share the resolved `[slurm]`
+settings) suggests a `time` and a `mem_per_cpu` that fit the largest run of
+the group with a 20 percent margin; that is the value to put in the machine
+profile. `--json` prints the `tslab.study-usage/1` document. The command is
+for SLURM machines: on a local machine it exits 1.
+
+```bash
+uv run tslab study usage my_paper.studies:example --machine cluster
+```
+
 ## Cancel live jobs
 
 `tslab study cancel` cancels queued and running SLURM jobs in the selected
-slice. Use `--dry-run` to inspect job ids first. It cannot stop local runs;
-those run in the foreground of `tslab study submit`. See the
-[Agent guide](agents.md).
+slice. Use `--dry-run` to inspect job ids first. `--signal` sends `USR2` to
+the running jobs instead of cancelling them; the runs save a checkpoint and
+end on their own, and read as `interrupted`. It is a way to test the timeout
+path without waiting for the time limit; queued runs are skipped, because a
+pending job has no step to signal. See [HPC and SLURM](hpc.md#time-limits)
+for the test. It cannot stop local runs; those run in the foreground of
+`tslab study submit`. See the [Agent guide](agents.md).
 
 ```bash
 uv run tslab study cancel my_paper.studies:example --machine cluster --dry-run --json
