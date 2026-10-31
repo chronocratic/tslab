@@ -8,8 +8,8 @@ import time
 
 import pytest
 
+from tslab.study.job_script import job_script
 from tslab.study.machine import SlurmSettings
-from tslab.study.slurm import _as_sbatch_flag, array_spec, job_script
 
 TASKS_LINES = [
     '3 1 ' + shlex.join(['python3', '-c', 'print(3)']),
@@ -104,6 +104,49 @@ def test_job_script_header_and_task(tmp_path: Path) -> None:
     assert not any('mem-per-cpu' in line for line in lines)
     assert "cd '/p q'" in lines
     assert "export A='x y'" in lines
+
+
+@pytest.mark.parametrize(
+    ('name', 'slurm', 'indices'),
+    [
+        ('array', SlurmSettings(partition='compute', time='1:00:00'), (0, 1, 3)),
+        ('followup', SlurmSettings(partition='compute', time='1:00:00'), None),
+        (
+            'gpus-4',
+            SlurmSettings(partition='compute', time='1:00:00', gpus=4, gpu_type='a100'),
+            (0,),
+        ),
+        ('signal-zero', SlurmSettings(partition='compute', time='1:00:00', signal_seconds=0), (0,)),
+        (
+            'sbatch-extra',
+            SlurmSettings(
+                partition='compute',
+                time='1:00:00',
+                sbatch_extra=(('no_requeue', False), ('time', '2:00:00'), ('exclusive', True)),
+            ),
+            (0,),
+        ),
+        (
+            'node-local-tmp-false',
+            SlurmSettings(partition='compute', time='1:00:00', node_local_tmp=False),
+            (0,),
+        ),
+    ],
+)
+def test_job_script_is_unchanged(
+    name: str, slurm: SlurmSettings, indices: tuple[int, ...] | None
+) -> None:
+    actual = job_script(
+        job_name='train',
+        slurm=slurm,
+        indices=indices,
+        tasks_file=Path('/project/jobs/0.tasks'),
+        log_pattern=Path('/project/logs/train_%a.out'),
+        project_root=Path('/project'),
+        env={'EXAMPLE': 'a b'},
+    )
+    expected = Path(__file__).with_name('job_scripts') / f'{name}.sbatch'
+    assert actual == expected.read_text()
 
 
 def test_job_script_writes_gpu_type(tmp_path: Path) -> None:
@@ -217,13 +260,6 @@ def test_missing_task_index_fails_with_a_message(tmp_path: Path) -> None:
     assert str(tasks_file) in result.stderr
 
 
-def test_array_spec() -> None:
-    assert array_spec(indices=(10, 9, 0, 1, 2, 3, 7, 3)) == '0-3,7,9-10'
-    assert array_spec(indices=(4,)) == '4'
-    with pytest.raises(ValueError, match='indices'):
-        array_spec(indices=())
-
-
 def _script(tmp_path: Path, **changes: object) -> str:
     values: dict[str, object] = {
         'job_name': 'cls',
@@ -268,13 +304,6 @@ def test_missing_task_message_survives_a_hostile_path(tmp_path: Path) -> None:
     assert str(tasks_file) in result.stderr
     assert not (tmp_path / 'pwned').exists()
     assert not Path('pwned').exists()
-
-
-def test_as_sbatch_flag() -> None:
-    assert _as_sbatch_flag(key='cpus_per_task', value=4) == '#SBATCH --cpus-per-task=4'
-    assert _as_sbatch_flag(key='exclusive', value=True) == '#SBATCH --exclusive'
-    value = '/a b/x_%a.out'
-    assert _as_sbatch_flag(key='output', value=value) == "#SBATCH --output='/a b/x_%a.out'"
 
 
 def test_job_script_quotes_values_with_spaces(tmp_path: Path) -> None:
