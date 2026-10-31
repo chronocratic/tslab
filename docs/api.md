@@ -47,6 +47,17 @@ import never pulls in heavy code. The commands (`submit`, `status`,
 .. autodata:: tslab.study.DEFAULT_RUN_SETTINGS
 ```
 
+## SLURM job helpers
+
+This provisional API may move to its own package; the names stay. These general
+helpers have no TSLab dependency.
+
+```{eval-rst}
+.. automodule:: tslab.jobs.slurm
+   :members:
+   :imported-members:
+```
+
 ## Command line
 
 `tslab --help` lists the commands, and `tslab <command> --help` their flags.

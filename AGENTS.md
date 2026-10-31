@@ -34,6 +34,7 @@ src/tslab/
   interfaces/          Protocols and ABCs: Trainer, DataSource, Encoder, DownstreamModel, Metric, Tracker
   stages/              the ready stages: train, encode, evaluate
   tasks/               classification and forecasting data shapes and helpers
+  jobs/                general job helpers (slurm/, local/), no TSLab imports (planned own package)
   lightning/           LightningTrainer, LightningDataSource, resume, SLURM signals
   probes/              SVMProbe, RidgeProbe (scikit-learn)
   tracking/            W&B, MLflow, TensorBoard trackers and TrackingOptions
@@ -67,10 +68,62 @@ changelog.d/           towncrier fragments, one per pull request
 - Only `tslab.adapters.chronocratic` imports chronocratic; the models adapter
   never imports the datasets adapter and the other way round.
 - `tslab.tasks` imports none of the optional libraries.
+- `tslab.jobs` imports only the standard library. TSLab code imports from
+  `tslab.jobs.slurm` or `tslab.jobs.local`, only through each domain root.
 
 If a feature seems to need a forbidden import, the design is wrong: add an
 interface in `interfaces/`, or put the code in the package that may import
 the library. Never weaken a rule in `test_import_rules.py`.
+
+### The `tslab.jobs` package
+
+These rules keep SLURM and local job helpers movable to their own distribution.
+Static checks live in `tests/import_rules/test_jobs_package.py`; API and runtime
+rules are enforced by review.
+
+1. **Standard library only.** Files in `src/tslab/jobs/` import only modules in
+   `sys.stdlib_module_names` and `tslab.jobs.*`. Ask a maintainer before adding a
+   third-party dependency. The static AST check
+   `test_jobs_package_imports_only_stdlib_and_itself` enforces this rule.
+2. **No TSLab imports.** Job code imports no `tslab.*` module except
+   `tslab.jobs.*`. Keep local copies of small helpers such as `require_path` or
+   `atomic_write_text` if needed. The same static AST check enforces this rule.
+3. **No TSLab words.** After removing `tslab.jobs`, no package file contains
+   `tslab`, in any case, except the required package docstring. Do not use TSLab
+   vocabulary such as a TSLab run, a stage, a study, an attempt, a machine
+   profile, a fingerprint or W&B. Pass TSLab values such as a `/tmp/tslab-...`
+   prefix, banners and extra exports as parameters. The static
+   `test_jobs_package_only_mentions_tslab_in_required_docstring` check enforces
+   the text rule; review enforces the vocabulary rule.
+4. **Domain doors in.** Code outside the package imports APIs only from
+   `tslab.jobs.slurm` or `tslab.jobs.local`, never from `tslab.jobs` or an
+   internal module. `test_code_outside_imports_only_jobs_domain_roots` checks
+   `src/` and `tests/`, except the package and `tests/unit/jobs/`.
+5. **SLURM vocabulary in the API.** Use sbatch long option names such as
+   `cpus_per_task`, `mem_per_cpu`, `gres` and `array`, with
+   `Mapping[str, object]`. `True` writes a flag; `False` omits it. Add no
+   settings dataclasses with TSLab defaults. Review enforces this rule.
+6. **No hidden state.** Read no environment variables, files or clock values
+   at import time. Pass environment and time as keyword parameters, such as
+   `environment: Mapping[str, str]` and `now: float`. `sbatch` may read
+   `os.environ` only when called, then must filter inherited job variables.
+   Review enforces this rule.
+7. **One subprocess door.** Route every scheduler command through private
+   `_run` in `tslab/jobs/slurm/commands.py`. Missing commands raise `SlurmError`
+   with the command name. Review enforces this rule.
+8. **Own tests, movable.** Keep job tests in `tests/unit/jobs/`. They may import
+   the standard library, `pytest`, `tslab.jobs.slurm`, `tslab.jobs.local` and
+   `tests.unit.jobs.*`; tests may import internal job modules to test private
+   helpers. `test_jobs_tests_import_only_the_jobs_domains` enforces this rule.
+9. **TSLab code rules still apply.** Use keyword-only parameters, `__all__`,
+    Google-style docstrings, assigned error messages before raising, `_LOGGER` with `%s`
+   arguments, and Python 3.12 syntax. Any dataclasses are frozen and
+   keyword-only. Ruff and ty enforce these rules.
+10. **Minimal and general.** Generalize only what TSLab uses today. Add no
+    speculative options or unused features. The package docstring is
+    `General helpers to run jobs on SLURM and on local machines, with no TSLab
+    dependency; planned to move to its own distribution.` The static check
+    verifies the wording; review enforces minimality.
 
 ### Where new code goes
 
