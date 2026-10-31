@@ -358,3 +358,9 @@ they have to read.
 45. A change to what a ready stage computes bumps the `version` of that
     stage, so cached results of the old code are not reused.
 46. Run options (`tslab.RunOptions`) never change a fingerprint.
+
+## 12. Modules
+
+47. A module holds one concept. Above about 400 lines, check whether it
+    holds more than one, and split it by concept if so. Line count alone is
+    no reason to split: a long module with one concept stays whole.
