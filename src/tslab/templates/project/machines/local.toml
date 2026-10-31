@@ -1,4 +1,4 @@
-# The local machine: tasks run one after another, in the foreground.
+# The local machine: tasks run on this machine, one after another by default.
 launcher = "local"
 output_root = "runs"
 
@@ -7,3 +7,13 @@ output_root = "runs"
 # "tracking.wandb_mode" = "offline"
 # "trainer.max_epochs" = 100
 # "data.num_workers" = "{cpus}" # the CPUs this machine may use
+
+# How the tasks of a launch run. Every key is optional.
+# [local]
+# timeout = "02:00:00"        # time limit of one task; none when unset
+# signal_seconds = 120        # SIGUSR2 this many seconds before the limit; 0 turns it off
+# gpus = "auto"               # find the GPUs at launch; [0, 1] for NVIDIA ids, ["mps"] for the Apple GPU
+# skip_busy_gpus = false      # leave out NVIDIA GPUs that already run a compute process
+# max_parallel = 1            # tasks at once without GPUs (not with an explicit gpus list)
+# tasks_per_gpu = 1           # tasks that share one GPU
+# keep_awake = true           # keep the machine awake while a launch runs

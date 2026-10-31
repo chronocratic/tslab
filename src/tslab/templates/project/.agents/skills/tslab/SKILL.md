@@ -32,7 +32,7 @@ Check each document's `schema` before using its fields. Use `grids[].name` for
 resources, then submit only the selection the researcher requested:
 
 ```bash
-uv run tslab study submit {{package_name}}.studies:example --machine local --json
+uv run tslab study submit {{package_name}}.studies:example --machine local --detach
 ```
 
 ## Wait and respond to the result
