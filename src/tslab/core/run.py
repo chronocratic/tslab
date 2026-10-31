@@ -505,20 +505,21 @@ class Run:
         self._previous_sigterm = previous
 
     def _install_sigusr2_handler(self) -> None:
-        if threading.current_thread() is not threading.main_thread():
+        sigusr2 = getattr(signal, 'SIGUSR2', None)
+        if sigusr2 is None or threading.current_thread() is not threading.main_thread():
             return
-        previous = signal.getsignal(signal.SIGUSR2)
+        previous = signal.getsignal(sigusr2)
         if previous is not signal.SIG_DFL:
             _LOGGER.warning('replacing an existing SIGUSR2 handler for this run')
-        signal.signal(signal.SIGUSR2, self._on_sigusr2)
+        signal.signal(sigusr2, self._on_sigusr2)
         self._previous_sigusr2 = previous
 
     def _on_sigusr2(self, signal_number: int, frame: FrameType | None) -> None:
         del signal_number, frame
+        self._time_limit_signalled = True
         if not self._writer:
             _LOGGER.info('SIGUSR2 received on a non-zero rank; rank 0 stops the run')
             return
-        self._time_limit_signalled = True
         if self._executing:
             message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
             raise JobTimeLimitSignal(message)

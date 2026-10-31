@@ -1,19 +1,26 @@
 import dataclasses
 import logging
 from pathlib import Path
+import pickle
+import signal
+from threading import Thread
+from typing import cast
 
 import lightning
-from lightning import LightningModule
+from lightning import LightningModule, Trainer
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 import pytest
 import torch
 
+from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.lightning.callbacks import (
+    _SignalStop,
     AccumulatingTimerCallback,
     build_callbacks,
     resolve_early_stopping_patience,
 )
 from tslab.lightning.config import LightningTrainerConfig
+from tslab.lightning.trainer import _defer_time_limit_signals
 
 
 @pytest.mark.parametrize(
@@ -115,6 +122,81 @@ def test_timer_ignores_checkpoints_without_its_state() -> None:
     timer.on_load_checkpoint(trainer, LightningModule(), {'timer_callback_state': 'garbage'})
     assert timer.sessions_count == 0
     assert timer.sessions_times == {}
+
+
+def test_defer_time_limit_signals_is_safe_in_a_worker_thread(tmp_path: Path) -> None:
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    signal_stop = _SignalStop(checkpoint_directory=tmp_path)
+    errors: list[BaseException] = []
+
+    def defer() -> None:
+        try:
+            with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+                pass
+        except ValueError as error:
+            errors.append(error)
+
+    thread = Thread(target=defer)
+    thread.start()
+    thread.join()
+    assert errors == []
+
+
+def test_defer_time_limit_signals_is_safe_without_sigusr2(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delattr(signal, 'SIGUSR2', raising=False)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    signal_stop = _SignalStop(checkpoint_directory=tmp_path)
+    with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+        pass
+
+
+def test_signal_stop_callback_can_be_pickled(tmp_path: Path) -> None:
+    callback = _SignalStop(checkpoint_directory=tmp_path)
+    pickle.dumps(callback)
+
+
+@pytest.mark.parametrize('hook_name', ['on_validation_end', 'on_sanity_check_end'])
+def test_signal_stop_saves_at_validation_safe_points(tmp_path: Path, hook_name: str) -> None:
+    class Strategy:
+        def reduce_boolean_decision(self, *, decision: bool, **_: bool) -> bool:
+            return decision
+
+    class FakeTrainer:
+        strategy = Strategy()
+
+        def __init__(self) -> None:
+            self.saved: list[Path] = []
+
+        def save_checkpoint(self, filepath: Path) -> None:
+            self.saved.append(filepath)
+
+    callback = _SignalStop(checkpoint_directory=tmp_path, signal_received=True)
+    trainer = FakeTrainer()
+
+    with pytest.raises(JobTimeLimitSignal):
+        getattr(callback, hook_name)(trainer, LightningModule())
+    assert trainer.saved == [tmp_path / 'last.ckpt']
+
+
+def test_signal_stop_suppresses_lightning_sigterm_after_usr2(tmp_path: Path) -> None:
+    previous = signal.getsignal(signal.SIGTERM)
+    calls: list[int] = []
+
+    def lightning_handler(signal_number: int, frame: object) -> None:
+        del frame
+        calls.append(signal_number)
+
+    signal.signal(signal.SIGTERM, lightning_handler)
+    callback = _SignalStop(checkpoint_directory=tmp_path)
+    callback.request_stop()
+    try:
+        callback.on_sanity_check_start(cast('Trainer', object()), LightningModule())
+        signal.raise_signal(signal.SIGTERM)
+        assert calls == []
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 def test_training_end_stores_the_final_session_time_in_last_checkpoint(tmp_path: Path) -> None:

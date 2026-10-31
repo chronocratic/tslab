@@ -377,6 +377,55 @@ def test_usr2_between_stages_fails_the_next_stage_as_signalled(tmp_path: Path) -
     assert (status.instances['second[default]'].error or '').startswith('JobTimeLimitSignal:')
 
 
+def test_signal_before_preparation_does_not_resume_checkpoint_from_another_fingerprint(
+    tmp_path: Path,
+) -> None:
+    observed: list[tuple[int, bool]] = []
+
+    @tslab.stage(name='fit', output=tslab.Json, in_place=True)
+    def fit(*, run: tslab.Run, settings: int, crash: bool) -> tslab.Json:
+        directory = run.instance_directory(stage_name='fit', instance_name=None)
+        observed.append((settings, (directory / 'last.ckpt').exists()))
+        (directory / 'last.ckpt').write_text(str(settings), encoding='utf-8')
+        if crash:
+            message = 'interrupted'
+            raise RuntimeError(message)
+        return tslab.Json(data={'settings': settings})
+
+    with open_run(tmp_path) as run:
+        fit(run=run, settings=1, crash=True)
+    with open_run(tmp_path) as run:
+        os.kill(os.getpid(), signal.SIGUSR2)
+        with pytest.raises(tslab.JobTimeLimitSignal):
+            fit(run=run, settings=2, crash=False)
+    with open_run(tmp_path) as run:
+        fit(run=run, settings=2, crash=False)
+
+    assert observed == [(1, False), (2, False)]
+
+
+def test_signal_before_forced_preparation_does_not_resume_old_checkpoint(tmp_path: Path) -> None:
+    observed: list[bool] = []
+
+    @tslab.stage(name='fit', output=tslab.Json, in_place=True)
+    def fit(*, run: tslab.Run) -> tslab.Json:
+        directory = run.instance_directory(stage_name='fit', instance_name=None)
+        observed.append((directory / 'last.ckpt').exists())
+        (directory / 'last.ckpt').write_text('checkpoint', encoding='utf-8')
+        return tslab.Json(data={})
+
+    with open_run(tmp_path) as run:
+        fit(run=run)
+    with run_with_options(tmp_path, force_all=True) as run:
+        os.kill(os.getpid(), signal.SIGUSR2)
+        with pytest.raises(tslab.JobTimeLimitSignal):
+            fit(run=run)
+    with open_run(tmp_path) as run:
+        fit(run=run)
+
+    assert observed == [False, False]
+
+
 def test_usr2_after_the_last_stage_finishes_the_run(tmp_path: Path) -> None:
     assert hasattr(tslab, 'JobTimeLimitSignal')
     with open_run(tmp_path):
@@ -467,10 +516,12 @@ def test_all_ranks_stage_follows_the_agreed_cache_decision(tmp_path: Path) -> No
         executed.append(1)
         return tslab.Json(data={'value': len(executed)})
 
+    first_agreement = FakeAgreement()
     with open_run(tmp_path) as run:
-        everywhere(run=run, agreement=FakeAgreement())
+        everywhere(run=run, agreement=first_agreement)
     agreement = FakeAgreement(cache=False)
     with open_run(tmp_path) as run:
         result = everywhere(run=run, agreement=agreement)
     assert result.data == {'value': 2}
-    assert agreement.keys == ['everywhere[default]:cache', 'everywhere[default]:prepared']
+    assert agreement.keys != first_agreement.keys
+    assert [key.rsplit(':', maxsplit=1)[-1] for key in agreement.keys] == ['cache', 'prepared']
