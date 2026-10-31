@@ -11,6 +11,7 @@ from tslab.study.state import StudyState
 __all__ = ['wait_for_study']
 
 _LOGGER = logging.getLogger(__name__)
+_FIRST_GAP_SECONDS = 30
 _COUNT_ORDER = (
     StudyState.DONE,
     StudyState.RUNNING,
@@ -34,7 +35,8 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
 
     Args:
         load: Load the latest context of the selected study.
-        interval: Seconds between status checks.
+        interval: Longest gap between checks in seconds; checks start 30 seconds
+            apart and slow down while nothing changes.
         timeout: Maximum seconds to wait, or ``None`` for no limit.
         keep_going: Wait for every live run instead of stopping on failure.
         sleep: Wait between checks.
@@ -45,6 +47,7 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
     """
     start = clock()
     previous_counts: tuple[int, ...] | None = None
+    gap: float = min(_FIRST_GAP_SECONDS, interval)
     warned_unknown = False
     last_context: Context | None = None
     last_code: int | None = None
@@ -57,6 +60,9 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
             if counts != previous_counts:
                 _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
                 previous_counts = counts
+                gap = min(_FIRST_GAP_SECONDS, interval)
+            else:
+                gap = min(gap * 2, interval)
             if code == EXIT_UNKNOWN and not warned_unknown:
                 _LOGGER.warning('SLURM job states unknown; still waiting')
                 warned_unknown = True
@@ -67,9 +73,9 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
             if _should_stop(context=context, code=code, keep_going=keep_going):
                 return code, context, waited
 
-            if timeout is not None and waited + interval > timeout:
+            if timeout is not None and waited + gap > timeout:
                 return EXIT_TIMEOUT, context, waited
-            sleep(interval)
+            sleep(gap)
         except KeyboardInterrupt:
             if last_context is None or last_code is None:
                 raise

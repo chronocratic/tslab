@@ -322,7 +322,8 @@ class Wait:
         machine: A machine name or profile path.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
-        interval: Seconds between checks; at least 10.
+        interval: Longest gap between checks in seconds (at least 10); checks start
+            30 seconds apart and slow down while nothing changes.
         timeout: Stop after this many seconds.
         keep_going: Wait until no run is live, even after a failure.
         json: Print one study-wait JSON document.
@@ -334,7 +335,7 @@ class Wait:
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
     ] = ()
-    interval: Annotated[float, tyro.conf.arg(metavar='SECONDS')] = 60.0
+    interval: Annotated[float, tyro.conf.arg(metavar='SECONDS')] = 300.0
     timeout: Annotated[float | None, tyro.conf.arg(metavar='SECONDS')] = None
     keep_going: bool = False
     json: bool = False
