@@ -11,8 +11,13 @@ have to read.
 
 [`CONTRIBUTING.md`](CONTRIBUTING.md) is the source for setup, the checks CI
 runs, test markers, branches, changelog fragments, protected files and docs.
-Read it first; this file does not repeat it. It adds how the code is split and
-the code rules reviewers hold every change to.
+Read it first; this file does not repeat it. It adds the checks to run, how
+the code is split, the project template, public API promises and git.
+
+[`CODING_RULES.md`](CODING_RULES.md) holds every coding convention: how to
+work on a change, control flow (no nested `if`), functional style, design
+patterns, types, names, errors, docstrings, prose and tests. Read it before
+you write code; reviewers hold every change to it.
 
 ## 1. Before you say a change is done
 
@@ -43,7 +48,7 @@ src/tslab/
     datasets/          chronocratic-datasets as TSLab data sources, study helpers
   study/               studies: grids, machine profiles, SLURM and local launch, results
   cli/                 `tslab new | status | study | wandb-sync`
-  templates/project/   the files `tslab new` copies (see section 6)
+  templates/project/   the files `tslab new` copies (see section 3)
 tests/
   unit/<package>/      unit tests, one folder per source package
   integration/         whole pipelines on toy data
@@ -115,10 +120,10 @@ rules are enforced by review.
    the standard library, `pytest`, `tslab.jobs.slurm`, `tslab.jobs.local` and
    `tests.unit.jobs.*`; tests may import internal job modules to test private
    helpers. `test_jobs_tests_import_only_the_jobs_domains` enforces this rule.
-9. **TSLab code rules still apply.** Use keyword-only parameters, `__all__`,
-    Google-style docstrings, assigned error messages before raising, `_LOGGER` with `%s`
-   arguments, and Python 3.12 syntax. Any dataclasses are frozen and
-   keyword-only. Ruff and ty enforce these rules.
+9. **TSLab code rules still apply.** Every rule in `CODING_RULES.md` holds:
+   keyword-only parameters, `__all__`, Google-style docstrings, assigned
+   error messages before raising, `_LOGGER` with `%s` arguments, Python 3.12
+   syntax, frozen keyword-only dataclasses. Ruff and ty enforce most of them.
 10. **Minimal and general.** Generalize only what TSLab uses today. Add no
     speculative options or unused features. The package docstring is
     `General helpers to run jobs on SLURM and on local machines, with no TSLab
@@ -134,119 +139,9 @@ rules are enforced by review.
 - An integration with a third-party library: its own package (like
   `lightning/` or `probes/`) or `adapters/<library>/`, so the core stays free of it.
 - A command: `cli/<command>.py`, routed from `cli/__init__.py`.
-- Tests mirror the source: code in `src/tslab/study/plan.py` is tested in
-  `tests/unit/study/test_plan.py`.
+- Tests mirror the source (see `CODING_RULES.md` Part III, rule 37).
 
-## 3. Clean code rules
-
-These are enforced by ruff (every rule on), ty (every rule an error) and the
-tests in `tests/import_rules/`. Where a tool does not enforce one, reviewers do.
-
-### Simplicity
-
-1. Write the minimum code that solves the problem. No speculative features,
-   no options nobody asked for, no "for later" scaffolding.
-2. No abstraction with one implementation unless it is a published extension
-   point. No factory for one product, no config for a value that never changes.
-3. Prefer the standard library and the dependencies already in
-   `pyproject.toml`. A new dependency needs a strong reason and version bounds.
-4. Deletion over addition. Boring over clever.
-5. **Surgical changes:** touch only what the task needs. Note unrelated
-   problems in your report; do not fix them in the same change.
-
-### Python and types
-
-6. Python 3.12 syntax: `class Trainer[M](ABC)`, `type InstanceName = str | tuple[str, ...]`,
-   `X | None` (never `Optional`), `Self`. No `from __future__ import annotations`
-   unless a circular import forces it.
-7. Every method that overrides a base method has `@override` (`from typing import override`).
-8. No `# ty: ignore` in `src/`. Fix types by narrowing (`isinstance`), typed
-   helpers, or a `cast(...)` with a comment that says why it is safe. In
-   tests, `# ty: ignore[code]` only on a line that misuses an API on purpose.
-9. Prefer Protocols for things users already own (data sources, encoders,
-    metrics), so their objects fit without inheriting from TSLab.
-
-### Functions, calls and data
-
-10. **Keyword-only parameters** with a leading `*`: `def fit(*, run: Run, model: M) -> Checkpoint:`.
-11. Keyword arguments in calls (see `CONTRIBUTING.md`) also apply to your own
-    functions; the only exception is a third-party API with positional-only parameters.
-12. **Dataclasses are `@dataclass(frozen=True, kw_only=True)`**, written on one
-    line. `tests/import_rules/test_dataclass_rules.py` checks every `.py` and
-    `.md` file. Mappings in frozen dataclasses are read-only (`MappingProxyType`
-    or a tuple of pairs), so frozen really means frozen.
-13. **Paths are `pathlib.Path`.** Every public parameter that is a location is
-    typed `Path`, never `str` or `str | Path`, and is checked with
-    `require_path(value=..., parameter=...)`, which raises `TypeError` for `str`.
-    Convert to `str` only at a third-party boundary. Saved files store paths
-    relative to the run folder with `.as_posix()`.
-14. **Atomic writes:** write a temporary file, `fsync`, then rename. Use the
-    helpers in `tslab.core.paths` (`atomic_write_text`, `atomic_write_json`).
-    A crash must never leave a half-written file that looks valid.
-15. **Names say what things are:** a scope prefix plus what it is
-    (`TSForecastingDataInfo`, `LightningTrainer`, `DownstreamModel`), never a
-    bare `Info`, `Model` or `Source`. Private module helpers start with `_`.
-16. Each module that is imported by users lists its public names in `__all__`.
-
-### Errors and logging
-
-17. **Fail loud, contain the blast radius.** Never swallow an error silently;
-    one failing stage instance must not stop unrelated work. A tracker that
-    fails is logged and skipped, never fails the run.
-18. Assign the message, then raise: `message = f'...'; raise ValueError(message)`.
-    Messages say what was wrong and what to do (`pass --name`).
-19. Catch the narrowest exception. A broad `except` needs
-    `# noqa: BLE001 # why: <reason>`.
-20. Logging: each module defines `_LOGGER = logging.getLogger(__name__)` and
-    uses `%s` arguments, not f-strings. No `print()` in library code; only
-    `cli/` and `examples/` may print.
-
-### Suppressions
-
-21. Never add a rule to a global or per-file ignore list. Fix the code, or
-    suppress one line with `# noqa: CODE # why: <reason>`; a blanket `# noqa`
-    is never allowed.
-
-### Formatting
-
-22. Single quotes, line length 100, imports sorted by ruff. Run
-    `uv run ruff format .`; do not hand-format against it.
-
-## 4. Docstrings, comments and prose
-
-23. Docstrings (Google style, see `CONTRIBUTING.md`) carry `Args:`, `Returns:`
-    and `Raises:` sections, and `Attributes:` on dataclasses. They become the
-    API page of the docs.
-24. Comments explain **why**, not what. Remove comments that repeat the code.
-25. Comments and docs explain themselves: never refer to internal design
-    notes, decision ids, issue-tracker shorthand or files that are not in the
-    repository. Write the reason itself ("keeps `import tslab.core.run` free
-    of Lightning").
-26. No academic citations in code, docstrings or docs: no author names, no
-    years, no "as in the ... paper". Model names such as `TS2Vec` and `CoST` stay.
-27. Write "time series" as two words, never "time-series".
-28. No possessive `'s` on things: "the run folder", not "the run's folder";
-    "the settings of the recipe", not "the recipe's settings". People are fine.
-29. Plain, short sentences. No marketing words.
-30. Nothing personal or site-specific lands in the repository: no cluster
-    partition or QOS names, no personal paths, no W&B entities, no personal
-    names. Examples use placeholders such as `CHANGE_ME`. Authorship is
-    "The Chronocratic Developers".
-
-## 5. Tests
-
-31. Test first: write the test, see it fail for the expected reason, write the
-    code, see it pass, then run the full checks.
-32. Every folder a test writes to comes from `tmp_path`. Tests never write
-    into the repository.
-33. Tests that use randomness call `tslab.core.seeding.seed_everything(seed=0)`
-    or pass an explicit seed.
-34. Test names say what they check (`test_require_path_rejects_str`),
-    so they need no docstring.
-35. Use the `slow` and `chronocratic` markers from `CONTRIBUTING.md`.
-36. A bug fix comes with a test that fails without the fix.
-
-## 6. The project template
+## 3. The project template
 
 `src/tslab/templates/project/` holds plain files that `tslab new` copies into a
 folder the user owns. `{{project_name}}` (for example `my-paper`) and
@@ -263,19 +158,14 @@ folder the user owns. `{{project_name}}` (for example `my-paper`) and
 - Use only the public API there (`tslab`, `tslab.stages`, `tslab.lightning`,
   `tslab.tracking`, `tslab.adapters...`), never private `_` names.
 
-## 7. Public API and compatibility
+## 4. Public API and compatibility
 
 - `tslab/__init__.py` and the `__all__` of each subpackage are a promise to
   users. Adding a name is cheap; renaming or removing one is a breaking change
   and needs a `removed` or `changed` changelog fragment.
-- Settings that change a result change the fingerprint. Settings that cannot
-  change a result (device, workers, logging intervals) are
-  `Annotated[..., tslab.NotFingerprinted]`.
-- A change to what a ready stage computes bumps the `version` of that stage,
-  so cached results of the old code are not reused.
-- Run options (`tslab.RunOptions`) never change a fingerprint.
+- Fingerprints and stage versions: see `CODING_RULES.md` Part III, section 11.
 
-## 8. Git and pull requests
+## 5. Git and pull requests
 
 Branches, commit flow, changelog fragments and protected files: see
 `CONTRIBUTING.md`. In addition:
