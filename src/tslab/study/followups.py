@@ -49,7 +49,12 @@ def queue_followups(
         return 0, []
     dependency = 'afterany:' + ':'.join(job_ids)
     slurm = dataclasses.replace(
-        machine.slurm, time=followup.time, cpus_per_task=1, gpus=0, mem_per_cpu=None
+        machine.slurm,
+        time=followup.time,
+        cpus_per_task=1,
+        gpus=0,
+        mem_per_cpu=None,
+        signal_seconds=0,
     )
     folder = study_folder(machine=machine, study=context.study)
     records: list[JobRecord] = []

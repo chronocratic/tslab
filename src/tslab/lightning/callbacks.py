@@ -2,8 +2,10 @@
 
 import logging
 from pathlib import Path
-from threading import Event
+import signal
+from threading import current_thread, main_thread
 import time
+from types import FrameType
 from typing import Any, override
 
 from lightning import LightningModule, Trainer
@@ -15,7 +17,7 @@ from lightning.pytorch.callbacks import (
 )
 import torch
 
-from tslab.core.run import is_writer_process, JobTimeLimitSignal, Run
+from tslab.core.run import is_writer_process, JobTimeLimitSignal
 from tslab.lightning.config import LightningTrainerConfig
 
 __all__ = [
@@ -30,19 +32,69 @@ _STATE_KEY = 'timer_callback_state'
 
 
 class _SignalStop(Callback):
-    def __init__(self, *, run: Run, signal_received: Event, checkpoint_directory: Path) -> None:
+    def __init__(self, *, checkpoint_directory: Path, signal_received: bool = False) -> None:
         super().__init__()
-        self._run = run
         self._signal_received = signal_received
         self._checkpoint_directory = checkpoint_directory
+        self._sigterm_filter_installed = False
+
+    @property
+    def signalled(self) -> bool:
+        return self._signal_received
+
+    def request_stop(self) -> None:
+        self._signal_received = True
+
+    @override
+    def on_sanity_check_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        del trainer, pl_module
+        self._install_sigterm_filter()
+
+    @override
+    def on_train_start(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        del trainer, pl_module
+        self._install_sigterm_filter()
+
+    def _install_sigterm_filter(self) -> None:
+        if (
+            self._sigterm_filter_installed
+            or getattr(signal, 'SIGUSR2', None) is None
+            or current_thread() is not main_thread()
+        ):
+            return
+        previous = signal.getsignal(signal.SIGTERM)
+
+        def defer_after_usr2(signal_number: int, frame: FrameType | None) -> None:
+            if self.signalled:
+                _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
+                return
+            if callable(previous):
+                previous(signal_number, frame)
+            elif previous is not signal.SIG_IGN:
+                raise SystemExit(128 + signal_number)
+
+        signal.signal(signal.SIGTERM, defer_after_usr2)
+        self._sigterm_filter_installed = True
 
     @override
     def on_train_batch_end(
         self, trainer: Trainer, pl_module: LightningModule, outputs: Any, batch: Any, batch_idx: int
     ) -> None:
         del pl_module, outputs, batch, batch_idx
-        signalled = self._signal_received.is_set() or self._run.time_limit_signalled
-        stop = trainer.strategy.reduce_boolean_decision(decision=signalled, all=False)
+        self._stop_at_safe_point(trainer=trainer)
+
+    @override
+    def on_validation_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        del pl_module
+        self._stop_at_safe_point(trainer=trainer)
+
+    @override
+    def on_sanity_check_end(self, trainer: Trainer, pl_module: LightningModule) -> None:
+        del pl_module
+        self._stop_at_safe_point(trainer=trainer)
+
+    def _stop_at_safe_point(self, *, trainer: Trainer) -> None:
+        stop = trainer.strategy.reduce_boolean_decision(decision=self.signalled, all=False)
         if not stop:
             return
         trainer.save_checkpoint(filepath=self._checkpoint_directory / 'last.ckpt')

@@ -114,6 +114,7 @@ def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm
     assert '--dependency=afterany:1000' in retry_script
     assert '--array' not in retry_script
     assert '#SBATCH --time=00:30:00' in retry_script
+    assert '#SBATCH --signal=USR2@120' not in retry_script
     assert '--gres' not in retry_script
     retry_tasks = job_file_of(project=project, job_file=retry.job_file, suffix='tasks').read_text()
     machine = (project / 'cluster.toml').as_posix()

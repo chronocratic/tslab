@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import inspect
+from itertools import count
 import logging
 import os
 from pathlib import Path
@@ -56,6 +57,7 @@ from tslab.core.text import describe_error, qualified_name
 __all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'RankAgreement', 'Stage', 'stage']
 
 _LOGGER = logging.getLogger(__name__)
+_AGREEMENT_SEQUENCE = count()
 INSTANCE_META_FORMAT_VERSION = 1
 _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
@@ -77,6 +79,8 @@ class _Execution:
     instance_id: str
     directory: Path
     fingerprint: str
+    previous_fingerprint: str | None = None
+    agreement_key: str
     settings: dict[str, object]
     inputs: Mapping[str, Artifact]
     agreement: RankAgreement | None = None
@@ -229,9 +233,13 @@ class Stage[Out: Artifact](ABC):
             if self.all_ranks
             else None
         )
+        agreement_key = (
+            f'{next(_AGREEMENT_SEQUENCE)}:{instance_id}' if agreement is not None else instance_id
+        )
         loaded = self._cached_result(
             directory=directory,
             instance_id=instance_id,
+            agreement_key=agreement_key,
             stale_reason=stale_reason,
             agreement=agreement,
         )
@@ -245,6 +253,8 @@ class Stage[Out: Artifact](ABC):
             instance_id=instance_id,
             directory=directory,
             fingerprint=fingerprint,
+            previous_fingerprint=None if record is None else record.fingerprint,
+            agreement_key=agreement_key,
             settings=settings,
             inputs=inputs,
             agreement=agreement,
@@ -262,6 +272,7 @@ class Stage[Out: Artifact](ABC):
         *,
         directory: Path,
         instance_id: str,
+        agreement_key: str,
         stale_reason: str | None,
         agreement: RankAgreement | None,
     ) -> Artifact | None:
@@ -273,7 +284,7 @@ class Stage[Out: Artifact](ABC):
         if agreement is None:
             return loaded
         use_cache = agreement.agree_across_ranks(
-            key=f'{instance_id}:cache', value=stale_reason is None and loaded is not None
+            key=f'{agreement_key}:cache', value=stale_reason is None and loaded is not None
         )
         if use_cache and loaded is None:
             loaded = self._try_load(directory=directory, instance_id=instance_id)
@@ -317,6 +328,7 @@ class Stage[Out: Artifact](ABC):
         fingerprint = execution.fingerprint
         started_at = utc_now_iso()
         start = time.perf_counter()
+        prepared = False
         run.record_instance(
             instance_id=instance_id,
             record=InstanceRecord(
@@ -328,8 +340,11 @@ class Stage[Out: Artifact](ABC):
             work_directory = self._prepare_work_directory(
                 run=run, directory=directory, resume=resume, instance_id=instance_id
             )
+            prepared = True
             if execution.agreement is not None:
-                execution.agreement.agree_across_ranks(key=f'{instance_id}:prepared', value=True)
+                execution.agreement.agree_across_ranks(
+                    key=f'{execution.agreement_key}:prepared', value=True
+                )
             artifact = self.execute(**arguments)
             if not isinstance(artifact, self.output_type):
                 message = (
@@ -354,9 +369,15 @@ class Stage[Out: Artifact](ABC):
                 )
                 self._publish(work_directory=work_directory, directory=directory)
         except JobTimeLimitSignal as error:
+            failure_fingerprint = execution.fingerprint
+            if not prepared and not resume:
+                failure_fingerprint = execution.previous_fingerprint
+                if failure_fingerprint == execution.fingerprint:
+                    failure_fingerprint = None
             self._record_failure(
                 execution=execution,
                 error=error,
+                fingerprint=failure_fingerprint,
                 started_at=started_at,
                 seconds=time.perf_counter() - start,
             )
@@ -366,6 +387,7 @@ class Stage[Out: Artifact](ABC):
             return self._record_failure(
                 execution=execution,
                 error=error,
+                fingerprint=execution.fingerprint,
                 started_at=started_at,
                 seconds=time.perf_counter() - start,
             )
@@ -429,6 +451,7 @@ class Stage[Out: Artifact](ABC):
         *,
         execution: _Execution,
         error: Exception | JobTimeLimitSignal,
+        fingerprint: str | None,
         started_at: str,
         seconds: float,
     ) -> Artifact:
@@ -452,7 +475,7 @@ class Stage[Out: Artifact](ABC):
             instance_id=instance_id,
             record=InstanceRecord(
                 state=InstanceState.FAILED,
-                fingerprint=execution.fingerprint,
+                fingerprint=fingerprint,
                 started_at=started_at,
                 finished_at=utc_now_iso(),
                 seconds=seconds,

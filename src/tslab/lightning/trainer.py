@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 import pickle
 import signal
-from threading import Event
+from threading import current_thread, main_thread
 import time
 from types import FrameType
 from typing import Any, override
@@ -42,12 +42,16 @@ _RESERVED_TRAINER_KWARGS = frozenset(
 
 
 @contextmanager
-def _defer_time_limit_signals(*, run: Run, signal_received: Event) -> Generator[None, None, None]:
-    previous_sigusr2 = signal.getsignal(signal.SIGUSR2)
+def _defer_time_limit_signals(*, run: Run, signal_stop: _SignalStop) -> Generator[None, None, None]:
+    sigusr2 = getattr(signal, 'SIGUSR2', None)
+    if sigusr2 is None or current_thread() is not main_thread():
+        yield
+        return
+    previous_sigusr2 = signal.getsignal(sigusr2)
     previous_sigterm = signal.getsignal(signal.SIGTERM)
 
     def defer_sigusr2(signal_number: int, frame: FrameType | None) -> None:
-        signal_received.set()
+        signal_stop.request_stop()
         if callable(previous_sigusr2):
             try:
                 previous_sigusr2(signal_number, frame)
@@ -55,7 +59,7 @@ def _defer_time_limit_signals(*, run: Run, signal_received: Event) -> Generator[
                 return
 
     def defer_sigterm(signal_number: int, frame: FrameType | None) -> None:
-        if signal_received.is_set() or run.time_limit_signalled:
+        if signal_stop.signalled or run.time_limit_signalled:
             _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
             return
         if callable(previous_sigterm):
@@ -63,13 +67,13 @@ def _defer_time_limit_signals(*, run: Run, signal_received: Event) -> Generator[
         elif previous_sigterm is not signal.SIG_IGN:
             raise SystemExit(128 + signal_number)
 
-    signal.signal(signal.SIGUSR2, defer_sigusr2)
+    signal.signal(sigusr2, defer_sigusr2)
     try:
         signal.signal(signal.SIGTERM, defer_sigterm)
         yield
     finally:
         signal.signal(signal.SIGTERM, previous_sigterm)
-        signal.signal(signal.SIGUSR2, previous_sigusr2)
+        signal.signal(sigusr2, previous_sigusr2)
 
 
 class TrainingTimeLimitReached(RuntimeError):  # noqa: N818 # why: public API name from the spec
@@ -168,13 +172,10 @@ class LightningTrainer(Trainer[LightningModule]):
         else:
             val_loader = data.val_loader()
             has_validation = val_loader is not None
-        signal_received = Event()
-        if run.time_limit_signalled:
-            signal_received.set()
         signal_stop = _SignalStop(
-            run=run, signal_received=signal_received, checkpoint_directory=checkpoint_directory
+            checkpoint_directory=checkpoint_directory, signal_received=run.time_limit_signalled
         )
-        with _defer_time_limit_signals(run=run, signal_received=signal_received):
+        with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
             trainer = self._build_trainer(
                 run=run,
                 checkpoint_directory=checkpoint_directory,
