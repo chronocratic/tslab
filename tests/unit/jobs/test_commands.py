@@ -1,3 +1,4 @@
+from datetime import timedelta
 import os
 from pathlib import Path
 import subprocess
@@ -8,9 +9,11 @@ from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.jobs.slurm import (
     query_expected_starts,
     query_job_states,
+    query_job_usage,
     sbatch,
     scancel,
     SlurmError,
+    SlurmJobUsage,
     submission_environment,
 )
 from tslab.jobs.slurm.commands import _expand_array_key
@@ -104,6 +107,58 @@ def test_query_expected_starts_accepts_squeue_not_knowing_a_job(fake: FakeSlurm)
         'squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id specified'}]
     )
     assert query_expected_starts(job_ids=['1000_0']) == {}
+
+
+def test_query_job_usage_folds_steps_into_task(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': (
+                    '1000_2|COMPLETED|01:00:00|02:00:00|00:50:00.5||4|billing=4,cpu=4,gres/gpu=1\n'
+                    '1000_2.batch|COMPLETED|01:00:00||00:01:00|100M|4|\n'
+                    '1000_2.0|COMPLETED|00:59:00||00:49:00|3G|4|\n'
+                ),
+            }
+        ],
+    )
+    usage = query_job_usage(job_ids=['1000_2'])['1000_2']
+    assert isinstance(usage, SlurmJobUsage)
+    assert usage.state == 'COMPLETED'
+    assert usage.max_rss == 3 * 1024**3
+    assert usage.gpus == 1
+    assert usage.alloc_cpus == 4
+    assert usage.elapsed == timedelta(hours=1)
+    assert usage.time_limit == timedelta(hours=2)
+    assert usage.total_cpu == timedelta(minutes=50)
+
+
+def test_query_job_usage_running_job_has_no_rss(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|RUNNING|00:10:00|02:00:00|||4|\n'}])
+    usage = query_job_usage(job_ids=['1000_2'])['1000_2']
+    assert usage.state == 'RUNNING'
+    assert usage.max_rss is None
+    assert usage.total_cpu is None
+    assert usage.elapsed == timedelta(minutes=10)
+
+
+def test_query_job_usage_keeps_first_word_of_state(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_2|CANCELLED by 123|01:00:00|02:00:00|||4|\n'}]
+    )
+    assert query_job_usage(job_ids=['1000_2'])['1000_2'].state == 'CANCELLED'
+
+
+def test_query_job_usage_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
+    assert query_job_usage(job_ids=[]) == {}
+    assert fake.calls('sacct') == []
+
+
+def test_query_job_usage_raises_on_failure(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'exit': 1, 'stderr': 'sacct: error: Problem talking to slurmdbd'}])
+    with pytest.raises(SlurmError, match='slurmdbd'):
+        query_job_usage(job_ids=['1000_2'])
 
 
 def test_query_job_states(fake: FakeSlurm) -> None:

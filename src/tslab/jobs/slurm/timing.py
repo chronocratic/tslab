@@ -4,11 +4,19 @@ from collections.abc import Mapping
 from datetime import timedelta
 import logging
 
-__all__ = ['parse_slurm_duration', 'remaining_job_seconds']
+__all__ = [
+    'format_slurm_duration',
+    'parse_sacct_duration',
+    'parse_slurm_duration',
+    'remaining_job_seconds',
+]
 
 _LOGGER = logging.getLogger(__name__)
 _END_TIME_VARIABLE = 'SLURM_JOB_END_TIME'
 _FORMAT_HINT = 'use an sbatch --time format: "M", "M:S", "H:M:S", "D-H", "D-H:M" or "D-H:M:S"'
+
+# why: what sacct prints in the duration fields when there is no duration to report
+_SACCT_NON_VALUES = ('UNLIMITED', 'Partition_Limit', 'INVALID')
 
 
 def parse_slurm_duration(*, text: str) -> timedelta:
@@ -55,6 +63,47 @@ def parse_slurm_duration(*, text: str) -> timedelta:
         message = f'invalid duration {text!r}; {_FORMAT_HINT}, without negative parts'
         raise ValueError(message)
     return timedelta(days=days) + clock_delta
+
+
+def parse_sacct_duration(*, text: str) -> timedelta | None:
+    """Parse a duration from ``sacct``, which also prints words and fractions.
+
+    Args:
+        text: A duration such as ``"1-02:03:04"`` or ``"01:02.345"``, or
+            ``""``, ``"UNLIMITED"``, ``"Partition_Limit"`` or ``"INVALID"``.
+
+    Returns:
+        The duration, with a fraction of a second dropped; ``None`` for an
+        empty string and the non-duration values.
+    """
+    stripped = text.strip()
+    if stripped in ('', *_SACCT_NON_VALUES):
+        return None
+    # why: sacct prints TotalCPU with a fraction of a second, sbatch --time does not
+    whole, _, fraction = stripped.partition('.')
+    if fraction:
+        stripped = whole
+    return parse_slurm_duration(text=stripped)
+
+
+def format_slurm_duration(*, duration: timedelta) -> str:
+    """Format a duration in sbatch ``--time`` format, rounded up to the minute.
+
+    Args:
+        duration: The duration to format.
+
+    Returns:
+        ``H:MM:SS`` below one day, ``D-HH:MM:SS`` from one day.
+    """
+    whole_seconds = duration // timedelta(seconds=1)
+    if duration > whole_seconds * timedelta(seconds=1):
+        whole_seconds += 1
+    minutes = (int(whole_seconds) + 59) // 60
+    days, remainder = divmod(minutes, 24 * 60)
+    hours, mins = divmod(remainder, 60)
+    if days:
+        return f'{days}-{hours:02d}:{mins:02d}:00'
+    return f'{hours}:{mins:02d}:00'
 
 
 def remaining_job_seconds(*, environment: Mapping[str, str], now: float) -> float | None:
