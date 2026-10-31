@@ -5,7 +5,7 @@ import subprocess
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.jobs import query_job_states, sbatch, SlurmError, submission_environment
+from tslab.jobs.slurm import query_job_states, sbatch, SlurmError, submission_environment
 from tslab.jobs.slurm.commands import _expand_array_key
 
 

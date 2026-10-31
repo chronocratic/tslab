@@ -40,7 +40,17 @@ def _imports(*, path: Path, root: Path, package: str) -> list[tuple[int, str]]:
                 ]
                 target = '.'.join((*parts, target) if target else parts)
             targets.append((node.lineno, target))
+            if target == 'tslab':
+                targets.extend(
+                    (node.lineno, 'tslab.jobs') for alias in node.names if alias.name == 'jobs'
+                )
     return targets
+
+
+def test_imports_identifies_jobs_imported_from_parent(tmp_path: Path) -> None:
+    path = tmp_path / 'module.py'
+    path.write_text('from tslab import jobs\n')
+    assert (1, 'tslab.jobs') in _imports(path=path, root=tmp_path, package='tests')
 
 
 def _is_within(*, path: Path, root: Path) -> bool:
@@ -71,7 +81,26 @@ def test_jobs_package_never_says_tslab() -> None:
     assert not violations, '\n'.join(violations)
 
 
-def test_code_outside_imports_only_the_jobs_package_root() -> None:
+def test_jobs_root_does_not_reexport_apis() -> None:
+    path = _JOBS_SOURCE / '__init__.py'
+    tree = ast.parse(path.read_text())
+    exports = [
+        node.value.elts
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == '__all__' for target in node.targets)
+        and isinstance(node.value, ast.List)
+    ]
+    imports = [
+        target
+        for _, target in _imports(path=path, root=_JOBS_SOURCE, package='tslab.jobs')
+        if target.startswith('tslab.jobs.')
+    ]
+    assert exports == [[]]
+    assert not imports
+
+
+def test_code_outside_imports_only_jobs_domain_roots() -> None:
     violations = [
         f'{path.relative_to(_ROOT)}:{line}:{target}'
         for search_root in (_SOURCE, _TESTS)
@@ -83,19 +112,26 @@ def test_code_outside_imports_only_the_jobs_package_root() -> None:
             root=_SOURCE if _is_within(path=path, root=_SOURCE) else _TESTS,
             package='tslab' if _is_within(path=path, root=_SOURCE) else 'tests',
         )
-        if target.startswith('tslab.jobs.')
+        if target == 'tslab.jobs'
+        or (
+            target.startswith('tslab.jobs.')
+            and target not in ('tslab.jobs.slurm', 'tslab.jobs.local')
+        )
     ]
     assert not violations, '\n'.join(violations)
 
 
-def test_jobs_tests_import_only_the_jobs_package() -> None:
+def test_jobs_tests_import_only_the_jobs_domains() -> None:
     allowed_roots = sys.stdlib_module_names | {'pytest'}
     violations = [
         f'{path.relative_to(_ROOT)}:{line}:{target}'
         for path in _python_files(root=_JOBS_TESTS)
         for line, target in _imports(path=path, root=_JOBS_TESTS, package='tests.unit.jobs')
         if target.split('.', 1)[0] not in allowed_roots
-        and not (target == 'tslab.jobs' or target.startswith('tslab.jobs.'))
+        and not (
+            target in ('tslab.jobs.slurm', 'tslab.jobs.local')
+            or target.startswith(('tslab.jobs.slurm.', 'tslab.jobs.local.'))
+        )
         and not (target == 'tests.unit.jobs' or target.startswith('tests.unit.jobs.'))
     ]
     assert not violations, '\n'.join(violations)

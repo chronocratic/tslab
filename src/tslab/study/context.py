@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from tslab.jobs import query_job_states, slurm_available, SlurmError
+from tslab.jobs.slurm import query_job_states, slurm_available, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile

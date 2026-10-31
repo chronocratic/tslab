@@ -15,7 +15,7 @@ from uuid import uuid4
 from tslab.core.meta import hostname
 from tslab.core.paths import atomic_write_text
 from tslab.core.status import utc_now_iso
-from tslab.jobs import sbatch, SlurmError
+from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
 from tslab.study.machine import MachineProfile, SlurmSettings
 from tslab.study.plan import JobGroup, next_job_file, PlannedTask, study_folder
