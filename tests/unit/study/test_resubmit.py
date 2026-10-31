@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
+from tests.unit.study.helpers import (
+    context,
+    finish_run,
+    jobs_of,
+    no_sleep,
+    submit_study,
+    write_run_status,
+)
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -256,3 +263,34 @@ def test_unknown_slurm_states_refuse_to_submit(
     assert code == 1
     assert len(fake.calls('sbatch')) == 1
     assert 'not submitting' in caplog.text
+
+
+def test_auto_resubmit_retries_paused_run_with_progress(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    # g/small/1 paused by job_time_share; it saved a checkpoint before the pause
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FAILED,
+        instance=InstanceState.FAILED,
+        error='TrainingPaused: job time share reached',
+    )
+    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_0|COMPLETED\n'}])
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        auto=True,
+        dry_run=True,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    # the dry-run plan holds only the paused run, one attempt further on
+    tasks_files = sorted((project / 'runs' / 's' / '.study' / 'jobs').glob('*.tasks'))
+    planned = tasks_files[-1].read_text()
+    assert planned.startswith('0 2 ')
+    assert '--run-path g/small/1' in planned
+    assert 'g/small/2' not in planned
+    assert 'g/large' not in planned
+    assert len(jobs_of(project=project)) == 1
