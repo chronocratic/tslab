@@ -6,11 +6,11 @@ import logging
 import shlex
 import time
 
+from tslab.jobs import SlurmError
 from tslab.study.context import Context
 from tslab.study.launch import submit_helper_job
 from tslab.study.plan import study_folder
 from tslab.study.records import JobRecord, submission_lock
-from tslab.study.slurm import SlurmError
 
 __all__ = ['queue_followups']
 

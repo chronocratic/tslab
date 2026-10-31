@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.jobs.fake_slurm import FakeSlurm
 from tslab.study.doctor import run_checks
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.jobs.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status

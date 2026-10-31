@@ -4,7 +4,7 @@ import dataclasses
 from pathlib import Path
 from typing import cast
 
-from tests.unit.study.fake_slurm import FakeSlurm
+from tests.unit.jobs.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import (
     context,
     finish_run,
