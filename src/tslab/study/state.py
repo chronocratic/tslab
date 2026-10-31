@@ -16,6 +16,7 @@ from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 __all__ = [
     'FAILING_JOB_STATES',
     'INTERRUPTING_JOB_STATES',
+    'LOCAL_ENDED',
     'QUEUED_JOB_STATES',
     'RUNNING_JOB_STATES',
     'FolderFacts',
@@ -42,6 +43,8 @@ INTERRUPTING_JOB_STATES = frozenset({'TIMEOUT', 'NODE_FAIL', 'PREEMPTED'})
 
 #: Ended SLURM states that read as a failed run.
 FAILING_JOB_STATES = frozenset({'OUT_OF_MEMORY', 'FAILED', 'CANCELLED', 'BOOT_FAIL', 'DEADLINE'})
+#: The job state of a local task that is not in a live launch.
+LOCAL_ENDED = 'ENDED'
 _INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
 
@@ -134,7 +137,7 @@ def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
                 return first_line(text=record.error)
     if folder.read_error is not None:
         return folder.read_error
-    if job_state is not None:
+    if job_state is not None and job_state != LOCAL_ENDED:
         return f'SLURM {job_state}'
     return None
 

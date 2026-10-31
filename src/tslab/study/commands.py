@@ -6,6 +6,7 @@ functions, so the behavior is testable without the command line.
 """
 
 from collections.abc import Callable, Mapping, Sequence
+import contextlib
 import json
 import logging
 import os
@@ -25,11 +26,13 @@ from tslab.study.launch import (
     launch,
     Launcher,
     LaunchReport,
+    local_job_id,
     LocalLauncher,
     resolve_local_gpus,
     SIGNAL_EXIT_BASE,
     SlurmLauncher,
 )
+from tslab.study.local_launch import hold_launch, LocalLaunchError
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import (
     assign_indices,
@@ -553,13 +556,14 @@ def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) 
         )
 
 
-def _launcher_of(
+def _launcher_of(  # noqa: PLR0913 # why: keyword-only private helper; one keyword per launcher input
     *,
     machine: MachineProfile,
     project_root: Path,
     sleep: Callable[[float], None],
     task_stream: TextIO | None = None,
     gpu_ids: tuple[str, ...] = (),
+    on_task_state: Callable[[str, str], None] | None = None,
 ) -> Launcher:
     if machine.launcher == 'slurm':
         return SlurmLauncher(sleep=sleep)
@@ -569,7 +573,76 @@ def _launcher_of(
         local=machine.local or LocalSettings(),  # why: loaded local profiles always carry the table
         gpu_ids=gpu_ids,
         stream=task_stream,
+        on_task_state=on_task_state,
     )
+
+
+def _local_task_ids(*, groups: Sequence[JobGroup]) -> list[str]:
+    return [
+        f'{local_job_id(job_file=group.job_file)}_{task.index}'
+        for group in groups
+        for task in group.tasks
+    ]
+
+
+def _launch_held(  # noqa: PLR0913 # why: keyword-only private helper; one keyword per input of launch
+    *,
+    context: Context,
+    groups: Sequence[JobGroup],
+    folder: Path,
+    dry_run: bool,
+    begin: str | None,
+    sleep: Callable[[float], None],
+    task_stream: TextIO | None,
+) -> LaunchReport | None:
+    """Launch the groups; on a local machine hold the pid file and keep the machine awake.
+
+    Returns:
+        The launch report; ``None`` when a GPU or launch file problem was logged.
+    """
+    machine = context.machine
+    gpu_ids: tuple[str, ...] = ()
+    keep_awake: subprocess.Popen[bytes] | None = None
+    is_local = machine.launcher != 'slurm' and not dry_run
+    if is_local:
+        # why: a loaded local profile always carries the table
+        local = machine.local or LocalSettings()
+        try:
+            gpu_ids = resolve_local_gpus(local=local, environment=os.environ)
+        except ValueError as error:
+            _LOGGER.error('%s', error)  # noqa: TRY400 # why: a GPU setup error is shown, not raised
+            return None
+        _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
+        if local.keep_awake:
+            keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
+    try:
+        with contextlib.ExitStack() as stack:
+            on_task_state = None
+            if is_local:
+                on_task_state = stack.enter_context(
+                    hold_launch(study_folder=folder, task_ids=_local_task_ids(groups=groups))
+                )
+            return launch(
+                launcher=_launcher_of(
+                    machine=machine,
+                    project_root=context.project_root,
+                    sleep=sleep,
+                    task_stream=task_stream,
+                    gpu_ids=gpu_ids,
+                    on_task_state=on_task_state,
+                ),
+                machine=machine,
+                study=context.study,
+                groups=groups,
+                project_root=context.project_root,
+                dry_run=dry_run,
+                begin=begin,
+            )
+    except LocalLaunchError as error:
+        _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch file problem is shown, not raised
+        return None
+    finally:
+        stop_keep_awake(process=keep_awake)
 
 
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
@@ -638,37 +711,17 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if failure is not None:
             _LOGGER.error('%s', failure)
             return 1, []
-        gpu_ids: tuple[str, ...] = ()
-        keep_awake: subprocess.Popen[bytes] | None = None
-        if machine.launcher != 'slurm' and not dry_run:
-            # why: a loaded local profile always carries the table
-            local = machine.local or LocalSettings()
-            try:
-                gpu_ids = resolve_local_gpus(local=local, environment=os.environ)
-            except ValueError as error:
-                _LOGGER.error('%s', error)  # noqa: TRY400 # why: a GPU setup error is shown, not raised
-                return 1, []
-            _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
-            if local.keep_awake:
-                keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
-        try:
-            report = launch(
-                launcher=_launcher_of(
-                    machine=machine,
-                    project_root=context.project_root,
-                    sleep=sleep,
-                    task_stream=task_stream,
-                    gpu_ids=gpu_ids,
-                ),
-                machine=machine,
-                study=context.study,
-                groups=groups,
-                project_root=context.project_root,
-                dry_run=dry_run,
-                begin=begin,
-            )
-        finally:
-            stop_keep_awake(process=keep_awake)
+        report = _launch_held(
+            context=context,
+            groups=groups,
+            folder=folder,
+            dry_run=dry_run,
+            begin=begin,
+            sleep=sleep,
+            task_stream=task_stream,
+        )
+        if report is None:
+            return 1, []
         if on_launch is not None:
             on_launch(report, groups)
     return log_launch(report=report, groups=groups)

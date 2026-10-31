@@ -7,13 +7,15 @@ from pathlib import Path
 from tslab.jobs.slurm import query_expected_starts, query_job_states, slurm_available, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
+from tslab.study.local_launch import local_job_states
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
-from tslab.study.records import JobRecord, read_jobs, submission_in_progress
+from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_in_progress
 from tslab.study.state import (
     collect_states,
     followup_job_ids,
     job_ended,
+    LOCAL_ENDED,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
     RunReport,
@@ -169,6 +171,8 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
             except SlurmError as error:
                 _LOGGER.warning('%s', error)
                 job_states_known = False
+    if machine.launcher == 'local':
+        job_states = _local_states(machine=machine, study=study, jobs=jobs)
     reports = collect_states(
         study_directory=machine.output_root / study.name,
         runs=runs,
@@ -192,6 +196,19 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         followup_live=bool(followup_live_job_ids),
         followup_live_job_ids=followup_live_job_ids,
     )
+
+
+def _local_states(
+    *, machine: MachineProfile, study: Study, jobs: list[JobRecord]
+) -> dict[str, str]:
+    live = local_job_states(study_folder=study_folder(machine=machine, study=study))
+    # why: a local task outside a live launch is over, whatever its folder says
+    ended = {
+        f'{job.job_id}_{task.index}': LOCAL_ENDED
+        for job, task in latest_tasks(jobs=jobs).values()
+        if job.launcher == 'local'
+    }
+    return {**ended, **live}
 
 
 def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) -> dict[str, str]:
