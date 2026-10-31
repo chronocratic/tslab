@@ -16,7 +16,9 @@ TOY_SCRIPT = '''
 """The toy experiment script of the toy study project."""
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import time
 from typing import Annotated
 
 import tyro
@@ -58,7 +60,7 @@ def main() -> None:
     # words of the study reach the union
     config = tyro.cli(ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
     with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
-        pass
+        time.sleep(float(os.environ.get('TOY_SLEEP', '0')))
 
 
 if __name__ == '__main__':

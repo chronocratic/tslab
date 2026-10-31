@@ -34,9 +34,10 @@ from tslab.study.documents import cancel_document, launch_document, show_documen
 from tslab.study.failures import collect_failures, log_failures
 from tslab.study.launch import LaunchReport
 from tslab.study.loading import load_study
+from tslab.study.local_launch import detach_launch
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
-from tslab.study.plan import JobGroup
+from tslab.study.plan import JobGroup, study_folder
 from tslab.study.report import log_show
 from tslab.study.state import StudyState
 from tslab.study.usage import log_usage, usage_document
@@ -119,6 +120,52 @@ def _selection_args(
     return shlex.join(arguments)
 
 
+def _selection_options(*, grid: tuple[str, ...], only: tuple[str, ...]) -> list[str]:
+    options: list[str] = []
+    for grid_name in grid:
+        options.extend(('--grid', grid_name))
+    for selection in only:
+        options.extend(('--only', selection))
+    return options
+
+
+def _detach(  # noqa: PLR0913 # why: keyword-only private helper; one keyword per part of the command line
+    *,
+    context: Context,
+    command: str,
+    selection_options: Sequence[str],
+    options: Sequence[str],
+    flags: Sequence[str],
+    extra_args: Sequence[str],
+    request: tuple[str, str],
+) -> int:
+    """Start the command again in the background; the arguments are the original ones."""
+    study, machine = request
+    if context.machine.launcher == 'slurm':
+        message = '--detach is for local machines; SLURM jobs already run in the background'
+        raise UsageError(message)
+    arguments = [
+        'study',
+        command,
+        study,
+        '--machine',
+        machine,
+        *selection_options,
+        *options,
+        *flags,
+    ]
+    if extra_args:
+        arguments.extend(('--', *extra_args))
+    return detach_launch(
+        study_folder=study_folder(machine=context.machine, study=context.study),
+        arguments=arguments,
+        project_root=context.project_root,
+        wait_command=shlex.join(
+            ['tslab', 'study', 'wait', study, '--machine', machine, *selection_options]
+        ),
+    )
+
+
 def _warn_no_runs(*, context: Context) -> None:
     if not context.reports:
         _LOGGER.warning('no runs match the selection; drop --grid/--only or check their values')
@@ -168,6 +215,8 @@ class Submit:
             several values of one axis.
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
+        detach: Local machines only: start the launch in the background and return once
+            it runs; follow it with tslab study wait.
         extra_args: The arguments after --, appended to every run.
         json: Print one study-launch JSON document.
     """
@@ -180,6 +229,7 @@ class Submit:
     ] = ()
     include_done: bool = False
     dry_run: bool = False
+    detach: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
     json: bool = False
 
@@ -188,6 +238,25 @@ class Submit:
         context = _context_of(
             study=self.study, machine=self.machine, grid=self.grid, only=self.only
         )
+        if self.detach:
+            flags = [
+                flag
+                for flag, on in (
+                    ('--include-done', self.include_done),
+                    ('--dry-run', self.dry_run),
+                    ('--json', self.json),
+                )
+                if on
+            ]
+            return _detach(
+                context=context,
+                command='submit',
+                selection_options=_selection_options(grid=self.grid, only=self.only),
+                options=[],
+                flags=flags,
+                extra_args=self.extra_args,
+                request=(self.study, self.machine),
+            )
         _warn_no_runs(context=context)
 
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
@@ -592,6 +661,8 @@ class Resubmit:
         auto: Retry only the interrupted runs that made progress, up to
             followup.max_attempts each; ignores --states and --cancel-live.
             The follow-up jobs pass this.
+        detach: Local machines only: start the launch in the background and return once
+            it runs; follow it with tslab study wait.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
         json: Print one study-launch JSON document.
@@ -609,6 +680,7 @@ class Resubmit:
     cancel_live: bool = False
     dry_run: bool = False
     auto: bool = False
+    detach: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
     json: bool = False
 
@@ -618,6 +690,29 @@ class Resubmit:
         context = _context_of(
             study=self.study, machine=self.machine, grid=self.grid, only=self.only
         )
+        if self.detach:
+            flags = [
+                flag
+                for flag, on in (
+                    ('--cancel-live', self.cancel_live),
+                    ('--dry-run', self.dry_run),
+                    ('--auto', self.auto),
+                    ('--json', self.json),
+                )
+                if on
+            ]
+            options: list[str] = []
+            for state in self.states:
+                options.extend(('--states', state))
+            return _detach(
+                context=context,
+                command='resubmit',
+                selection_options=_selection_options(grid=self.grid, only=self.only),
+                options=options,
+                flags=flags,
+                extra_args=self.extra_args,
+                request=(self.study, self.machine),
+            )
         _warn_no_runs(context=context)
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
 
