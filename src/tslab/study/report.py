@@ -1,7 +1,7 @@
 """What the study commands print: the state table, the launch plan, the problems."""
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import logging
 import shlex
 
@@ -13,7 +13,7 @@ from tslab.study.launch import LaunchReport
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import StudyState
+from tslab.study.state import RunReport, StudyState
 
 __all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']
 
@@ -24,12 +24,19 @@ _PROBLEMS_SHOWN = 20
 _TABLE_STATES: tuple[StudyState, ...] = tuple(StudyState)
 
 
-def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None:
+def log_status(
+    *,
+    context: Context,
+    states: tuple[StudyState, ...] = (),
+    starts: Mapping[str, str | None] | None = None,
+) -> None:
     """Log the state table of the study and one line per run not done.
 
     Args:
         context: The context to report on.
         states: When given, the listed lines are limited to these states.
+        starts: When given, the lines of queued runs end with their expected
+            start time, as reported by the scheduler.
     """
     if context.machine.launcher == 'slurm' and not context.job_states_known:
         _LOGGER.info(
@@ -58,6 +65,7 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
                     report.state.value,
                     None if report.job_id is None else f'job {report.job_id}',
                     report.reason,
+                    _start_suffix(report=report, starts=starts),
                 )
                 if part is not None and part != ''
             )
@@ -109,6 +117,13 @@ def log_show(*, study: Study) -> None:
 
 def _table_row(*, name: str, grid: Counter[StudyState]) -> list[str]:
     return [name, *(str(grid[state]) for state in _TABLE_STATES), str(sum(grid.values()))]
+
+
+def _start_suffix(*, report: RunReport, starts: Mapping[str, str | None] | None) -> str | None:
+    if starts is None or report.state is not StudyState.QUEUED or report.job_id is None:
+        return None
+    start = starts.get(report.job_id)
+    return None if start is None else f'starts {start}'
 
 
 def resources_of(*, slurm: SlurmSettings | None) -> str:

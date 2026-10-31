@@ -5,7 +5,14 @@ import subprocess
 import pytest
 
 from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.jobs.slurm import query_job_states, sbatch, scancel, SlurmError, submission_environment
+from tslab.jobs.slurm import (
+    query_expected_starts,
+    query_job_states,
+    sbatch,
+    scancel,
+    SlurmError,
+    submission_environment,
+)
 from tslab.jobs.slurm.commands import _expand_array_key
 
 
@@ -55,6 +62,48 @@ def test_scancel_without_signal_is_unchanged(fake: FakeSlurm) -> None:
 def test_scancel_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
     scancel(job_ids=[], signal='USR2')
     assert fake.calls('scancel') == []
+
+
+def test_query_expected_starts_maps_na_to_none(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00\n1000_1|N/A\n'}])
+    assert query_expected_starts(job_ids=['1000_0', '1000_1']) == {
+        '1000_0': '2026-11-01T10:00:00',
+        '1000_1': None,
+    }
+    assert fake.calls('squeue') == [
+        ['--array', '--start', '--jobs', '1000_0,1000_1', '--noheader', '--format=%i|%S']
+    ]
+
+
+def test_query_expected_starts_empty_value_is_none(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|\n'}])
+    assert query_expected_starts(job_ids=['1000_0']) == {'1000_0': None}
+
+
+def test_query_expected_starts_expands_array_ranges(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_[2-3]|2026-11-01T10:00:00\n'}])
+    assert query_expected_starts(job_ids=['1000_2', '1000_3']) == {
+        '1000_2': '2026-11-01T10:00:00',
+        '1000_3': '2026-11-01T10:00:00',
+    }
+
+
+def test_query_expected_starts_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
+    assert query_expected_starts(job_ids=[]) == {}
+    assert fake.calls('squeue') == []
+
+
+def test_query_expected_starts_raises_on_failure(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'}])
+    with pytest.raises(SlurmError, match='Socket timed out'):
+        query_expected_starts(job_ids=['1000_0'])
+
+
+def test_query_expected_starts_accepts_squeue_not_knowing_a_job(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id specified'}]
+    )
+    assert query_expected_starts(job_ids=['1000_0']) == {}
 
 
 def test_query_job_states(fake: FakeSlurm) -> None:

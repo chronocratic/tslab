@@ -130,17 +130,24 @@ def parse_states(*, values: Sequence[str]) -> tuple[StudyState, ...]:
     return tuple(states)
 
 
-def status(*, context: Context, states: tuple[StudyState, ...] = ()) -> int:
+def status(
+    *,
+    context: Context,
+    states: tuple[StudyState, ...] = (),
+    starts: Mapping[str, str | None] | None = None,
+) -> int:
     """Print the state table of the study and one line per run not done.
 
     Args:
         context: The context to report on.
         states: When given, the listed lines are limited to these states.
+        starts: When given, the lines of queued runs end with their expected
+            start time.
 
     Returns:
         ``0``; the command only reads (spec §7).
     """
-    log_status(context=context, states=states)
+    log_status(context=context, states=states, starts=starts)
     return 0
 
 

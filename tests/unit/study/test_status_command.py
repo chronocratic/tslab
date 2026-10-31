@@ -2,6 +2,7 @@
 
 import dataclasses
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -10,6 +11,8 @@ from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status
+from tslab.study.context import Context, expected_starts
+from tslab.study.documents import status_document
 from tslab.study.report import log_status
 from tslab.study.state import StudyState
 
@@ -81,6 +84,87 @@ def test_run_lines_stop_after_a_limit(
     assert 'g/small/1 queued job 1000_0' in text
     assert 'g/small/2' not in text
     assert '… and 3 more; narrow with --states, --grid or --only' in text
+
+
+def _queued_context(project: Path, fake: FakeSlurm) -> Context:
+    """A submitted study where 1000_0 is queued and the rest completed."""
+    submit_study(project=project)
+    fake.set_answers(
+        'squeue',
+        [
+            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
+            {'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00\n'},
+        ],
+    )
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    return context(project=project, machine_file='cluster.toml')
+
+
+def test_status_shows_expected_start_of_queued_runs(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = _queued_context(project=project, fake=fake)
+    starts = expected_starts(context=ctx)
+    with caplog.at_level('INFO'):
+        status(context=ctx, starts=starts)
+    text = normalized(caplog.text)
+    assert 'g/small/1 queued job 1000_0 starts 2026-11-01T10:00:00' in text
+
+
+def test_status_json_has_expected_start(project: Path, fake: FakeSlurm) -> None:
+    ctx = _queued_context(project=project, fake=fake)
+    starts = expected_starts(context=ctx)
+    document = status_document(context=ctx, exit_code=0, starts=starts)
+    # why: status_document types the value as object; the runs list is a list of dicts
+    runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
+    assert document['schema'] == 'tslab.study-status/1'
+    assert runs['g/small/1']['expected_start'] == '2026-11-01T10:00:00'
+    assert runs['g/small/2']['expected_start'] is None
+    assert runs['g/large/1']['expected_start'] is None
+
+
+def test_status_without_queued_runs_skips_squeue_start(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n'}])
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    starts = expected_starts(context=ctx)
+    assert starts is None
+    assert len(fake.calls('squeue')) == 1
+    document = status_document(context=ctx, exit_code=0, starts=starts)
+    # why: status_document types the value as object; the runs list is a list of dicts
+    for run in cast('list[dict[str, object]]', document['runs']):
+        assert 'expected_start' not in run
+
+
+def test_status_keeps_working_when_squeue_start_fails(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'squeue',
+        [
+            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
+            {'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'},
+        ],
+    )
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    with caplog.at_level('WARNING', logger='tslab.study.context'):
+        starts = expected_starts(context=ctx)
+    assert starts is None
+    assert 'squeue' in caplog.text
+    with caplog.at_level('INFO'):
+        status(context=ctx, starts=starts)
+    text = normalized(caplog.text)
+    assert 'g/small/1 queued job 1000_0' in text
+    assert ' starts ' not in text
 
 
 def test_time_limit_hint(project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture) -> None:
