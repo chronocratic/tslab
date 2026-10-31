@@ -23,12 +23,13 @@ process code. `tslab study wait` always returns the state code.
 | `tslab.error/1` | `exit_code`, `message`; used for command and usage errors. |
 | `tslab.machine-list/1` | `machines`: `name`, `source`, `profile`, `note`. |
 | `tslab.run-status/1` | `exit_code`, `runs`: `directory`, `state`, `instances` (`instance`, `stage`, `state`, `fingerprint`, `seconds`, `error`). |
-| `tslab.study-status/1` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`. |
+| `tslab.study-status/1` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, and `expected_start` (null when unknown) when the scheduler reports a start for a queued job. |
 | `tslab.study-show/1` | `study`, `grids`, `total_runs`. Each grid has `name`, `short_name`, `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
 | `tslab.study-launch/1` | `dry_run`, `jobs`, `cancelled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
-| `tslab.study-wait/1` | All `tslab.study-status/1` fields, plus `waited_seconds` and `timed_out`. |
-| `tslab.study-failures/1` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`. |
-| `tslab.study-cancel/1` | `cancelled` (job ids), `dry_run`, `exit_code`. |
+| `tslab.study-wait/1` | The `tslab.study-status/1` fields without `expected_start` on runs, plus `waited_seconds` and `timed_out`. |
+| `tslab.study-failures/1` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null). |
+| `tslab.study-cancel/1` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
+| `tslab.study-usage/1` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
 | `tslab.study-results/1` | `rows`, the same rows as the CSV. |
 | `tslab.doctor/1` | `machine`, `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
 
@@ -51,6 +52,11 @@ Use these codes for `tslab status --exit-code`,
 Priority is 6, then 4, then 3, then 5, then 0. An empty selection is a usage
 error (2), not success. `study wait` treats unknown SLURM state (6) as live and
 keeps checking; it warns once. A timeout returns 124.
+
+`study usage` returns 0 on success, 1 when the machine is local or the
+accounting query fails. `study run` returns the exit code of the command it
+runs, 1 when the run is queued or running or the plan has problems, and 2
+when the selection does not name exactly one run.
 
 ## Worked study session
 
@@ -85,17 +91,45 @@ wait "$wait_pid"
 ```
 
 When wait returns 4, inspect errors and log tails before changing code or
-settings. After fixing the cause, retry only failed runs:
+settings. The `hint` field of each failed run states what the data shows — a
+value to raise, or a resubmit — and nothing else. After fixing the cause,
+retry only failed runs:
 
 ```bash
 uv run tslab study failures "$STUDY" --machine "$MACHINE" --json
 uv run tslab study resubmit "$STUDY" --machine "$MACHINE" --states failed --json
 ```
 
+To reproduce one run in the terminal, select exactly one run. `study run`
+runs the command of the run with the environment and setup of the machine,
+prints to the terminal, and records nothing; it refuses a queued or running
+run and does not call SLURM:
+
+```bash
+uv run tslab study run "$STUDY" --machine "$MACHINE" --only <axis>=<value>
+```
+
 When it returns 5, resubmit the default interrupted and missing states:
 
 ```bash
 uv run tslab study resubmit "$STUDY" --machine "$MACHINE" --json
+```
+
+When a group needs more time or memory, size the change before editing the
+profile. `study usage` shows what each run used, and the `groups` field
+suggests a `time` and a `mem_per_cpu` per resource group — the largest usage
+of the group plus a 20 percent margin:
+
+```bash
+uv run tslab study usage "$STUDY" --machine "$MACHINE" --json
+```
+
+To test the timeout path without waiting for the time limit, send the signal
+to the running jobs: the runs save a checkpoint and end on their own as
+`interrupted`, and queued jobs are skipped:
+
+```bash
+uv run tslab study cancel "$STUDY" --machine "$MACHINE" --signal --json
 ```
 
 Start another background wait after resubmitting. Repeat failure review and
@@ -113,7 +147,9 @@ uv run tslab study results "$STUDY" --machine "$MACHINE" --out - --json
   every non-live run in the chosen slice, including failed, interrupted, and
   missing runs. Check that scope before submitting; ask if it exceeds the request.
 - Never run `tslab study cancel` unless the researcher asks. Use `--dry-run` to
-  inspect selected job ids first.
+  inspect selected job ids first. With `--signal`, the command sends `USR2` to
+  the running jobs instead of cancelling them: the runs save and end on their
+  own, so the command never stops a job hard.
 - Inspect failures before retrying them. Change code or settings before using
   `--states failed`.
 - Unknown SLURM state does not mean the job stopped. Report it; do not resubmit

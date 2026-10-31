@@ -51,6 +51,8 @@ uv run tslab study submit {{package_name}}.studies:example --machine local
 uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
 uv run tslab study wait {{package_name}}.studies:example --machine local
 uv run tslab study failures {{package_name}}.studies:example --machine local
+uv run tslab study run {{package_name}}.studies:example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
+uv run tslab study usage {{package_name}}.studies:example --machine local  # per-run and per-group accounting, SLURM only
 uv run tslab study resubmit {{package_name}}.studies:example --machine local
 uv run tslab study results {{package_name}}.studies:example \
     --machine local --out results.csv

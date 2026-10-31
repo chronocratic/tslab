@@ -62,11 +62,21 @@ the state as its process exit code. `study wait` always returns the state code.
 | 124 | Wait timed out | Wait again or report; if SLURM is unknown, do not resubmit. |
 
 For code 4, inspect the error details and log tails before changing code or
-settings. After fixing the cause, retry only failed runs:
+settings. The `hint` field of each failed run states what the data shows — a
+value to raise, or a resubmit — and nothing else. After fixing the cause,
+retry only failed runs:
 
 ```bash
 uv run tslab study failures {{package_name}}.studies:example --machine local --json
 uv run tslab study resubmit {{package_name}}.studies:example --machine local --states failed --json
+```
+
+To reproduce one run in the terminal, select exactly one run. `study run`
+runs the command of the run, prints to the terminal, and records nothing; it
+refuses a queued or running run and does not call SLURM:
+
+```bash
+uv run tslab study run {{package_name}}.studies:example --machine local --only <axis>=<value>
 ```
 
 `--include-done` belongs to `study submit`, not `study resubmit`. It submits
@@ -78,6 +88,24 @@ For code 5, the default resubmit selection is interrupted and missing runs:
 
 ```bash
 uv run tslab study resubmit {{package_name}}.studies:example --machine local --json
+```
+
+When a group needs more time or memory, size the change before editing the
+machine profile. `study usage` shows what each run used, and the `groups`
+field suggests a `time` and a `mem_per_cpu` per resource group. It is SLURM
+only and exits 1 on a local machine.
+
+```bash
+uv run tslab study usage {{package_name}}.studies:example --machine local --json
+```
+
+To test the timeout path without waiting for the time limit, `study cancel
+--signal` sends `USR2` to the running jobs of the selection: the runs save a
+checkpoint and end on their own as `interrupted`, and queued jobs are skipped.
+It never cancels.
+
+```bash
+uv run tslab study cancel {{package_name}}.studies:example --machine local --signal --json
 ```
 
 After either resubmit, start another background wait and handle its exit code
@@ -95,7 +123,9 @@ uv run tslab study results {{package_name}}.studies:example --machine local --ou
 - Never pass `--include-done` or `--cancel-live` unless the researcher asks.
 - Never pass `--include-done` to `study resubmit`; that command selects states
   with `--states` instead.
-- Never run `tslab study cancel` unless the researcher asks.
+- Never run `tslab study cancel` unless the researcher asks. With `--signal`,
+  it sends `USR2` to the running jobs instead of cancelling them: the runs
+  save and end on their own.
 - Inspect failures before retrying them; change code or settings before using
   `--states failed`.
 - Unknown SLURM states are not evidence that jobs stopped. Report them; do not
