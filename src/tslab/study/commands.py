@@ -8,6 +8,7 @@ functions, so the behavior is testable without the command line.
 from collections.abc import Callable, Mapping, Sequence
 import json
 import logging
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -15,11 +16,19 @@ import time
 from typing import TextIO
 
 from tslab.core.paths import atomic_write_text, LOCK_FILE
+from tslab.jobs.local import start_keep_awake, stop_keep_awake
 from tslab.jobs.slurm import scancel, SlurmError
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
 from tslab.study.job_script import foreground_script
-from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher
+from tslab.study.launch import (
+    launch,
+    Launcher,
+    LaunchReport,
+    LocalLauncher,
+    resolve_local_gpus,
+    SlurmLauncher,
+)
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import (
     assign_indices,
@@ -539,6 +548,7 @@ def _launcher_of(
     project_root: Path,
     sleep: Callable[[float], None],
     task_stream: TextIO | None = None,
+    gpu_ids: tuple[str, ...] = (),
 ) -> Launcher:
     if machine.launcher == 'slurm':
         return SlurmLauncher(sleep=sleep)
@@ -546,6 +556,7 @@ def _launcher_of(
         project_root=project_root,
         env=machine.env,
         local=machine.local or LocalSettings(),  # why: loaded local profiles always carry the table
+        gpu_ids=gpu_ids,
         stream=task_stream,
     )
 
@@ -616,20 +627,37 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if failure is not None:
             _LOGGER.error('%s', failure)
             return 1, []
-        report = launch(
-            launcher=_launcher_of(
+        gpu_ids: tuple[str, ...] = ()
+        keep_awake: subprocess.Popen[bytes] | None = None
+        if machine.launcher != 'slurm' and not dry_run:
+            # why: a loaded local profile always carries the table
+            local = machine.local or LocalSettings()
+            try:
+                gpu_ids = resolve_local_gpus(local=local, environment=os.environ)
+            except ValueError as error:
+                _LOGGER.error('%s', error)  # noqa: TRY400 # why: a GPU setup error is shown, not raised
+                return 1, []
+            _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
+            if local.keep_awake:
+                keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
+        try:
+            report = launch(
+                launcher=_launcher_of(
+                    machine=machine,
+                    project_root=context.project_root,
+                    sleep=sleep,
+                    task_stream=task_stream,
+                    gpu_ids=gpu_ids,
+                ),
                 machine=machine,
+                study=context.study,
+                groups=groups,
                 project_root=context.project_root,
-                sleep=sleep,
-                task_stream=task_stream,
-            ),
-            machine=machine,
-            study=context.study,
-            groups=groups,
-            project_root=context.project_root,
-            dry_run=dry_run,
-            begin=begin,
-        )
+                dry_run=dry_run,
+                begin=begin,
+            )
+        finally:
+            stop_keep_awake(process=keep_awake)
         if on_launch is not None:
             on_launch(report, groups)
     return log_launch(report=report, groups=groups)

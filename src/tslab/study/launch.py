@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
+import logging
 import os
 from pathlib import Path
 import shlex
@@ -15,7 +16,14 @@ from uuid import uuid4
 from tslab.core.meta import hostname
 from tslab.core.paths import atomic_write_json, atomic_write_text
 from tslab.core.status import utc_now_iso
-from tslab.jobs.local import gpu_lock_folder, PoolCommand, ProcessResult, run_commands
+from tslab.jobs.local import (
+    busy_gpus,
+    gpu_lock_folder,
+    PoolCommand,
+    ProcessResult,
+    run_commands,
+    visible_gpus,
+)
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
 from tslab.study.job_script import job_script
@@ -30,10 +38,13 @@ __all__ = [
     'SlurmLauncher',
     'launch',
     'local_job_id',
+    'resolve_local_gpus',
     'submit_helper_job',
     'usage_file',
     'write_job_files',
 ]
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -145,6 +156,44 @@ def usage_file(*, log_file: Path) -> Path:
         log_file: The log file of the task.
     """
     return log_file.with_name(log_file.name + '.usage.json')
+
+
+def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) -> tuple[str, ...]:
+    """The GPU ids of a local launch, with ``"auto"`` resolved and the busy ones left out.
+
+    Args:
+        local: The ``[local]`` table: the ``gpus`` list and ``skip_busy_gpus``.
+        environment: The environment to discover the GPUs from.
+
+    Returns:
+        The ids the launch may lease, in order; empty for CPU-only slots.
+
+    Raises:
+        ValueError: If ``skip_busy_gpus`` applies to no NVIDIA GPU, or every
+            GPU it would use is busy.
+    """
+    if local.gpus == 'auto':
+        gpu_ids = visible_gpus(environment=environment)
+    else:
+        gpu_ids = tuple(str(gpu) for gpu in local.gpus)
+    if local.skip_busy_gpus:
+        if not gpu_ids or gpu_ids == ('mps',):
+            message = 'skip_busy_gpus needs NVIDIA GPUs'
+            raise ValueError(message)
+        busy = busy_gpus(gpu_ids=gpu_ids)
+        if busy:
+            gpu_ids = tuple(gpu for gpu in gpu_ids if gpu not in busy)
+        if not gpu_ids:
+            message = (
+                f'all local GPUs are busy: {", ".join(sorted(busy))}; '
+                'wait for a GPU to free, or remove skip_busy_gpus'
+            )
+            raise ValueError(message)
+    if gpu_ids and local.max_parallel != 1:
+        _LOGGER.warning('local.gpus is set, so local.max_parallel is ignored')
+    if not gpu_ids and local.tasks_per_gpu > 1:
+        _LOGGER.warning('no local GPUs, so local.tasks_per_gpu is ignored')
+    return gpu_ids
 
 
 def _format_elapsed(*, seconds: float) -> str:
