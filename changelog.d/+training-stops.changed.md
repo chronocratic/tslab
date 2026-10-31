@@ -1,0 +1,1 @@
+`max_training_time` now ends training as finished and changes the fingerprint; `slurm_time_fraction` is renamed `job_time_share` and counts only the current job; `TrainingTimeLimitReached` is renamed `TrainingPaused`.

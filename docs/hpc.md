@@ -2,21 +2,27 @@
 
 ## Time limits
 
-`LightningTrainer` stops training in time to save a checkpoint:
+`LightningTrainer` uses separate limits to end training or pause it.
+
+### Ends training
 
 - `--trainer.max-training-time 23:30:00` caps training (any sbatch `--time`
-  format: `M`, `M:S`, `H:M:S`, `D-H`, `D-H:M`, `D-H:M:S`);
-- under SLURM, the remaining job time (`SLURM_JOB_END_TIME`) caps it as well:
-  training gets `--trainer.slurm-time-fraction` (default 0.5) of the time left,
-  so the stages after training can still run.
+  format: `M`, `M:S`, `H:M:S`, `D-H`, `D-H:M`, `D-H:M:S`). It ends training
+  normally when the total training time reaches the limit. It counts across all
+  resumed jobs.
+- `max_training_time` changes trained weights and is fingerprinted. Changing it
+  trains again.
 
-Training stopped by the time limit is unfinished: submit the same command
-again and it resumes from its last checkpoint.
+### Pauses until the next job
 
-SLURM also sends `SIGUSR2` before the job time limit. Training saves
-`last.ckpt` at the next batch boundary, then the run is marked `interrupted`.
-Other stages stop without a checkpoint. Resubmit the study to resume training;
-set `[slurm] signal_seconds = 0` to disable the signal.
+- Under SLURM, `--trainer.job-time-share` (default `0.5`) gives training that
+  share of the remaining job time. The deadline applies to the current job only.
+  When it passes, TSLab saves `last.ckpt` and marks the run interrupted. Resubmit
+  the same command to resume.
+- SLURM also sends `SIGUSR2` before the job time limit. Training saves
+  `last.ckpt` at the next batch boundary, then the run is marked `interrupted`.
+  Other stages stop without a checkpoint. Resubmit the study to resume training;
+  set `[slurm] signal_seconds = 0` to disable the signal.
 
 Machine profiles can run site setup commands before each task with
 `[slurm] setup = ["module load cuda"]`. Set `gpu_type = "a100"` to request

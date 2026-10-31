@@ -72,10 +72,7 @@ def log_status(*, context: Context, states: tuple[StudyState, ...] = ()) -> None
         1
         for report in context.reports
         if report.state is StudyState.INTERRUPTED
-        and (
-            report.job_state == 'TIMEOUT'
-            or (report.reason or '').startswith('TrainingTimeLimitReached')
-        )
+        and (report.job_state == 'TIMEOUT' or (report.reason or '').startswith('TrainingPaused:'))
     )
     if limited:
         _LOGGER.info(
