@@ -1,0 +1,1 @@
+Study jobs run through `srun`, with one task per GPU on one node. Training uses every task for distributed training; other stages run on rank zero. `SIGUSR2` before the time limit saves `last.ckpt` at a batch boundary, raises `tslab.JobTimeLimitSignal`, and marks the run interrupted for resubmission. Machine profiles support `setup`, `gpu_type`, and `signal_seconds`.
