@@ -14,7 +14,7 @@ import time
 from typing import TextIO
 
 from tslab.core.paths import atomic_write_text, LOCK_FILE
-from tslab.jobs import scancel, SlurmError
+from tslab.jobs.slurm import scancel, SlurmError
 from tslab.study.context import Context
 from tslab.study.followups import queue_followups
 from tslab.study.launch import launch, Launcher, LaunchReport, LocalLauncher, SlurmLauncher

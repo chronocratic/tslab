@@ -6,7 +6,7 @@ import logging
 import shlex
 import time
 
-from tslab.jobs import SlurmError
+from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context
 from tslab.study.launch import submit_helper_job
 from tslab.study.plan import study_folder

@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from tslab.jobs import parse_slurm_duration, remaining_job_seconds
+from tslab.jobs.slurm import parse_slurm_duration, remaining_job_seconds
 
 NOW = 1_000_000.0
 
