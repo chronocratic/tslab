@@ -2,9 +2,13 @@
 
 from io import StringIO
 import json
+import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
+import threading
+import time
 
 import pytest
 
@@ -521,3 +525,96 @@ def test_local_usage_file_and_footer(machine: MachineProfile, tmp_path: Path) ->
     assert usages[1]['max_rss_bytes'] > usages[0]['max_rss_bytes']
     for log in (folder / 'logs').glob('*.out'):
         assert log.read_text().strip().splitlines()[-1].startswith('=== task')
+
+
+_SIGNAL_SCRIPT = (
+    'import signal\n'
+    'import sys\n'
+    'import time\n'
+    'signal.signal(signal.SIGTERM, lambda signum, frame: sys.exit(0))\n'
+    'while True:\n'
+    '    time.sleep(0.1)\n'
+)
+
+_IGNORE_SIGTERM_SCRIPT = (
+    'import signal\n'
+    'import time\n'
+    'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+    'while True:\n'
+    '    time.sleep(0.1)\n'
+)
+
+
+def test_local_sigterm_stops_tasks_and_reports_signal(
+    machine: MachineProfile, tmp_path: Path
+) -> None:
+    local_machine = _local_machine(machine)
+    study = Study(
+        name='s',
+        grids={
+            'a': grid(
+                short_name='g1',
+                command=(sys.executable, '-c', _SIGNAL_SCRIPT),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            ),
+            'b': grid(
+                short_name='g2',
+                command=(sys.executable, '-c', _SIGNAL_SCRIPT),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            ),
+        },
+    )
+    timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    start = time.monotonic()
+    try:
+        report = launch(
+            launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
+            machine=local_machine,
+            study=study,
+            groups=_local_groups(study, local_machine),
+            project_root=tmp_path,
+            dry_run=False,
+        )
+    finally:
+        timer.cancel()
+    elapsed = time.monotonic() - start
+    assert report.stopped_signal == signal.SIGTERM
+    assert [group.job_name for group in report.not_submitted] == ['g2']
+    assert len(report.submitted) == 1
+    assert elapsed < 5
+
+
+def test_local_stop_kills_task_ignoring_sigterm(machine: MachineProfile, tmp_path: Path) -> None:
+    local_machine = _local_machine(machine)
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, '-c', _IGNORE_SIGTERM_SCRIPT),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            )
+        },
+    )
+    timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    start = time.monotonic()
+    try:
+        report = launch(
+            launcher=LocalLauncher(
+                project_root=tmp_path, env={}, local=LocalSettings(), grace_seconds=1
+            ),
+            machine=local_machine,
+            study=study,
+            groups=_local_groups(study, local_machine),
+            project_root=tmp_path,
+            dry_run=False,
+        )
+    finally:
+        timer.cancel()
+    elapsed = time.monotonic() - start
+    assert report.stopped_signal == signal.SIGTERM
+    assert elapsed < 4
+    folder = study_folder(machine=local_machine, study=study)
+    assert 'exit -9' in (folder / 'logs' / 'g1_0.out').read_text()

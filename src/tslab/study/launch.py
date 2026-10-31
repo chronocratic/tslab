@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 import shlex
+import signal
 import sys
 import threading
 import time
@@ -22,6 +23,7 @@ from tslab.jobs.local import (
     PoolCommand,
     ProcessResult,
     run_commands,
+    stop_on_signals,
     visible_gpus,
 )
 from tslab.jobs.slurm import sbatch, SlurmError
@@ -32,7 +34,9 @@ from tslab.study.plan import JobGroup, next_job_file, PlannedTask, study_folder
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 
 __all__ = [
+    'SIGNAL_EXIT_BASE',
     'LaunchReport',
+    'LaunchStopped',
     'Launcher',
     'LocalLauncher',
     'SlurmLauncher',
@@ -46,6 +50,26 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 
+#: The base of an exit code made from a signal: the code is the base plus the number.
+SIGNAL_EXIT_BASE = 128
+
+#: The signals that stop a local launch; the records of the groups sent survive.
+_STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+
+
+class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, not an error
+    """A signal stopped the launch before every group was submitted.
+
+    Attributes:
+        signal_number: The number of the first signal that stopped the launch.
+    """
+
+    def __init__(self, *, signal_number: int) -> None:
+        """Set the number of the first signal that stopped the launch."""
+        message = f'stopped by signal {signal_number}'
+        super().__init__(message)
+        self.signal_number = signal_number
+
 
 @dataclass(frozen=True, kw_only=True)
 class LaunchReport:
@@ -54,13 +78,15 @@ class LaunchReport:
     Args:
         submitted: One job record per submitted group, in order.
         not_submitted: The groups the launch did not reach; all of them
-            on a dry run, the rest after an error.
+            on a dry run, the rest after an error or a signal.
         error: The submission error that stopped the launch, if any.
+        stopped_signal: The signal that stopped the launch, if any.
     """
 
     submitted: tuple[JobRecord, ...]
     not_submitted: tuple[JobGroup, ...]
     error: str | None
+    stopped_signal: int | None = None
 
 
 def write_job_files(
@@ -389,6 +415,13 @@ class LocalLauncher:
         line per start and per end. After each task the launcher writes the
         usage file and a footer line to the log; a task that exits
         non-zero or cannot start does not stop the group.
+
+        A SIGINT, SIGTERM or SIGHUP to this process stops the pool: running
+        tasks get a SIGTERM, then a SIGKILL after ``grace_seconds``, and no
+        task starts after the signal.
+
+        Raises:
+            LaunchStopped: If a stop signal was caught, with its number.
         """
         job_id = local_job_id(job_file=group.job_file)
         record(job_id)
@@ -407,34 +440,37 @@ class LocalLauncher:
             on_task_state=self._on_task_state,
             timeout=timeout_seconds(local=self._local),
         )
-        run_commands(
-            commands=[
-                PoolCommand(
-                    key=key,
-                    command=task.command,
-                    cwd=self._project_root,
-                    environment={**os.environ, **self._env},
-                )
-                for key, task in by_key.items()
-            ],
-            slots=slots,
-            gpu_ids=self._gpu_ids,
-            tasks_per_gpu=self._local.tasks_per_gpu,
-            lock_folder=(
-                gpu_lock_folder(name='tslab-gpus', environment=os.environ)
-                if self._gpu_ids
-                else None
-            ),
-            stop=threading.Event(),
-            timeout_seconds=timeout_seconds(local=self._local),
-            signal_seconds=self._local.signal_seconds,
-            on_start=output.on_start,
-            on_line=output.on_line,
-            on_event=output.on_event,
-            on_wait=output.on_wait,
-            on_end=output.on_end,
-            grace_seconds=self._grace_seconds,
-        )
+        with stop_on_signals(signals=_STOP_SIGNALS) as request:
+            run_commands(
+                commands=[
+                    PoolCommand(
+                        key=key,
+                        command=task.command,
+                        cwd=self._project_root,
+                        environment={**os.environ, **self._env},
+                    )
+                    for key, task in by_key.items()
+                ],
+                slots=slots,
+                gpu_ids=self._gpu_ids,
+                tasks_per_gpu=self._local.tasks_per_gpu,
+                lock_folder=(
+                    gpu_lock_folder(name='tslab-gpus', environment=os.environ)
+                    if self._gpu_ids
+                    else None
+                ),
+                stop=request.event,
+                timeout_seconds=timeout_seconds(local=self._local),
+                signal_seconds=self._local.signal_seconds,
+                on_start=output.on_start,
+                on_line=output.on_line,
+                on_event=output.on_event,
+                on_wait=output.on_wait,
+                on_end=output.on_end,
+                grace_seconds=self._grace_seconds,
+            )
+        if request.signal_number is not None:
+            raise LaunchStopped(signal_number=request.signal_number)
         return job_id
 
 
@@ -466,7 +502,8 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         begin: A SLURM ``--begin`` for the jobs.
 
     Returns:
-        What was submitted, what was not, and the error that stopped the launch.
+        What was submitted, what was not, the error that stopped the launch,
+        and the signal that stopped it.
     """
     folder = study_folder(machine=machine, study=study)
     write_job_files(
@@ -478,6 +515,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
     study_directory = machine.output_root / study.name
     records: list[JobRecord] = []
     error: str | None = None
+    stopped_signal: int | None = None
     for group in groups:
         tasks = tuple(
             TaskRecord(
@@ -519,8 +557,15 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         except SlurmError as exc:
             error = str(exc)
             break
+        except LaunchStopped as exc:
+            # why: the record of this group is kept; resubmit continues the stopped runs
+            stopped_signal = exc.signal_number
+            break
     return LaunchReport(
-        submitted=tuple(records), not_submitted=tuple(groups[len(records) :]), error=error
+        submitted=tuple(records),
+        not_submitted=tuple(groups[len(records) :]),
+        error=error,
+        stopped_signal=stopped_signal,
     )
 
 
