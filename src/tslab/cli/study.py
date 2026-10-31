@@ -25,6 +25,7 @@ from tslab.study.commands import (
     parse_states,
     resubmit,
     results,
+    run_one,
     status,
     submit,
 )
@@ -47,6 +48,7 @@ __all__ = [
     'Failures',
     'Resubmit',
     'Results',
+    'RunOne',
     'Show',
     'Status',
     'Submit',
@@ -527,6 +529,47 @@ class Usage:
 
 
 @dataclass(frozen=True, kw_only=True)
+class RunOne:
+    """Run one selected run in the foreground of this terminal.
+
+    The command of the run is built the same way as for a submission, but
+    nothing is submitted or recorded: SLURM is never called and the study
+    folder is untouched. Inside a ``salloc`` allocation, ``job_time_share``
+    still pauses the training; pass ``-- --trainer.job-time-share 1`` to
+    train for the whole allocation.
+
+    For example:
+        tslab study run my_paper.studies:example --machine cluster --only model=small,seed=1
+
+    Attributes:
+        study: The study reference, module:attribute.
+        machine: A machine name or profile path.
+        grid: Keep only this grid.
+        only: Keep only runs that match axis=value.
+        extra_args: The arguments after --; taken from the last
+            submission when omitted.
+    """
+
+    study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
+    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
+    only: Annotated[
+        tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
+    ] = ()
+    extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
+
+    def run(self) -> int:
+        """Run the one selected run and return its exit code."""
+        context = _context_of(
+            study=self.study, machine=self.machine, grid=self.grid, only=self.only
+        )
+        try:
+            return run_one(context=context, extra_args=self.extra_args or None)
+        except ValueError as error:
+            raise UsageError(str(error)) from error
+
+
+@dataclass(frozen=True, kw_only=True)
 class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
@@ -670,4 +713,5 @@ STUDY_COMMANDS = {
     'failures': Failures,
     'cancel': Cancel,
     'usage': Usage,
+    'run': RunOne,
 }
