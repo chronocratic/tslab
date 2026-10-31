@@ -1,5 +1,6 @@
 """What a study command reads before it does anything: the ``Context``."""
 
+import dataclasses
 from dataclasses import dataclass
 import logging
 from pathlib import Path
@@ -23,7 +24,14 @@ from tslab.study.state import (
     StudyState,
 )
 
-__all__ = ['Context', 'Selection', 'context_for', 'expected_starts', 'load_context']
+__all__ = [
+    'Context',
+    'Selection',
+    'context_for',
+    'expected_starts',
+    'load_context',
+    'refresh_context',
+]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -209,6 +217,27 @@ def _local_states(
         if job.launcher == 'local'
     }
     return {**ended, **live}
+
+
+def refresh_context(*, context: Context) -> Context:
+    """The jobs and run states of a local context, read again for the same runs.
+
+    Args:
+        context: A context of a local machine.
+
+    Returns:
+        The context with fresh ``jobs`` and ``reports``.
+    """
+    jobs = read_jobs(
+        path=study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
+    )
+    reports = collect_states(
+        study_directory=context.study_directory,
+        runs=context.runs,
+        jobs=jobs,
+        job_states=_local_states(machine=context.machine, study=context.study, jobs=jobs),
+    )
+    return dataclasses.replace(context, jobs=jobs, reports=reports)
 
 
 def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) -> dict[str, str]:

@@ -24,6 +24,7 @@ from tslab.core.status import (
     write_status,
 )
 from tslab.study.commands import resubmit, submit
+from tslab.study.context import Context, load_context, refresh_context, Selection
 from tslab.study.state import StudyState
 
 
@@ -294,3 +295,55 @@ def test_auto_resubmit_retries_paused_run_with_progress(project: Path, fake: Fak
     assert 'g/small/2' not in planned
     assert 'g/large' not in planned
     assert len(jobs_of(project=project)) == 1
+
+
+def _local_retry_context(*, project: Path, max_attempts: int) -> Context:
+    """The local context of the run g/small/1, with the automatic retry on."""
+    local = project / 'local.toml'
+    local.write_text(
+        local.read_text() + f'\n[followup]\nauto_retry = true\nmax_attempts = {max_attempts}\n'
+    )
+    return load_context(
+        reference='toy_studies:study',
+        machine_path=local,
+        selection=Selection(only=('model=small', 'seed=1')),
+        project_root=Path.cwd(),
+    )
+
+
+def _local_attempts(*, project: Path) -> int:
+    return int((project / 'runs' / 's' / 'g/small/1' / 'attempts').read_text())
+
+
+def test_local_auto_retry_finishes_after_three_attempts(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('TOY_SUCCEED_ON', '3')
+    ctx = _local_retry_context(project=project, max_attempts=3)
+    submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+    assert _local_attempts(project=project) == 3
+    report = refresh_context(context=ctx).reports[0]
+    assert report.state is StudyState.DONE
+    assert len(jobs_of(project=project)) == 3
+
+
+def test_local_auto_retry_stops_at_max_attempts(
+    project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv('TOY_SUCCEED_ON', '3')
+    ctx = _local_retry_context(project=project, max_attempts=2)
+    with caplog.at_level('INFO'):
+        submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+    assert _local_attempts(project=project) == 2
+    assert refresh_context(context=ctx).reports[0].state is StudyState.INTERRUPTED
+    assert 'gave up' in caplog.text
+
+
+def test_local_no_retry_after_signal(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    ctx = _local_retry_context(project=project, max_attempts=3)
+    calls: list[object] = []
+    monkeypatch.setattr('tslab.study.commands.submit_runs', lambda **_: (143, []))
+    monkeypatch.setattr('tslab.study.commands.resubmit', lambda **kwargs: calls.append(kwargs))
+    code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+    assert code == 143
+    assert calls == []
