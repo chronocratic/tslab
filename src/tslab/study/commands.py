@@ -20,7 +20,7 @@ from typing import TextIO
 from tslab.core.paths import atomic_write_text, LOCK_FILE
 from tslab.jobs.local import start_keep_awake, stop_keep_awake
 from tslab.jobs.slurm import scancel, SlurmError
-from tslab.study.context import Context
+from tslab.study.context import Context, refresh_context
 from tslab.study.followups import queue_followups
 from tslab.study.job_script import foreground_script
 from tslab.study.launch import (
@@ -70,16 +70,35 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _finish_launch(
-    *, code: int, submitted: Sequence[JobRecord], context: Context, sleep: Callable[[float], None]
+    *,
+    code: int,
+    submitted: Sequence[JobRecord],
+    context: Context,
+    sleep: Callable[[float], None],
+    task_stream: TextIO | None,
 ) -> int:
-    """The exit code of a launch, with its follow-ups queued when it was not stopped by a signal."""
+    """The exit code of a launch, with its follow-ups queued when it was not stopped by a signal.
+
+    On a local machine with ``followup.auto_retry`` the interrupted runs that made progress
+    are submitted again, in this process; that call ends here too, so the chain runs until a
+    pass retries nothing.
+    """
     if code >= SIGNAL_EXIT_BASE:
         # why: the launch was stopped by a signal; resubmit continues it
         return code
     followup_code, _ = queue_followups(
         context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
     )
-    return max(code, followup_code)
+    code = max(code, followup_code)
+    if context.machine.launcher == 'local' and context.machine.followup.auto_retry and submitted:
+        retry_code = resubmit(
+            context=refresh_context(context=context),
+            auto=True,
+            sleep=sleep,
+            task_stream=task_stream,
+        )
+        return max(code, retry_code)
+    return code
 
 
 # why: a cancelled job leaves its lock until the heartbeat is stale; the restart
@@ -134,7 +153,9 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         on_launch=on_launch,
         task_stream=task_stream,
     )
-    return _finish_launch(code=code, submitted=submitted, context=context, sleep=sleep)
+    return _finish_launch(
+        code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
+    )
 
 
 def parse_states(*, values: Sequence[str]) -> tuple[StudyState, ...]:
@@ -353,7 +374,9 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         on_launch=on_launch,
         task_stream=task_stream,
     )
-    return _finish_launch(code=code, submitted=submitted, context=context, sleep=sleep)
+    return _finish_launch(
+        code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
+    )
 
 
 def _run_in_terminal(args: list[str]) -> int:
