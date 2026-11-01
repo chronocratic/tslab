@@ -18,7 +18,7 @@ from tests.unit.study.configs import (
 )
 import tslab
 from tslab.core.codec import union_choices
-from tslab.study.settings import Settings, settings_to_args
+from tslab.study.definition import Settings, settings_to_args
 
 
 def test_union_choices_reads_subcommand_names() -> None:

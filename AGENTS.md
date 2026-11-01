@@ -48,6 +48,7 @@ src/tslab/
     datasets/          chronocratic-datasets as TSLab data sources, study helpers
   study/               studies: grids, machine profiles, SLURM and local launch, results
      commands/          the study commands: submit, status, resubmit, results
+     definition/        the Study and StudyRun types, expansion, loading, settings
      launchers/         the launch backends: one per launcher, SLURM and local apart
   cli/                 `tslab new | status | study | wandb-sync`
      study/             the study subcommands: one module per command

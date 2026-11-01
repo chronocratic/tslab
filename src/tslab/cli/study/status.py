@@ -9,8 +9,8 @@ from tslab.cli.common import print_json, UsageError, watch
 from tslab.cli.study import _context_of, _states_of, _status_hints, _usage_errors
 from tslab.study.commands import status
 from tslab.study.context import Context, expected_starts
+from tslab.study.definition import load_study
 from tslab.study.documents import show_document, status_document
-from tslab.study.loading import load_study
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
 from tslab.study.report import log_show
 from tslab.study.wait import wait_for_study

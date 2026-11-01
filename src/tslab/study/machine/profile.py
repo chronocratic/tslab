@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
+from tslab.study.definition import SettingValue
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.slurm import SlurmSettings
-from tslab.study.settings import SettingValue
 
 __all__ = ['FollowupSettings', 'MachineOverride', 'MachineProfile']
 

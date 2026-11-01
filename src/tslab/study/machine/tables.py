@@ -9,8 +9,7 @@ from typing import cast
 from tslab.core.codec import decode_dataclass
 from tslab.core.config import ConfigFileError
 from tslab.core.text import unknown_key_message
-from tslab.study.expansion import expand_variables
-from tslab.study.settings import SettingValue
+from tslab.study.definition import expand_variables, SettingValue
 
 __all__ = [
     'MachineProfileError',

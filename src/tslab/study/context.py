@@ -6,8 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
-from tslab.study.loading import load_study
+from tslab.study.definition import expand_runs, load_study, select_runs, Study, StudyRun
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun

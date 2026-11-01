@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from tslab.study.loading import load_study
+from tslab.study.definition import load_study
 
 
 @pytest.fixture(autouse=True)
