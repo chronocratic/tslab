@@ -9,27 +9,27 @@ from pathlib import Path
 import shlex
 import signal
 import sys
-import threading
 import time
 from typing import Protocol, TextIO
 from uuid import uuid4
 
-from tslab.core.files import atomic_write_json, atomic_write_text
+from tslab.core.files import atomic_write_text
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import (
     gpu_lock_folder,
     PoolCommand,
-    ProcessResult,
     run_commands,
     select_gpus,
     stop_on_signals,
+    TaskInfo,
+    TaskOutput,
 )
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
 from tslab.study.job_script import job_script
 from tslab.study.machine import LocalSettings, MachineProfile, SlurmSettings, timeout_seconds
-from tslab.study.plan import JobGroup, next_job_file, PlannedTask, study_folder
+from tslab.study.plan import JobGroup, next_job_file, study_folder
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 
 __all__ = [
@@ -205,143 +205,6 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
     return gpu_ids
 
 
-def _format_elapsed(*, seconds: float) -> str:
-    """The footer's elapsed time, as ``H:MM:SS``."""
-    total = int(seconds)
-    return f'{total // 3600}:{(total % 3600) // 60:02d}:{total % 60:02d}'
-
-
-def _format_peak_memory(*, peak_bytes: int) -> str:
-    """The footer's peak memory: one decimal in the largest of GiB, MiB, KiB that keeps it at 1."""
-    for unit, divisor in (('GiB', 1024**3), ('MiB', 1024**2), ('KiB', 1024)):
-        if peak_bytes >= divisor:
-            return f'{peak_bytes / divisor:.1f} {unit}'
-    return f'{peak_bytes / 1024:.1f} KiB'
-
-
-class _TaskOutput:
-    """The log and console lines of the tasks of one local launch, under one lock."""
-
-    def __init__(  # noqa: PLR0913 # why: one keyword per task of the output state
-        self,
-        *,
-        job_id: str,
-        stream: TextIO,
-        single_slot: bool,
-        by_key: Mapping[str, PlannedTask],
-        gpu_ids: tuple[str, ...],
-        on_task_state: Callable[[str, str], None] | None,
-        timeout: float | None,
-    ) -> None:
-        self._job_id = job_id
-        self._stream = stream
-        self._single_slot = single_slot
-        self._by_key = by_key
-        self._gpu_ids = gpu_ids
-        self._on_task_state = on_task_state
-        self._timeout = timeout
-        self._lock = threading.Lock()
-        self._logs: dict[str, TextIO] = {}
-        self._waits: dict[str, list[str]] = {}
-
-    def on_start(self, key: str, gpu_id: str | None) -> None:
-        """The log header of one task, and its start line on more than one slot."""
-        task = self._by_key[key]
-        task.log_file.parent.mkdir(parents=True, exist_ok=True)
-        header = (
-            f'=== tslab attempt {task.attempt} | job {self._job_id} '
-            f'| {hostname()} | {utc_now_iso()}'
-        )
-        if self._gpu_ids:
-            header += f' | gpus {",".join(self._gpu_ids)}'
-        header += ' ===\n'
-        with self._lock:
-            log = task.log_file.open('a', encoding='utf-8')
-            log.write(header)
-            # why: the wait lines come before the start, so they stay under the header
-            for line in self._waits.pop(key, []):
-                log.write(line)
-            log.flush()
-            self._logs[key] = log
-            if not self._single_slot:
-                self._console(
-                    f'=== task {task.index} started | run {task.resolved.run.run_path} '
-                    f'| gpu {gpu_id or "none"} ===\n'
-                )
-        if self._on_task_state is not None:
-            self._on_task_state(key, 'running')
-
-    def on_line(self, key: str, line: str) -> None:
-        """One output line of a task: to the log, and to the console on one slot."""
-        with self._lock:
-            self._logs[key].write(line)
-            self._logs[key].flush()
-            if self._single_slot:
-                self._console(line)
-
-    def on_event(self, key: str, text: str) -> None:
-        """One signal event of a task, as a line."""
-        self.on_line(key=key, line=text + '\n')
-
-    def on_wait(self, key: str) -> None:
-        """One line when a task waits for a free GPU."""
-        line = f'=== task {self._by_key[key].index} waiting for a free gpu ===\n'
-        with self._lock:
-            # why: the task may not have started, so its log is not open yet
-            self._waits.setdefault(key, []).append(line)
-            self._console(line)
-
-    def on_end(self, key: str, gpu_id: str | None, outcome: ProcessResult | OSError) -> None:
-        """The footer of a finished task, the usage file, and the closed log."""
-        task = self._by_key[key]
-        with self._lock:
-            log = self._logs.pop(key)
-            if isinstance(outcome, OSError):
-                line = f'=== task {task.index} could not start: {outcome} ===\n'
-                log.write(line)
-                log.flush()
-                self._console(line)
-            else:
-                peak = _format_peak_memory(peak_bytes=outcome.max_rss_bytes)
-                footer = (
-                    f'=== task {task.index}: exit {outcome.exit_code} '
-                    f'| elapsed {_format_elapsed(seconds=outcome.elapsed_seconds)} '
-                    f'| peak memory {peak} ===\n'
-                )
-                log.write(footer)
-                log.flush()
-                if self._single_slot:
-                    self._console(footer)
-                else:
-                    self._console(
-                        f'=== task {task.index} ended | run {task.resolved.run.run_path} '
-                        f'| gpu {gpu_id or "none"} | exit {outcome.exit_code} ===\n'
-                    )
-            log.close()
-        if isinstance(outcome, ProcessResult):
-            atomic_write_json(
-                path=usage_file(log_file=task.log_file),
-                document={
-                    'schema': 'tslab.local-usage/1',
-                    'attempt': task.attempt,
-                    'job_id': self._job_id,
-                    'exit_code': outcome.exit_code,
-                    'elapsed_seconds': outcome.elapsed_seconds,
-                    'cpu_seconds': outcome.cpu_seconds,
-                    'max_rss_bytes': outcome.max_rss_bytes,
-                    'gpu_id': gpu_id,
-                    'timeout': self._timeout,
-                    'timed_out': outcome.timed_out,
-                },
-            )
-        if self._on_task_state is not None:
-            self._on_task_state(key, 'ended')
-
-    def _console(self, line: str) -> None:
-        # why: the console output is the design
-        print(line, end='', file=self._stream)
-
-
 class LocalLauncher:
     """The tasks of the group in parallel slots, under a per-task time limit.
 
@@ -414,14 +277,36 @@ class LocalLauncher:
         else:
             slots = self._local.max_parallel
         by_key = {f'{job_id}_{task.index}': task for task in group.tasks}
-        output = _TaskOutput(
-            job_id=job_id,
+
+        def task_header(key: str) -> str:
+            task = by_key[key]
+            header = (
+                f'=== tslab attempt {task.attempt} | job {job_id} | {hostname()} | {utc_now_iso()}'
+            )
+            if self._gpu_ids:
+                header += f' | gpus {",".join(self._gpu_ids)}'
+            return header + ' ===\n'
+
+        output = TaskOutput(
             stream=stream,
             single_slot=slots == 1,
-            by_key=by_key,
-            gpu_ids=self._gpu_ids,
+            tasks={
+                key: TaskInfo(
+                    log_file=task.log_file,
+                    index=task.index,
+                    name=f'run {task.resolved.run.run_path}',
+                    usage_file=usage_file(log_file=task.log_file),
+                    usage_document={
+                        'schema': 'tslab.local-usage/1',
+                        'attempt': task.attempt,
+                        'job_id': job_id,
+                        'timeout': timeout_seconds(local=self._local),
+                    },
+                )
+                for key, task in by_key.items()
+            },
+            header=task_header,
             on_task_state=self._on_task_state,
-            timeout=timeout_seconds(local=self._local),
         )
         with stop_on_signals(signals=_STOP_SIGNALS) as request:
             run_commands(
