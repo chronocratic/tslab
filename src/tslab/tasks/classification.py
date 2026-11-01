@@ -2,11 +2,31 @@
 
 from dataclasses import dataclass
 
+import torch
+
+from tslab.interfaces import Split
 from tslab.tasks.data import TSDataInfo
 
-__all__ = ['TSClassificationDataInfo']
+__all__ = ['TSClassificationDataInfo', 'check_label_range']
 
 _MIN_CLASSES = 2
+
+
+def check_label_range(*, labels: torch.Tensor, num_classes: int, split: Split) -> None:
+    """Fail when a label lies outside ``0 .. num_classes - 1``.
+
+    Raises:
+        ValueError: If a label is negative or not below ``num_classes``.
+    """
+    if labels.numel() == 0:
+        return
+    lowest, highest = int(labels.min()), int(labels.max())
+    if lowest < 0 or highest >= num_classes:
+        message = (
+            f'{split} labels lie in [{lowest}, {highest}], outside [0, {num_classes}); '
+            'labels must be encoded as 0 .. num_classes - 1'
+        )
+        raise ValueError(message)
 
 
 @dataclass(frozen=True, kw_only=True)

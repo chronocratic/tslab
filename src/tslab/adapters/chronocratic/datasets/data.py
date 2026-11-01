@@ -15,31 +15,13 @@ import torch
 from tslab.adapters.chronocratic.datasets.settings import datamodule_class_of
 from tslab.interfaces import Split
 from tslab.lightning import LightningDataSource
-from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.tasks import check_label_range, TSClassificationDataInfo, TSForecastingDataInfo
 
 __all__ = [
     'ChronocraticClassificationData',
     'ChronocraticForecastingData',
     'build_chronocratic_data_source',
-    'check_label_range',
 ]
-
-
-def check_label_range(*, labels: torch.Tensor, num_classes: int, split: Split) -> None:
-    """Fail when a label lies outside ``0 .. num_classes - 1``.
-
-    Raises:
-        ValueError: If a label is negative or not below ``num_classes``.
-    """
-    if labels.numel() == 0:
-        return
-    lowest, highest = int(labels.min()), int(labels.max())
-    if lowest < 0 or highest >= num_classes:
-        message = (
-            f'{split} labels lie in [{lowest}, {highest}], outside [0, {num_classes}); '
-            'labels must be encoded as 0 .. num_classes - 1'
-        )
-        raise ValueError(message)
 
 
 def _known[T](*, value: T | None, name: str) -> T:

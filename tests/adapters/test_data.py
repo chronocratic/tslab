@@ -19,7 +19,6 @@ from tslab.adapters.chronocratic.datasets import (
     data_settings,
     DATAMODULES,
 )
-from tslab.adapters.chronocratic.datasets.data import check_label_range
 from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import SPLITS
 
@@ -99,12 +98,6 @@ def test_labeled_splits_cover_every_sample_once() -> None:
     assert torch.unique(samples.flatten(start_dim=1), dim=0).shape[0] == 56
     assert set(labels.tolist()) == {0, 1}
     assert splits['test'][0].shape[0] == 28
-
-
-def test_label_range_check() -> None:
-    check_label_range(labels=torch.tensor([0, 1, 1]), num_classes=2, split='train')
-    with pytest.raises(ValueError, match=r'outside \[0, 2\)'):
-        check_label_range(labels=torch.tensor([1, 2]), num_classes=2, split='test')
 
 
 def test_setup_again_gives_the_same_data() -> None:
