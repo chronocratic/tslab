@@ -6,7 +6,7 @@ from typing import cast
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm
+from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status

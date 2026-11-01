@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
+from tests.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.jobs.slurm import (
     query_expected_starts,
     query_job_states,

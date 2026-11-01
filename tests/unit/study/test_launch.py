@@ -12,7 +12,7 @@ import time
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm, install_fake_slurm
+from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs

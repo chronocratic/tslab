@@ -7,7 +7,7 @@ import shlex
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm
+from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import submit_study
 from tslab.cli import main
 from tslab.study.commands import run_one

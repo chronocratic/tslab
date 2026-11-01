@@ -11,7 +11,7 @@ import time
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm
+from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
