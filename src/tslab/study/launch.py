@@ -18,13 +18,12 @@ from tslab.core.files import atomic_write_json, atomic_write_text
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import (
-    busy_gpus,
     gpu_lock_folder,
     PoolCommand,
     ProcessResult,
     run_commands,
+    select_gpus,
     stop_on_signals,
-    visible_gpus,
 )
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
@@ -195,26 +194,10 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
         The ids the launch may lease, in order; empty for CPU-only slots.
 
     Raises:
-        ValueError: If ``skip_busy_gpus`` applies to no NVIDIA GPU, or every
-            GPU it would use is busy.
+        ValueError: As ``select_gpus``.
     """
-    if local.gpus == 'auto':
-        gpu_ids = visible_gpus(environment=environment)
-    else:
-        gpu_ids = tuple(str(gpu) for gpu in local.gpus)
-    if local.skip_busy_gpus:
-        if not gpu_ids or gpu_ids == ('mps',):
-            message = 'skip_busy_gpus needs NVIDIA GPUs'
-            raise ValueError(message)
-        busy = busy_gpus(gpu_ids=gpu_ids)
-        if busy:
-            gpu_ids = tuple(gpu for gpu in gpu_ids if gpu not in busy)
-        if not gpu_ids:
-            message = (
-                f'all local GPUs are busy: {", ".join(sorted(busy))}; '
-                'wait for a GPU to free, or remove skip_busy_gpus'
-            )
-            raise ValueError(message)
+    gpus = 'auto' if local.gpus == 'auto' else tuple(str(gpu) for gpu in local.gpus)
+    gpu_ids = select_gpus(gpus=gpus, skip_busy=local.skip_busy_gpus, environment=environment)
     if gpu_ids and local.max_parallel != 1:
         _LOGGER.warning('local.gpus is set, so local.max_parallel is ignored')
     if not gpu_ids and local.tasks_per_gpu > 1:

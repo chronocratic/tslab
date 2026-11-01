@@ -10,8 +10,16 @@ import platform
 import shutil
 import subprocess
 import tempfile
+from typing import Literal
 
-__all__ = ['GpuLease', 'busy_gpus', 'gpu_lock_folder', 'try_lease_gpu', 'visible_gpus']
+__all__ = [
+    'GpuLease',
+    'busy_gpus',
+    'gpu_lock_folder',
+    'select_gpus',
+    'try_lease_gpu',
+    'visible_gpus',
+]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -222,3 +230,39 @@ def busy_gpus(*, gpu_ids: Sequence[str]) -> frozenset[str]:
         if (index := index_by_uuid.get(line.strip())) is not None and index in gpu_ids
     }
     return frozenset(busy)
+
+
+def select_gpus(
+    *, gpus: Sequence[str] | Literal['auto'], skip_busy: bool, environment: Mapping[str, str]
+) -> tuple[str, ...]:
+    """The GPU ids a launch may lease, with ``"auto"`` resolved and the busy ones left out.
+
+    Args:
+        gpus: The GPU ids to use, or ``"auto"`` to discover them from
+            ``environment``.
+        skip_busy: Whether to leave out GPUs with running compute processes.
+        environment: The environment to discover the GPUs from.
+
+    Returns:
+        The ids the launch may lease, in order; empty for CPU-only slots.
+
+    Raises:
+        ValueError: If ``skip_busy`` applies to no NVIDIA GPU, or every
+            GPU it would use is busy.
+    """
+    gpu_ids = visible_gpus(environment=environment) if gpus == 'auto' else tuple(gpus)
+    if not skip_busy:
+        return gpu_ids
+    if not gpu_ids or gpu_ids == ('mps',):
+        message = 'skip_busy_gpus needs NVIDIA GPUs'
+        raise ValueError(message)
+    busy = busy_gpus(gpu_ids=gpu_ids)
+    if busy:
+        gpu_ids = tuple(gpu for gpu in gpu_ids if gpu not in busy)
+    if not gpu_ids:
+        message = (
+            f'all local GPUs are busy: {", ".join(sorted(busy))}; '
+            'wait for a GPU to free, or remove skip_busy_gpus'
+        )
+        raise ValueError(message)
+    return gpu_ids
