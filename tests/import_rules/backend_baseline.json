@@ -1,7 +1,5 @@
 {
-  "module_imports_both": {
-    "src/tslab/study/reporting/failures.py": 1
-  },
+  "module_imports_both": {},
   "name_comparisons": {},
   "none_checks": {},
   "test_imports_both": {}
