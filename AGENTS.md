@@ -49,6 +49,7 @@ src/tslab/
   study/               studies: grids, machine profiles, SLURM and local launch, results
      launchers/         the launch backends: one per launcher, SLURM and local apart
   cli/                 `tslab new | status | study | wandb-sync`
+     study/             the study subcommands: one module per command
   templates/project/   the files `tslab new` copies (see section 3)
 tests/
   unit/<package>/      unit tests, one folder per source package
