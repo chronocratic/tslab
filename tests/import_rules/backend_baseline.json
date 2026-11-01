@@ -3,13 +3,9 @@
     "src/tslab/study/failures.py": 1
   },
   "name_comparisons": {
-    "src/tslab/study/doctor.py": 1,
-    "src/tslab/study/failures.py": 1,
     "src/tslab/study/machine/load.py": 5,
     "src/tslab/study/machine/local.py": 2,
-    "src/tslab/study/machine/slurm.py": 2,
-    "src/tslab/study/state.py": 2,
-    "src/tslab/study/usage.py": 3
+    "src/tslab/study/machine/slurm.py": 2
   },
   "none_checks": {},
   "test_imports_both": {}

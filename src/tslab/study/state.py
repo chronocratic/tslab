@@ -17,16 +17,7 @@ from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 if TYPE_CHECKING:
     from tslab.study.launchers import JobPhase, JobStates
 
-__all__ = [
-    'FolderFacts',
-    'RunReport',
-    'StudyState',
-    'collect_states',
-    'followup_job_ids',
-    'read_folder',
-    'slurm_task_ids',
-    'study_state',
-]
+__all__ = ['FolderFacts', 'RunReport', 'StudyState', 'collect_states', 'read_folder', 'study_state']
 
 _INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
@@ -179,38 +170,6 @@ def study_state(
     if failed:
         return StudyState.FAILED, _reason(folder=folder, job_state=job_state)
     return StudyState.MISSING, None
-
-
-def slurm_task_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
-    """The task ids to query: the latest SLURM task of every run.
-
-    Args:
-        jobs: The job records of the study, in submission order.
-
-    Returns:
-        The ``<job>_<index>`` ids of the latest slurm-submitted tasks,
-        sorted; local jobs hold no task ids.
-    """
-    ids = {
-        f'{job.job_id}_{task.index}'
-        for job, task in latest_tasks(jobs=jobs).values()
-        if job.launcher == 'slurm'
-    }
-    return sorted(ids)
-
-
-def followup_job_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
-    """The sorted SLURM ids of follow-up jobs.
-
-    Args:
-        jobs: The job records of the study, in submission order.
-
-    Returns:
-        The ids of SLURM jobs recorded as follow-ups.
-    """
-    return sorted(
-        {job.job_id for job in jobs if job.kind == 'followup' and job.launcher == 'slurm'}
-    )
 
 
 def _pause(seconds: float) -> None:

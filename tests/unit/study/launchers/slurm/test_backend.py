@@ -261,7 +261,7 @@ def test_usage_delegates_and_has_no_gpu_ids(
 ) -> None:
     ctx = _context(project=project, fake=fake)
     usage: dict[str, SlurmJobUsage] = {}
-    monkeypatch.setattr('tslab.study.usage._usage_of', lambda **_kwargs: usage)
+    monkeypatch.setattr('tslab.study.launchers.slurm.usage.usage', lambda **_kwargs: usage)
 
     returned_usage, gpu_ids = SlurmBackend().usage(context=ctx)
 
@@ -274,7 +274,7 @@ def test_failure_usage_delegates_to_failures(
 ) -> None:
     ctx = _context(project=project, fake=fake)
     usage: dict[str, SlurmJobUsage] = {}
-    monkeypatch.setattr('tslab.study.failures._usage_of', lambda **_kwargs: usage)
+    monkeypatch.setattr('tslab.study.launchers.slurm.usage.failure_usage', lambda **_kwargs: usage)
 
     assert SlurmBackend().failure_usage(context=ctx, reports=()) is usage
 

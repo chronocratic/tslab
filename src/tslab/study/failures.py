@@ -6,7 +6,7 @@ import logging
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import InstanceState
 from tslab.jobs.local import tail_lines
-from tslab.jobs.slurm import format_slurm_memory, query_job_usage, SlurmError, SlurmJobUsage
+from tslab.jobs.slurm import format_slurm_memory, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.documents import run_entry
 from tslab.study.machine import SlurmSettings
@@ -36,7 +36,9 @@ def collect_failures(
     """
     selected_states = states or _DEFAULT_STATES
     reports = [report for report in context.reports if report.state in selected_states]
-    usage = _usage_of(context=context, reports=reports)
+    from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+    usage = backend_for(machine=context.machine).failure_usage(context=context, reports=reports)
     return [
         _failure_entry(
             context=context,
@@ -46,24 +48,6 @@ def collect_failures(
         )
         for report in reports
     ]
-
-
-def _usage_of(*, context: Context, reports: Sequence[RunReport]) -> dict[str, SlurmJobUsage]:
-    """The accounting usage of the selected out-of-memory runs; no numbers on failure."""
-    if context.machine.launcher != 'slurm':
-        return {}
-    oom_ids = [
-        report.job_id
-        for report in reports
-        if report.job_state == 'OUT_OF_MEMORY' and report.job_id is not None
-    ]
-    if not oom_ids:
-        return {}
-    try:
-        return query_job_usage(job_ids=oom_ids)
-    except SlurmError as error:
-        _LOGGER.warning('%s', error)
-        return {}
 
 
 def failure_hint(

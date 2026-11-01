@@ -53,7 +53,6 @@
     "src/tslab/lightning/trainer.py": 1,
     "src/tslab/study/commands.py": 3,
     "src/tslab/study/definition.py": 1,
-    "src/tslab/study/doctor.py": 1,
     "src/tslab/study/documents.py": 2,
     "src/tslab/study/failures.py": 4,
     "src/tslab/study/launchers/slurm/followups.py": 1,

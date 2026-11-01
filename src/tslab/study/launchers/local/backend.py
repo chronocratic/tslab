@@ -227,11 +227,9 @@ class LocalBackend:
         self, *, context: Context
     ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
         """The usage of every local run from its usage file, with the GPU ids."""
-        # why: the usage module reads the launch module, which reads the backends
-        # door, so a module-level import would cycle
-        from tslab.study.usage import _local_usage_of  # noqa: PLC0415
+        from tslab.study.launchers.local.usage import usage  # noqa: PLC0415
 
-        return _local_usage_of(context=context)
+        return usage(context=context)
 
     def doctor_checks(self) -> tuple[DoctorCheck, ...]:
         """A local machine needs no scheduler checks."""

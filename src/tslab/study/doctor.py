@@ -20,7 +20,6 @@ __all__ = ['DoctorCheck', 'run_checks']
 
 _LOGGER = logging.getLogger(__name__)
 _DISK_WARNING_BYTES = 10 * 1024**3
-_SLURM_COMMANDS = ('sbatch', 'squeue', 'sacct')
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -68,8 +67,10 @@ def run_checks(
         checks.append(DoctorCheck(name='profile', status='ok', message='profile loaded'))
 
     if machine is not None:
-        if machine.launcher == 'slurm':
-            checks.append(_slurm_check())
+        # why: the launcher package imports DoctorCheck from this module
+        from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+        checks.extend(backend_for(machine=machine).doctor_checks())
         output_check, disk_path = _output_root_check(machine=machine)
         checks.append(output_check)
         checks.append(_disk_check(path=disk_path, free_bytes=free_bytes))
@@ -80,15 +81,6 @@ def run_checks(
     if importlib.util.find_spec('wandb') is not None:
         checks.append(_wandb_check())
     return checks
-
-
-def _slurm_check() -> DoctorCheck:
-    missing = [name for name in _SLURM_COMMANDS if shutil.which(name) is None]
-    if missing:
-        return DoctorCheck(
-            name='slurm', status='fail', message=f'missing SLURM commands: {", ".join(missing)}'
-        )
-    return DoctorCheck(name='slurm', status='ok', message='SLURM commands found')
 
 
 def _output_root_check(*, machine: MachineProfile) -> tuple[DoctorCheck, Path]:

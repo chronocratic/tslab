@@ -1,5 +1,6 @@
 """Failure details, hints, and bounded log tails."""
 
+from collections.abc import Mapping, Sequence
 import dataclasses
 import json
 from pathlib import Path
@@ -26,6 +27,7 @@ from tslab.core.status import (
     write_status,
 )
 from tslab.jobs.slurm import parse_slurm_memory, SlurmJobUsage
+from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.failures import collect_failures, failure_hint, log_failures
 from tslab.study.result_table import instance_directory
@@ -99,6 +101,28 @@ def test_failures_default_states_skip_done_and_missing(project: Path, fake: Fake
     ctx = context(project=project, machine_file='cluster.toml')
     failures = collect_failures(context=ctx, states=(), lines=30)
     assert [failure['state'] for failure in failures] == [StudyState.FAILED.value]
+
+
+def test_collect_failures_uses_selected_backend_usage(
+    project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _failed_context(project, fake)
+    calls: list[tuple[Context, Sequence[RunReport]]] = []
+
+    class Backend:
+        def failure_usage(
+            self, *, context: Context, reports: Sequence[RunReport]
+        ) -> Mapping[str, SlurmJobUsage]:
+            calls.append((context, reports))
+            no_usage: dict[str, SlurmJobUsage] = {}
+            return no_usage
+
+    backend = Backend()
+    monkeypatch.setattr(launchers, 'backend_for', lambda **_kwargs: backend)
+
+    collect_failures(context=ctx, states=(), lines=30)
+
+    assert calls == [(ctx, [ctx.reports[0]])]
 
 
 def test_failures_json_shape(
