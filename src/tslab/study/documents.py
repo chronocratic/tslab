@@ -6,7 +6,7 @@ import shlex
 from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launch import LaunchReport
+from tslab.study.launchers import LaunchReport
 from tslab.study.outcome import counts_live
 from tslab.study.plan import JobGroup
 from tslab.study.report import resources_of

@@ -48,6 +48,29 @@ class SlurmSettings:
     setup: tuple[str, ...] = ()
     signal_seconds: int = 120
 
+    @property
+    def cpus(self) -> int:
+        """The CPUs allocated to each task."""
+        return self.cpus_per_task
+
+    @property
+    def max_tasks_per_job(self) -> int | None:
+        """The maximum number of tasks in one array."""
+        return self.max_array_size
+
+    def describe(self) -> str:
+        """The resource line of the settings, for the dry run printout."""
+        # why: the fields mirror SlurmSettings, named in display order
+        parts = [f'partition={self.partition}', f'time={self.time}']
+        if self.qos is not None:
+            parts.append(f'qos={self.qos}')
+        parts.append(f'cpus={self.cpus_per_task}')
+        if self.mem_per_cpu is not None:
+            parts.append(f'mem/cpu={self.mem_per_cpu}')
+        if self.gpus:
+            parts.append(f'gpus={self.gpus}')
+        return ', '.join(parts)
+
 
 def sbatch_extra(
     *, value: object, location: str, path: Path

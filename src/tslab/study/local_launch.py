@@ -15,7 +15,7 @@ from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import process_alive, start_detached, tail_lines
-from tslab.study.launch import OnTaskState
+from tslab.study.launchers import OnTaskState
 from tslab.study.state import LOCAL_ENDED
 
 __all__ = [

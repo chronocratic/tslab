@@ -3,7 +3,7 @@
 import pytest
 
 from tslab.core.text import format_table
-from tslab.study.launch import LaunchReport
+from tslab.study.launchers import LaunchReport
 from tslab.study.machine import SlurmSettings
 from tslab.study.report import log_launch, log_problems, resources_of
 

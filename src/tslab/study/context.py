@@ -16,7 +16,6 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
-from tslab.study.local_launch import local_job_states
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_in_progress
@@ -216,6 +215,10 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
 def _local_states(
     *, machine: MachineProfile, study: Study, jobs: list[JobRecord]
 ) -> dict[str, str]:
+    # why: local_launch reads the backends door for its types, and the door
+    # imports this module's Context, so a module-level import would cycle
+    from tslab.study.local_launch import local_job_states  # noqa: PLC0415
+
     live = local_job_states(study_folder=study_folder(machine=machine, study=study))
     # why: a local task outside a live launch is over, whatever its folder says
     ended = {
