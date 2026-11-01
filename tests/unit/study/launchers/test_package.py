@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study.launchers import backend_for, BACKENDS, JobUsage
+from tslab.study.launchers import backend_for, BACKENDS, JobUsage, LaunchError
 from tslab.study.machine import (
     load_machine,
     LocalSettings,
@@ -39,6 +39,12 @@ def test_unknown_launcher_is_rejected_by_the_profile(*, tmp_path: Path) -> None:
     path.write_text('launcher = "kubernetes"\noutput_root = "out"\n', encoding='utf-8')
     with pytest.raises(MachineProfileError, match=r'launcher must be "slurm" or "local"'):
         load_machine(path=path, environment=os.environ)
+
+
+def test_launch_error_carries_the_scheduler_message() -> None:
+    error = LaunchError('sbatch: error: invalid partition')
+    assert isinstance(error, RuntimeError)
+    assert str(error) == 'sbatch: error: invalid partition'
 
 
 def test_job_usage_is_a_frozen_neutral_record() -> None:

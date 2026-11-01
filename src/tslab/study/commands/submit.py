@@ -8,10 +8,9 @@ import time
 from typing import TextIO
 
 from tslab.core.status import utc_now_iso
-from tslab.jobs.slurm import SlurmError
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, OnLaunch
+from tslab.study.launchers import backend_for, LaunchError, OnLaunch
 from tslab.study.paths import next_job_file, study_folder
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import JobRecord, read_jobs, submission_lock
@@ -101,7 +100,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         sleep: What waits out the submission pause of the cluster.
         begin: A SLURM ``--begin`` for the submitted jobs.
         before_launch: Called once the plan is valid and before the first job
-            is submitted, never on a dry run; a ``SlurmError`` from it stops
+            is submitted, never on a dry run; a ``LaunchError`` from it stops
             the command with exit code 1.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
@@ -137,7 +136,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if before_launch is not None and not dry_run:
             try:
                 before_launch_code = before_launch()
-            except SlurmError as error:
+            except LaunchError as error:
                 failure = str(error)
             else:
                 if before_launch_code != 0:

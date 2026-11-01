@@ -17,7 +17,6 @@ import sys
 from typing import cast, Protocol, TextIO
 from uuid import uuid4
 
-from tslab.jobs.slurm import SlurmError
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
@@ -33,6 +32,7 @@ __all__ = [
     'JobPhase',
     'JobStates',
     'JobUsage',
+    'LaunchError',
     'LaunchReport',
     'LaunchStopped',
     'Launcher',
@@ -47,6 +47,10 @@ __all__ = [
 
 #: The base of an exit code made from a signal: the code is the base plus the number.
 SIGNAL_EXIT_BASE = 128
+
+
+class LaunchError(RuntimeError):
+    """The launch could not be executed on the machine; the message is the failure."""
 
 
 class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, not an error
@@ -287,7 +291,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
 
         try:
             launcher.submit(group=group, study_folder=folder, record=record_job)
-        except SlurmError as exc:
+        except LaunchError as exc:
             error = str(exc)
             break
         except LaunchStopped as exc:

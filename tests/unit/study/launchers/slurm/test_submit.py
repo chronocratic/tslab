@@ -8,7 +8,7 @@ from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
-from tslab.study.launchers import launch as _launch, LaunchReport
+from tslab.study.launchers import launch as _launch, LaunchError, LaunchReport
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import study_folder
@@ -136,3 +136,16 @@ def test_launch_reports_partial_submission(
     assert report.error is not None
     assert 'invalid partition' in report.error
     assert len(read_jobs(path=folder / 'submissions.jsonl')) == 1
+
+
+def test_launcher_submit_raises_launch_error_when_sbatch_fails(
+    fake: FakeSlurm, machine: MachineProfile, study: Study, tmp_path: Path
+) -> None:
+    fake.set_answers('sbatch', [{'exit': 1, 'stderr': 'error: invalid partition'}])
+    groups = groups_of(study, machine)
+    folder = study_folder(machine=machine, study=study)
+    write_job_files(study_folder=folder, groups=groups, machine=machine, project_root=tmp_path)
+    with pytest.raises(LaunchError, match='invalid partition'):
+        SlurmLauncher(sleep=lambda _: None).submit(
+            group=groups[0], study_folder=folder, record=lambda **_kwargs: None
+        )

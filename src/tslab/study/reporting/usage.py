@@ -35,7 +35,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         The versioned study-usage document.
 
     Raises:
-        SlurmError: If the ``sacct`` usage query fails.
+        LaunchError: If the usage query fails on the scheduler.
     """
     backend = backend_for(machine=context.machine)
     usage, gpu_ids = backend.usage(context=context)
