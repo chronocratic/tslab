@@ -1,4 +1,4 @@
-"""Pieces shared by the TS2Vec evaluation protocols."""
+"""Pieces shared by the scikit-learn probes of the TS2Vec evaluation protocols."""
 
 from collections.abc import Sequence
 import logging

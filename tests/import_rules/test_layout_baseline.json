@@ -1,6 +1,5 @@
 [
   "tests/unit/cli/test_cli_study.py",
-  "tests/unit/probes/test_probes.py",
   "tests/unit/study/test_arguments.py",
   "tests/unit/study/test_cancel.py",
   "tests/unit/study/test_check_paths.py",
