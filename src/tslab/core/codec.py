@@ -90,31 +90,33 @@ def union_choices(*, annotation: object) -> dict[str, type] | None:
     )
     if not has_dataclass:
         return None
-    choices: dict[str, type] = {}
-    for member in members:
-        if get_origin(member) is not Annotated:
-            stripped: object = member
-            name = None
-        else:
-            stripped = strip_annotated(annotation=member)
-            name = next(
-                (meta.name for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE), None
-            )
-        if stripped is None or stripped is type(None):  # Annotated[None, ...] normalizes
-            if name is None:
-                continue  # a bare None carries no name
-            choices[name] = type(None)
-            continue
-        if not isinstance(stripped, type) or not dataclasses.is_dataclass(stripped):
-            continue
-        if name is None:
-            message = (
-                f'union member {stripped.__qualname__} is unnamed; name it with '
-                f'tyro.conf.subcommand(name=...)'
-            )
-            raise ValueError(message)
-        choices[name] = stripped
-    return choices
+    choices = (_choice(member=member) for member in members)
+    return dict(choice for choice in choices if choice is not None)
+
+
+def _subcommand_name(*, member: object) -> str | None:
+    """The ``tyro.conf.subcommand`` name of an ``Annotated`` member, or ``None``."""
+    if get_origin(member) is not Annotated:
+        return None
+    names = [str(meta.name) for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE]
+    return names[0] if names else None
+
+
+def _choice(*, member: object) -> tuple[str, type] | None:
+    """The ``(name, class)`` of one union member, or ``None`` when it is not a choice."""
+    stripped = strip_annotated(annotation=member)
+    name = _subcommand_name(member=member)
+    if stripped is None or stripped is type(None):  # Annotated[None, ...] normalizes
+        return None if name is None else (name, type(None))  # a bare None carries no name
+    if not isinstance(stripped, type) or not dataclasses.is_dataclass(stripped):
+        return None
+    if name is None:
+        message = (
+            f'union member {stripped.__qualname__} is unnamed; name it with '
+            f'tyro.conf.subcommand(name=...)'
+        )
+        raise ValueError(message)
+    return name, stripped
 
 
 def union_members(*, annotation: object) -> tuple[object, ...] | None:
@@ -153,12 +155,12 @@ def _item_annotations(*, annotation: object, length: int, location: str) -> list
     arguments = get_args(annotation)
     if not arguments:
         return [Any] * length  # why: a missing item annotation means any type, checked by identity
-    if get_origin(annotation) is tuple and arguments[-1] is not Ellipsis:
-        if len(arguments) != length:
-            message = f'{location}: expected {len(arguments)} items, got {length}'
-            raise ConfigFileError(message)
-        return list(arguments)
-    return [arguments[0]] * length
+    if get_origin(annotation) is not tuple or arguments[-1] is Ellipsis:
+        return [arguments[0]] * length
+    if len(arguments) != length:
+        message = f'{location}: expected {len(arguments)} items, got {length}'
+        raise ConfigFileError(message)
+    return list(arguments)
 
 
 def _mapping_value_annotation(*, annotation: object) -> object:
@@ -194,23 +196,36 @@ def _encode(*, value: object, annotation: object, location: str) -> object:
             for index, (item, item_annotation) in enumerate(zip(value, annotations, strict=True))
         ]
     if isinstance(value, Mapping):
-        value_annotation = _mapping_value_annotation(annotation=annotation)
-        for key in value:
-            if not isinstance(key, str):
-                message = (
-                    f'{location}: mapping keys must be str to be saved in a config file, '
-                    f'got {key!r}; YAML would load other keys back as text'
-                )
-                raise TypeError(message)
-        return {
-            key: _encode(value=item, annotation=value_annotation, location=f'{location}.{key}')
-            for key, item in value.items()
-        }
+        return _encode_mapping(value=value, annotation=annotation, location=location)
     message = (
         f'{location}: cannot save a value of type {type(value).__qualname__} in a config file; '
         f'configs may hold only dataclasses, scalars, Path, Enum, tuples, lists, dicts and None'
     )
     raise TypeError(message)
+
+
+def _encode_mapping(*, value: Mapping[object, object], annotation: object, location: str) -> object:
+    value_annotation = _mapping_value_annotation(annotation=annotation)
+    for key in value:
+        if not isinstance(key, str):
+            message = (
+                f'{location}: mapping keys must be str to be saved in a config file, '
+                f'got {key!r}; YAML would load other keys back as text'
+            )
+            raise TypeError(message)
+    return {
+        key: _encode(value=item, annotation=value_annotation, location=f'{location}.{key}')
+        for key, item in value.items()
+    }
+
+
+def _type_entry(*, members: Sequence[object], value: object, location: str) -> dict[str, object]:
+    """The ``__type__`` entry of a value stored in a union of several dataclasses."""
+    choices = [member for member in members if member is not type(None)]
+    if len(choices) <= 1:
+        return {}
+    _reject_duplicate_names(members=choices, location=location)
+    return {_TYPE_KEY: type(value).__name__}
 
 
 def _encode_dataclass(
@@ -219,10 +234,7 @@ def _encode_dataclass(
     encoded: dict[str, object] = {}
     members = union_members(annotation=annotation)
     if members is not None:
-        choices = [member for member in members if member is not type(None)]
-        if len(choices) > 1:
-            _reject_duplicate_names(members=choices, location=location)
-            encoded[_TYPE_KEY] = type(value).__name__
+        encoded.update(_type_entry(members=members, value=value, location=location))
     elif annotation is not Any and annotation is not type(value):
         message = (
             f'{location}: value of type {type(value).__qualname__} is stored in a field '
@@ -271,9 +283,7 @@ def _decode(*, data: object, annotation: object, location: str) -> object:
         return _decode_union(data=data, members=members, location=location)
     origin = get_origin(annotation)
     if origin is Literal:
-        if data in get_args(annotation):
-            return data
-        _fail(data=data, expected=f'one of {list(get_args(annotation))}', location=location)
+        return _decode_literal(data=data, annotation=annotation, location=location)
     if origin in {tuple, list, Sequence}:
         return _decode_sequence(data=data, annotation=annotation, location=location)
     if origin in {dict, Mapping}:
@@ -282,6 +292,12 @@ def _decode(*, data: object, annotation: object, location: str) -> object:
         return _decode_class(data=data, cls=annotation, location=location)
     message = f'{location}: config files do not support fields annotated {annotation!r}'
     raise ConfigFileError(message)
+
+
+def _decode_literal(*, data: object, annotation: object, location: str) -> object:
+    if data in get_args(annotation):
+        return data
+    _fail(data=data, expected=f'one of {list(get_args(annotation))}', location=location)
 
 
 def _decode_sequence(*, data: object, annotation: object, location: str) -> object:
@@ -309,23 +325,35 @@ def _decode_mapping(*, data: object, annotation: object, location: str) -> dict[
 
 def _decode_class(*, data: object, cls: type, location: str) -> object:
     if cls is type(None):
-        if data is None:
-            return None
-        _fail(data=data, expected='null', location=location)
+        return _decode_null(data=data, location=location)
     if issubclass(cls, Enum):
-        if isinstance(data, str) and data in cls.__members__:
-            return cls[data]
-        _fail(data=data, expected=f'one of {list(cls.__members__)}', location=location)
+        return _decode_enum(data=data, cls=cls, location=location)
     if issubclass(cls, Path):
-        if isinstance(data, str):
-            return cls(data)
-        _fail(data=data, expected='path string', location=location)
+        return _decode_path(data=data, cls=cls, location=location)
     if dataclasses.is_dataclass(cls):
         return decode_dataclass(data=data, cls=cls, location=location)
     if cls in _SCALARS:
         return _decode_scalar(data=data, cls=cls, location=location)
     message = f'{location}: config files do not support fields of type {cls.__qualname__}'
     raise ConfigFileError(message)
+
+
+def _decode_null(*, data: object, location: str) -> None:
+    if data is None:
+        return
+    _fail(data=data, expected='null', location=location)
+
+
+def _decode_enum(*, data: object, cls: type[Enum], location: str) -> object:
+    if isinstance(data, str) and data in cls.__members__:
+        return cls[data]
+    _fail(data=data, expected=f'one of {list(cls.__members__)}', location=location)
+
+
+def _decode_path(*, data: object, cls: type[Path], location: str) -> object:
+    if isinstance(data, str):
+        return cls(data)
+    _fail(data=data, expected='path string', location=location)
 
 
 def _decode_scalar(*, data: object, cls: type, location: str) -> object:
@@ -341,6 +369,23 @@ def _decode_scalar(*, data: object, cls: type, location: str) -> object:
     _fail(data=data, expected=cls.__name__, location=location)
 
 
+def _decode_tagged(
+    *, data: dict[object, object], dataclass_members: Sequence[type], location: str
+) -> object:
+    """Decode a mapping whose ``__type__`` names one dataclass member of the union."""
+    name = data[_TYPE_KEY]
+    matches = [member for member in dataclass_members if member.__name__ == name]
+    if len(matches) > 1:
+        message = f'{location}: {_TYPE_KEY} {name!r} names several union members'
+        raise ConfigFileError(message)
+    if len(matches) != 1:
+        names = [member.__name__ for member in dataclass_members]
+        message = f'{location}: {_TYPE_KEY} {name!r} is not one of {names}'
+        raise ConfigFileError(message)
+    body = {key: value for key, value in data.items() if key != _TYPE_KEY}
+    return decode_dataclass(data=body, cls=matches[0], location=location)
+
+
 def _decode_union(*, data: object, members: tuple[object, ...], location: str) -> object:
     if data is None and type(None) in members:
         return None
@@ -351,17 +396,7 @@ def _decode_union(*, data: object, members: tuple[object, ...], location: str) -
         if isinstance(member, type) and dataclasses.is_dataclass(member)
     ]
     if isinstance(data, dict) and _TYPE_KEY in data:
-        name = data[_TYPE_KEY]
-        matches = [member for member in dataclass_members if member.__name__ == name]
-        if len(matches) > 1:
-            message = f'{location}: {_TYPE_KEY} {name!r} names several union members'
-            raise ConfigFileError(message)
-        if len(matches) != 1:
-            names = [member.__name__ for member in dataclass_members]
-            message = f'{location}: {_TYPE_KEY} {name!r} is not one of {names}'
-            raise ConfigFileError(message)
-        body = {key: value for key, value in data.items() if key != _TYPE_KEY}
-        return decode_dataclass(data=body, cls=matches[0], location=location)
+        return _decode_tagged(data=data, dataclass_members=dataclass_members, location=location)
     if isinstance(data, dict) and len(dataclass_members) > 1:
         names = [member.__name__ for member in dataclass_members]
         message = f'{location}: missing {_TYPE_KEY}; it must name one of {names}'

@@ -114,8 +114,29 @@ def _canonicalize_dataclass(*, value: 'DataclassInstance') -> dict[str, object]:
     return canonical
 
 
+def _canonicalize_artifact(*, value: CarriesFingerprint) -> object:
+    fingerprint = value.tslab_fingerprint
+    if fingerprint is None:
+        message = (
+            f'{type(value).__qualname__} was not produced by a stage and has no fingerprint; '
+            f'return it from a stage or use {type(value).__qualname__}.external(path=...)'
+        )
+        raise TypeError(message)
+    return {'__fingerprint__': fingerprint}
+
+
+def _canonicalize_mapping(*, value: Mapping[object, object]) -> dict[str, object]:
+    canonical_mapping: dict[str, object] = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            message = f'cannot fingerprint mapping with non-str key {key!r}'
+            raise TypeError(message)
+        canonical_mapping[key] = canonicalize(value=item)
+    return canonical_mapping
+
+
 # why: one branch per supported type keeps the rules readable
-def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
+def canonicalize(*, value: object) -> object:  # noqa: PLR0911
     """Convert ``value`` into a JSON-compatible form with a single spelling.
 
     Rules:
@@ -152,14 +173,7 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
     if isinstance(value, Path):
         return value.as_posix()
     if isinstance(value, CarriesFingerprint):
-        fingerprint = value.tslab_fingerprint
-        if fingerprint is None:
-            message = (
-                f'{type(value).__qualname__} was not produced by a stage and has no fingerprint; '
-                f'return it from a stage or use {type(value).__qualname__}.external(path=...)'
-            )
-            raise TypeError(message)
-        return {'__fingerprint__': fingerprint}
+        return _canonicalize_artifact(value=value)
     # Fingerprintable comes before the dataclass rule on purpose: a dataclass such as
     # ``RunOptions`` can opt out of the fingerprint by returning ``None`` from
     # ``fingerprint_settings``.
@@ -170,13 +184,7 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
     if isinstance(value, list | tuple):
         return [canonicalize(value=item) for item in value]
     if isinstance(value, Mapping):
-        canonical_mapping: dict[str, object] = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                message = f'cannot fingerprint mapping with non-str key {key!r}'
-                raise TypeError(message)
-            canonical_mapping[key] = canonicalize(value=item)
-        return canonical_mapping
+        return _canonicalize_mapping(value=value)
     message = (
         f'cannot fingerprint value of type {type(value).__qualname__}; make it Fingerprintable '
         f'(add fingerprint_settings()) or pass its config dataclass instead'
@@ -208,6 +216,14 @@ def _hash_file(*, path: Path) -> str:
 _content_hash_cache: dict[tuple[str, int, int, int], str] = {}
 
 
+def _cached_file_hash(*, path: Path) -> str:
+    stat = path.stat()
+    cache_key = (path.resolve().as_posix(), stat.st_ino, stat.st_size, stat.st_mtime_ns)
+    if cache_key not in _content_hash_cache:
+        _content_hash_cache[cache_key] = _hash_file(path=path)
+    return _content_hash_cache[cache_key]
+
+
 def hash_path_contents(*, path: Path) -> str:
     """Return the SHA-256 hex digest of a file or the contents of a directory tree.
 
@@ -230,11 +246,7 @@ def hash_path_contents(*, path: Path) -> str:
         message = f'{path.as_posix()} does not exist'
         raise FileNotFoundError(message)
     if path.is_file():
-        stat = path.stat()
-        cache_key = (path.resolve().as_posix(), stat.st_ino, stat.st_size, stat.st_mtime_ns)
-        if cache_key not in _content_hash_cache:
-            _content_hash_cache[cache_key] = _hash_file(path=path)
-        return _content_hash_cache[cache_key]
+        return _cached_file_hash(path=path)
     digest = hashlib.sha256()
     for file_path in sorted(item for item in path.rglob('*') if item.is_file()):
         # NUL separates the fields, so no file name can run into the hash after it.

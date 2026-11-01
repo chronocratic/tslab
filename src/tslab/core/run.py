@@ -15,7 +15,7 @@ from pathlib import Path
 import signal
 import sys
 import threading
-from types import FrameType, TracebackType
+from types import FrameType, MappingProxyType, TracebackType
 from typing import Literal, Self
 
 from tslab.core.codec import config_to_data
@@ -316,14 +316,7 @@ class Run:
         self._claimed_ids.add(format_instance_id(stage_name=stage_name, name_parts=name_parts))
         claimed = self._claimed.setdefault(stage_name, [])
         if name_parts in claimed:
-            if name_parts == ('default',):
-                message = (
-                    f'stage {stage_name!r} called twice without name=; '
-                    f'pass a distinct name= for each instance'
-                )
-            else:
-                message = f'stage {stage_name!r} called twice with name {"/".join(name_parts)!r}'
-            raise ValueError(message)
+            raise ValueError(_duplicate_message(stage_name=stage_name, name_parts=name_parts))
         recorded = [
             tuple(instance_id[len(stage_name) + 1 : -1].split('/'))
             for instance_id in self._snapshot.instances
@@ -335,17 +328,14 @@ class Run:
         ]:
             shorter, longer = sorted((name_parts, other), key=len)
             if shorter != longer and longer[: len(shorter)] == shorter:
-                message = (
-                    f'instance name {"/".join(name_parts)!r} of stage {stage_name!r} conflicts '
-                    f'with {"/".join(other)!r}: one would be stored inside the other'
-                )
-                if is_recorded:
-                    message += (
-                        f'. {"/".join(other)!r} comes from an earlier execution in status.json; '
-                        f'if it is obsolete, delete its folder and its entry in '
-                        f'{(self._directory / STATUS_FILE).as_posix()}, or choose another name'
+                raise ValueError(
+                    _conflict_message(
+                        stage_name=stage_name,
+                        name_parts=name_parts,
+                        other=other,
+                        recorded_in=(self._directory / STATUS_FILE) if is_recorded else None,
                     )
-                raise ValueError(message)
+                )
         claimed.append(name_parts)
 
     def instance_record(self, *, instance_id: str) -> InstanceRecord | None:
@@ -439,18 +429,21 @@ class Run:
             self._persist_status()
             if self.writes_files:
                 self._write_meta(finished_at=utc_now_iso())
-                for tracker in self._trackers:
-                    _call_tracker(
-                        tracker=tracker,
-                        action='finish',
-                        call=lambda tracker=tracker: tracker.finish(
-                            status=RunStatus.from_run_state(run_state=run_state)
-                        ),
-                    )
+                self._finish_trackers(run_state=run_state)
             self._log_summary(run_state=run_state)
         finally:
             self._release()
         return False
+
+    def _finish_trackers(self, *, run_state: RunState) -> None:
+        for tracker in self._trackers:
+            _call_tracker(
+                tracker=tracker,
+                action='finish',
+                call=lambda tracker=tracker: tracker.finish(
+                    status=RunStatus.from_run_state(run_state=run_state)
+                ),
+            )
 
     def _persist_status(self) -> None:
         if self.writes_files:
@@ -583,10 +576,9 @@ class Run:
             ', '.join(f'{counts[state]} {state.value}' for state in InstanceState),
         )
         for instance_id, record in records.items():
-            if record.state is InstanceState.FAILED:
-                _LOGGER.error('  failed  %s: %s', instance_id, record.error)
-            elif record.state is InstanceState.SKIPPED:
-                _LOGGER.warning('  skipped %s: %s', instance_id, record.reason)
+            log_record = _RECORD_LOGGERS.get(record.state)
+            if log_record is not None:
+                log_record(instance_id=instance_id, record=record)
         for unmatched in sorted(set(self._options.rerun) - self._matched_rerun_ids):
             _LOGGER.warning('--run.rerun %s matched no instance called in this run', unmatched)
         if self._options.rerun_from is not None and not self._rerun_from_reached:
@@ -616,6 +608,54 @@ class Run:
             root_logger.setLevel(self._previous_root_level)
         if self._previous_tslab_level is not None:
             logging.getLogger('tslab').setLevel(self._previous_tslab_level)
+
+
+def _log_failed(*, instance_id: str, record: InstanceRecord) -> None:
+    _LOGGER.error('  failed  %s: %s', instance_id, record.error)
+
+
+def _log_skipped(*, instance_id: str, record: InstanceRecord) -> None:
+    _LOGGER.warning('  skipped %s: %s', instance_id, record.reason)
+
+
+#: The summary line of an instance by its state; the other states log nothing.
+_RECORD_LOGGERS: Mapping[InstanceState, Callable[..., None]] = MappingProxyType(
+    {InstanceState.FAILED: _log_failed, InstanceState.SKIPPED: _log_skipped}
+)
+
+
+def _duplicate_message(*, stage_name: str, name_parts: tuple[str, ...]) -> str:
+    if name_parts == ('default',):
+        return (
+            f'stage {stage_name!r} called twice without name=; '
+            f'pass a distinct name= for each instance'
+        )
+    return f'stage {stage_name!r} called twice with name {"/".join(name_parts)!r}'
+
+
+def _conflict_message(
+    *,
+    stage_name: str,
+    name_parts: tuple[str, ...],
+    other: tuple[str, ...],
+    recorded_in: Path | None,
+) -> str:
+    """The error for two instance names that would be stored one inside the other.
+
+    ``recorded_in`` is the ``status.json`` that holds ``other`` when it comes from an
+    earlier execution, and ``None`` when ``other`` was claimed in this process.
+    """
+    message = (
+        f'instance name {"/".join(name_parts)!r} of stage {stage_name!r} conflicts '
+        f'with {"/".join(other)!r}: one would be stored inside the other'
+    )
+    if recorded_in is None:
+        return message
+    return message + (
+        f'. {"/".join(other)!r} comes from an earlier execution in status.json; '
+        f'if it is obsolete, delete its folder and its entry in '
+        f'{recorded_in.as_posix()}, or choose another name'
+    )
 
 
 def _options_from_config(*, config: object) -> RunOptions:

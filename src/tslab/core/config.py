@@ -179,19 +179,33 @@ def parse_config[C](
     """
     cascade = (tyro.conf.CascadeSubcommandArgs,)
     if presets is not None:
-        if default is not None:
-            message = 'pass either presets= or default=, not both'
-            raise ValueError(message)
-        choice = _preset_choice(config_class=config_class, presets=presets)
-        parsed = tyro.cli(choice, args=args, config=cascade)
-        # tyro returns Any; every preset is an instance of config_class.
-        if not isinstance(parsed, config_class):
-            message = f'a preset is not a {config_class.__qualname__}: {type(parsed).__qualname__}'
-            raise TypeError(message)
-        return parsed
+        return _parse_preset(
+            config_class=config_class, presets=presets, default=default, args=args, config=cascade
+        )
     if default is None:
         return tyro.cli(config_class, args=args, config=cascade)
     return tyro.cli(config_class, default=default, args=args, config=cascade)
+
+
+def _parse_preset[C](
+    *,
+    config_class: type[C],
+    presets: 'Mapping[str, tuple[str, C]]',
+    default: C | None,
+    args: Sequence[str] | None,
+    config: tuple[object, ...],
+) -> C:
+    """Parse the arguments with the first argument selecting a preset."""
+    if default is not None:
+        message = 'pass either presets= or default=, not both'
+        raise ValueError(message)
+    choice = _preset_choice(config_class=config_class, presets=presets)
+    parsed = tyro.cli(choice, args=args, config=config)
+    # tyro returns Any; every preset is an instance of config_class.
+    if not isinstance(parsed, config_class):
+        message = f'a preset is not a {config_class.__qualname__}: {type(parsed).__qualname__}'
+        raise TypeError(message)
+    return parsed
 
 
 type _Presets[C] = Mapping[str, tuple[str, C]]
