@@ -163,10 +163,12 @@ def test_callbacks_get_keyword_arguments(*, tmp_path: Path) -> None:
         command=(
             sys.executable,
             '-c',
-            'import signal, time\n'
-            'signal.signal(signal.SIGUSR2, lambda *args: None)\n'
-            'print("line", flush=True)\n'
-            'time.sleep(0.4)\n',
+            (
+                'import signal, time\n'
+                'signal.signal(signal.SIGUSR2, lambda *args: None)\n'
+                'print("line", flush=True)\n'
+                'time.sleep(0.4)\n'
+            ),
         ),
         cwd=tmp_path,
         environment=os.environ,
