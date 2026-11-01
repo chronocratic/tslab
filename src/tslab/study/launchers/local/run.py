@@ -18,6 +18,7 @@ from tslab.jobs.local import (
     stop_on_signals,
     TaskInfo,
     TaskOutput,
+    without_scheduler_variables,
 )
 from tslab.study.launchers import LaunchStopped, OnTaskState, RecordJob
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
@@ -207,7 +208,10 @@ class LocalLauncher:
                         key=key,
                         command=task.command,
                         cwd=self._project_root,
-                        environment={**os.environ, **self._env},
+                        environment={
+                            **without_scheduler_variables(environ=os.environ),
+                            **self._env,
+                        },
                     )
                     for key, task in by_key.items()
                 ],
