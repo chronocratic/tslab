@@ -9,9 +9,9 @@ import pytest
 
 from tslab.core.run import Run
 from tslab.interfaces.tracker import RunStatus
-from tslab.tracking import wandb_tracker as wandb_tracker_module
-from tslab.tracking.wandb_log import read_exit_codes, read_records
-from tslab.tracking.wandb_tracker import WandbTracker
+from tslab.tracking.wandb import tracker as wandb_tracker_module
+from tslab.tracking.wandb.log import read_exit_codes, read_records
+from tslab.tracking.wandb.tracker import WandbTracker
 
 
 @dataclass(frozen=True, kw_only=True)
