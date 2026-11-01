@@ -118,11 +118,21 @@ def try_lease_gpu(*, folder: Path, gpu_ids: Sequence[str], tasks_per_gpu: int) -
             continue
         if tasks_per_gpu == 1:
             return GpuLease(gpu_id=gpu_id, fds=(main_fd,))
-        for slot in range(tasks_per_gpu):
-            slot_fd = _open_lock(folder=folder, name=f'gpu-{gpu_id}.{slot}.lock')
-            if _lock_now(fd=slot_fd, lock=fcntl.LOCK_EX):
-                return GpuLease(gpu_id=gpu_id, fds=(main_fd, slot_fd))
+        lease = _lease_slot(
+            folder=folder, gpu_id=gpu_id, main_fd=main_fd, tasks_per_gpu=tasks_per_gpu
+        )
+        if lease is not None:
+            return lease
         os.close(main_fd)
+    return None
+
+
+def _lease_slot(*, folder: Path, gpu_id: str, main_fd: int, tasks_per_gpu: int) -> GpuLease | None:
+    """Take the first free slot lock of a GPU whose shared lock is held, else ``None``."""
+    for slot in range(tasks_per_gpu):
+        slot_fd = _open_lock(folder=folder, name=f'gpu-{gpu_id}.{slot}.lock')
+        if _lock_now(fd=slot_fd, lock=fcntl.LOCK_EX):
+            return GpuLease(gpu_id=gpu_id, fds=(main_fd, slot_fd))
     return None
 
 

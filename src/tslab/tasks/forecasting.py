@@ -422,11 +422,10 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
         message = f'horizons must be distinct and non-empty, got {list(horizons)}'
         raise ValueError(message)
     prefix = () if name is None else normalize_instance_name(name=name)
-    if isinstance(encoder(model), SequenceEncoder):
-        if window_length is not None or stride != 1:
-            _LOGGER.warning(
-                'this encoder has encode_sequence, so window_length and stride are ignored'
-            )
+    from_sequence = isinstance(encoder(model), SequenceEncoder)
+    if from_sequence and (window_length is not None or stride != 1):
+        _LOGGER.warning('this encoder has encode_sequence, so window_length and stride are ignored')
+    if from_sequence:
         sequences = encode_series(
             run=run,
             name=name,

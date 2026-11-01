@@ -96,6 +96,14 @@ def _selection_args(
     return shlex.join(arguments)
 
 
+def _log_next_step(*, dry_run: bool, selection: str) -> None:
+    """Log what to run next after a launch that exited cleanly."""
+    if dry_run:
+        _LOGGER.info('dry run: nothing submitted; run again without --dry-run to submit')
+        return
+    _LOGGER.info('follow progress: tslab study status %s', selection)
+
+
 def _selection_options(*, grid: tuple[str, ...], only: tuple[str, ...]) -> list[str]:
     options: list[str] = []
     for grid_name in grid:

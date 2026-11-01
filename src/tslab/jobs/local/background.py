@@ -76,12 +76,12 @@ def stop_keep_awake(*, process: subprocess.Popen[bytes] | None) -> None:
     if process is None:
         return
     code = process.poll()
-    if code is not None:
-        if code != 0:
-            _LOGGER.warning('the keep-awake helper exited with code %s', code)
+    if code is None:
+        process.terminate()
+        process.wait()
         return
-    process.terminate()
-    process.wait()
+    if code != 0:
+        _LOGGER.warning('the keep-awake helper exited with code %s', code)
 
 
 def start_detached(

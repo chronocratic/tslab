@@ -304,15 +304,21 @@ def _training_stop_reason(*, trainer: lightning.Trainer) -> str:
         early-stopping callback stopped the training, otherwise ``'max_epochs'``.
     """
     callbacks = cast('_TrainerCallbacks', trainer).callbacks
-    for callback in callbacks:
-        if isinstance(callback, Timer):
-            remaining = callback.time_remaining()
-            if remaining is not None and remaining <= 0:
-                return 'time_limit'
-    for callback in callbacks:
-        if isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0:
-            return 'early_stopping'
+    if any(
+        isinstance(callback, Timer) and _timer_ran_out(timer=callback) for callback in callbacks
+    ):
+        return 'time_limit'
+    if any(
+        isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0 for callback in callbacks
+    ):
+        return 'early_stopping'
     return 'max_epochs'
+
+
+def _timer_ran_out(*, timer: Timer) -> bool:
+    """Whether the training timer has no time left."""
+    remaining = timer.time_remaining()
+    return remaining is not None and remaining <= 0
 
 
 def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> None:

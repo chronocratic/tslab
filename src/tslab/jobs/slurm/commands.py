@@ -303,6 +303,13 @@ def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
     return _parse_usage_rows(stdout=sacct.stdout)
 
 
+def _note_peak(*, peak: dict[str, int], task_id: str, max_rss: str) -> None:
+    """Raise the peak memory of a task to the ``MaxRSS`` of one step row."""
+    rss = parse_slurm_memory(text=max_rss)
+    if rss is not None:
+        peak[task_id] = max(peak.get(task_id, 0), rss)
+
+
 def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
     allocations: dict[str, _Allocation] = {}
     peak: dict[str, int] = {}
@@ -315,10 +322,7 @@ def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
         ]
         if '.' in job_id:
             # why: MaxRSS is only on the step rows, never on the allocation row
-            task_id = job_id.split('.', 1)[0]
-            rss = parse_slurm_memory(text=max_rss)
-            if rss is not None:
-                peak[task_id] = max(peak.get(task_id, 0), rss)
+            _note_peak(peak=peak, task_id=job_id.split('.', 1)[0], max_rss=max_rss)
             continue
         allocations[job_id] = (
             state.split()[0] if state else '',
@@ -345,8 +349,12 @@ def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
 def _gres_gpus(*, alloc_tres: str) -> int:
     for part in alloc_tres.split(','):
         if part.startswith('gres/gpu='):
-            try:
-                return int(part.split('=', 1)[1])
-            except ValueError:
-                return 0
+            return _int_or_zero(text=part.split('=', 1)[1])
     return 0
+
+
+def _int_or_zero(*, text: str) -> int:
+    try:
+        return int(text)
+    except ValueError:
+        return 0

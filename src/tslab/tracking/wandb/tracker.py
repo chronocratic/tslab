@@ -112,24 +112,37 @@ class WandbTracker(LightningLoggerTracker):
         tags = [*self._tags, *Path(run_name).parts]
         modes = [self._mode] if self._mode == 'offline' else [self._mode, 'offline']
         for mode in modes:
-            try:
-                return self._build(
-                    run_directory=run_directory, run_name=run_name, tags=tags, mode=mode
+            built = self._try_build(
+                run_directory=run_directory,
+                run_name=run_name,
+                tags=tags,
+                mode=mode,
+                last=mode == modes[-1],
+            )
+            if built is not None:
+                return built
+        return None
+
+    def _try_build(
+        self, *, run_directory: Path, run_name: str, tags: list[str], mode: str, last: bool
+    ) -> WandbLogger | None:
+        """Build the logger in one mode; ``None`` with a warning when W&B fails."""
+        try:
+            return self._build(run_directory=run_directory, run_name=run_name, tags=tags, mode=mode)
+        except Exception:  # wandb raises version-unstable private exception types
+            if last:
+                _LOGGER.warning(
+                    'W&B initialization failed, including offline. Continuing without W&B; '
+                    'results are unaffected and CSV tracking is still on.',
+                    exc_info=True,
                 )
-            except Exception:  # wandb raises version-unstable private exception types
-                if mode == modes[-1]:
-                    _LOGGER.warning(
-                        'W&B initialization failed, including offline. Continuing without W&B; '
-                        'results are unaffected and CSV tracking is still on.',
-                        exc_info=True,
-                    )
-                else:
-                    _LOGGER.warning(
-                        'W&B init failed in %s mode; retrying offline. Sync later with '
-                        '`tslab wandb-sync`.',
-                        mode,
-                        exc_info=True,
-                    )
+            else:
+                _LOGGER.warning(
+                    'W&B init failed in %s mode; retrying offline. Sync later with '
+                    '`tslab wandb-sync`.',
+                    mode,
+                    exc_info=True,
+                )
         return None
 
     def _build(
