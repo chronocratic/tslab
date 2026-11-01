@@ -7,6 +7,7 @@ from tslab.core.text import (
     first_line,
     format_bytes,
     format_duration,
+    format_index_ranges,
     format_table,
     log_table,
     qualified_name,
@@ -45,6 +46,13 @@ def test_format_bytes() -> None:
     assert format_bytes(size=3 * 1024**2 // 2) == '1.5 MiB'
     assert format_bytes(size=1024) == '1.0 KiB'
     assert format_bytes(size=512) == '0.5 KiB'
+
+
+def test_format_index_ranges() -> None:
+    assert format_index_ranges(indices=(10, 9, 0, 1, 2, 3, 7, 3)) == '0-3,7,9-10'
+    assert format_index_ranges(indices=(4,)) == '4'
+    with pytest.raises(ValueError, match='indices'):
+        format_index_ranges(indices=())
 
 
 def test_format_table_aligns_left_and_strips_trailing_spaces() -> None:
