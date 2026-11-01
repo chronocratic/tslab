@@ -364,19 +364,6 @@ def test_foreground_script_orders_like_the_job_script(tmp_path: Path) -> None:
     assert len(lines) == 7
 
 
-def test_foreground_script_without_slurm_has_no_setup(tmp_path: Path) -> None:
-    lines = foreground_script(
-        slurm=None, project_root=tmp_path, env={}, command=('python', 'x.py')
-    ).splitlines()
-    assert lines == [
-        '#!/bin/bash',
-        'set -euo pipefail',
-        f'cd {shlex.quote(str(tmp_path))}',
-        'export PYTHONUNBUFFERED=1',
-        'exec python x.py',
-    ]
-
-
 def test_foreground_script_rejects_a_line_break_in_setup(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match='setup'):
         foreground_script(
@@ -390,5 +377,8 @@ def test_foreground_script_rejects_a_line_break_in_setup(tmp_path: Path) -> None
 def test_foreground_script_rejects_bad_env_names(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match='environment variable name'):
         foreground_script(
-            slurm=None, project_root=tmp_path, env={'A B': 'v'}, command=('python', 'x.py')
+            slurm=SlurmSettings(partition='p'),
+            project_root=tmp_path,
+            env={'A B': 'v'},
+            command=('python', 'x.py'),
         )

@@ -18,6 +18,7 @@ from tslab.jobs.local.process import (
     stop_on_signals,
     StopRequest,
 )
+from tslab.jobs.local.shell import export_lines
 
 __all__ = [
     'GpuLease',
@@ -32,6 +33,7 @@ __all__ = [
     'TaskInfo',
     'TaskOutput',
     'busy_gpus',
+    'export_lines',
     'gpu_lock_folder',
     'process_alive',
     'run_commands',

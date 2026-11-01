@@ -347,6 +347,12 @@ class Backend(Protocol):
         """The resources of one grid, with the machine overrides applied."""
         ...
 
+    def foreground_script(
+        self, *, context: Context, resources: Resources, command: Sequence[str]
+    ) -> str:
+        """The shell script that runs one study run in the terminal."""
+        ...
+
     def launch(  # noqa: PLR0913 # why: the Backend signature; one keyword per launch input
         self,
         *,

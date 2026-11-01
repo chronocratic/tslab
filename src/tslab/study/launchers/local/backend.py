@@ -20,6 +20,7 @@ from tslab.study.launchers import (
     OnTaskState,
     Resources,
 )
+from tslab.study.launchers.local.foreground import foreground_script
 from tslab.study.launchers.local.pid_file import hold_launch, LocalLaunchError
 from tslab.study.launchers.local.run import (
     local_job_id,
@@ -120,6 +121,18 @@ class LocalBackend:
     ) -> Resources:
         """The CPUs of the machine; a local launch holds no array limit."""
         return LocalResources(cpus=local_cpus)
+
+    def foreground_script(
+        self,
+        *,
+        context: Context,
+        resources: Resources,  # noqa: ARG002 # why: the Backend signature
+        command: Sequence[str],
+    ) -> str:
+        """The foreground script of the machine: no setup lines."""
+        return foreground_script(
+            project_root=context.project_root, env=context.machine.env, command=command
+        )
 
     def launch(  # noqa: PLR0913 # why: the Backend signature; one keyword per launch input
         self,
