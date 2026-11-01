@@ -13,9 +13,13 @@ baseline only ever goes down (the plan's shrinking-baseline guard).
 
 import ast
 from collections.abc import Mapping, Sequence
+from importlib.util import resolve_name
 import itertools
 import json
 from pathlib import Path
+import sys
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'src' / 'tslab'
@@ -115,14 +119,31 @@ def _none_checks(*, tree: ast.Module) -> int:
     return count
 
 
-def _imported_modules(*, tree: ast.Module) -> frozenset[str]:
+def _package_name(*, path: Path) -> str:
+    """The package of one source or test file, for resolving relative imports."""
+    roots = ((SOURCE, 'tslab'), (ROOT / 'tests', 'tests'))
+    for root, prefix in roots:
+        if path.is_relative_to(root):
+            return '.'.join((prefix, *path.relative_to(root).parent.parts))
+    message = f'{path} is not under the source or tests folder'
+    raise ValueError(message)
+
+
+def _imported_modules(*, tree: ast.Module, path: Path) -> frozenset[str]:
     """The absolute module paths the file imports."""
     modules: set[str] = set()
+    package = _package_name(path=path)
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module is not None:
-            modules.add(node.module)
-            modules.update(f'{node.module}.{alias.name}' for alias in node.names)
-        elif isinstance(node, ast.Import):
+        if isinstance(node, ast.ImportFrom):
+            module = node.module
+            if node.level:
+                relative_name = f'{"." * node.level}{module or ""}'
+                module = resolve_name(relative_name, package)
+            if module is None:
+                continue
+            modules.add(module)
+            modules.update(f'{module}.{alias.name}' for alias in node.names)
+        if isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
     return frozenset(module for module in modules if module.startswith('tslab.'))
 
@@ -141,9 +162,9 @@ def _imports_a_side(*, modules: frozenset[str], name: str) -> bool:
     )
 
 
-def _imports_both_backends(*, tree: ast.Module) -> int:
+def _imports_both_backends(*, tree: ast.Module, path: Path) -> int:
     """Whether the file imports both a SLURM module and a local one."""
-    modules = _imported_modules(tree=tree)
+    modules = _imported_modules(tree=tree, path=path)
     slurm = _imports_a_side(modules=modules, name='slurm')
     local = _imports_a_side(modules=modules, name='local')
     return int(slurm and local)
@@ -185,15 +206,14 @@ def _unit_files() -> list[Path]:
 
 def _scan(*, kind: str, files: Sequence[Path]) -> dict[str, int]:
     """The per-file counts of one kind, zero entries omitted."""
-    counters = {
-        'name_comparisons': _name_comparisons,
-        'none_checks': _none_checks,
-        'module_imports_both': _imports_both_backends,
-        'test_imports_both': _imports_both_backends,
-    }
+    counters = {'name_comparisons': _name_comparisons, 'none_checks': _none_checks}
     counts: dict[str, int] = {}
     for path in files:
-        number = counters[kind](tree=_parse(path=path))
+        tree = _parse(path=path)
+        if kind in ('module_imports_both', 'test_imports_both'):
+            number = _imports_both_backends(tree=tree, path=path)
+        else:
+            number = counters[kind](tree=tree)
         if number:
             counts[path.relative_to(ROOT).as_posix()] = number
     return counts
@@ -229,7 +249,22 @@ def test_match_cases_count_each_backend_name() -> None:
 def test_by_name_import_of_both_backends_counts() -> None:
     """``from tslab.jobs import slurm, local`` imports both backends."""
     tree = ast.parse('from tslab.jobs import slurm, local')
-    assert _imports_both_backends(tree=tree) == 1
+    assert _imports_both_backends(tree=tree, path=SOURCE / 'study' / 'commands.py') == 1
+
+
+def test_relative_import_of_both_backends_counts(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / 'src' / 'tslab'
+    module = source / 'study' / 'relative_imports.py'
+    module.parent.mkdir(parents=True)
+    module.write_text('from .launchers import slurm, local\n', encoding='utf-8')
+    monkeypatch.setattr(sys.modules[__name__], 'ROOT', tmp_path)
+    monkeypatch.setattr(sys.modules[__name__], 'SOURCE', source)
+
+    assert _scan(kind='module_imports_both', files=[module]) == {
+        'src/tslab/study/relative_imports.py': 1
+    }
 
 
 def test_no_backend_name_comparison() -> None:
