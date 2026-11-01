@@ -10,7 +10,7 @@ from tests.unit.study.machine.helpers import (
     SLURM_TABLE,
     write,
 )
-from tslab.study.machine import MachineProfileError, SlurmSettings
+from tslab.study.machine import MachineOverride, MachineProfileError, SlurmSettings
 import tslab.study.machine.slurm as slurm_machine
 
 
@@ -131,3 +131,21 @@ def test_slurm_settings_describe_their_record_and_requested_memory() -> None:
     assert record['mem_per_cpu'] == '2G'
     assert settings.requested_memory == 2 * 2 * 1024**3
     assert SlurmSettings(partition='gpu').requested_memory is None
+
+
+def test_slurm_for_merges_matching_overrides_in_order() -> None:
+    base = SlurmSettings(partition='p', sbatch_extra=(('account', 'X'), ('constraint', 'v100')))
+    overrides = (
+        MachineOverride(match={'recipe': ('a',)}, slurm={'cpus_per_task': 8}),
+        MachineOverride(match={'recipe': ('b',)}, slurm={'cpus_per_task': 2}),
+        MachineOverride(
+            match={'recipe': ('a',)}, slurm={'sbatch_extra': (('constraint', 'a100'),)}
+        ),
+    )
+    merged = slurm_machine.slurm_for(
+        base=base, overrides=overrides, grid_name='g', values={'recipe': 'a'}
+    )
+    assert merged is not None
+    assert merged.cpus_per_task == 8
+    assert merged.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
+    assert slurm_machine.slurm_for(base=None, overrides=overrides, grid_name='g', values={}) is None
