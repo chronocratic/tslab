@@ -19,16 +19,7 @@ from tslab.cli.console import use_stderr, watch
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
 from tslab.jobs.slurm import SlurmError
-from tslab.study.commands import (
-    cancel,
-    LIVE_STATES,
-    parse_states,
-    resubmit,
-    results,
-    run_one,
-    status,
-    submit,
-)
+from tslab.study.commands import cancel, parse_states, resubmit, results, run_one, status, submit
 from tslab.study.context import Context, expected_starts, load_context, Selection
 from tslab.study.documents import cancel_document, launch_document, show_document, status_document
 from tslab.study.failures import collect_failures, log_failures
@@ -714,15 +705,12 @@ class Resubmit:
         def remember_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
             launches.append((report, groups))
 
-        cancelled = [
-            report.job_id
-            for report in context.reports
-            if self.cancel_live
-            and not self.auto
-            and context.machine.launcher == 'slurm'
-            and report.state in LIVE_STATES
-            and report.job_id is not None
-        ]
+        backend = backend_for(machine=context.machine)
+        cancelled = (
+            backend.cancellable_job_ids(reports=context.reports)
+            if self.cancel_live and not self.auto
+            else []
+        )
         code = resubmit(
             context=context,
             states=states,

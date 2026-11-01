@@ -2,21 +2,41 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import logging
+import os
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
-from tslab.jobs.slurm import SlurmJobUsage
-from tslab.study.context import _local_states, Context
+from tslab.jobs.local import start_keep_awake, stop_keep_awake
+from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, JobStates, LaunchReport, Resources
-from tslab.study.machine import MachineOverride, MachineProfile
+from tslab.study.launchers import (
+    JobPhase,
+    JobStates,
+    launch,
+    LaunchReport,
+    OnTaskState,
+    Resources,
+    SlurmJobUsage,
+)
+from tslab.study.launchers.local.pid_file import hold_launch, LocalLaunchError
+from tslab.study.launchers.local.run import (
+    local_job_id,
+    LocalLauncher,
+    resolve_local_gpus,
+    write_job_files,
+)
+from tslab.study.launchers.local.states import _local_states
+from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
 from tslab.study.plan import _usable_cpus, JobGroup, study_folder
 from tslab.study.records import JobRecord
 from tslab.study.state import RunReport
 
 __all__ = ['LocalBackend', 'LocalResources']
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -99,24 +119,57 @@ class LocalBackend:
         folder: Path,
         dry_run: bool,
         begin: str | None,
-        sleep: Callable[[float], None],
+        sleep: Callable[[float], None],  # noqa: ARG002 # why: the Backend launch signature
         task_stream: TextIO | None,
-        environment: Mapping[str, str],  # noqa: ARG002 # why: wired when the launch code moves
+        environment: Mapping[str, str],
     ) -> LaunchReport | None:
         """Run the groups in this process; ``None`` when a problem was logged."""
-        # why: the commands module reads the backends door for its types, so a
-        # module-level import would cycle
-        from tslab.study.commands import _launch_held  # noqa: PLC0415
-
-        return _launch_held(
-            context=context,
-            groups=groups,
-            folder=folder,
-            dry_run=dry_run,
-            begin=begin,
-            sleep=sleep,
-            task_stream=task_stream,
-        )
+        machine = context.machine
+        local = machine.local or LocalSettings()
+        gpu_ids: tuple[str, ...] = ()
+        keep_awake = None
+        if not dry_run:
+            try:
+                gpu_ids = resolve_local_gpus(local=local, environment=environment)
+            except ValueError as error:
+                _LOGGER.error('%s', error)  # noqa: TRY400 # why: a GPU setup error is shown, not raised
+                return None
+            _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
+        if not dry_run and local.keep_awake:
+            keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
+        if dry_run:
+            return _launch_local_groups(
+                context=context,
+                groups=groups,
+                dry_run=True,
+                begin=begin,
+                task_stream=task_stream,
+                local=local,
+                gpu_ids=gpu_ids,
+                on_task_state=None,
+            )
+        try:
+            task_ids = [
+                f'{local_job_id(job_file=group.job_file)}_{task.index}'
+                for group in groups
+                for task in group.tasks
+            ]
+            with hold_launch(study_folder=folder, task_ids=task_ids) as on_task_state:
+                return _launch_local_groups(
+                    context=context,
+                    groups=groups,
+                    dry_run=False,
+                    begin=begin,
+                    task_stream=task_stream,
+                    local=local,
+                    gpu_ids=gpu_ids,
+                    on_task_state=on_task_state,
+                )
+        except LocalLaunchError as error:
+            _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch-file problem is shown, not raised
+            return None
+        finally:
+            stop_keep_awake(process=keep_awake)
 
     def after_submit(
         self,
@@ -135,11 +188,9 @@ class LocalBackend:
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:
         """Stop the live local launch; the exit code and the stopped pid."""
-        # why: the commands module reads the backends door for its types, so a
-        # module-level import would cycle
-        from tslab.study.commands import cancel  # noqa: PLC0415
+        from tslab.study.launchers.local.cancel import cancel_local  # noqa: PLC0415
 
-        return cancel(context=context, dry_run=dry_run, signal=signal)
+        return cancel_local(context=context, dry_run=dry_run, signal=signal)
 
     def cancellable_job_ids(
         self,
@@ -151,9 +202,9 @@ class LocalBackend:
 
     def detach(self, *, context: Context, arguments: Sequence[str], wait_command: str) -> int:
         """Start the launch in the background and wait until it holds the pid file."""
-        # why: local_launch reads the backends door for OnTaskState, so a
+        # why: the local pid-file module reads the backends door for OnTaskState, so a
         # module-level import would cycle
-        from tslab.study.local_launch import detach_launch  # noqa: PLC0415
+        from tslab.study.launchers.local.pid_file import detach_launch  # noqa: PLC0415
 
         return detach_launch(
             study_folder=study_folder(machine=context.machine, study=context.study),
@@ -185,3 +236,33 @@ class LocalBackend:
     def doctor_checks(self) -> tuple[DoctorCheck, ...]:
         """A local machine needs no scheduler checks."""
         return ()
+
+
+def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forwards backend inputs
+    *,
+    context: Context,
+    groups: Sequence[JobGroup],
+    dry_run: bool,
+    begin: str | None,
+    task_stream: TextIO | None,
+    local: LocalSettings,
+    gpu_ids: tuple[str, ...],
+    on_task_state: OnTaskState | None,
+) -> LaunchReport:
+    return launch(
+        launcher=LocalLauncher(
+            project_root=context.project_root,
+            env=context.machine.env,
+            local=local,
+            gpu_ids=gpu_ids,
+            stream=task_stream,
+            on_task_state=on_task_state,
+        ),
+        write_job_files=write_job_files,
+        machine=context.machine,
+        study=context.study,
+        groups=groups,
+        project_root=context.project_root,
+        dry_run=dry_run,
+        begin=begin,
+    )

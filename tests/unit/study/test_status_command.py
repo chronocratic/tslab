@@ -156,7 +156,7 @@ def test_status_keeps_working_when_squeue_start_fails(
         'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
     )
     ctx = context(project=project, machine_file='cluster.toml')
-    with caplog.at_level('WARNING', logger='tslab.study.context'):
+    with caplog.at_level('WARNING', logger='tslab.study.launchers.slurm.states'):
         starts = expected_starts(context=ctx)
     assert starts is None
     assert 'squeue' in caplog.text

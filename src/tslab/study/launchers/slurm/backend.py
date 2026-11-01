@@ -11,18 +11,21 @@ from tslab.jobs.slurm import (
     INTERRUPTING_JOB_STATES,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
+    scancel,
     slurm_available,
     SlurmError,
     SlurmJobUsage,
 )
-from tslab.study.context import _query_states, Context, expected_starts
+from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import _slurm_check, DoctorCheck
-from tslab.study.launchers import JobPhase, JobStates, LaunchReport, Resources
+from tslab.study.launchers import JobPhase, JobStates, launch, LaunchReport, Resources
+from tslab.study.launchers.slurm.states import _query_states, expected_starts
+from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError
 from tslab.study.plan import _slurm_for, JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import followup_job_ids, RunReport, slurm_task_ids
+from tslab.study.state import followup_job_ids, RunReport, slurm_task_ids, StudyState
 
 __all__ = ['SlurmBackend']
 
@@ -78,11 +81,10 @@ class SlurmBackend:
         """The states of the tasks and follow-up jobs, with the new cache second."""
         if not slurm_available():
             return _unknown_states(), cache
-        ended_states = dict(cache)
         try:
             followups = followup_job_ids(jobs=jobs)
-            states = _query_states(
-                job_ids=slurm_task_ids(jobs=jobs) + followups, ended_states=ended_states
+            states, new_cache = _query_states(
+                job_ids=slurm_task_ids(jobs=jobs) + followups, ended_states=cache
             )
         except SlurmError as error:
             _LOGGER.warning('%s', error)
@@ -100,7 +102,7 @@ class SlurmBackend:
                 phases=MappingProxyType(phases),
                 followup_live_job_ids=live,
             ),
-            ended_states,
+            new_cache,
         )
 
     def expected_starts(self, *, context: Context) -> dict[str, str | None] | None:
@@ -129,26 +131,23 @@ class SlurmBackend:
         *,
         context: Context,
         groups: Sequence[JobGroup],
-        folder: Path,
+        folder: Path,  # noqa: ARG002 # why: the Backend launch signature
         dry_run: bool,
         begin: str | None,
         sleep: Callable[[float], None],
-        task_stream: TextIO | None,
-        environment: Mapping[str, str],  # noqa: ARG002 # why: wired when the launch code moves
+        task_stream: TextIO | None,  # noqa: ARG002 # why: the Backend launch signature
+        environment: Mapping[str, str],  # noqa: ARG002 # why: the SLURM writer uses the profile env
     ) -> LaunchReport | None:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
-        # why: the commands module reads the backends door for its types, so a
-        # module-level import would cycle
-        from tslab.study.commands import _launch_held  # noqa: PLC0415
-
-        return _launch_held(
-            context=context,
+        return launch(
+            launcher=SlurmLauncher(sleep=sleep),
+            write_job_files=write_job_files,
+            machine=context.machine,
+            study=context.study,
             groups=groups,
-            folder=folder,
+            project_root=context.project_root,
             dry_run=dry_run,
             begin=begin,
-            sleep=sleep,
-            task_stream=task_stream,
         )
 
     def after_submit(
@@ -162,7 +161,7 @@ class SlurmBackend:
         """The exit code of the queued follow-up jobs; 0 without one."""
         # why: the followups module reads the launch module, which reads the backends
         # door, so a module-level import would cycle
-        from tslab.study.followups import queue_followups  # noqa: PLC0415
+        from tslab.study.launchers.slurm.followups import queue_followups  # noqa: PLC0415
 
         code, _ = queue_followups(
             context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
@@ -173,22 +172,27 @@ class SlurmBackend:
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:
         """Cancel or signal the queued and running jobs; the exit code and ids."""
-        # why: the commands module reads the backends door for its types, so a
-        # module-level import would cycle
-        from tslab.study.commands import cancel  # noqa: PLC0415
-
-        return cancel(context=context, dry_run=dry_run, signal=signal)
+        live = _live_reports(reports=context.reports, signal=signal)
+        job_ids = [report.job_id for report in live if report.job_id is not None]
+        if not job_ids:
+            _LOGGER.info('nothing to cancel')
+            return 0, []
+        if dry_run:
+            return _dry_run_cancel(job_ids=job_ids, signal=signal)
+        try:
+            scancel(job_ids=job_ids, signal=signal)
+        except SlurmError as error:
+            _LOGGER.error('%s', error)  # noqa: TRY400 # why: cancellation failures need no traceback
+            return 1, []
+        _log_cancelled(job_ids=job_ids, signal=signal)
+        return 0, job_ids
 
     def cancellable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
         """The job ids a cancel can reach: the queued and running runs."""
-        # why: the commands module reads the backends door for its types, so a
-        # module-level import would cycle
-        from tslab.study.commands import LIVE_STATES  # noqa: PLC0415
-
         return [
             report.job_id
             for report in reports
-            if report.state in LIVE_STATES and report.job_id is not None
+            if report.state in (StudyState.QUEUED, StudyState.RUNNING) and report.job_id is not None
         ]
 
     def detach(
@@ -230,3 +234,44 @@ class SlurmBackend:
     def doctor_checks(self) -> tuple[DoctorCheck, ...]:
         """The readiness checks of a SLURM machine."""
         return (_slurm_check(),)
+
+
+def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:
+    live = [
+        report
+        for report in reports
+        if report.state in (StudyState.QUEUED, StudyState.RUNNING) and report.job_id is not None
+    ]
+    if signal is None:
+        return live
+    queued = [
+        report.job_id
+        for report in live
+        if report.state is StudyState.QUEUED and report.job_id is not None
+    ]
+    _log_skipped_queued(job_ids=queued)
+    return [report for report in live if report.state is StudyState.RUNNING]
+
+
+def _log_skipped_queued(*, job_ids: Sequence[str]) -> None:
+    if job_ids:
+        _LOGGER.info('skipped queued runs: %s', ', '.join(job_ids))
+
+
+def _dry_run_cancel(*, job_ids: Sequence[str], signal: str | None) -> tuple[int, list[str]]:
+    if signal is None:
+        _LOGGER.info('would cancel %s', ', '.join(job_ids))
+        return 0, list(job_ids)
+    _LOGGER.info(
+        'would signal %s with %s; the jobs save and end on their own', ', '.join(job_ids), signal
+    )
+    return 0, list(job_ids)
+
+
+def _log_cancelled(*, job_ids: Sequence[str], signal: str | None) -> None:
+    if signal is None:
+        _LOGGER.info('cancelled %s', ', '.join(job_ids))
+        return
+    _LOGGER.info(
+        'signalled %s with %s; the jobs save and end on their own', ', '.join(job_ids), signal
+    )

@@ -1,6 +1,7 @@
 """The behavior of the local study backend."""
 
 from dataclasses import replace
+from io import StringIO
 import os
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
@@ -19,7 +20,9 @@ from tslab.core.meta import hostname
 from tslab.study.launchers import JobPhase, LaunchReport
 import tslab.study.launchers.local.backend as local_backend
 from tslab.study.launchers.local.backend import _phase_of, LocalBackend
-from tslab.study.machine import FollowupSettings
+from tslab.study.launchers.local.states import _is_local_job_id
+from tslab.study.machine import FollowupSettings, LocalSettings
+from tslab.study.plan import plan_jobs
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -37,6 +40,14 @@ if TYPE_CHECKING:
 )
 def test_phase_of_maps_local_states(*, job_state: str | None, phase: JobPhase) -> None:
     assert _phase_of(job_state=job_state) is phase
+
+
+@pytest.mark.parametrize(
+    ('job_id', 'expected'),
+    [('local-123-4', True), ('1000', False), ('1000_4', False), ('worker-123-x', False)],
+)
+def test_local_job_id_recognizes_process_id_shape(*, job_id: str, expected: bool) -> None:
+    assert _is_local_job_id(job_id=job_id) is expected
 
 
 def test_job_states_reads_live_launch_and_returns_read_only_mappings(*, project: Path) -> None:
@@ -178,7 +189,7 @@ def test_after_submit_does_not_retry_empty_submission(*, project: Path) -> None:
 
 def test_detach_delegates_to_pid_file(*, project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    monkeypatch.setattr('tslab.study.local_launch.detach_launch', lambda **_kwargs: 7)
+    monkeypatch.setattr('tslab.study.launchers.local.pid_file.detach_launch', lambda **_kwargs: 7)
 
     assert (
         LocalBackend().detach(context=ctx, arguments=('--study',), wait_command='tslab status') == 7
@@ -204,10 +215,13 @@ def test_failure_usage_and_doctor_checks_are_empty(*, project: Path) -> None:
     assert LocalBackend().doctor_checks() == ()
 
 
-def test_launch_delegates_to_held_launch(*, project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_launch_delegates_to_shared_launch(
+    *, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     ctx = context(project=project, machine_file='local.toml')
+    ctx = replace(ctx, machine=replace(ctx.machine, local=LocalSettings(keep_awake=False)))
     expected = LaunchReport(submitted=(), not_submitted=(), error=None)
-    monkeypatch.setattr('tslab.study.commands._launch_held', lambda **_kwargs: expected)
+    monkeypatch.setattr(local_backend, 'launch', lambda **_kwargs: expected)
 
     report = LocalBackend().launch(
         context=ctx,
@@ -223,11 +237,41 @@ def test_launch_delegates_to_held_launch(*, project: Path, monkeypatch: pytest.M
     assert report is expected
 
 
-def test_cancel_delegates_to_study_command(
+def test_launch_resolves_gpus_from_given_environment(*, project: Path) -> None:
+    ctx = context(project=project, machine_file='local.toml')
+    run = ctx.runs[0]
+    machine = replace(ctx.machine, local=LocalSettings(gpus='auto'))
+    ctx = replace(ctx, machine=machine)
+    groups = plan_jobs(
+        study=ctx.study,
+        machine=machine,
+        resolved=[ctx.resolved[run.run_path]],
+        indices={run.run_path: 0},
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+    )
+
+    report = LocalBackend().launch(
+        context=ctx,
+        groups=groups,
+        folder=ctx.study_directory / '.study',
+        dry_run=False,
+        begin=None,
+        sleep=lambda _seconds: None,
+        task_stream=StringIO(),
+        environment={'CUDA_VISIBLE_DEVICES': '4'},
+    )
+
+    assert report is not None
+    assert '| gpus 4' in groups[0].tasks[0].log_file.read_text()
+
+
+def test_cancel_delegates_to_local_cancel(
     *, project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
     result = (0, ['local-1-1'])
-    monkeypatch.setattr('tslab.study.commands.cancel', lambda **_kwargs: result)
+    monkeypatch.setattr('tslab.study.launchers.local.cancel.cancel_local', lambda **_kwargs: result)
 
     assert LocalBackend().cancel(context=ctx, dry_run=True, signal=None) is result

@@ -1,6 +1,7 @@
 """The behavior of the SLURM study backend."""
 
 from dataclasses import replace
+import json
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
@@ -8,6 +9,7 @@ import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
+from tslab.cli import main
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -15,6 +17,7 @@ from tslab.jobs.slurm import (
     RUNNING_JOB_STATES,
     SlurmJobUsage,
 )
+from tslab.study.commands import cancel
 from tslab.study.context import Context
 from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import JobPhase, LaunchReport
@@ -209,12 +212,12 @@ def test_doctor_checks_reports_scheduler_commands(*, fake: FakeSlurm) -> None:
     assert fake.calls('sbatch') == []
 
 
-def test_launch_delegates_to_held_launch(
+def test_launch_delegates_to_shared_launch(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = _context(project=project, fake=fake)
     expected = LaunchReport(submitted=(), not_submitted=(), error=None)
-    monkeypatch.setattr('tslab.study.commands._launch_held', lambda **_kwargs: expected)
+    monkeypatch.setattr(slurm_backend, 'launch', lambda **_kwargs: expected)
 
     report = SlurmBackend().launch(
         context=ctx,
@@ -234,21 +237,13 @@ def test_after_submit_delegates_to_followup_queue(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = _context(project=project, fake=fake)
-    monkeypatch.setattr('tslab.study.followups.queue_followups', lambda **_kwargs: (7, ()))
+    monkeypatch.setattr(
+        'tslab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (7, ())
+    )
 
     assert (
         SlurmBackend().after_submit(context=ctx, submitted=(), retry=lambda: 0, sleep=no_sleep) == 7
     )
-
-
-def test_cancel_delegates_to_study_command(
-    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    ctx = _context(project=project, fake=fake)
-    result = (0, ['1000_0'])
-    monkeypatch.setattr('tslab.study.commands.cancel', lambda **_kwargs: result)
-
-    assert SlurmBackend().cancel(context=ctx, dry_run=True, signal=None) is result
 
 
 def test_expected_starts_delegates_to_context(
@@ -282,3 +277,116 @@ def test_failure_usage_delegates_to_failures(
     monkeypatch.setattr('tslab.study.failures._usage_of', lambda **_kwargs: usage)
 
     assert SlurmBackend().failure_usage(context=ctx, reports=()) is usage
+
+
+def _context_with_live_runs(*, project: Path, fake: FakeSlurm) -> Context:
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n1000_1|PENDING\n'}])
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|COMPLETED\n'}])
+    return context(project=project, machine_file='cluster.toml')
+
+
+def test_cancel_scancels_live_runs_only(project: Path, fake: FakeSlurm) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    code, cancelled = cancel(context=ctx, dry_run=False)
+    assert code == 0
+    assert cancelled == ['1000_0', '1000_1']
+    assert fake.calls('scancel') == [['1000_0', '1000_1']]
+
+
+def test_cancel_dry_run_calls_nothing(project: Path, fake: FakeSlurm) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    code, cancelled = cancel(context=ctx, dry_run=True)
+    assert code == 0
+    assert cancelled == ['1000_0', '1000_1']
+    assert fake.calls('scancel') == []
+
+
+def test_cancel_signal_signals_running_runs_only(project: Path, fake: FakeSlurm) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    code, ids = cancel(context=ctx, dry_run=False, signal='USR2')
+    assert (code, ids) == (0, ['1000_0'])
+    assert fake.calls('scancel') == [['--signal=USR2', '1000_0']]
+
+
+def test_cancel_signal_skips_queued_runs_with_a_log(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm.backend'):
+        cancel(context=ctx, dry_run=False, signal='USR2')
+    assert 'skipped queued runs: 1000_1' in caplog.text
+
+
+def test_cancel_signal_dry_run_calls_nothing(project: Path, fake: FakeSlurm) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    code, ids = cancel(context=ctx, dry_run=True, signal='USR2')
+    assert (code, ids) == (0, ['1000_0'])
+    assert fake.calls('scancel') == []
+
+
+def test_cancel_signal_cli_json_has_signal(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _context_with_live_runs(project=project, fake=fake)
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'cancel',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--signal',
+                '--json',
+            ]
+        )
+    document = json.loads(capsys.readouterr().out)
+    assert raised.value.code == 0
+    assert document['signal'] == 'USR2'
+    assert document['cancelled'] == ['1000_0']
+
+
+def test_cancel_respects_only_selection(project: Path, fake: FakeSlurm) -> None:
+    _context_with_live_runs(project=project, fake=fake)
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'cancel',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--only',
+                'model=small',
+            ]
+        )
+    assert raised.value.code == 0
+    assert fake.calls('scancel') == [['1000_0', '1000_1']]
+
+
+def test_cancel_json_shape(
+    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _context_with_live_runs(project=project, fake=fake)
+    with pytest.raises(SystemExit) as raised:
+        main(
+            args=[
+                'study',
+                'cancel',
+                'toy_studies:study',
+                '--machine',
+                'cluster.toml',
+                '--dry-run',
+                '--json',
+            ]
+        )
+    document = json.loads(capsys.readouterr().out)
+    assert raised.value.code == 0
+    assert document == {
+        'schema': 'tslab.study-cancel/1',
+        'cancelled': ['1000_0', '1000_1'],
+        'dry_run': True,
+        'signal': None,
+        'exit_code': 0,
+    }

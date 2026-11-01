@@ -2,17 +2,15 @@
 
 import dataclasses
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tslab.jobs.slurm import job_ended, query_expected_starts, query_job_states, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
-from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_in_progress
-from tslab.study.state import collect_states, RunReport, StudyState
+from tslab.study.records import JobRecord, read_jobs, submission_in_progress
+from tslab.study.state import collect_states, RunReport
 
 if TYPE_CHECKING:
     from tslab.study.launchers import JobStates
@@ -25,8 +23,6 @@ __all__ = [
     'load_context',
     'refresh_context',
 ]
-
-_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -101,20 +97,10 @@ def expected_starts(*, context: Context) -> dict[str, str | None] | None:
         ``None`` on a local machine, when no run is queued, or when the
         scheduler call fails (a failed call is logged as a warning).
     """
-    if context.machine.launcher != 'slurm':
-        return None
-    queued = [
-        report.job_id
-        for report in context.reports
-        if report.state is StudyState.QUEUED and report.job_id is not None
-    ]
-    if not queued:
-        return None
-    try:
-        return query_expected_starts(job_ids=queued)
-    except SlurmError as error:
-        _LOGGER.warning('%s', error)
-        return None
+    # why: the launcher door imports Context, so this import must wait until calls
+    from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+    return backend_for(machine=context.machine).expected_starts(context=context)
 
 
 def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
@@ -196,23 +182,6 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
 
 
-def _local_states(
-    *, machine: MachineProfile, study: Study, jobs: list[JobRecord]
-) -> dict[str, str]:
-    # why: local_launch reads the backends door for its types, and the door
-    # imports this module's Context, so a module-level import would cycle
-    from tslab.study.local_launch import local_job_states  # noqa: PLC0415
-
-    live = local_job_states(study_folder=study_folder(machine=machine, study=study))
-    # why: a local task outside a live launch is over, whatever its folder says
-    ended = {
-        f'{job.job_id}_{task.index}': 'ended'
-        for job, task in latest_tasks(jobs=jobs).values()
-        if job.launcher == 'local'
-    }
-    return {**ended, **live}
-
-
 def refresh_context(*, context: Context) -> Context:
     """The jobs and run states of a local context, read again for the same runs.
 
@@ -235,17 +204,6 @@ def refresh_context(*, context: Context) -> Context:
         study_directory=context.study_directory, runs=context.runs, jobs=jobs, job_states=job_states
     )
     return dataclasses.replace(context, jobs=jobs, job_states=job_states, reports=reports)
-
-
-def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) -> dict[str, str]:
-    if ended_states is None:
-        return query_job_states(job_ids=job_ids)
-    queried = query_job_states(job_ids=[item for item in job_ids if item not in ended_states])
-    # why: a failed query raised above, so the cache only ever holds states SLURM reported
-    ended_states.update(
-        {item: state for item, state in queried.items() if job_ended(job_state=state)}
-    )
-    return {**ended_states, **queried}
 
 
 def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
