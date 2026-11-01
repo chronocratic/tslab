@@ -14,7 +14,7 @@ from typing import cast
 from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
-from tslab.jobs.local import start_detached
+from tslab.jobs.local import start_detached, tail_lines
 from tslab.study.state import LOCAL_ENDED
 
 __all__ = [
@@ -190,9 +190,12 @@ def local_job_states(*, study_folder: Path) -> dict[str, str]:
 
 def _log_tail(*, path: Path, lines: int = 20) -> str:
     try:
-        return '\n'.join(path.read_text(encoding='utf-8', errors='replace').splitlines()[-lines:])
+        tail = tail_lines(path=path, lines=lines)
     except OSError:
+        # why: tail_lines only returns None for a missing file; other read errors
+        # (for example permissions) must not stop the launch report
         return ''
+    return '\n'.join(tail) if tail is not None else ''
 
 
 def detach_launch(  # why: keyword-only public API; each option is documented below

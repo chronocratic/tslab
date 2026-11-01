@@ -2,6 +2,7 @@
 
 from tslab.jobs.local.background import start_detached, start_keep_awake, stop_keep_awake
 from tslab.jobs.local.gpus import busy_gpus, gpu_lock_folder, GpuLease, try_lease_gpu, visible_gpus
+from tslab.jobs.local.output import tail_lines
 from tslab.jobs.local.pool import PoolCommand, run_commands
 from tslab.jobs.local.process import (
     process_alive,
@@ -25,6 +26,7 @@ __all__ = [
     'start_keep_awake',
     'stop_keep_awake',
     'stop_on_signals',
+    'tail_lines',
     'try_lease_gpu',
     'visible_gpus',
 ]

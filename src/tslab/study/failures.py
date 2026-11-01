@@ -1,12 +1,11 @@
 """Errors and recent log lines of failed or interrupted study runs."""
 
-from collections import deque
 from collections.abc import Mapping, Sequence
 import logging
-from pathlib import Path
 
-from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY, require_path
+from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import InstanceState
+from tslab.jobs.local import tail_lines
 from tslab.jobs.slurm import format_slurm_memory, query_job_usage, SlurmError, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.documents import run_entry
@@ -15,28 +14,10 @@ from tslab.study.result_table import instance_directory
 from tslab.study.state import RunReport, StudyState
 from tslab.study.usage import _requested_memory
 
-__all__ = ['collect_failures', 'failure_hint', 'log_failures', 'tail_lines']
+__all__ = ['collect_failures', 'failure_hint', 'log_failures']
 
 _LOGGER = logging.getLogger(__name__)
 _DEFAULT_STATES = (StudyState.FAILED, StudyState.INTERRUPTED)
-
-
-def tail_lines(*, path: Path, lines: int) -> list[str] | None:
-    """Read the last lines of a file, or return ``None`` when it is missing.
-
-    Args:
-        path: The file to read.
-        lines: Maximum number of trailing lines.
-
-    Returns:
-        The trailing lines without line endings, or ``None`` when missing.
-    """
-    require_path(value=path, parameter='path')
-    try:
-        with path.open(encoding='utf-8', errors='replace') as file:
-            return [line.rstrip('\r\n') for line in deque(file, maxlen=lines)]
-    except FileNotFoundError:
-        return None
 
 
 def collect_failures(
