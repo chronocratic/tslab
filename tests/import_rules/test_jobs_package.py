@@ -137,6 +137,17 @@ def test_code_outside_imports_only_jobs_domain_roots() -> None:
     assert not violations, '\n'.join(violations)
 
 
+def test_no_test_outside_jobs_imports_jobs_tests() -> None:
+    violations = [
+        f'{path.relative_to(_ROOT)}:{line}:{target}'
+        for path in _python_files(root=_TESTS)
+        if not _is_within(path=path, root=_JOBS_TESTS)
+        for line, target in _imports(path=path, root=_TESTS, package='tests')
+        if target == 'tests.unit.jobs' or target.startswith('tests.unit.jobs.')
+    ]
+    assert not violations, '\n'.join(violations)
+
+
 def test_jobs_tests_import_only_the_jobs_domains() -> None:
     allowed_roots = sys.stdlib_module_names | {'pytest'}
     violations = [

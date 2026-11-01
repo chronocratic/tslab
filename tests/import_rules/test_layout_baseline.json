@@ -1,0 +1,20 @@
+[
+  "tests/unit/cli/test_cli_study.py",
+  "tests/unit/probes/test_probes.py",
+  "tests/unit/study/test_arguments.py",
+  "tests/unit/study/test_cancel.py",
+  "tests/unit/study/test_check_paths.py",
+  "tests/unit/study/test_detach.py",
+  "tests/unit/study/test_expand_runs.py",
+  "tests/unit/study/test_from_presets.py",
+  "tests/unit/study/test_grouping.py",
+  "tests/unit/study/test_match.py",
+  "tests/unit/study/test_resolve.py",
+  "tests/unit/study/test_resubmit.py",
+  "tests/unit/study/test_run_one.py",
+  "tests/unit/study/test_select.py",
+  "tests/unit/study/test_show.py",
+  "tests/unit/study/test_status_command.py",
+  "tests/unit/study/test_study_cli_run.py",
+  "tests/unit/study/test_submit.py"
+]

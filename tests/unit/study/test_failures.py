@@ -7,7 +7,7 @@ from typing import cast
 
 import pytest
 
-from tests.unit.jobs.fake_slurm import FakeSlurm
+from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import (
     context,
     finish_run,
