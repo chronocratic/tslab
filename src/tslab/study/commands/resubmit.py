@@ -6,14 +6,13 @@ import os
 from pathlib import Path
 import subprocess
 import time
-from typing import cast, TextIO, TYPE_CHECKING
+from typing import TextIO, TYPE_CHECKING
 
 from tslab.core.paths import LOCK_FILE
 from tslab.study.commands import _finish_launch, _uncounted, _UNCOUNTED_JOB_STATES, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
 from tslab.study.launchers import backend_for, JobPhase, OnLaunch
-from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
 from tslab.study.reporting.report import log_problems
@@ -21,7 +20,6 @@ from tslab.study.reporting.state import RunReport, StudyState
 
 if TYPE_CHECKING:
     from tslab.study.launchers import Backend
-    from tslab.study.machine import SlurmSettings
 
 __all__ = ['resubmit', 'run_one']
 
@@ -242,18 +240,8 @@ def run_one(
         log_problems(problems=problems)
         return 1
     (task,) = groups[0].tasks
-    slurm = (
-        cast('SlurmSettings', resolved.resources)
-        if resolved.resources.max_tasks_per_job is not None
-        else None
-    )
-    if slurm is not None and slurm.gpus > 1:
-        _LOGGER.info('study run starts one process; the job would start %d', slurm.gpus)
-    script = foreground_script(
-        slurm=slurm,
-        project_root=context.project_root,
-        env=context.machine.env,
-        command=task.command,
+    script = backend_for(machine=context.machine).foreground_script(
+        context=context, resources=resolved.resources, command=task.command
     )
     return run_process(['bash', '-c', script])
 

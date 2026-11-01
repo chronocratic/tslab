@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping, Sequence
 import logging
 from pathlib import Path
 from types import MappingProxyType
-from typing import TextIO
+from typing import cast, TextIO
 
 from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import (
@@ -29,6 +29,7 @@ from tslab.study.launchers import (
     Resources,
 )
 from tslab.study.launchers.slurm.doctor import slurm_check
+from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.launchers.slurm.states import (
     _query_states,
     expected_starts,
@@ -36,7 +37,7 @@ from tslab.study.launchers.slurm.states import (
     slurm_task_ids,
 )
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
-from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError
+from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError, SlurmSettings
 from tslab.study.machine.slurm import slurm_for
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
@@ -231,6 +232,20 @@ class SlurmBackend:
         """
         message = '--detach is for local machines; SLURM jobs already run in the background'
         raise ValueError(message)
+
+    def foreground_script(
+        self, *, context: Context, resources: Resources, command: Sequence[str]
+    ) -> str:
+        """The foreground script with the setup lines of the SLURM settings."""
+        settings = cast('SlurmSettings', resources)
+        if settings.gpus > 1:
+            _LOGGER.info('study run starts one process; the job would start %d', settings.gpus)
+        return foreground_script(
+            slurm=settings,
+            project_root=context.project_root,
+            env=context.machine.env,
+            command=command,
+        )
 
     def failure_usage(
         self, *, context: Context, reports: Sequence[RunReport]

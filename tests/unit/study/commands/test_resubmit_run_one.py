@@ -140,7 +140,7 @@ def test_run_one_says_one_process_for_multi_gpu_jobs(
         project=project, machine_file='gpus.toml', only=('model=small', 'seed=1')
     )
     calls, process = _process()
-    with caplog.at_level('INFO', logger='tslab.study.commands'):
+    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm'):
         run_one(context=ctx, extra_args=None, run_process=process)
     assert 'study run starts one process; the job would start 2' in caplog.text
     assert len(calls) == 1
