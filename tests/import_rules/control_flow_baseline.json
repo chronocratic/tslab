@@ -28,7 +28,7 @@
     "src/tslab/study/settings.py": 3,
     "src/tslab/study/state.py": 2,
     "src/tslab/study/wait.py": 1,
-    "src/tslab/tracking/wandb_tracker.py": 1
+    "src/tslab/tracking/wandb/tracker.py": 1
   },
   "kind_switches": {
     "src/tslab/core/run.py": 1,

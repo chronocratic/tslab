@@ -1,7 +1,7 @@
 from tslab.tracking import build_trackers, TrackingOptions
 from tslab.tracking.mlflow_tracker import MLflowTracker
 from tslab.tracking.tensorboard_tracker import TensorBoardTracker
-from tslab.tracking.wandb_tracker import WandbTracker
+from tslab.tracking.wandb.tracker import WandbTracker
 
 
 def test_build_trackers_follows_options() -> None:

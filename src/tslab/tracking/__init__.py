@@ -59,7 +59,7 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
     # why: imported inside each branch so that `import tslab.tracking` never imports
     # Lightning or a tracker SDK, and a tracker nobody enabled is never imported.
     if options.wandb_mode != 'disabled':
-        from tslab.tracking.wandb_tracker import WandbTracker  # noqa: PLC0415
+        from tslab.tracking.wandb.tracker import WandbTracker  # noqa: PLC0415
 
         trackers.append(
             WandbTracker(

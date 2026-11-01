@@ -42,6 +42,7 @@ src/tslab/
   lightning/           LightningTrainer, LightningDataSource, resume, SLURM signals
   probes/              SVMProbe, RidgeProbe (scikit-learn)
   tracking/            W&B, MLflow, TensorBoard trackers and TrackingOptions
+    wandb/             the W&B tracker, the transaction-log reader and the resync logic
   adapters/chronocratic/
     models/            chronocratic-models as TSLab models and encoders
     datasets/          chronocratic-datasets as TSLab data sources, study helpers
