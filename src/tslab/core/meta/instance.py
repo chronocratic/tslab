@@ -81,26 +81,35 @@ def stale_reason(
         return f'fingerprint changed {record.fingerprint} -> {fingerprint}'
     if record.state is not InstanceState.DONE:
         return f'previous state {record.state.value}'
+    return _metadata_reason(directory=directory, inputs=inputs)
+
+
+def _metadata_reason(*, directory: Path, inputs: Mapping[str, Artifact]) -> str | None:
+    """Why the metadata of a finished result cannot be trusted, or ``None``."""
     meta_path = directory / META_FILE
     if not meta_path.exists():
         return 'result folder missing'
     document = read_instance_meta(path=meta_path)
     if document is None:
-        reason = 'cannot read result metadata'
-    elif document.get('format_version') != INSTANCE_META_FORMAT_VERSION:
-        reason = 'unsupported result metadata format'
-    else:
-        # TSLab writes ``inputs`` as a mapping of dicts; the cast names that shape.
-        recorded_inputs = cast('dict[str, dict[str, str | None]]', document.get('inputs') or {})
-        reason = None
-        for key, value in inputs.items():
-            identity = value.tslab_identity
-            if identity is None or identity.instance_id is None:
-                continue
-            if recorded_inputs.get(key, {}).get('execution_id') != identity.execution_id:
-                reason = f'input {identity.instance_id} was executed again'
-                break
-    return reason
+        return 'cannot read result metadata'
+    if document.get('format_version') != INSTANCE_META_FORMAT_VERSION:
+        return 'unsupported result metadata format'
+    return _changed_input_reason(document=document, inputs=inputs)
+
+
+def _changed_input_reason(
+    *, document: Mapping[str, object], inputs: Mapping[str, Artifact]
+) -> str | None:
+    """Why an input was executed again since the result was made, or ``None``."""
+    # TSLab writes ``inputs`` as a mapping of dicts; the cast names that shape.
+    recorded_inputs = cast('dict[str, dict[str, str | None]]', document.get('inputs') or {})
+    for key, value in inputs.items():
+        identity = value.tslab_identity
+        if identity is None or identity.instance_id is None:
+            continue
+        if recorded_inputs.get(key, {}).get('execution_id') != identity.execution_id:
+            return f'input {identity.instance_id} was executed again'
+    return None
 
 
 def can_resume(*, record: InstanceRecord | None, fingerprint: str) -> bool:

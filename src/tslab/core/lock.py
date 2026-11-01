@@ -120,6 +120,23 @@ def _lock_is_stale(*, owner: _LockOwner | None, age: float) -> bool:
     return owner is not None and owner.host == hostname() and not process_alive(pid=owner.pid)
 
 
+def _retry_or_refuse(*, path: Path) -> None:
+    """Return when the caller should look again; raise when a live process owns the lock."""
+    owner = read_lock_owner(path=path)
+    try:
+        age = time.time() - path.stat().st_mtime
+    except FileNotFoundError:
+        return
+    if not _lock_is_stale(owner=owner, age=age):
+        message = (
+            f'{path.parent.as_posix()} is in use by {owner or "an unknown process"}; '
+            f'if no such process exists, delete {path.as_posix()}'
+        )
+        raise RunLockedError(message) from None
+    if not remove_stale_lock(path=path):
+        time.sleep(_LOCK_RETRY_SECONDS)  # another process is deciding; look again
+
+
 def acquire_lock(*, path: Path) -> str:
     """Create the lock file atomically, replacing it once if it is stale.
 
@@ -141,20 +158,8 @@ def acquire_lock(*, path: Path) -> str:
         try:
             descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
         except FileExistsError:
-            owner = read_lock_owner(path=path)
-            try:
-                age = time.time() - path.stat().st_mtime
-            except FileNotFoundError:
-                continue
-            if _lock_is_stale(owner=owner, age=age):
-                if not remove_stale_lock(path=path):
-                    time.sleep(_LOCK_RETRY_SECONDS)  # another process is deciding; look again
-                continue
-            message = (
-                f'{path.parent.as_posix()} is in use by {owner or "an unknown process"}; '
-                f'if no such process exists, delete {path.as_posix()}'
-            )
-            raise RunLockedError(message) from None
+            _retry_or_refuse(path=path)
+            continue
         with os.fdopen(descriptor, mode='w', encoding='utf-8') as handle:
             handle.write(payload)
         return nonce
@@ -177,30 +182,38 @@ def remove_stale_lock(*, path: Path) -> bool:
     try:
         descriptor = os.open(guard, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
     except FileExistsError:
-        try:
-            if time.time() - guard.stat().st_mtime > _TAKEOVER_GUARD_SECONDS:
-                guard.unlink(missing_ok=True)  # its holder died mid-takeover
-        except FileNotFoundError:
-            pass
+        _clear_old_guard(guard=guard)
         return False
     os.close(descriptor)
     try:
-        owner = read_lock_owner(path=path)
-        try:
-            age = time.time() - path.stat().st_mtime
-        except FileNotFoundError:
-            return True
-        if _lock_is_stale(owner=owner, age=age):
-            _LOGGER.warning(
-                'removing stale lock %s left by %s (last heartbeat %.0f s ago)',
-                path.as_posix(),
-                owner or 'an unknown process',
-                age,
-            )
-            path.unlink(missing_ok=True)
+        _remove_if_stale(path=path)
     finally:
         guard.unlink(missing_ok=True)
     return True
+
+
+def _clear_old_guard(*, guard: Path) -> None:
+    try:
+        if time.time() - guard.stat().st_mtime > _TAKEOVER_GUARD_SECONDS:
+            guard.unlink(missing_ok=True)  # its holder died mid-takeover
+    except FileNotFoundError:
+        pass
+
+
+def _remove_if_stale(*, path: Path) -> None:
+    owner = read_lock_owner(path=path)
+    try:
+        age = time.time() - path.stat().st_mtime
+    except FileNotFoundError:
+        return
+    if _lock_is_stale(owner=owner, age=age):
+        _LOGGER.warning(
+            'removing stale lock %s left by %s (last heartbeat %.0f s ago)',
+            path.as_posix(),
+            owner or 'an unknown process',
+            age,
+        )
+        path.unlink(missing_ok=True)
 
 
 def release_lock(*, path: Path, nonce: str) -> None:

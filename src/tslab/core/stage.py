@@ -277,11 +277,15 @@ class Stage[Out: Artifact](ABC):
             key=f'{agreement_key}:cache', value=stale_reason is None and loaded is not None
         )
         if use_cache and loaded is None:
-            loaded = self._try_load(directory=directory, instance_id=instance_id)
-            if loaded is None:
-                message = f'{instance_id}: rank 0 chose the cache but this rank cannot load it'
-                raise RuntimeError(message)
+            loaded = self._load_chosen_cache(directory=directory, instance_id=instance_id)
         return loaded if use_cache else None
+
+    def _load_chosen_cache(self, *, directory: Path, instance_id: str) -> Artifact:
+        loaded = self._try_load(directory=directory, instance_id=instance_id)
+        if loaded is None:
+            message = f'{instance_id}: rank 0 chose the cache but this rank cannot load it'
+            raise RuntimeError(message)
+        return loaded
 
     def _canonical_settings(
         self, *, arguments: Mapping[str, object], instance_id: str
@@ -359,15 +363,12 @@ class Stage[Out: Artifact](ABC):
                 )
                 self._publish(work_directory=work_directory, directory=directory)
         except JobTimeLimitSignal as error:
-            failure_fingerprint = execution.fingerprint
-            if not prepared and not resume:
-                failure_fingerprint = execution.previous_fingerprint
-                if failure_fingerprint == execution.fingerprint:
-                    failure_fingerprint = None
             self._record_failure(
                 execution=execution,
                 error=error,
-                fingerprint=failure_fingerprint,
+                fingerprint=_interrupted_fingerprint(
+                    execution=execution, prepared=prepared, resume=resume
+                ),
                 started_at=started_at,
                 seconds=time.perf_counter() - start,
             )
@@ -425,16 +426,26 @@ class Stage[Out: Artifact](ABC):
             shutil.rmtree(leftover, ignore_errors=True)
         work_directory = self._work_directory(directory=directory)
         if self.in_place:
-            if resume:
-                _LOGGER.info('resume %s in %s', instance_id, directory.as_posix())
-                (directory / ERROR_FILE).unlink(missing_ok=True)
-            elif directory.exists():
-                shutil.rmtree(directory)
-            directory.mkdir(parents=True, exist_ok=True)
-            (directory / _INCOMPLETE_MARKER).touch()
-            return directory
+            return _prepare_in_place(directory=directory, resume=resume, instance_id=instance_id)
         work_directory.mkdir(parents=True)
         return work_directory
+
+    def _save_error(
+        self, *, run: Run, directory: Path, error: Exception | JobTimeLimitSignal
+    ) -> str | None:
+        """Write ``error.txt`` beside the result; return its path in the run, or ``None``."""
+        if not self.in_place:
+            shutil.rmtree(self._work_directory(directory=directory), ignore_errors=True)
+        # A result from an earlier successful execution stays in the folder: it is
+        # replaced only when a new execution succeeds. ``error.txt`` lands beside it.
+        error_path = directory / ERROR_FILE
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+            atomic_write_text(path=error_path, text=''.join(traceback.format_exception(error)))
+        except OSError:
+            _LOGGER.warning('cannot write %s', error_path.as_posix(), exc_info=True)
+            return None
+        return error_path.relative_to(run.directory).as_posix()
 
     def _record_failure(
         self,
@@ -447,20 +458,11 @@ class Stage[Out: Artifact](ABC):
     ) -> Artifact:
         run, instance_id, directory = execution.run, execution.instance_id, execution.directory
         error_line = describe_error(error=error)
-        traceback_file: str | None = None
-        if run.writes_files:
-            if not self.in_place:
-                shutil.rmtree(self._work_directory(directory=directory), ignore_errors=True)
-            # A result from an earlier successful execution stays in the folder: it is
-            # replaced only when a new execution succeeds. ``error.txt`` lands beside it.
-            error_path = directory / ERROR_FILE
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-                atomic_write_text(path=error_path, text=''.join(traceback.format_exception(error)))
-            except OSError:
-                _LOGGER.warning('cannot write %s', error_path.as_posix(), exc_info=True)
-            else:
-                traceback_file = error_path.relative_to(run.directory).as_posix()
+        traceback_file = (
+            self._save_error(run=run, directory=directory, error=error)
+            if run.writes_files
+            else None
+        )
         run.record_instance(
             instance_id=instance_id,
             record=InstanceRecord(
@@ -479,6 +481,26 @@ class Stage[Out: Artifact](ABC):
         return UnavailableArtifact(
             instance_id=instance_id, reason=UnavailableReason.FAILED, detail=error_line
         )
+
+
+def _interrupted_fingerprint(*, execution: _Execution, prepared: bool, resume: bool) -> str | None:
+    """The fingerprint to record when the job time limit stops an instance."""
+    if prepared or resume:
+        return execution.fingerprint
+    previous = execution.previous_fingerprint
+    return None if previous == execution.fingerprint else previous
+
+
+def _prepare_in_place(*, directory: Path, resume: bool, instance_id: str) -> Path:
+    """Make the result folder ready for a stage that writes into it directly."""
+    if resume:
+        _LOGGER.info('resume %s in %s', instance_id, directory.as_posix())
+        (directory / ERROR_FILE).unlink(missing_ok=True)
+    elif directory.exists():
+        shutil.rmtree(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / _INCOMPLETE_MARKER).touch()
+    return directory
 
 
 def _plan_dry_run(

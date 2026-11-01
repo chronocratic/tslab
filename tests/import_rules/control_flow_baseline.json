@@ -4,12 +4,6 @@
     "src/tslab/adapters/chronocratic/models/settings.py": 1,
     "src/tslab/cli/new.py": 1,
     "src/tslab/cli/status.py": 1,
-    "src/tslab/core/codec.py": 2,
-    "src/tslab/core/fingerprint.py": 1,
-    "src/tslab/core/lock.py": 2,
-    "src/tslab/core/meta/instance.py": 1,
-    "src/tslab/core/run.py": 2,
-    "src/tslab/core/stage.py": 1,
     "src/tslab/jobs/local/gpus.py": 1,
     "src/tslab/jobs/local/pool.py": 1,
     "src/tslab/jobs/slurm/commands.py": 2,
@@ -33,9 +27,7 @@
     "src/tslab/tracking/wandb/tracker.py": 1
   },
   "kind_switches": {
-    "src/tslab/core/run.py": 1,
-    "src/tslab/study/reporting/documents.py": 1,
-    "src/tslab/study/reporting/failures.py": 1
+    "src/tslab/study/reporting/documents.py": 1
   },
   "nested_if": {
     "src/tslab/adapters/chronocratic/datasets/settings.py": 1,
@@ -44,13 +36,6 @@
     "src/tslab/cli/status.py": 3,
     "src/tslab/cli/study/resubmit.py": 1,
     "src/tslab/cli/study/submit.py": 1,
-    "src/tslab/core/codec.py": 9,
-    "src/tslab/core/config.py": 1,
-    "src/tslab/core/fingerprint.py": 3,
-    "src/tslab/core/lock.py": 1,
-    "src/tslab/core/meta/instance.py": 1,
-    "src/tslab/core/run.py": 2,
-    "src/tslab/core/stage.py": 4,
     "src/tslab/jobs/local/background.py": 1,
     "src/tslab/jobs/slurm/commands.py": 1,
     "src/tslab/lightning/callbacks.py": 1,
@@ -66,7 +51,7 @@
     "src/tslab/study/machine/slurm.py": 2,
     "src/tslab/study/machine/tables.py": 1,
     "src/tslab/study/reporting/documents.py": 2,
-    "src/tslab/study/reporting/failures.py": 4,
+    "src/tslab/study/reporting/failures.py": 3,
     "src/tslab/study/reporting/report.py": 2,
     "src/tslab/study/reporting/state.py": 1,
     "src/tslab/tasks/forecasting.py": 1
