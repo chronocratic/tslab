@@ -20,7 +20,7 @@ from typing import TextIO
 from tslab.core.files import atomic_write_text
 from tslab.core.paths import LOCK_FILE
 from tslab.jobs.local import start_keep_awake, stop_keep_awake
-from tslab.jobs.slurm import scancel, SlurmError
+from tslab.jobs.slurm import job_ended, scancel, SlurmError
 from tslab.study.context import Context, refresh_context
 from tslab.study.followups import queue_followups
 from tslab.study.job_script import foreground_script
@@ -47,7 +47,7 @@ from tslab.study.plan import (
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_lock, take_progress
 from tslab.study.report import log_launch, log_problems, log_status
 from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
-from tslab.study.state import job_ended, RunReport, StudyState
+from tslab.study.state import RunReport, StudyState
 
 __all__ = [
     'LIVE_STATES',
@@ -595,7 +595,7 @@ def _cancel_live(*, reports: Sequence[RunReport], launcher: str, signal: str | N
 def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) -> None:
     for report in reports:
         job_state = report.job_state
-        if not job_ended(job_state) or not report.folder.lock_live:
+        if not job_ended(job_state=job_state) or not report.folder.lock_live:
             continue
         (study_directory / report.run.run_path / LOCK_FILE).unlink(missing_ok=True)
         _LOGGER.info(

@@ -1,4 +1,4 @@
-"""SLURM helpers for job timing."""
+"""SLURM helpers: submitting jobs and reading their states and timing."""
 
 from tslab.jobs.slurm.commands import (
     QOS_LIMIT_MARKERS,
@@ -23,6 +23,13 @@ from tslab.jobs.slurm.script import (
     srun_command,
     wait_for_file_line,
 )
+from tslab.jobs.slurm.states import (
+    FAILING_JOB_STATES,
+    INTERRUPTING_JOB_STATES,
+    job_ended,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+)
 from tslab.jobs.slurm.timing import (
     format_slurm_duration,
     parse_sacct_duration,
@@ -31,7 +38,11 @@ from tslab.jobs.slurm.timing import (
 )
 
 __all__ = [
+    'FAILING_JOB_STATES',
+    'INTERRUPTING_JOB_STATES',
     'QOS_LIMIT_MARKERS',
+    'QUEUED_JOB_STATES',
+    'RUNNING_JOB_STATES',
     'SlurmError',
     'SlurmJobUsage',
     'array_spec',
@@ -39,6 +50,7 @@ __all__ = [
     'export_lines',
     'format_slurm_duration',
     'format_slurm_memory',
+    'job_ended',
     'node_local_tmp_lines',
     'parse_sacct_duration',
     'parse_slurm_duration',

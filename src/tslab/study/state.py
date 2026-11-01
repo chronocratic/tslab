@@ -10,39 +10,28 @@ from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
 from tslab.core.text import first_line
+from tslab.jobs.slurm import (
+    FAILING_JOB_STATES,
+    INTERRUPTING_JOB_STATES,
+    job_ended,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+)
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
 __all__ = [
-    'FAILING_JOB_STATES',
-    'INTERRUPTING_JOB_STATES',
     'LOCAL_ENDED',
-    'QUEUED_JOB_STATES',
-    'RUNNING_JOB_STATES',
     'FolderFacts',
     'RunReport',
     'StudyState',
     'collect_states',
     'followup_job_ids',
-    'job_ended',
     'read_folder',
     'slurm_task_ids',
     'study_state',
 ]
 
-#: SLURM states in which the job has not started yet.
-QUEUED_JOB_STATES = frozenset({'PENDING', 'REQUEUED'})
-
-#: SLURM states in which the job is actively working.
-RUNNING_JOB_STATES = frozenset(
-    {'RUNNING', 'CONFIGURING', 'COMPLETING', 'SUSPENDED', 'STAGE_OUT', 'SIGNALING', 'RESIZING'}
-)
-
-#: Ended SLURM states that read as an interrupted run, not a failed one.
-INTERRUPTING_JOB_STATES = frozenset({'TIMEOUT', 'NODE_FAIL', 'PREEMPTED'})
-
-#: Ended SLURM states that read as a failed run.
-FAILING_JOB_STATES = frozenset({'OUT_OF_MEMORY', 'FAILED', 'CANCELLED', 'BOOT_FAIL', 'DEADLINE'})
 #: The job state of a local task that is not in a live launch.
 LOCAL_ENDED = 'ENDED'
 _INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
@@ -120,15 +109,6 @@ class RunReport:
     folder: FolderFacts
 
 
-def job_ended(job_state: str | None) -> bool:
-    """Whether a SLURM state says the job is over; ``None`` (unknown) is not."""
-    return (
-        job_state is not None
-        and job_state not in QUEUED_JOB_STATES
-        and job_state not in RUNNING_JOB_STATES
-    )
-
-
 def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
     snapshot = folder.snapshot
     if snapshot is not None:
@@ -156,7 +136,7 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
     snapshot = folder.snapshot
     if job_state in QUEUED_JOB_STATES:
         return StudyState.QUEUED, None
-    live = folder.lock_live and (job_state is None or not job_ended(job_state))
+    live = folder.lock_live and (job_state is None or not job_ended(job_state=job_state))
     if job_state in RUNNING_JOB_STATES or live:
         return StudyState.RUNNING, None
     if (
