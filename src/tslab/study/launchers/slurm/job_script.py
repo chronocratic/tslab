@@ -109,6 +109,13 @@ def _check_job_values(  # why: keyword-only private helper, one per checked valu
         check_script_text(value=value, what=what)
 
 
+def _gres(*, slurm: SlurmSettings) -> str:
+    """The ``--gres`` value of the GPUs of one task."""
+    if slurm.gpu_type is None:
+        return f'gpu:{slurm.gpus}'
+    return f'gpu:{slurm.gpu_type}:{slurm.gpus}'
+
+
 def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per script line
     *,
     job_name: str,
@@ -158,10 +165,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if slurm.mem_per_cpu is not None:
         options['mem_per_cpu'] = slurm.mem_per_cpu
     if slurm.gpus > 0:
-        gpu = f'gpu:{slurm.gpus}'
-        if slurm.gpu_type is not None:
-            gpu = f'gpu:{slurm.gpu_type}:{slurm.gpus}'
-        options['gres'] = gpu
+        options['gres'] = _gres(slurm=slurm)
     if indices is not None:
         spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
         options['array'] = spec

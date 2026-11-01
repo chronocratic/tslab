@@ -74,6 +74,17 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
     )
 
 
+def _before_launch_code(*, before_launch: Callable[[], int] | None, dry_run: bool) -> int:
+    """The exit code of the hook that runs before the first submission; 0 to go on."""
+    if before_launch is None or dry_run:
+        return 0
+    try:
+        return before_launch()
+    except LaunchError as error:
+        _LOGGER.error('%s', error)  # noqa: TRY400 # why: a hook failure is shown, not raised
+        return 1
+
+
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     context: Context,
@@ -132,18 +143,9 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if problems:
             log_problems(problems=problems)
             return 1, []
-        failure = None
-        if before_launch is not None and not dry_run:
-            try:
-                before_launch_code = before_launch()
-            except LaunchError as error:
-                failure = str(error)
-            else:
-                if before_launch_code != 0:
-                    return before_launch_code, []
-        if failure is not None:
-            _LOGGER.error('%s', failure)
-            return 1, []
+        before_code = _before_launch_code(before_launch=before_launch, dry_run=dry_run)
+        if before_code != 0:
+            return before_code, []
         report = backend_for(machine=machine).launch(
             context=context,
             groups=groups,

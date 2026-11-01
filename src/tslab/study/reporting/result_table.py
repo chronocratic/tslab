@@ -104,12 +104,7 @@ def study_results(
 
 def _axis_names(*, study: Study) -> list[str]:
     """The axis names of every grid, in first-appearance order."""
-    axes: list[str] = []
-    for grid in study.grids.values():
-        for axis in grid.axes:
-            if axis not in axes:
-                axes.append(axis)
-    return axes
+    return list(dict.fromkeys(axis for grid in study.grids.values() for axis in grid.axes))
 
 
 def _row_head(*, report: RunReport, axes: Sequence[str]) -> ResultRow:

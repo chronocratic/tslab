@@ -1,6 +1,7 @@
 """Wait for a study to finish or reach a state that needs attention."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 import logging
 import time
 
@@ -52,40 +53,75 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
         The final exit code, last context, and elapsed seconds.
     """
     start = clock()
+    poll = _Poll(gap=min(_FIRST_GAP_SECONDS, interval))
+    while True:
+        result = _step(
+            poll=poll,
+            load=load,
+            interval=interval,
+            timeout=timeout,
+            keep_going=keep_going,
+            sleep=sleep,
+            elapsed=lambda: clock() - start,
+        )
+        if result is not None:
+            return result
+
+
+@dataclass(kw_only=True)
+class _Poll:
+    """What the wait loop remembers from one check to the next."""
+
+    gap: float
     previous_counts: tuple[int, ...] | None = None
-    gap: float = min(_FIRST_GAP_SECONDS, interval)
-    warned_unknown = False
+    warned_unknown: bool = False
     last_context: Context | None = None
     last_code: int | None = None
-    while True:
-        try:
-            context = load()
-            code = study_exit_code(context=context)
-            last_context, last_code = context, code
-            counts = _counts(context=context)
-            if counts != previous_counts:
-                _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
-                previous_counts = counts
-                gap = min(_FIRST_GAP_SECONDS, interval)
-            else:
-                gap = min(gap * 2, interval)
-            if code == EXIT_UNKNOWN and not warned_unknown:
-                _LOGGER.warning('job states unknown; still waiting')
-                warned_unknown = True
-            elif code != EXIT_UNKNOWN:
-                warned_unknown = False
 
-            waited = clock() - start
-            if _should_stop(context=context, code=code, keep_going=keep_going):
-                return code, context, waited
 
-            if timeout is not None and waited + gap > timeout:
-                return EXIT_TIMEOUT, context, waited
-            sleep(gap)
-        except KeyboardInterrupt:
-            if last_context is None or last_code is None:
-                raise
-            return last_code, last_context, clock() - start
+def _step(  # noqa: PLR0913 # why: the wait controls, passed on from wait_for_study
+    *,
+    poll: _Poll,
+    load: Callable[[], Context],
+    interval: float,
+    timeout: float | None,
+    keep_going: bool,
+    sleep: Callable[[float], None],
+    elapsed: Callable[[], float],
+) -> tuple[int, Context, float] | None:
+    """One check: the final result when the wait is over, else ``None`` after the pause."""
+    try:
+        context = load()
+        code = study_exit_code(context=context)
+        poll.last_context, poll.last_code = context, code
+        _note_progress(poll=poll, context=context, code=code, interval=interval)
+        waited = elapsed()
+        if _should_stop(context=context, code=code, keep_going=keep_going):
+            return code, context, waited
+        if timeout is not None and waited + poll.gap > timeout:
+            return EXIT_TIMEOUT, context, waited
+        sleep(poll.gap)
+    except KeyboardInterrupt:
+        if poll.last_context is None or poll.last_code is None:
+            raise
+        return poll.last_code, poll.last_context, elapsed()
+    return None
+
+
+def _note_progress(*, poll: _Poll, context: Context, code: int, interval: float) -> None:
+    """Log a changed count line, once the unknown-state warning, and set the next gap."""
+    counts = _counts(context=context)
+    if counts != poll.previous_counts:
+        _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
+        poll.previous_counts = counts
+        poll.gap = min(_FIRST_GAP_SECONDS, interval)
+    else:
+        poll.gap = min(poll.gap * 2, interval)
+    if code == EXIT_UNKNOWN and not poll.warned_unknown:
+        _LOGGER.warning('job states unknown; still waiting')
+        poll.warned_unknown = True
+    elif code != EXIT_UNKNOWN:
+        poll.warned_unknown = False
 
 
 def _should_stop(*, context: Context, code: int, keep_going: bool) -> bool:

@@ -21,17 +21,17 @@ def parse_states(*, values: Sequence[str]) -> tuple[StudyState, ...]:
     Raises:
         ValueError: If a name is not a state name; the six names are named.
     """
-    states: list[StudyState] = []
-    for value in values:
-        for raw in value.split(','):
-            name = raw.strip()
-            try:
-                states.append(StudyState(name))
-            except ValueError:
-                allowed = ', '.join(state.value for state in StudyState)
-                message = f'unknown state {name!r}; use one of: {allowed}'
-                raise ValueError(message) from None
-    return tuple(states)
+    return tuple(_parse_state(name=raw.strip()) for value in values for raw in value.split(','))
+
+
+def _parse_state(*, name: str) -> StudyState:
+    """The state of one name, or a ``ValueError`` that lists the valid names."""
+    try:
+        return StudyState(name)
+    except ValueError:
+        allowed = ', '.join(state.value for state in StudyState)
+        message = f'unknown state {name!r}; use one of: {allowed}'
+        raise ValueError(message) from None
 
 
 def status(

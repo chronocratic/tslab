@@ -111,6 +111,18 @@ class MachineLocation:
     project_root: Path
 
 
+def _registered_location(*, machine: str, path: Path, start: Path) -> MachineLocation:
+    """The location of a registered machine, or an error when its file is gone."""
+    if path.is_file():
+        return MachineLocation(path=path, project_root=start)
+    message = (
+        f'machine {machine!r} is registered with {path}, which does not exist; '
+        f'register the new location with: tslab machine add {machine} <path>, '
+        f'or drop it with: tslab machine remove {machine}'
+    )
+    raise MachineProfileError(message)
+
+
 def resolve_machine(
     *, machine: str, start: Path, environment: Mapping[str, str]
 ) -> MachineLocation:
@@ -141,15 +153,7 @@ def resolve_machine(
             return MachineLocation(path=folder / f'{machine}.toml', project_root=folder.parent)
     registered = read_register(environment=environment)
     if machine in registered:
-        path = registered[machine]
-        if not path.is_file():
-            message = (
-                f'machine {machine!r} is registered with {path}, which does not exist; '
-                f'register the new location with: tslab machine add {machine} <path>, '
-                f'or drop it with: tslab machine remove {machine}'
-            )
-            raise MachineProfileError(message)
-        return MachineLocation(path=path, project_root=start)
+        return _registered_location(machine=machine, path=registered[machine], start=start)
     message = (
         f'no machine named {machine!r}: no machines/{machine}.toml in {start} or a folder '
         f'above it, and the registered names are: {", ".join(sorted(registered)) or "none"}. '

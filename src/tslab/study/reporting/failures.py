@@ -84,21 +84,20 @@ def _failure_entry(
 ) -> dict[str, object]:
     run_directory = context.study_directory / report.run.run_path
     snapshot = report.folder.snapshot
-    errors = []
-    if snapshot is not None:
-        for instance, record in snapshot.instances.items():
-            if record.state is InstanceState.FAILED:
-                error_file = (
-                    instance_directory(run_directory=run_directory, instance_id=instance)
-                    / ERROR_FILE
-                )
-                errors.append(
-                    {
-                        'instance': instance,
-                        'error_file': error_file.resolve().as_posix(),
-                        'error': record.error,
-                    }
-                )
+    failed = {} if snapshot is None else snapshot.instances
+    errors = [
+        {
+            'instance': instance,
+            'error_file': (
+                (instance_directory(run_directory=run_directory, instance_id=instance) / ERROR_FILE)
+                .resolve()
+                .as_posix()
+            ),
+            'error': record.error,
+        }
+        for instance, record in failed.items()
+        if record.state is InstanceState.FAILED
+    ]
     log_file = None
     log_tail = None
     if report.task is not None:
@@ -146,16 +145,19 @@ def log_failures(*, failures: Sequence[Mapping[str, object]]) -> None:
         if isinstance(hint, str) and hint:
             _LOGGER.info('hint: %s', hint)
         errors = failure.get('errors')
-        if isinstance(errors, Sequence):
-            for error in errors:
-                if isinstance(error, Mapping):
-                    _LOGGER.error(
-                        '%s failed; full error: %s', error.get('instance'), error.get('error_file')
-                    )
-                    if error.get('error') is not None:
-                        _LOGGER.error('%s', error.get('error'))
+        for error in errors if isinstance(errors, Sequence) else ():
+            _log_error(error=error)
         _log_tail(path=failure.get('log_file'), tail=failure.get('log_tail'))
         _log_tail(path=failure.get('run_log'), tail=failure.get('run_log_tail'))
+
+
+def _log_error(*, error: object) -> None:
+    """Log one failed instance of a failure entry: where its error is, and the error."""
+    if not isinstance(error, Mapping):
+        return
+    _LOGGER.error('%s failed; full error: %s', error.get('instance'), error.get('error_file'))
+    if error.get('error') is not None:
+        _LOGGER.error('%s', error.get('error'))
 
 
 def _log_status_line(*, failure: Mapping[str, object]) -> None:

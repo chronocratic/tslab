@@ -166,23 +166,24 @@ def settings_from(*, table: Mapping[str, object], path: Path) -> SlurmSettings:
     return slurm
 
 
+def _converted_line(*, line: object) -> str:
+    """One list entry of ``sbatch_extra`` as a line of the table form, or a comment."""
+    fallback = f'# could not convert: {line}'
+    if not (isinstance(line, str) and line.startswith('--')):
+        return fallback
+    name, separator, argument = line[2:].partition('=')
+    if _SBATCH_NAME_PATTERN.fullmatch(name) is None:
+        return fallback
+    key = name.replace('-', '_')
+    return f'{key} = {json.dumps(argument)}' if separator else f'{key} = true'
+
+
 def sbatch_extra(
     *, value: object, location: str, path: Path
 ) -> tuple[tuple[str, str | int | bool], ...]:
     """The ``sbatch_extra`` table: sbatch long names to string, integer or boolean values."""
     if isinstance(value, list):
-        converted = []
-        for line in value:
-            if isinstance(line, str) and line.startswith('--'):
-                name, separator, argument = line[2:].partition('=')
-                if _SBATCH_NAME_PATTERN.fullmatch(name):
-                    converted.append(
-                        f'{name.replace("-", "_")} = {json.dumps(argument)}'
-                        if separator
-                        else f'{name.replace("-", "_")} = true'
-                    )
-                    continue
-            converted.append(f'# could not convert: {line}')
+        converted = [_converted_line(line=line) for line in value]
         hint = '\n'.join(('[slurm.sbatch_extra]', *converted))
         message = f'{path}: {location} must be a table, not a list; use:\n{hint}'
         raise MachineProfileError(message)

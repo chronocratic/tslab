@@ -3,12 +3,14 @@
 from collections.abc import Callable, Sequence
 import dataclasses
 import logging
+from pathlib import Path
 import shlex
 import time
 
 from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context
 from tslab.study.launchers.slurm.submit import submit_helper_job
+from tslab.study.machine import SlurmSettings
 from tslab.study.paths import study_folder
 from tslab.study.records import JobRecord, submission_lock
 
@@ -57,59 +59,76 @@ def queue_followups(
         signal_seconds=0,
     )
     folder = study_folder(machine=machine, study=context.study)
-    records: list[JobRecord] = []
-    failure: str | None = None
     with submission_lock(study_folder=folder):
-        for job_name, command in _followup_commands(context=context):
-            try:
-                record = submit_helper_job(
-                    study_folder=folder,
-                    job_name=job_name,
-                    command=command,
-                    slurm=slurm,
-                    machine=machine,
-                    project_root=context.project_root,
-                    dependency=dependency,
-                    now=now,
-                    sleep=sleep,
-                )
-            except SlurmError as error:
-                failure = f'follow-up {job_name} not submitted: {error}'
-                break
-            records.append(record)
-            _LOGGER.info(
-                'submitted follow-up %s as %s (waits for %s)', job_name, record.job_id, dependency
-            )
+        records, failure = _submit_followups(
+            context=context, folder=folder, slurm=slurm, dependency=dependency, now=now, sleep=sleep
+        )
     # why: logged here, not from inside the except (TRY400)
     if failure is not None:
         _LOGGER.error('%s', failure)
     return (0 if failure is None else 1), records
 
 
+def _submit_followups(  # noqa: PLR0913 # why: one keyword per submission input
+    *,
+    context: Context,
+    folder: Path,
+    slurm: SlurmSettings,
+    dependency: str,
+    now: Callable[[], str],
+    sleep: Callable[[float], None],
+) -> tuple[list[JobRecord], str | None]:
+    """Submit each helper job in order; the records, and why it stopped early, if it did."""
+    records: list[JobRecord] = []
+    for job_name, command in _followup_commands(context=context):
+        try:
+            record = submit_helper_job(
+                study_folder=folder,
+                job_name=job_name,
+                command=command,
+                slurm=slurm,
+                machine=context.machine,
+                project_root=context.project_root,
+                dependency=dependency,
+                now=now,
+                sleep=sleep,
+            )
+        except SlurmError as error:
+            return records, f'follow-up {job_name} not submitted: {error}'
+        records.append(record)
+        _LOGGER.info(
+            'submitted follow-up %s as %s (waits for %s)', job_name, record.job_id, dependency
+        )
+    return records, None
+
+
+def _retry_command(*, context: Context) -> tuple[str, str] | None:
+    """The automatic retry follow-up, or ``None`` (with a warning) without a study reference."""
+    if not context.reference:
+        _LOGGER.warning('no study reference: the automatic retry follow-up is skipped')
+        return None
+    machine = context.machine
+    command = shlex.join(
+        [
+            *machine.tslab_command,
+            'study',
+            'resubmit',
+            context.reference,
+            '--machine',
+            context.machine_path.as_posix(),
+            '--auto',
+        ]
+    )
+    return 'retry', command
+
+
 def _followup_commands(*, context: Context) -> list[tuple[str, str]]:
     machine = context.machine
     followup = machine.followup
     commands: list[tuple[str, str]] = []
-    if followup.auto_retry:
-        if context.reference:
-            commands.append(
-                (
-                    'retry',
-                    shlex.join(
-                        [
-                            *machine.tslab_command,
-                            'study',
-                            'resubmit',
-                            context.reference,
-                            '--machine',
-                            context.machine_path.as_posix(),
-                            '--auto',
-                        ]
-                    ),
-                )
-            )
-        else:
-            _LOGGER.warning('no study reference: the automatic retry follow-up is skipped')
+    retry = _retry_command(context=context) if followup.auto_retry else None
+    if retry is not None:
+        commands.append(retry)
     if followup.wandb_sync:
         commands.append(
             (

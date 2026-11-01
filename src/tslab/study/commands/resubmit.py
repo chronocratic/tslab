@@ -148,10 +148,9 @@ def _before_resubmit(
         _LOGGER.info('would cancel %s', ', '.join(cancellable))
 
     def before_launch() -> int:
-        if cancellable:
-            code, _ = backend.cancel(context=context, dry_run=False, signal=None)
-            if code != 0:
-                return code
+        code = backend.cancel(context=context, dry_run=False, signal=None)[0] if cancellable else 0
+        if code != 0:
+            return code
         _remove_ended_locks(reports=selected, study_directory=context.study_directory)
         return 0
 
@@ -258,28 +257,33 @@ def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[Ru
     An attempt that ended ``PREEMPTED`` or ``NODE_FAIL`` does not count toward the
     cap and needs no progress, until 20 of them follow one another.
     """
-    max_attempts = context.machine.followup.max_attempts
-    retried: list[RunReport] = []
-    for report in reports:
-        if JobFlag.NOT_COUNTED in report.job_flags:
-            if _uncounted(report=report)[1] > _MAX_UNCOUNTED_IN_ROW:
-                _LOGGER.info(
-                    'gave up: %s preempted or node failed %d times in a row',
-                    report.run.run_path,
-                    _MAX_UNCOUNTED_IN_ROW,
-                )
-                continue
-            retried.append(report)
-            continue
-        counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
-        if counted >= max_attempts:
-            _LOGGER.info('gave up: %s after %d attempts', report.run.run_path, counted)
-            continue
-        if not _made_progress(report=report, context=context):
-            _LOGGER.info('stuck: %s (attempt %d, no progress)', report.run.run_path, report.attempt)
-            continue
-        retried.append(report)
-    return retried
+    return [report for report in reports if _may_retry(report=report, context=context)]
+
+
+def _may_retry(*, report: RunReport, context: Context) -> bool:
+    """Whether one report is under the cap and one step further on; logs why not."""
+    if JobFlag.NOT_COUNTED in report.job_flags:
+        return _under_uncounted_limit(report=report)
+    counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
+    if counted >= context.machine.followup.max_attempts:
+        _LOGGER.info('gave up: %s after %d attempts', report.run.run_path, counted)
+        return False
+    if not _made_progress(report=report, context=context):
+        _LOGGER.info('stuck: %s (attempt %d, no progress)', report.run.run_path, report.attempt)
+        return False
+    return True
+
+
+def _under_uncounted_limit(*, report: RunReport) -> bool:
+    """Whether the run has not yet failed too many times in a row without counting."""
+    if _uncounted(report=report)[1] <= _MAX_UNCOUNTED_IN_ROW:
+        return True
+    _LOGGER.info(
+        'gave up: %s preempted or node failed %d times in a row',
+        report.run.run_path,
+        _MAX_UNCOUNTED_IN_ROW,
+    )
+    return False
 
 
 def _made_progress(*, report: RunReport, context: Context) -> bool:

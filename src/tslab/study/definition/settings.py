@@ -121,39 +121,63 @@ def field_annotation(*, config_class: type, path: str, settings: Settings) -> ob
     """
     parts = path.split('.')
     holder: object = config_class
-    annotation: object = Any
     for position, part in enumerate(parts):
-        if not (isinstance(holder, type) and dataclasses.is_dataclass(holder)):
-            message = f'{path}: the path walked through a non-dataclass member at {part!r}'
-            raise ValueError(message)
-        hints = get_type_hints(holder, include_extras=True)
-        if part not in hints:
-            message = f'{path}: {holder.__name__} has no field {part!r}'
-            raise ValueError(message)
-        annotation = hints[part]
+        owner = _dataclass_holder(path=path, holder=holder, part=part)
+        annotation = _field_hint(path=path, holder=owner, part=part)
         if position == len(parts) - 1:
             return annotation
-        prefix = '.'.join(parts[: position + 1])
-        choices = union_choices(annotation=annotation)
-        if choices is not None:
-            name: object = settings.get(prefix)
-            if name is None:
-                name = _default_choice_name(holder=holder, field_name=part)
-            if not isinstance(name, str) or name not in choices:
-                if name is None:
-                    message = f'{path}: choose {part} first'
-                else:
-                    known = ', '.join(sorted(choices))
-                    message = f'{path}: {name!r} is not a choice; choices are {known}'
-                raise ValueError(message)
-            holder = choices[name]
-        else:
-            member = strip_annotated(annotation=annotation)
-            if not (isinstance(member, type) and dataclasses.is_dataclass(member)):
-                message = f'{path}: {part} is not a dataclass field to walk into'
-                raise ValueError(message)
-            holder = member
-    return annotation
+        holder = _next_holder(
+            path=path,
+            holder=owner,
+            part=part,
+            annotation=annotation,
+            chosen=settings.get('.'.join(parts[: position + 1])),
+        )
+    return Any
+
+
+def _dataclass_holder(*, path: str, holder: object, part: str) -> type:
+    """The holder as a dataclass type, or a ``ValueError`` naming the part."""
+    if not (isinstance(holder, type) and dataclasses.is_dataclass(holder)):
+        message = f'{path}: the path walked through a non-dataclass member at {part!r}'
+        raise ValueError(message)
+    return holder
+
+
+def _field_hint(*, path: str, holder: type, part: str) -> object:
+    """The annotation of one field of a dataclass."""
+    hints = get_type_hints(holder, include_extras=True)
+    if part not in hints:
+        message = f'{path}: {holder.__name__} has no field {part!r}'
+        raise ValueError(message)
+    return hints[part]
+
+
+def _plain_member(*, path: str, part: str, annotation: object) -> type:
+    """The dataclass of a field that is not a choice union, or a ``ValueError``."""
+    member = strip_annotated(annotation=annotation)
+    if not (isinstance(member, type) and dataclasses.is_dataclass(member)):
+        message = f'{path}: {part} is not a dataclass field to walk into'
+        raise ValueError(message)
+    return member
+
+
+def _next_holder(
+    *, path: str, holder: type, part: str, annotation: object, chosen: object
+) -> object:
+    """The dataclass the path walks into below one field: the chosen member of a union."""
+    choices = union_choices(annotation=annotation)
+    if choices is None:
+        return _plain_member(path=path, part=part, annotation=annotation)
+    name = chosen if chosen is not None else _default_choice_name(holder=holder, field_name=part)
+    if name is None:
+        message = f'{path}: choose {part} first'
+        raise ValueError(message)
+    if not isinstance(name, str) or name not in choices:
+        known = ', '.join(sorted(choices))
+        message = f'{path}: {name!r} is not a choice; choices are {known}'
+        raise ValueError(message)
+    return choices[name]
 
 
 def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
@@ -184,34 +208,47 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
         annotation = field_annotation(config_class=config_class, path=path, settings=settings)
         choices = union_choices(annotation=annotation)
         if choices is not None:
-            if not isinstance(value, str) or value not in choices:
-                known = ', '.join(sorted(choices))
-                message = f'{path}: {value!r} is not a choice; choices are {known}'
-                raise ValueError(message)
-            words.append(f'{path}:{value}')
+            words.append(_choice_word(path=path, value=value, choices=choices))
         elif strip_annotated(annotation=annotation) is bool:
-            if not isinstance(value, bool):
-                message = f'{path}: expected a bool, got {type(value).__qualname__}'
-                raise TypeError(message)
-            flags += _bool_flag(path=path, value=value)
+            flags += _bool_flags(path=path, value=value)
         else:
-            if value is None and not _allows_none(annotation=annotation):
-                message = f'{path}: None is not a value of a field that does not accept None'
-                raise ValueError(message)
-            if isinstance(value, str) and value == 'None' and _allows_none(annotation=annotation):
-                message = (
-                    f'{path}: the text None is ambiguous; pass the Python value '
-                    f'None (not the string) to set no value'
-                )
-                raise ValueError(message)
-            if isinstance(value, str) and value.startswith('-'):
-                # why: a separate word would be read as another flag
-                flags.append(f'{_flag(path=path)}={value}')
-                continue
-            flags.append(_flag(path=path))
-            flags += _value_args(value=value, path=path)
+            flags += _leaf_flags(path=path, value=value, annotation=annotation)
     words.sort(key=lambda word: word.count('.'))
     return words + flags
+
+
+def _choice_word(*, path: str, value: SettingValue, choices: Mapping[str, type]) -> str:
+    """The subcommand word of a choice union path."""
+    if not isinstance(value, str) or value not in choices:
+        known = ', '.join(sorted(choices))
+        message = f'{path}: {value!r} is not a choice; choices are {known}'
+        raise ValueError(message)
+    return f'{path}:{value}'
+
+
+def _bool_flags(*, path: str, value: SettingValue) -> list[str]:
+    """The flag words of a bool path."""
+    if not isinstance(value, bool):
+        message = f'{path}: expected a bool, got {type(value).__qualname__}'
+        raise TypeError(message)
+    return _bool_flag(path=path, value=value)
+
+
+def _leaf_flags(*, path: str, value: SettingValue, annotation: object) -> list[str]:
+    """The flag words of a leaf path that is neither a choice nor a bool."""
+    if value is None and not _allows_none(annotation=annotation):
+        message = f'{path}: None is not a value of a field that does not accept None'
+        raise ValueError(message)
+    if isinstance(value, str) and value == 'None' and _allows_none(annotation=annotation):
+        message = (
+            f'{path}: the text None is ambiguous; pass the Python value '
+            f'None (not the string) to set no value'
+        )
+        raise ValueError(message)
+    if isinstance(value, str) and value.startswith('-'):
+        # why: a separate word would be read as another flag
+        return [f'{_flag(path=path)}={value}']
+    return [_flag(path=path), *_value_args(value=value, path=path)]
 
 
 def from_presets(
@@ -246,14 +283,7 @@ def from_presets(
         TypeError: If a preset holds a leaf value settings cannot hold, or a
             choice union field holds a non-member.
     """
-    if names is None:
-        selected = list(presets)
-    else:
-        unknown = [name for name in names if name not in presets]
-        if unknown:
-            message = f'unknown preset names {unknown}; known: {sorted(presets)}'
-            raise ValueError(message)
-        selected = list(names)
+    selected = _selected_presets(presets=presets, names=names)
     unknown_without = [
         drop
         for drop in without
@@ -275,6 +305,19 @@ def from_presets(
             if not any(path == drop or path.startswith(f'{drop}.') for drop in without)
         }
     return result
+
+
+def _selected_presets(
+    *, presets: Mapping[str, tuple[str, object]], names: Sequence[str] | None
+) -> list[str]:
+    """The names of the presets to read, in order; ``ValueError`` for an unknown one."""
+    if names is None:
+        return list(presets)
+    unknown = [name for name in names if name not in presets]
+    if unknown:
+        message = f'unknown preset names {unknown}; known: {sorted(presets)}'
+        raise ValueError(message)
+    return list(names)
 
 
 _NO_DEFAULT = object()
@@ -343,49 +386,65 @@ def _preset_settings(
     for field in fields(cls):
         if not field.init:
             continue
-        path = f'{prefix}.{field.name}' if prefix else field.name
-        item = getattr(config, field.name)
-        default = _default_of(field=field, base=base)
-        choices = union_choices(annotation=hints[field.name])
-        if choices is not None:
-            choice_name = next(
-                (
-                    member_name
-                    for member_name, member_cls in choices.items()
-                    if type(item) is member_cls
-                ),
-                None,
-            )
-            if choice_name is None:
-                message = (
-                    f'preset {preset_name}: {path} holds {type(item).__qualname__}, '
-                    f'which is not a member of the choice'
-                )
-                raise TypeError(message)
-            settings[path] = choice_name
-            if item is not None:
-                # why: tyro starts a chosen member from the default instance only when the
-                # default is a member of the same class; otherwise from the class defaults
-                member_base = default if type(default) is type(item) else None
-                settings.update(
-                    _preset_settings(
-                        config=item, base=member_base, prefix=path, preset_name=preset_name
-                    )
-                )
-            continue
-        if dataclasses.is_dataclass(item) and not isinstance(item, type):
-            if default is _NO_DEFAULT or item != default:
-                nested_base = default if type(default) is type(item) else None
-                settings.update(
-                    _preset_settings(
-                        config=item, base=nested_base, prefix=path, preset_name=preset_name
-                    )
-                )
-            continue
         settings.update(
-            _preset_leaf(item=item, path=path, preset_name=preset_name, default=default)
+            _field_settings(
+                item=getattr(config, field.name),
+                default=_default_of(field=field, base=base),
+                annotation=hints[field.name],
+                path=f'{prefix}.{field.name}' if prefix else field.name,
+                preset_name=preset_name,
+            )
         )
     return settings
+
+
+def _field_settings(
+    *, item: object, default: object, annotation: object, path: str, preset_name: str
+) -> dict[str, SettingValue]:
+    """The settings of one field of a preset: a choice, a nested dataclass or a leaf."""
+    choices = union_choices(annotation=annotation)
+    if choices is not None:
+        return _choice_settings(
+            item=item, default=default, choices=choices, path=path, preset_name=preset_name
+        )
+    if dataclasses.is_dataclass(item) and not isinstance(item, type):
+        return _nested_settings(item=item, default=default, path=path, preset_name=preset_name)
+    return _preset_leaf(item=item, path=path, preset_name=preset_name, default=default)
+
+
+def _choice_settings(
+    *, item: object, default: object, choices: Mapping[str, type], path: str, preset_name: str
+) -> dict[str, SettingValue]:
+    """The settings of a choice union field: the chosen name, then the member settings."""
+    choice_name = next(
+        (member_name for member_name, member_cls in choices.items() if type(item) is member_cls),
+        None,
+    )
+    if choice_name is None:
+        message = (
+            f'preset {preset_name}: {path} holds {type(item).__qualname__}, '
+            f'which is not a member of the choice'
+        )
+        raise TypeError(message)
+    settings: dict[str, SettingValue] = {path: choice_name}
+    if item is not None:
+        # why: tyro starts a chosen member from the default instance only when the
+        # default is a member of the same class; otherwise from the class defaults
+        member_base = default if type(default) is type(item) else None
+        settings.update(
+            _preset_settings(config=item, base=member_base, prefix=path, preset_name=preset_name)
+        )
+    return settings
+
+
+def _nested_settings(
+    *, item: object, default: object, path: str, preset_name: str
+) -> dict[str, SettingValue]:
+    """The settings of a nested dataclass field; none when it equals the default."""
+    if default is not _NO_DEFAULT and item == default:
+        return {}
+    nested_base = default if type(default) is type(item) else None
+    return _preset_settings(config=item, base=nested_base, prefix=path, preset_name=preset_name)
 
 
 def check_paths(*, config_class: type, settings: Settings) -> list[str]:
@@ -436,9 +495,7 @@ def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
     choices = union_choices(annotation=annotation)
     if choices is None:
         member = strip_annotated(annotation=annotation)
-        if isinstance(member, type) and dataclasses.is_dataclass(member):
-            return [member]
-        return []
+        return [member] if isinstance(member, type) and dataclasses.is_dataclass(member) else []
     if isinstance(name, str) and name in choices:
         return [choices[name]]
     return list(choices.values())
