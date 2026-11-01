@@ -1,1 +1,1 @@
-`tslab.interfaces` no longer exports `Tracker` and `RunStatus`; import them from `tslab`. `tslab.interfaces.tracker` is removed.
+`tslab.interfaces` no longer exports `Tracker` and `RunStatus`; import them from `tslab`. `tslab.interfaces.tracker` is removed. Other re-exports are gone too: import `STATUS_FILE` from `tslab.core.paths`, `parse_slurm_duration` from `tslab.jobs.slurm`, and `TrainingPaused` from `tslab.lightning`.
