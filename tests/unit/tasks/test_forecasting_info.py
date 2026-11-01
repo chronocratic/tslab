@@ -7,6 +7,11 @@ from tslab.interfaces import Split
 from tslab.tasks import checked_split_slices, TSForecastingDataInfo
 
 
+def test_ts_forecasting_data_info_rejects_zero_channels() -> None:
+    with pytest.raises(ValueError, match='num_channels'):
+        TSForecastingDataInfo(num_channels=0, length=None, target_channels=(0,))
+
+
 def test_forecasting_info_accepts_disjoint_channels() -> None:
     info = TSForecastingDataInfo(
         num_channels=4, length=100, target_channels=(2, 3), covariate_channels=(0, 1)
