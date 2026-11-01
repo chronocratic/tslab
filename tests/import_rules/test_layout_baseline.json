@@ -1,9 +1,7 @@
 [
   "tests/unit/cli/test_cli_study.py",
   "tests/unit/study/test_arguments.py",
-  "tests/unit/study/test_cancel.py",
   "tests/unit/study/test_check_paths.py",
-  "tests/unit/study/test_detach.py",
   "tests/unit/study/test_expand_runs.py",
   "tests/unit/study/test_from_presets.py",
   "tests/unit/study/test_grouping.py",

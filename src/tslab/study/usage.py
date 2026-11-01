@@ -17,7 +17,6 @@ from tslab.jobs.slurm import (
     SlurmJobUsage,
 )
 from tslab.study.context import Context
-from tslab.study.launch import usage_file
 from tslab.study.launchers import Resources
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import log_file_of, study_folder
@@ -83,7 +82,7 @@ def _local_usage_of(*, context: Context) -> tuple[dict[str, SlurmJobUsage], dict
             continue
         grid = context.study.grids[report.run.grid]
         log_file = log_file_of(folder=folder, short_name=grid.short_name, index=report.task.index)
-        document = _read_usage_file(path=usage_file(log_file=log_file))
+        document = _read_usage_file(path=log_file.with_name(log_file.name + '.usage.json'))
         usage[report.job_id] = _local_job_usage(document=document, state=report.state.value)
         gpu_ids[report.job_id] = _gpu_id_of(document=document)
     return usage, gpu_ids

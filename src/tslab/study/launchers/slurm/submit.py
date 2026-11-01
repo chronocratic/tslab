@@ -1,0 +1,144 @@
+"""Writing and submitting SLURM job files."""
+
+from collections.abc import Callable, Sequence
+from pathlib import Path
+import shlex
+import time
+from typing import cast
+from uuid import uuid4
+
+from tslab.core.files import atomic_write_text
+from tslab.core.status import utc_now_iso
+from tslab.jobs.slurm import sbatch
+from tslab.study.launchers.slurm.job_script import job_script
+from tslab.study.machine import MachineProfile, SlurmSettings
+from tslab.study.plan import JobGroup, next_job_file
+from tslab.study.records import append_job, JobRecord
+
+__all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']
+
+
+def write_job_files(
+    *,
+    study_folder: Path,
+    groups: Sequence[JobGroup],
+    machine: MachineProfile,
+    project_root: Path,
+    begin: str | None = None,
+) -> None:
+    """The ``jobs/<n>.tasks`` and ``jobs/<n>.sbatch`` files of every group.
+
+    Args:
+        study_folder: The ``.study`` folder of the study.
+        groups: The planned groups.
+        machine: The machine the jobs run on; its ``[env]`` goes in the scripts.
+        project_root: The directory the scripts ``cd`` into.
+        begin: A SLURM ``--begin`` for the jobs.
+    """
+    (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
+    (study_folder / 'logs').mkdir(parents=True, exist_ok=True)
+    for group in groups:
+        tasks_text = '\n'.join(
+            f'{task.index} {task.attempt} {shlex.join(task.command)}' for task in group.tasks
+        )
+        atomic_write_text(
+            path=study_folder / 'jobs' / f'{group.job_file}.tasks', text=tasks_text + '\n'
+        )
+        if group.resources.max_tasks_per_job is None:
+            continue
+        script = job_script(
+            job_name=group.job_name,
+            slurm=cast('SlurmSettings', group.resources),
+            indices=[task.index for task in group.tasks],
+            tasks_file=study_folder / 'jobs' / f'{group.job_file}.tasks',
+            log_pattern=study_folder / 'logs' / f'{group.job_name}_%a.out',
+            project_root=project_root,
+            env=machine.env,
+            begin=begin,
+        )
+        atomic_write_text(path=study_folder / 'jobs' / f'{group.job_file}.sbatch', text=script)
+
+
+class SlurmLauncher:
+    """One ``sbatch`` per group, paused between the limits of the cluster."""
+
+    def __init__(self, *, sleep: Callable[[float], None] = time.sleep) -> None:
+        """Set up the launcher.
+
+        Args:
+            sleep: What waits out the submission pause of the cluster.
+        """
+        self._sleep = sleep
+
+    def submit(self, *, group: JobGroup, study_folder: Path, record: Callable[[str], None]) -> str:
+        """The id of the ``sbatch`` job of the group."""
+        job_id = sbatch(
+            script=study_folder / 'jobs' / f'{group.job_file}.sbatch', sleep=self._sleep
+        )
+        record(job_id)
+        if group.resources.max_tasks_per_job is not None:
+            slurm = cast('SlurmSettings', group.resources)
+            self._sleep(slurm.submit_pause_seconds)
+        return job_id
+
+
+def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
+    *,
+    study_folder: Path,
+    job_name: str,
+    command: str,
+    slurm: SlurmSettings,
+    machine: MachineProfile,
+    project_root: Path,
+    dependency: str,
+    sleep: Callable[[float], None] = time.sleep,
+) -> JobRecord:
+    """Write, submit and record one single-task helper job, e.g. a follow-up.
+
+    Args:
+        study_folder: The ``.study`` folder of the study.
+        job_name: The job name; it also names the log file.
+        command: The shell-quoted command of the job.
+        slurm: The resources of the job.
+        machine: The machine the job runs on; its ``[env]`` goes in the script.
+        project_root: The directory the script ``cd``s into.
+        dependency: The SLURM ``--dependency`` of the job.
+        sleep: What waits out the submission pause of the cluster.
+
+    Returns:
+        The record of the submitted job, already appended to the study.
+
+    Raises:
+        SlurmError: If ``sbatch`` fails; nothing is recorded then.
+    """
+    job_file = next_job_file(study_folder=study_folder)
+    (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
+    (study_folder / 'logs').mkdir(parents=True, exist_ok=True)
+    tasks_file = study_folder / 'jobs' / f'{job_file}.tasks'
+    sbatch_file = study_folder / 'jobs' / f'{job_file}.sbatch'
+    atomic_write_text(path=tasks_file, text=f'0 1 {command}\n')
+    atomic_write_text(
+        path=sbatch_file,
+        text=job_script(
+            job_name=job_name,
+            slurm=slurm,
+            indices=None,
+            tasks_file=tasks_file,
+            log_pattern=study_folder / 'logs' / f'followup_{job_file}.out',
+            project_root=project_root,
+            env=machine.env,
+            dependency=dependency,
+        ),
+    )
+    job_id = sbatch(script=sbatch_file, sleep=sleep)
+    record = JobRecord(
+        kind='followup',
+        submission_id=uuid4().hex,
+        time=utc_now_iso(),
+        launcher='slurm',
+        job_id=job_id,
+        job_file=job_file,
+        tasks=(),
+    )
+    append_job(path=study_folder / 'submissions.jsonl', record=record)
+    return record

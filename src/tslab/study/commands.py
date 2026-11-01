@@ -6,48 +6,30 @@ functions, so the behavior is testable without the command line.
 """
 
 from collections.abc import Callable, Mapping, Sequence
-import contextlib
 import json
 import logging
 import os
 from pathlib import Path
-import signal as signal_module
 import subprocess
 import sys
 import time
-from typing import cast, TextIO
+from typing import cast, TextIO, TYPE_CHECKING
 
 from tslab.core.files import atomic_write_text
 from tslab.core.paths import LOCK_FILE
-from tslab.jobs.local import start_keep_awake, stop_keep_awake
-from tslab.jobs.slurm import job_ended, scancel, SlurmError
+from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context, refresh_context
-from tslab.study.followups import queue_followups
-from tslab.study.job_script import foreground_script
-from tslab.study.launch import (
-    launch,
-    Launcher,
-    local_job_id,
-    LocalLauncher,
-    resolve_local_gpus,
-    SIGNAL_EXIT_BASE,
-    SlurmLauncher,
-)
-from tslab.study.launchers import LaunchReport, OnLaunch, OnTaskState
-from tslab.study.local_launch import hold_launch, launch_is_live, LocalLaunchError, read_launch
-from tslab.study.machine import LocalSettings, MachineProfile, SlurmSettings
-from tslab.study.plan import (
-    assign_indices,
-    JobGroup,
-    next_job_file,
-    plan_jobs,
-    study_folder,
-    validate_jobs,
-)
+from tslab.study.launchers import backend_for, JobPhase, OnLaunch, SIGNAL_EXIT_BASE
+from tslab.study.launchers.slurm.job_script import foreground_script
+from tslab.study.plan import assign_indices, next_job_file, plan_jobs, study_folder, validate_jobs
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_lock, take_progress
 from tslab.study.report import log_launch, log_problems, log_status
 from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
 from tslab.study.state import RunReport, StudyState
+
+if TYPE_CHECKING:
+    from tslab.study.launchers import Backend
+    from tslab.study.machine import SlurmSettings
 
 __all__ = [
     'LIVE_STATES',
@@ -87,19 +69,20 @@ def _finish_launch(
     if code >= SIGNAL_EXIT_BASE:
         # why: the launch was stopped by a signal; resubmit continues it
         return code
-    followup_code, _ = queue_followups(
-        context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
-    )
-    code = max(code, followup_code)
-    if context.machine.launcher == 'local' and context.machine.followup.auto_retry and submitted:
-        retry_code = resubmit(
-            context=refresh_context(context=context),
-            auto=True,
+    return max(
+        code,
+        backend_for(machine=context.machine).after_submit(
+            context=context,
+            submitted=submitted,
+            retry=lambda: resubmit(
+                context=refresh_context(context=context),
+                auto=True,
+                sleep=sleep,
+                task_stream=task_stream,
+            ),
             sleep=sleep,
-            task_stream=task_stream,
-        )
-        return max(code, retry_code)
-    return code
+        ),
+    )
 
 
 # why: a cancelled job leaves its lock until the heartbeat is stale; the restart
@@ -205,30 +188,6 @@ def status(
     return 0
 
 
-def _cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tuple[int, list[str]]:
-    if signal is not None:
-        _LOGGER.error('cancel --signal is SLURM only')
-        return 2, []
-    launch = read_launch(study_folder=study_folder(machine=context.machine, study=context.study))
-    if launch is None or not launch_is_live(launch=launch):
-        _LOGGER.info('nothing to cancel')
-        return 0, []
-    selected = {report.job_id for report in context.reports}
-    missed = [key for key, state in launch.tasks if state != 'ended' and key not in selected]
-    if missed:
-        _LOGGER.error(
-            'a local launch is cancelled as one unit; the selection misses its tasks: %s',
-            ', '.join(missed),
-        )
-        return 2, []
-    if dry_run:
-        _LOGGER.info('would stop local launch %s', launch.pid)
-        return 0, [str(launch.pid)]
-    os.kill(launch.pid, signal_module.SIGTERM)
-    _LOGGER.info('sent SIGTERM to local launch %s', launch.pid)
-    return 0, [str(launch.pid)]
-
-
 def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tuple[int, list[str]]:
     """Cancel or signal the queued and running SLURM jobs of selected runs.
 
@@ -246,42 +205,9 @@ def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tup
         The process exit code and the job ids cancelled, signalled, or
         selected for either.
     """
-    if context.machine.launcher != 'slurm':
-        return _cancel_local(context=context, dry_run=dry_run, signal=signal)
-    live = [
-        report
-        for report in context.reports
-        if report.state in LIVE_STATES and report.job_id is not None
-    ]
-    if signal is not None:
-        queued = [
-            report.job_id
-            for report in live
-            if report.state is StudyState.QUEUED and report.job_id is not None
-        ]
-        if queued:
-            _LOGGER.info('skipped queued runs: %s', ', '.join(queued))
-        live = [report for report in live if report.state is StudyState.RUNNING]
-    job_ids = [report.job_id for report in live if report.job_id is not None]
-    if not job_ids:
-        _LOGGER.info('nothing to cancel')
-        return 0, []
-    if dry_run:
-        if signal is not None:
-            _LOGGER.info(
-                'would signal %s with %s; the jobs save and end on their own',
-                ', '.join(job_ids),
-                signal,
-            )
-        else:
-            _LOGGER.info('would cancel %s', ', '.join(job_ids))
-        return 0, job_ids
-    try:
-        _cancel_live(reports=live, launcher=context.machine.launcher, signal=signal)
-    except SlurmError as error:
-        _LOGGER.error('%s', error)  # noqa: TRY400 # why: cancellation failures need no traceback
-        return 1, []
-    return 0, job_ids
+    return backend_for(machine=context.machine).cancel(
+        context=context, dry_run=dry_run, signal=signal
+    )
 
 
 def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
@@ -338,13 +264,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     ]
     if auto:
         selected = _with_progress(reports=selected, context=context)
-    live = []
-    if cancel_live:
-        live = [
-            report
-            for report in context.reports
-            if report.state in LIVE_STATES and report.job_id is not None
-        ]
+    live = _live_reports(reports=context.reports, cancel_live=cancel_live)
     selected += live
     if not selected:
         _LOGGER.info('nothing to resubmit')
@@ -357,12 +277,13 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
             args[path] = task[1].extra_args
         else:
             args[path] = extra_args or ()
-    if dry_run and live:
-        _LOGGER.info('would cancel %s', ', '.join(str(report.job_id) for report in live))
-
-    def before_launch() -> None:
-        _cancel_live(reports=live, launcher=context.machine.launcher)
-        _remove_ended_locks(reports=selected, study_directory=context.study_directory)
+    begin, before_launch = _before_resubmit(
+        backend=backend_for(machine=context.machine),
+        context=context,
+        live=live,
+        selected=selected,
+        dry_run=dry_run,
+    )
 
     code, submitted = submit_runs(
         context=context,
@@ -370,7 +291,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         dry_run=dry_run,
         extra_args=args,
         sleep=sleep,
-        begin=f'now+{_RESTART_DELAY_SECONDS}' if live else None,
+        begin=begin,
         before_launch=before_launch,
         on_launch=on_launch,
         task_stream=task_stream,
@@ -378,6 +299,38 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     return _finish_launch(
         code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
     )
+
+
+def _live_reports(*, reports: Sequence[RunReport], cancel_live: bool) -> list[RunReport]:
+    if not cancel_live:
+        return []
+    return [
+        report for report in reports if report.state in LIVE_STATES and report.job_id is not None
+    ]
+
+
+def _before_resubmit(
+    *,
+    backend: 'Backend',
+    context: Context,
+    live: Sequence[RunReport],
+    selected: Sequence[RunReport],
+    dry_run: bool,
+) -> tuple[str | None, Callable[[], int]]:
+    cancellable = backend.cancellable_job_ids(reports=live)
+    if dry_run and cancellable:
+        _LOGGER.info('would cancel %s', ', '.join(cancellable))
+
+    def before_launch() -> int:
+        if cancellable:
+            code, _ = backend.cancel(context=context, dry_run=False, signal=None)
+            if code != 0:
+                return code
+        _remove_ended_locks(reports=selected, study_directory=context.study_directory)
+        return 0
+
+    begin = f'now+{_RESTART_DELAY_SECONDS}' if cancellable else None
+    return begin, before_launch
 
 
 def _run_in_terminal(args: list[str]) -> int:
@@ -575,32 +528,12 @@ def _made_progress(*, report: RunReport, context: Context) -> bool:
     )
 
 
-def _cancel_live(*, reports: Sequence[RunReport], launcher: str, signal: str | None = None) -> None:
-    """Cancel the SLURM jobs of the live reports, or send their steps a signal.
-
-    Raises:
-        SlurmError: If ``scancel`` fails.
-    """
-    if not reports:
-        return
-    if launcher != 'slurm':
-        _LOGGER.info('skipped the live runs: only SLURM jobs can be cancelled')
-        return
-    ids = [report.job_id for report in reports if report.job_id is not None]
-    if ids:
-        scancel(job_ids=ids, signal=signal)
-        if signal is not None:
-            _LOGGER.info(
-                'signalled %s with %s; the jobs save and end on their own', ', '.join(ids), signal
-            )
-        else:
-            _LOGGER.info('cancelled %s', ', '.join(ids))
-
-
 def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) -> None:
     for report in reports:
         job_state = report.job_state
-        if not job_ended(job_state=job_state) or not report.folder.lock_live:
+        if report.job_phase in (JobPhase.QUEUED, JobPhase.RUNNING, JobPhase.UNKNOWN):
+            continue
+        if not report.folder.lock_live:
             continue
         (study_directory / report.run.run_path / LOCK_FILE).unlink(missing_ok=True)
         _LOGGER.info(
@@ -611,95 +544,6 @@ def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) 
         )
 
 
-def _launcher_of(  # noqa: PLR0913 # why: keyword-only private helper; one keyword per launcher input
-    *,
-    machine: MachineProfile,
-    project_root: Path,
-    sleep: Callable[[float], None],
-    task_stream: TextIO | None = None,
-    gpu_ids: tuple[str, ...] = (),
-    on_task_state: OnTaskState | None = None,
-) -> Launcher:
-    if machine.launcher == 'slurm':
-        return SlurmLauncher(sleep=sleep)
-    return LocalLauncher(
-        project_root=project_root,
-        env=machine.env,
-        local=machine.local or LocalSettings(),  # why: loaded local profiles always carry the table
-        gpu_ids=gpu_ids,
-        stream=task_stream,
-        on_task_state=on_task_state,
-    )
-
-
-def _local_task_ids(*, groups: Sequence[JobGroup]) -> list[str]:
-    return [
-        f'{local_job_id(job_file=group.job_file)}_{task.index}'
-        for group in groups
-        for task in group.tasks
-    ]
-
-
-def _launch_held(  # noqa: PLR0913 # why: keyword-only private helper; one keyword per input of launch
-    *,
-    context: Context,
-    groups: Sequence[JobGroup],
-    folder: Path,
-    dry_run: bool,
-    begin: str | None,
-    sleep: Callable[[float], None],
-    task_stream: TextIO | None,
-) -> LaunchReport | None:
-    """Launch the groups; on a local machine hold the pid file and keep the machine awake.
-
-    Returns:
-        The launch report; ``None`` when a GPU or launch file problem was logged.
-    """
-    machine = context.machine
-    gpu_ids: tuple[str, ...] = ()
-    keep_awake: subprocess.Popen[bytes] | None = None
-    is_local = machine.launcher != 'slurm' and not dry_run
-    if is_local:
-        # why: a loaded local profile always carries the table
-        local = machine.local or LocalSettings()
-        try:
-            gpu_ids = resolve_local_gpus(local=local, environment=os.environ)
-        except ValueError as error:
-            _LOGGER.error('%s', error)  # noqa: TRY400 # why: a GPU setup error is shown, not raised
-            return None
-        _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
-        if local.keep_awake:
-            keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
-    try:
-        with contextlib.ExitStack() as stack:
-            on_task_state = None
-            if is_local:
-                on_task_state = stack.enter_context(
-                    hold_launch(study_folder=folder, task_ids=_local_task_ids(groups=groups))
-                )
-            return launch(
-                launcher=_launcher_of(
-                    machine=machine,
-                    project_root=context.project_root,
-                    sleep=sleep,
-                    task_stream=task_stream,
-                    gpu_ids=gpu_ids,
-                    on_task_state=on_task_state,
-                ),
-                machine=machine,
-                study=context.study,
-                groups=groups,
-                project_root=context.project_root,
-                dry_run=dry_run,
-                begin=begin,
-            )
-    except LocalLaunchError as error:
-        _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch file problem is shown, not raised
-        return None
-    finally:
-        stop_keep_awake(process=keep_awake)
-
-
 def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     context: Context,
@@ -708,7 +552,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     extra_args: Mapping[str, tuple[str, ...]],
     sleep: Callable[[float], None],
     begin: str | None = None,
-    before_launch: Callable[[], None] | None = None,
+    before_launch: Callable[[], int] | None = None,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
 ) -> tuple[int, list[JobRecord]]:
@@ -760,13 +604,16 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         failure = None
         if before_launch is not None and not dry_run:
             try:
-                before_launch()
+                before_launch_code = before_launch()
             except SlurmError as error:
                 failure = str(error)
+            else:
+                if before_launch_code != 0:
+                    return before_launch_code, []
         if failure is not None:
             _LOGGER.error('%s', failure)
             return 1, []
-        report = _launch_held(
+        report = backend_for(machine=machine).launch(
             context=context,
             groups=groups,
             folder=folder,
@@ -774,6 +621,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             begin=begin,
             sleep=sleep,
             task_stream=task_stream,
+            environment=os.environ,
         )
         if report is None:
             return 1, []

@@ -8,7 +8,7 @@ import time
 
 from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context
-from tslab.study.launch import submit_helper_job
+from tslab.study.launchers.slurm.submit import submit_helper_job
 from tslab.study.plan import study_folder
 from tslab.study.records import JobRecord, submission_lock
 
@@ -40,12 +40,7 @@ def queue_followups(
     """
     machine = context.machine
     followup = machine.followup
-    if (
-        machine.launcher != 'slurm'
-        or machine.slurm is None
-        or not job_ids
-        or not (followup.auto_retry or followup.wandb_sync)
-    ):
+    if machine.slurm is None or not job_ids or not (followup.auto_retry or followup.wandb_sync):
         return 0, []
     dependency = 'afterany:' + ':'.join(job_ids)
     slurm = dataclasses.replace(

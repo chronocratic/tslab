@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from tslab.study.job_script import foreground_script, job_script
+from tslab.study.launchers.slurm.job_script import foreground_script, job_script
 from tslab.study.machine import SlurmSettings
 
 TASKS_LINES = [

@@ -17,7 +17,7 @@ from tslab.core.status import (
     write_status,
 )
 from tslab.study.commands import resubmit, submit
-from tslab.study.followups import queue_followups
+from tslab.study.launchers.slurm.followups import queue_followups
 from tslab.study.machine import resolve_machine, write_register
 from tslab.study.records import append_job, JobRecord, ProgressSnapshot, TaskRecord
 

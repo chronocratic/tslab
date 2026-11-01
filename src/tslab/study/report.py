@@ -9,8 +9,7 @@ from tslab.core.text import log_table
 from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launch import SIGNAL_EXIT_BASE
-from tslab.study.launchers import LaunchReport, Resources
+from tslab.study.launchers import LaunchReport, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.state import RunReport, StudyState

@@ -7,31 +7,40 @@ import each other.
 """
 
 from collections.abc import Callable, Mapping, Sequence
+import dataclasses
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol, TextIO
+from typing import cast, Protocol, TextIO
+from uuid import uuid4
 
-from tslab.jobs.slurm import SlurmJobUsage
+from tslab.core.status import utc_now_iso
+from tslab.jobs.slurm import SlurmError, SlurmJobUsage
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.machine import MachineOverride, MachineProfile
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
+from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.plan import JobGroup, study_folder
+from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 from tslab.study.state import RunReport
 
 __all__ = [
     'BACKENDS',
+    'SIGNAL_EXIT_BASE',
     'Backend',
     'JobPhase',
     'JobStates',
     'LaunchReport',
     'LaunchStopped',
+    'Launcher',
     'OnLaunch',
     'OnTaskState',
     'Resources',
     'backend_for',
+    'launch',
 ]
+
+#: The base of an exit code made from a signal: the code is the base plus the number.
+SIGNAL_EXIT_BASE = 128
 
 
 class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, not an error
@@ -134,8 +143,125 @@ class Resources(Protocol):
 
 
 # why: the types above must exist first: this import reaches
-# tslab.study.local_launch, which imports OnTaskState from this door
+# the local pid-file module, which imports OnTaskState from this door
 from tslab.study.context import Context  # noqa: E402
+
+
+class Launcher(Protocol):
+    """What one launch does with a written group: returns the job id."""
+
+    def submit(self, *, group: JobGroup, study_folder: Path, record: Callable[[str], None]) -> str:
+        """Submit one group and record its job id before tasks run."""
+        ...
+
+
+class WriteJobFiles(Protocol):
+    """Write the task and launcher files of a planned launch."""
+
+    def __call__(
+        self,
+        *,
+        study_folder: Path,
+        groups: Sequence[JobGroup],
+        machine: MachineProfile,
+        project_root: Path,
+        begin: str | None = None,
+    ) -> None:
+        """Write files needed by one backend's launch."""
+        ...
+
+
+def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input is explicit
+    *,
+    launcher: Launcher,
+    write_job_files: WriteJobFiles,
+    machine: MachineProfile,
+    study: Study,
+    groups: Sequence[JobGroup],
+    project_root: Path,
+    dry_run: bool,
+    begin: str | None = None,
+) -> LaunchReport:
+    """Write backend files, then submit groups one by one.
+
+    A dry run writes files and stops. Otherwise each group is recorded as soon
+    as its job exists, so a failed launch keeps records for submitted groups.
+
+    Args:
+        launcher: The backend's implementation that submits one group.
+        write_job_files: The backend's file writer.
+        machine: The machine the jobs run on.
+        study: The study the groups came from.
+        groups: Planned groups in submission order.
+        project_root: The directory the jobs run in.
+        dry_run: Write files and stop without submitting.
+        begin: A SLURM ``--begin`` value, when set.
+
+    Returns:
+        What was submitted, what was not, and any error or stopping signal.
+    """
+    folder = study_folder(machine=machine, study=study)
+    write_job_files(
+        study_folder=folder, groups=groups, machine=machine, project_root=project_root, begin=begin
+    )
+    if dry_run:
+        return LaunchReport(submitted=(), not_submitted=tuple(groups), error=None)
+    submission_id = uuid4().hex
+    study_directory = machine.output_root / study.name
+    records: list[JobRecord] = []
+    error: str | None = None
+    stopped_signal: int | None = None
+    for group in groups:
+        tasks = tuple(
+            TaskRecord(
+                index=task.index,
+                grid=task.resolved.run.grid,
+                run_path=task.resolved.run.run_path,
+                command=task.command,
+                extra_args=task.extra_args,
+                resources=(
+                    dataclasses.asdict(cast('SlurmSettings', task.resolved.resources))
+                    if task.resolved.resources.max_tasks_per_job is not None
+                    else {}
+                ),
+                attempt=task.attempt,
+                progress=take_progress(run_directory=study_directory / task.resolved.run.run_path),
+                uncounted_attempts=task.uncounted_attempts,
+                uncounted_in_row=task.uncounted_in_row,
+            )
+            for task in group.tasks
+        )
+
+        def record_job(
+            job_id: str, group: JobGroup = group, tasks: tuple[TaskRecord, ...] = tasks
+        ) -> None:
+            record = JobRecord(
+                kind='run',
+                submission_id=submission_id,
+                time=utc_now_iso(),
+                launcher=machine.launcher,
+                job_id=job_id,
+                job_file=group.job_file,
+                tasks=tasks,
+            )
+            records.append(record)
+            append_job(path=folder / 'submissions.jsonl', record=record)
+
+        try:
+            launcher.submit(group=group, study_folder=folder, record=record_job)
+        except SlurmError as exc:
+            error = str(exc)
+            break
+        except LaunchStopped as exc:
+            # why: the record of this group is kept; resubmit continues the stopped runs
+            stopped_signal = exc.signal_number
+            break
+    return LaunchReport(
+        submitted=tuple(records),
+        not_submitted=tuple(groups[len(records) :]),
+        error=error,
+        stopped_signal=stopped_signal,
+    )
 
 
 class Backend(Protocol):

@@ -18,7 +18,7 @@ from tslab.core.status import (
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import JobPhase, JobStates
-from tslab.study.local_launch import LAUNCH_FILE
+from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.records import append_job, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
 __all__ = [
