@@ -1,0 +1,1 @@
+The lock of a run folder moved to `tslab.core.lock` (`is_run_active`, `RunLockedError`, lock acquisition, stale-lock removal and the heartbeat), and the rank helpers moved to `tslab.core.ranks` (`is_writer_process`, `slurm_task_count` and `RankAgreement`). The top-level names of `tslab` are unchanged.

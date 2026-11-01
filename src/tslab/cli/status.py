@@ -23,8 +23,8 @@ import tyro
 from tslab.cli.console import watch
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
+from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
-from tslab.core.run import is_run_active
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,

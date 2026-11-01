@@ -21,7 +21,8 @@ import torch
 
 from tslab.core.artifact import Checkpoint
 from tslab.core.paths import atomic_write_json, require_path
-from tslab.core.run import JobTimeLimitSignal, Run, slurm_task_count
+from tslab.core.ranks import slurm_task_count
+from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
 from tslab.lightning.callbacks import _SignalStop, build_callbacks
