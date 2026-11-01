@@ -1,6 +1,7 @@
 """Local helpers for job processes."""
 
 from tslab.jobs.local.background import start_detached, start_keep_awake, stop_keep_awake
+from tslab.jobs.local.environment import without_scheduler_variables
 from tslab.jobs.local.gpus import (
     busy_gpus,
     gpu_lock_folder,
@@ -46,4 +47,5 @@ __all__ = [
     'tail_lines',
     'try_lease_gpu',
     'visible_gpus',
+    'without_scheduler_variables',
 ]

@@ -78,6 +78,23 @@ def test_local_cancel_signals_supervisor(project: Path, tmp_path: Path) -> None:
         child.wait()
 
 
+def test_local_cancel_ignores_tasks_of_groups_not_started(project: Path) -> None:
+    child = _sleeper()
+    try:
+        ids = record_local_job(project=project)
+        write_launch(
+            folder=study_directory(project=project) / '.study',
+            pid=child.pid,
+            host=hostname(),
+            tasks=dict.fromkeys(ids, 'pending') | {'local-1-9_0': 'pending'},
+        )
+        ctx = context(project=project, machine_file='local.toml')
+        assert cancel(context=ctx, dry_run=True) == (0, [str(child.pid)])
+    finally:
+        child.kill()
+        child.wait()
+
+
 def test_local_cancel_signal_flag_is_usage_error(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

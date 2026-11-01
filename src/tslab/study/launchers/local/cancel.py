@@ -24,7 +24,13 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
         _LOGGER.info('nothing to cancel')
         return 0, []
     selected = {report.job_id for report in context.reports}
-    missed = [key for key, state in launch.tasks if state != 'ended' and key not in selected]
+    # why: the tasks of a group that has not started have no job record, so no selection names them
+    recorded = {f'{job.job_id}_{task.index}' for job in context.jobs for task in job.tasks}
+    missed = [
+        key
+        for key, state in launch.tasks
+        if state != 'ended' and key in recorded and key not in selected
+    ]
     if missed:
         _LOGGER.error(
             'a local launch is cancelled as one unit; the selection misses its tasks: %s',
