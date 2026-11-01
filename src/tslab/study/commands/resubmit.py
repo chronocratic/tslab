@@ -103,7 +103,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
             args[path] = task[1].extra_args
         else:
             args[path] = extra_args or ()
-    begin, before_launch = _before_resubmit(
+    start_delay_seconds, before_launch = _before_resubmit(
         backend=backend_for(machine=context.machine),
         context=context,
         live=live,
@@ -117,7 +117,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         dry_run=dry_run,
         extra_args=args,
         sleep=sleep,
-        begin=begin,
+        start_delay_seconds=start_delay_seconds,
         before_launch=before_launch,
         on_launch=on_launch,
         task_stream=task_stream,
@@ -142,7 +142,7 @@ def _before_resubmit(
     live: Sequence[RunReport],
     selected: Sequence[RunReport],
     dry_run: bool,
-) -> tuple[str | None, Callable[[], int]]:
+) -> tuple[int | None, Callable[[], int]]:
     cancellable = backend.cancellable_job_ids(reports=live)
     if dry_run and cancellable:
         _LOGGER.info('would cancel %s', ', '.join(cancellable))
@@ -155,8 +155,8 @@ def _before_resubmit(
         _remove_ended_locks(reports=selected, study_directory=context.study_directory)
         return 0
 
-    begin = f'now+{_RESTART_DELAY_SECONDS}' if cancellable else None
-    return begin, before_launch
+    delay = _RESTART_DELAY_SECONDS if cancellable else None
+    return delay, before_launch
 
 
 def _run_in_terminal(*, args: list[str]) -> int:

@@ -228,7 +228,7 @@ def test_launch_delegates_to_shared_launch(
         groups=(),
         folder=ctx.study_directory / '.study',
         dry_run=False,
-        begin=None,
+        start_delay_seconds=None,
         sleep=no_sleep,
         task_stream=None,
         environment={},

@@ -150,7 +150,7 @@ class SlurmBackend:
         groups: Sequence[JobGroup],
         folder: Path,  # noqa: ARG002 # why: the Backend launch signature
         dry_run: bool,
-        begin: str | None,
+        start_delay_seconds: int | None,
         sleep: Callable[[float], None],
         task_stream: TextIO | None,  # noqa: ARG002 # why: the Backend launch signature
         environment: Mapping[str, str],  # noqa: ARG002 # why: the SLURM writer uses the profile env
@@ -167,7 +167,7 @@ class SlurmBackend:
             groups=groups,
             project_root=context.project_root,
             dry_run=dry_run,
-            begin=begin,
+            start_delay_seconds=start_delay_seconds,
             now=now,
         )
 

@@ -81,7 +81,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     dry_run: bool,
     extra_args: Mapping[str, tuple[str, ...]],
     sleep: Callable[[float], None],
-    begin: str | None = None,
+    start_delay_seconds: int | None = None,
     before_launch: Callable[[], int] | None = None,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
@@ -98,7 +98,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The run path to pass-through arguments.
         sleep: What waits out the submission pause of the cluster.
-        begin: A SLURM ``--begin`` for the submitted jobs.
+        start_delay_seconds: Seconds the submitted jobs wait before they may start.
         before_launch: Called once the plan is valid and before the first job
             is submitted, never on a dry run; a ``LaunchError`` from it stops
             the command with exit code 1.
@@ -149,7 +149,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             groups=groups,
             folder=folder,
             dry_run=dry_run,
-            begin=begin,
+            start_delay_seconds=start_delay_seconds,
             sleep=sleep,
             task_stream=task_stream,
             environment=os.environ,

@@ -25,7 +25,7 @@ def write_job_files(
     groups: Sequence[JobGroup],
     machine: MachineProfile,
     project_root: Path,
-    begin: str | None = None,
+    start_delay_seconds: int | None = None,
 ) -> None:
     """The ``jobs/<n>.tasks`` and ``jobs/<n>.sbatch`` files of every group.
 
@@ -34,8 +34,9 @@ def write_job_files(
         groups: The planned groups.
         machine: The machine the jobs run on; its ``[env]`` goes in the scripts.
         project_root: The directory the scripts ``cd`` into.
-        begin: A SLURM ``--begin`` for the jobs.
+        start_delay_seconds: Seconds the jobs wait before they may start; written as a ``--begin``.
     """
+    begin = None if start_delay_seconds is None else f'now+{start_delay_seconds}'
     (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
     (study_folder / 'logs').mkdir(parents=True, exist_ok=True)
     for group in groups:
