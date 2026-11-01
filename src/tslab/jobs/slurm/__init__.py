@@ -12,6 +12,7 @@ from tslab.jobs.slurm.commands import (
     SlurmJobUsage,
     submission_environment,
 )
+from tslab.jobs.slurm.environment import task_count
 from tslab.jobs.slurm.memory import format_slurm_memory, parse_slurm_memory
 from tslab.jobs.slurm.script import (
     array_spec,
@@ -52,5 +53,6 @@ __all__ = [
     'slurm_available',
     'srun_command',
     'submission_environment',
+    'task_count',
     'wait_for_file_line',
 ]
