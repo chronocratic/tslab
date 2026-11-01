@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import tslab
-from tslab.core import config as core_config
+from tslab.core import codec as core_codec
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -48,4 +48,4 @@ def test_presets_without_the_marker_are_unchanged() -> None:
 
 def test_saving_an_unparsed_preset_with_the_marker_raises() -> None:
     with pytest.raises(TypeError):
-        core_config.config_to_data(config=PRESETS['any'][1])
+        core_codec.config_to_data(config=PRESETS['any'][1])

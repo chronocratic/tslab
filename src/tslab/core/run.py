@@ -18,7 +18,8 @@ import threading
 from types import FrameType, TracebackType
 from typing import Literal, Self
 
-from tslab.core.config import config_to_data, config_to_yaml, save_config
+from tslab.core.codec import config_to_data
+from tslab.core.config import config_to_yaml, save_config
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.lock import acquire_lock, Heartbeat, release_lock
 from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION

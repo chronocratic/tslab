@@ -6,7 +6,7 @@ import pytest
 import tyro
 
 import tslab
-import tslab.core.config
+import tslab.core.codec
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -73,4 +73,4 @@ def test_same_named_union_members_are_rejected_on_save() -> None:
         choice: first | second = field(default_factory=first)  # ty: ignore[invalid-type-form]
 
     with pytest.raises(TypeError, match=r"share the class name \['Twin'\]"):
-        tslab.core.config.config_to_data(config=Holder())
+        tslab.core.codec.config_to_data(config=Holder())

@@ -5,13 +5,8 @@ from typing import Annotated
 
 import pytest
 
-from tslab.core.config import (
-    config_to_data,
-    ConfigFileError,
-    decode_dataclass,
-    strip_annotated,
-    union_members,
-)
+from tslab.core.codec import config_to_data, decode_dataclass, strip_annotated, union_members
+from tslab.core.config import ConfigFileError
 from tslab.core.fingerprint import NotFingerprinted
 
 
