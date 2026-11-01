@@ -30,6 +30,7 @@ from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage
 from tslab.study.paths import instance_directory
+import tslab.study.reporting.failures as failures_module
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
 from tslab.study.reporting.state import RunReport, StudyState
 
@@ -117,8 +118,11 @@ def test_collect_failures_uses_selected_backend_usage(
             no_usage: dict[str, JobUsage] = {}
             return no_usage
 
+        def failure_hint(self, **_kwargs: object) -> None:
+            return None
+
     backend = Backend()
-    monkeypatch.setattr(launchers, 'backend_for', lambda **_kwargs: backend)
+    monkeypatch.setattr(failures_module, 'backend_for', lambda **_kwargs: backend)
 
     collect_failures(context=ctx, states=(), lines=30)
 
