@@ -75,10 +75,9 @@ def test_groups_by_grid_and_resources(
         first_job_file=3,
     )
     assert [g.job_file for g in groups] == [3, 4]
-    assert groups[0].slurm is not None
-    assert groups[0].slurm.gpus == 0
-    assert groups[1].slurm is not None
-    assert groups[1].slurm.gpus == 1
+    assert groups[0].resources.describe() == 'partition=gpu, time=01:00:00, cpus=1'
+    assert groups[0].resources.max_tasks_per_job == 1000
+    assert groups[1].resources.describe() == 'partition=gpu, time=01:00:00, cpus=1, gpus=1'
     assert [[t.index for t in g.tasks] for g in groups] == [[0, 1], [2, 3]]
     assert [g.job_name for g in groups] == ['g1', 'g1']
     task = groups[1].tasks[1]

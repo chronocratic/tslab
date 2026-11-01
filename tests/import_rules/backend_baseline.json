@@ -18,10 +18,7 @@
     "src/tslab/study/usage.py": 3
   },
   "none_checks": {
-    "src/tslab/study/commands.py": 1,
-    "src/tslab/study/followups.py": 1,
-    "src/tslab/study/launch.py": 3,
-    "src/tslab/study/plan.py": 2
+    "src/tslab/study/followups.py": 1
   },
   "test_imports_both": {}
 }

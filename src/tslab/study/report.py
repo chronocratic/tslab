@@ -10,8 +10,7 @@ from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launch import SIGNAL_EXIT_BASE
-from tslab.study.launchers import LaunchReport
-from tslab.study.machine import SlurmSettings
+from tslab.study.launchers import LaunchReport, Resources
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.state import RunReport, StudyState
@@ -127,11 +126,9 @@ def _start_suffix(*, report: RunReport, starts: Mapping[str, str | None] | None)
     return None if start is None else f'starts {start}'
 
 
-def resources_of(*, slurm: SlurmSettings | None) -> str:
+def resources_of(*, resources: Resources) -> str:
     """The resource line of one group, for the dry run printout."""
-    if slurm is None:
-        return 'local'
-    return slurm.describe()
+    return resources.describe()
 
 
 def log_problems(*, problems: Sequence[tuple[str, str]]) -> None:
@@ -173,7 +170,7 @@ def log_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> tuple[int
         return 1, list(report.submitted)
     if not report.submitted:
         rows = [
-            (group.job_name, str(len(group.tasks)), resources_of(slurm=group.slurm))
+            (group.job_name, str(len(group.tasks)), resources_of(resources=group.resources))
             for group in groups
         ]
         log_table(logger=_LOGGER, header=('job', 'runs', 'resources'), rows=rows)

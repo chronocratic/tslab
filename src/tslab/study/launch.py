@@ -9,7 +9,7 @@ import shlex
 import signal
 import sys
 import time
-from typing import Protocol, TextIO
+from typing import cast, Protocol, TextIO
 from uuid import uuid4
 
 from tslab.core.files import atomic_write_text
@@ -80,11 +80,11 @@ def write_job_files(
         atomic_write_text(
             path=study_folder / 'jobs' / f'{group.job_file}.tasks', text=tasks_text + '\n'
         )
-        if group.slurm is None:
+        if group.resources.max_tasks_per_job is None:
             continue
         script = job_script(
             job_name=group.job_name,
-            slurm=group.slurm,
+            slurm=cast('SlurmSettings', group.resources),
             indices=[task.index for task in group.tasks],
             tasks_file=study_folder / 'jobs' / f'{group.job_file}.tasks',
             log_pattern=study_folder / 'logs' / f'{group.job_name}_%a.out',
@@ -126,8 +126,9 @@ class SlurmLauncher:
             script=study_folder / 'jobs' / f'{group.job_file}.sbatch', sleep=self._sleep
         )
         record(job_id)
-        if group.slurm is not None:
-            self._sleep(group.slurm.submit_pause_seconds)
+        if group.resources.max_tasks_per_job is not None:
+            slurm = cast('SlurmSettings', group.resources)
+            self._sleep(slurm.submit_pause_seconds)
         return job_id
 
 
@@ -363,8 +364,8 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
                 command=task.command,
                 extra_args=task.extra_args,
                 resources=(
-                    dataclasses.asdict(task.resolved.slurm)
-                    if task.resolved.slurm is not None
+                    dataclasses.asdict(cast('SlurmSettings', task.resolved.resources))
+                    if task.resolved.resources.max_tasks_per_job is not None
                     else {}
                 ),
                 attempt=task.attempt,

@@ -15,7 +15,7 @@ import signal as signal_module
 import subprocess
 import sys
 import time
-from typing import TextIO
+from typing import cast, TextIO
 
 from tslab.core.files import atomic_write_text
 from tslab.core.paths import LOCK_FILE
@@ -35,7 +35,7 @@ from tslab.study.launch import (
 )
 from tslab.study.launchers import LaunchReport, OnLaunch, OnTaskState
 from tslab.study.local_launch import hold_launch, launch_is_live, LocalLaunchError, read_launch
-from tslab.study.machine import LocalSettings, MachineProfile
+from tslab.study.machine import LocalSettings, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     assign_indices,
     JobGroup,
@@ -455,10 +455,15 @@ def run_one(
         log_problems(problems=problems)
         return 1
     (task,) = groups[0].tasks
-    if resolved.slurm is not None and resolved.slurm.gpus > 1:
-        _LOGGER.info('study run starts one process; the job would start %d', resolved.slurm.gpus)
+    slurm = (
+        cast('SlurmSettings', resolved.resources)
+        if resolved.resources.max_tasks_per_job is not None
+        else None
+    )
+    if slurm is not None and slurm.gpus > 1:
+        _LOGGER.info('study run starts one process; the job would start %d', slurm.gpus)
     script = foreground_script(
-        slurm=resolved.slurm,
+        slurm=slurm,
         project_root=context.project_root,
         env=context.machine.env,
         command=task.command,

@@ -9,7 +9,7 @@ import logging
 import os
 from pathlib import Path
 import sys
-from typing import cast
+from typing import cast, TYPE_CHECKING
 
 import tslab
 from tslab.study.definition import (
@@ -25,6 +25,9 @@ from tslab.study.expansion import expand_setting
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.records import JobRecord, latest_tasks
 from tslab.study.settings import check_paths, settings_to_args, SettingValue
+
+if TYPE_CHECKING:
+    from tslab.study.launchers import Resources
 
 __all__ = [
     'JobGroup',
@@ -54,13 +57,12 @@ class ResolvedRun:
         run: The study run this resolves.
         settings: The settings of the run, then the machine settings, then the
             settings of the matching machine overrides; not yet expanded.
-        slurm: The base ``[slurm]`` table with the matching overrides'
-            ``slurm`` applied field by field, or ``None`` off SLURM.
+        resources: The resources of the run, from its machine's backend.
     """
 
     run: StudyRun
     settings: Mapping[str, SettingValue]
-    slurm: SlurmSettings | None
+    resources: 'Resources'
 
 
 def resolve_runs(
@@ -92,6 +94,10 @@ def resolve_runs(
             or ``settings``, the grid and the paths.
     """
     check_machine(study=study, machine=machine, warned=warned)
+    # why: the launcher door imports JobGroup from this module
+    from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+    backend = backend_for(machine=machine)
     return [
         ResolvedRun(
             run=run,
@@ -101,11 +107,8 @@ def resolve_runs(
                 grid_name=run.grid,
                 values=run.values,
             ),
-            slurm=_slurm_for(
-                base=machine.slurm,
-                overrides=machine.overrides,
-                grid_name=run.grid,
-                values=run.values,
+            resources=backend.resources(
+                machine=machine, overrides=machine.overrides, grid_name=run.grid, values=run.values
             ),
         )
         for run in runs
@@ -319,14 +322,14 @@ class JobGroup:
     Args:
         grid: The grid name the runs of the group came from.
         job_name: The ``short_name`` of the grid; it names the job and its logs.
-        slurm: The resources of the job; ``None`` when the machine is local.
+        resources: The resources of the job, as declared by its backend.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
     """
 
     grid: str
     job_name: str
-    slurm: SlurmSettings | None
+    resources: 'Resources'
     job_file: int
     tasks: tuple[PlannedTask, ...]
 
@@ -401,7 +404,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
-    Runs group by (grid, slurm) in first-appearance order; a group is never
+    Runs group by (grid, resources) in first-appearance order; a group is never
     split by count, so a group of tasks past ``max_array_size`` is reported
     by ``validate_jobs`` instead of planned around.
 
@@ -422,16 +425,15 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         order.
     """
     folder = study_folder(machine=machine, study=study)
-    local_cpus = _usable_cpus()
     groups: list[JobGroup] = []
-    lookup: dict[tuple[str, SlurmSettings | None], int] = {}
+    lookup: dict[tuple[str, Resources], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
     env = expansion_env(machine=machine)
     counters = uncounted or {}
     for run in resolved:
         grid = study.grids[run.run.grid]
-        key = (run.run.grid, run.slurm)
+        key = (run.run.grid, run.resources)
         if key not in lookup:
             lookup[key] = len(groups)
             tasks_of[lookup[key]] = []
@@ -439,7 +441,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                 JobGroup(
                     grid=run.run.grid,
                     job_name=grid.short_name,
-                    slurm=run.slurm,
+                    resources=run.resources,
                     job_file=next_file,
                     tasks=(),
                 )
@@ -458,7 +460,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     'study': study.name,
                     'run_path': run.run.run_path,
                     'log_file': str(log_file),
-                    'cpus': str(local_cpus if run.slurm is None else run.slurm.cpus_per_task),
+                    'cpus': str(run.resources.cpus),
                 },
             )
         except (ValueError, TypeError) as error:
@@ -466,12 +468,13 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             error_text = str(error)
         else:
             error_text = None
-        if run.slurm is not None and index >= run.slurm.max_array_size:
+        max_tasks_per_job = run.resources.max_tasks_per_job
+        if max_tasks_per_job is not None and index >= max_tasks_per_job:
             size_error = _task_error(
                 grid_name=run.run.grid,
                 run_path=run.run.run_path,
                 index=index,
-                max_array_size=run.slurm.max_array_size,
+                max_array_size=max_tasks_per_job,
             )
             error_text = size_error if error_text is None else f'{error_text}\n{size_error}'
         task = PlannedTask(
