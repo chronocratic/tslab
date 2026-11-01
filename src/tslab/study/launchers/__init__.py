@@ -322,7 +322,8 @@ class Backend(Protocol):
     """
 
     name: str
-    suggests_memory: bool
+    #: Whether the jobs have a time limit; a missing one shows as ``-``, else as ``no limit``.
+    has_time_limit: bool
 
     def job_states(
         self,

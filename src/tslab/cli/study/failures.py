@@ -101,6 +101,6 @@ class Usage:
         else:
             log_usage(
                 document=document,
-                suggests_memory=backend_for(machine=context.machine).suggests_memory,
+                has_time_limit=backend_for(machine=context.machine).has_time_limit,
             )
         return 0
