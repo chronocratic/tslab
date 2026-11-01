@@ -98,8 +98,9 @@ def _subcommand_name(*, member: object) -> str | None:
     """The ``tyro.conf.subcommand`` name of an ``Annotated`` member, or ``None``."""
     if get_origin(member) is not Annotated:
         return None
-    names = [str(meta.name) for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE]
-    return names[0] if names else None
+    metas = [meta for meta in get_args(member)[1:] if type(meta) is _SUBCOMMAND_TYPE]
+    name: object = metas[0].name if metas else None
+    return name if isinstance(name, str) else None
 
 
 def _choice(*, member: object) -> tuple[str, type] | None:

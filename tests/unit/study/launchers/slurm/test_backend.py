@@ -94,7 +94,8 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
             {
                 'exit': 0,
                 'stdout': (
-                    '1000_0|TIMEOUT\n1000_1|PREEMPTED\n1000_2|COMPLETED\n1000_3|CANCELLED by 12\n'
+                    '1000_0|TIMEOUT\n1000_1|PREEMPTED\n1000_2|COMPLETED\n'
+                    '1000_3|CANCELLED by 12\n1000_4|NODE_FAIL\n'
                 ),
             }
         ],
@@ -109,10 +110,12 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
         '1000_1': 'SLURM PREEMPTED',
         '1000_2': 'SLURM COMPLETED',
         '1000_3': 'SLURM CANCELLED',
+        '1000_4': 'SLURM NODE_FAIL',
     }
     assert states.flags == {
         '1000_0': frozenset({JobFlag.TIME_LIMIT}),
         '1000_1': frozenset({JobFlag.NOT_COUNTED}),
+        '1000_4': frozenset({JobFlag.NOT_COUNTED}),
     }
 
 
