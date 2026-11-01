@@ -9,6 +9,8 @@ __all__ = [
     'TextTable',
     'describe_error',
     'first_line',
+    'format_bytes',
+    'format_duration',
     'format_table',
     'log_table',
     'qualified_name',
@@ -60,6 +62,31 @@ def unknown_key_message(*, location: str, key: str, valid: Iterable[str]) -> str
     close = difflib.get_close_matches(key, names, n=1)
     hint = f"; did you mean '{close[0]}'?" if close else '.'
     return f'{where}: unknown key{hint} Valid keys: {", ".join(names)}'
+
+
+def format_duration(*, seconds: float) -> str:
+    """Format a length of time in seconds for display, as ``H:MM:SS``.
+
+    Args:
+        seconds: The length of time in seconds; the fraction is dropped.
+    """
+    total = int(seconds)
+    return f'{total // 3600}:{(total % 3600) // 60:02d}:{total % 60:02d}'
+
+
+def format_bytes(*, size: int) -> str:
+    """Format a size in bytes for display, in the largest unit that keeps it at one or more.
+
+    Args:
+        size: The size in bytes.
+
+    Returns:
+        The size with one decimal, e.g. ``1.5 GiB``.
+    """
+    for unit, divisor in (('GiB', 1024**3), ('MiB', 1024**2), ('KiB', 1024)):
+        if size >= divisor:
+            return f'{size / divisor:.1f} {unit}'
+    return f'{size / 1024:.1f} KiB'
 
 
 def format_table(

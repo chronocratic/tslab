@@ -5,6 +5,8 @@ import pytest
 from tslab.core.text import (
     describe_error,
     first_line,
+    format_bytes,
+    format_duration,
     format_table,
     log_table,
     qualified_name,
@@ -25,6 +27,24 @@ def test_first_line() -> None:
     assert first_line(text='a\nb') == 'a'
     assert first_line(text='') == ''
     assert first_line(text='\nb') == ''
+
+
+def test_format_duration() -> None:
+    assert format_duration(seconds=0) == '0:00:00'
+    assert format_duration(seconds=59) == '0:00:59'
+    assert format_duration(seconds=60) == '0:01:00'
+    assert format_duration(seconds=3600) == '1:00:00'
+    assert format_duration(seconds=3661) == '1:01:01'
+    assert format_duration(seconds=90.7) == '0:01:30'
+
+
+def test_format_bytes() -> None:
+    assert format_bytes(size=1024**3) == '1.0 GiB'
+    assert format_bytes(size=3 * 1024**3 // 2) == '1.5 GiB'
+    assert format_bytes(size=1024**2) == '1.0 MiB'
+    assert format_bytes(size=3 * 1024**2 // 2) == '1.5 MiB'
+    assert format_bytes(size=1024) == '1.0 KiB'
+    assert format_bytes(size=512) == '0.5 KiB'
 
 
 def test_format_table_aligns_left_and_strips_trailing_spaces() -> None:
