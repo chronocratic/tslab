@@ -5,6 +5,7 @@ import time
 import zlib
 
 import pytest
+from wandb.proto import wandb_internal_pb2
 
 from tslab.tracking.wandb.sync import (
     Action,
@@ -15,7 +16,6 @@ from tslab.tracking.wandb.sync import (
     plan_action,
     resolve_run_path,
 )
-from wandb.proto import wandb_internal_pb2
 
 TARGETS = frozenset({'crashed', 'failed', 'killed'})
 FILESTREAM_LOG = 'POST https://api.wandb.ai/files/team/proj/abc123/file_stream 200\n'
