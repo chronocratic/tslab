@@ -8,6 +8,8 @@ import subprocess
 import time
 from typing import TextIO, TYPE_CHECKING
 
+from tslab.core.lock import read_lock_owner
+from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
@@ -311,7 +313,13 @@ def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) 
             continue
         if not report.folder.lock_live:
             continue
-        (study_directory / report.run.run_path / LOCK_FILE).unlink(missing_ok=True)
+        lock = study_directory / report.run.run_path / LOCK_FILE
+        owner = read_lock_owner(path=lock)
+        # why: on this host a live lock means a live process, so only a lock left on
+        # another host, whose job the scheduler says ended, is safe to remove
+        if owner is None or owner.host == hostname():
+            continue
+        lock.unlink(missing_ok=True)
         _LOGGER.info(
             'removed the lock of %s: its job %s ended (%s)',
             report.run.run_path,
