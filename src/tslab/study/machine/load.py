@@ -1,22 +1,19 @@
 """Reading a machine profile file into a checked MachineProfile."""
 
+from collections.abc import Mapping
 import dataclasses
 import os
 from pathlib import Path
 import tomllib
-from typing import cast, TYPE_CHECKING
+from typing import cast, Literal, Protocol
 
 from tslab.core.text import unknown_key_message
 from tslab.study.expansion import expand_variables
-from tslab.study.machine.local import (
-    check_local,
-    local_gpus,
-    LocalSettings,
-    reject_local_followups,
-    reject_slurm,
-)
+import tslab.study.machine.local as machine_local
+from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
-from tslab.study.machine.slurm import reject_local, sbatch_extra, slurm_overrides, SlurmSettings
+import tslab.study.machine.slurm as machine_slurm
+from tslab.study.machine.slurm import slurm_overrides, SlurmSettings
 from tslab.study.machine.tables import (
     check_keys,
     expand_env,
@@ -27,14 +24,37 @@ from tslab.study.machine.tables import (
     string_tuple,
 )
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping
-
 __all__ = ['load_machine']
 
 _TOP_LEVEL_KEYS = frozenset(
     item.name for item in dataclasses.fields(MachineProfile) if item.name != 'path'
 )
+
+
+class ProfileBackend(Protocol):
+    """The machine-specific part of one profile table."""
+
+    @property
+    def TABLE(self) -> Literal['slurm', 'local']:  # noqa: N802 # why: the profile module exports TABLE
+        """The top-level key that selects this table."""
+        ...
+
+    @property
+    def FOLLOWUP_KEYS(self) -> frozenset[str]:  # noqa: N802 # why: the profile module exports FOLLOWUP_KEYS
+        """The follow-up keys this backend supports."""
+        ...
+
+    def settings_from(
+        self, *, table: Mapping[str, object], path: Path
+    ) -> SlurmSettings | LocalSettings:
+        """Read this backend's settings from one profile."""
+        ...
+
+
+PROFILE_BACKENDS: dict[str, ProfileBackend] = {
+    machine_slurm.TABLE: machine_slurm,
+    machine_local.TABLE: machine_local,
+}
 
 
 def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
@@ -75,49 +95,17 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         message = f'{path}: {problem}'
         raise MachineProfileError(message)
     launcher = string_field(table=table, name='launcher', path=path)
-    if launcher not in {'slurm', 'local'}:
+    backend = PROFILE_BACKENDS.get(launcher)
+    if backend is None:
         message = f'{path}: launcher must be "slurm" or "local", got {launcher!r}'
         raise MachineProfileError(message)
     output_root = string_field(table=table, name='output_root', path=path)
     env = expand_env(table=table, path=path, lenient=lenient_env)
-    if launcher == 'local':
-        reject_slurm(table=table, path=path)
-        reject_local_followups(table=table, path=path)
-    else:
-        reject_local(table=table, path=path)
-    slurm_table = table.get('slurm')
-    if isinstance(slurm_table, dict) and 'sbatch_extra' in slurm_table:
-        slurm_table = {
-            **slurm_table,
-            'sbatch_extra': [
-                list(pair)
-                for pair in sbatch_extra(
-                    value=slurm_table['sbatch_extra'], location='slurm.sbatch_extra', path=path
-                )
-            ],
-        }
-    slurm = from_table(
-        cls=SlurmSettings,
-        table=slurm_table,
-        location='slurm',
-        path=path,
-        required=launcher == 'slurm',
-    )
-    local_table = table.get('local')
-    if isinstance(local_table, dict) and 'gpus' in local_table:
-        local_table = {
-            **local_table,
-            'gpus': local_gpus(value=local_table['gpus'], location='local.gpus', path=path),
-        }
-    local = from_table(
-        cls=LocalSettings, table=local_table, location='local', path=path, required=False
-    )
-    if launcher == 'local':
-        local = local or LocalSettings()
-        # why: from_table raised when the local table is not a dict
-        check_local(
-            local=local, table=cast('Mapping[str, object]', table.get('local') or {}), path=path
-        )
+    _reject_other_backend_tables(backend=backend, table=table, path=path)
+    _reject_unsupported_followups(backend=backend, table=table, path=path)
+    backend_settings = backend.settings_from(table=table, path=path)
+    slurm = backend_settings if isinstance(backend_settings, SlurmSettings) else None
+    local = backend_settings if isinstance(backend_settings, LocalSettings) else None
     followup = from_table(
         cls=FollowupSettings,
         table=table.get('followup'),
@@ -142,16 +130,77 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         raise MachineProfileError(message)
     return MachineProfile(
         path=path,
-        launcher=launcher,
+        launcher=backend.TABLE,
         output_root=Path(root),
         tslab_command=tslab_command,
         settings=settings_of(table=table, location='settings', path=path),
         env=env,
         slurm=slurm,
-        local=(local or LocalSettings()) if launcher == 'local' else None,
+        local=local,
         followup=followup or FollowupSettings(),
         overrides=overrides,
     )
+
+
+def _reject_other_backend_tables(
+    *, backend: ProfileBackend, table: dict[str, object], path: Path
+) -> None:
+    for other in PROFILE_BACKENDS.values():
+        if other is backend:
+            continue
+        _reject_other_backend_table(backend=backend, other=other, table=table, path=path)
+
+
+def _reject_other_backend_table(
+    *, backend: ProfileBackend, other: ProfileBackend, table: dict[str, object], path: Path
+) -> None:
+    if other.TABLE in table:
+        message = (
+            f'{path}: {other.TABLE} is not used by launcher "{backend.TABLE}"; '
+            f'remove the [{other.TABLE}] table'
+        )
+        raise MachineProfileError(message)
+    entries = table.get('overrides')
+    if not isinstance(entries, list):
+        return
+    position = next(
+        (
+            index
+            for index, entry in enumerate(entries)
+            if isinstance(entry, dict) and other.TABLE in entry
+        ),
+        None,
+    )
+    if position is None:
+        return
+    message = (
+        f'{path}: overrides[{position}].{other.TABLE} is not used by launcher '
+        f'"{backend.TABLE}"; remove it'
+    )
+    raise MachineProfileError(message)
+
+
+def _reject_unsupported_followups(
+    *, backend: ProfileBackend, table: dict[str, object], path: Path
+) -> None:
+    followup = table.get('followup')
+    if not isinstance(followup, dict):
+        return
+    for key in followup:
+        owner = next(
+            (
+                other
+                for other in PROFILE_BACKENDS.values()
+                if other is not backend
+                and key in other.FOLLOWUP_KEYS
+                and key not in backend.FOLLOWUP_KEYS
+            ),
+            None,
+        )
+        if owner is None:
+            continue
+        message = f'{path}: followup.{key} is {owner.TABLE.upper()} only; remove it'
+        raise MachineProfileError(message)
 
 
 def _override_from_table(*, table: object, location: str, path: Path) -> MachineOverride:

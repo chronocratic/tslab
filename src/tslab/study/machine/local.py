@@ -2,20 +2,25 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import cast, Literal
 
-from tslab.jobs.slurm import parse_slurm_duration
-from tslab.study.machine.tables import MachineProfileError
+from tslab.study.machine.tables import from_table, MachineProfileError
 
 __all__ = [
+    'FOLLOWUP_KEYS',
+    'TABLE',
     'LocalSettings',
     'check_local',
     'local_gpus',
-    'reject_local_followups',
-    'reject_slurm',
+    'settings_from',
     'timeout_seconds',
 ]
+
+TABLE: Literal['local'] = 'local'
+FOLLOWUP_KEYS = frozenset(('auto_retry',))
+_DURATION_HINT = 'use an sbatch --time format: "M", "M:S", "H:M:S", "D-H", "D-H:M" or "D-H:M:S"'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -53,14 +58,65 @@ def timeout_seconds(*, local: LocalSettings) -> float | None:
     """
     if local.timeout is None:
         return None
-    return parse_slurm_duration(text=local.timeout).total_seconds()
+    return _parse_duration(text=local.timeout).total_seconds()
+
+
+def settings_from(*, table: Mapping[str, object], path: Path) -> LocalSettings:
+    """Read and validate this profile's local settings table."""
+    local_table = table.get(TABLE)
+    decoded_table = local_table
+    if isinstance(local_table, dict) and 'gpus' in local_table:
+        decoded_table = {
+            **local_table,
+            'gpus': local_gpus(value=local_table['gpus'], location='local.gpus', path=path),
+        }
+    local = from_table(
+        cls=LocalSettings, table=decoded_table, location=TABLE, path=path, required=False
+    )
+    local = local or LocalSettings()
+    check_local(local=local, table=cast('Mapping[str, object]', local_table or {}), path=path)
+    return local
+
+
+def _parse_duration(*, text: str) -> timedelta:
+    """Parse an sbatch duration without importing scheduler code."""
+    days_text, separator, clock = text.partition('-')
+    has_days = bool(separator)
+    if not has_days:
+        clock = text
+    try:
+        days = int(days_text) if has_days else 0
+        parts = [int(part) for part in clock.split(':')]
+    except ValueError as error:
+        message = f'invalid duration {text!r}; {_DURATION_HINT}'
+        raise ValueError(message) from error
+    match has_days, parts:
+        case True, [hours]:
+            clock_delta = timedelta(hours=hours)
+        case True, [hours, minutes]:
+            clock_delta = timedelta(hours=hours, minutes=minutes)
+        case True, [hours, minutes, seconds]:
+            clock_delta = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+        case False, [minutes]:
+            clock_delta = timedelta(minutes=minutes)
+        case False, [minutes, seconds]:
+            clock_delta = timedelta(minutes=minutes, seconds=seconds)
+        case False, [hours, minutes, seconds]:
+            clock_delta = timedelta(hours=hours, minutes=minutes, seconds=seconds)
+        case _:
+            message = f'invalid duration {text!r}; {_DURATION_HINT}'
+            raise ValueError(message)
+    if days < 0 or any(part < 0 for part in parts):
+        message = f'invalid duration {text!r}; {_DURATION_HINT}, without negative parts'
+        raise ValueError(message)
+    return timedelta(days=days) + clock_delta
 
 
 def check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path) -> None:
     """The [local] rules that span several keys or the raw table."""
     if local.timeout is not None:
         try:
-            parse_slurm_duration(text=local.timeout)
+            _parse_duration(text=local.timeout)
         except ValueError as error:
             message = f'{path}: local.timeout: {error}'
             raise MachineProfileError(message) from error
@@ -104,30 +160,3 @@ def local_gpus(*, value: object, location: str, path: Path) -> list[int | str] |
         f'{path}: {location} must be "auto", a list of non-negative integers, or exactly ["mps"]'
     )
     raise MachineProfileError(message)
-
-
-def reject_slurm(*, table: dict[str, object], path: Path) -> None:
-    """A local launcher has no scheduler: SLURM tables would be silently half-applied."""
-    if 'slurm' in table:
-        message = f'{path}: slurm is not used by launcher "local"; remove the [slurm] table'
-        raise MachineProfileError(message)
-    entries = table.get('overrides')
-    if not isinstance(entries, list):
-        return
-    for position, entry in enumerate(entries):
-        if isinstance(entry, dict) and 'slurm' in entry:
-            message = (
-                f'{path}: overrides[{position}].slurm is not used by launcher "local"; remove it'
-            )
-            raise MachineProfileError(message)
-
-
-def reject_local_followups(*, table: dict[str, object], path: Path) -> None:
-    """wandb_sync and time queue SLURM jobs; a local launch has no scheduler to queue them on."""
-    followup = table.get('followup')
-    if not isinstance(followup, dict):
-        return
-    for key in ('wandb_sync', 'time'):
-        if key in followup:
-            message = f'{path}: followup.{key} is SLURM only; remove it'
-            raise MachineProfileError(message)
