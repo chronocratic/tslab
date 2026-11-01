@@ -14,7 +14,7 @@ from typing import cast
 from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
-from tslab.jobs.local import start_detached, tail_lines
+from tslab.jobs.local import process_alive, start_detached, tail_lines
 from tslab.study.state import LOCAL_ENDED
 
 __all__ = [
@@ -92,13 +92,7 @@ def launch_is_live(*, launch: LocalLaunch) -> bool:
     """
     if launch.hostname != hostname():
         return False
-    try:
-        os.kill(launch.pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
+    return process_alive(pid=launch.pid)
 
 
 def _write(*, path: Path, launch: LocalLaunch) -> None:
