@@ -15,7 +15,7 @@ from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 # why: the small model has no ``depth`` field, so a study that sets
 # ``model.depth`` for it does not load; the parse-bad study leaves the

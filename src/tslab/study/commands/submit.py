@@ -15,8 +15,8 @@ from tslab.study.launchers import backend_for, OnLaunch
 from tslab.study.paths import next_job_file, study_folder
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import JobRecord, read_jobs, submission_lock
-from tslab.study.report import log_launch, log_problems
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.report import log_launch, log_problems
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = ['submit', 'submit_runs']
 

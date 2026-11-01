@@ -9,7 +9,7 @@ import tyro
 from tslab.cli.common import print_json
 from tslab.cli.study import _context_of, _selection_args
 from tslab.study.commands import cancel
-from tslab.study.documents import cancel_document
+from tslab.study.reporting.documents import cancel_document
 
 __all__ = ['Cancel']
 

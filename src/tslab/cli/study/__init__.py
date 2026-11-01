@@ -16,7 +16,7 @@ from tslab.study.commands import parse_states
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import available_cpus, backend_for
 from tslab.study.machine import resolve_machine
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 __all__ = [
     'STUDY_COMMANDS',

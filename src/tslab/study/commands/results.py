@@ -7,7 +7,11 @@ import sys
 
 from tslab.core.files import atomic_write_text
 from tslab.study.context import Context
-from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
+from tslab.study.reporting.result_table import (
+    collect_results,
+    format_results_csv,
+    write_results_csv,
+)
 
 __all__ = ['results']
 

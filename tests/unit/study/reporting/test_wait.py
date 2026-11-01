@@ -15,9 +15,9 @@ from tslab.cli.study import Wait
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
 from tslab.study.launchers.slurm.states import slurm_task_ids
-from tslab.study.outcome import EXIT_TIMEOUT
-from tslab.study.state import StudyState
-from tslab.study.wait import wait_for_study
+from tslab.study.reporting.outcome import EXIT_TIMEOUT
+from tslab.study.reporting.state import StudyState
+from tslab.study.reporting.wait import wait_for_study
 
 
 def _with_states(
@@ -160,7 +160,7 @@ def test_wait_keeps_going_through_unknown_states_and_warns_once(
     )
     prepared = iter([unknown, unknown, unknown, done])
     elapsed = [0.0]
-    with caplog.at_level(logging.WARNING, logger='tslab.study.wait'):
+    with caplog.at_level(logging.WARNING, logger='tslab.study.reporting.wait'):
         code, _, _ = wait_for_study(
             load=prepared.__next__,
             interval=10,
@@ -206,7 +206,7 @@ def test_wait_logs_only_when_counts_change(
     done = _with_states(context=base, states=(StudyState.DONE,) * len(base.reports))
     prepared = iter([running, running, done])
     elapsed = [0.0]
-    with caplog.at_level(logging.INFO, logger='tslab.study.wait'):
+    with caplog.at_level(logging.INFO, logger='tslab.study.reporting.wait'):
         wait_for_study(
             load=prepared.__next__,
             interval=10,
@@ -215,7 +215,8 @@ def test_wait_logs_only_when_counts_change(
             sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
             clock=lambda: elapsed[0],
         )
-    lines = [record.getMessage() for record in caplog.records if record.name == 'tslab.study.wait']
+    logger = 'tslab.study.reporting.wait'
+    lines = [record.getMessage() for record in caplog.records if record.name == logger]
     assert len(lines) == 2
     assert 'running 4' in lines[0]
     assert 'done 4' in lines[1]

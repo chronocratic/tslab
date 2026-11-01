@@ -29,9 +29,9 @@ from tslab.core.status import (
 from tslab.jobs.slurm import parse_slurm_memory, SlurmJobUsage
 from tslab.study import launchers
 from tslab.study.context import Context
-from tslab.study.failures import collect_failures, failure_hint, log_failures
 from tslab.study.paths import instance_directory
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
+from tslab.study.reporting.state import RunReport, StudyState
 
 
 def _failed_context(project: Path, fake: FakeSlurm) -> Context:
@@ -89,7 +89,7 @@ def test_failures_names_missing_files(
     failure = failures[0]
     assert failure['log_tail'] is None
     assert failure['run_log_tail'] is None
-    with caplog.at_level('INFO', logger='tslab.study.failures'):
+    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
         log_failures(failures=failures)
     assert f'{failure["log_file"]}: missing' in caplog.text
     assert f'{failure["run_log"]}: missing' in caplog.text
@@ -251,7 +251,7 @@ def test_oom_hint_without_numbers_when_sacct_fails(
         ],
     )
     ctx = context(project=project, machine_file='cluster.toml')
-    with caplog.at_level('WARNING', logger='tslab.study.failures'):
+    with caplog.at_level('WARNING', logger='tslab.study.reporting.failures'):
         failures = collect_failures(context=ctx, states=(), lines=30)
     assert 'sacct' in caplog.text
     (failure,) = failures
@@ -273,6 +273,6 @@ def test_failures_log_has_hint(
     )
     ctx = context(project=project, machine_file='cluster.toml')
     failures = collect_failures(context=ctx, states=(), lines=30)
-    with caplog.at_level('INFO', logger='tslab.study.failures'):
+    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
         log_failures(failures=failures)
     assert 'hint: training used its share of the job (job_time_share)' in caplog.text

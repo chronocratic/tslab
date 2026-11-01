@@ -3,8 +3,8 @@
 from collections.abc import Mapping, Sequence
 
 from tslab.study.context import Context
-from tslab.study.report import log_status
-from tslab.study.state import StudyState
+from tslab.study.reporting.report import log_status
+from tslab.study.reporting.state import StudyState
 
 __all__ = ['parse_states', 'status']
 

@@ -49,6 +49,7 @@ src/tslab/
   study/               studies: grids, machine profiles, SLURM and local launch, results
      commands/          the study commands: submit, status, resubmit, results
      definition/        the Study and StudyRun types, expansion, loading, settings
+     reporting/         states, outcomes, results, usage and the study documents
      launchers/         the launch backends: one per launcher, SLURM and local apart
   cli/                 `tslab new | status | study | wandb-sync`
      study/             the study subcommands: one module per command

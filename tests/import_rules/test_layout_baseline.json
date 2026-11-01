@@ -1,7 +1,3 @@
 [
-  "tests/unit/study/test_arguments.py",
-  "tests/unit/study/test_grouping.py",
-  "tests/unit/study/test_resolve.py",
-  "tests/unit/study/test_show.py",
-  "tests/unit/study/test_study_cli_run.py"
+  "tests/unit/study/commands/test_study_cli_run.py"
 ]

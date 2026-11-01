@@ -11,7 +11,7 @@ from typing import TextIO
 from tslab.study.context import Context, refresh_context
 from tslab.study.launchers import backend_for, SIGNAL_EXIT_BASE
 from tslab.study.records import JobRecord
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = [
     'LIVE_STATES',

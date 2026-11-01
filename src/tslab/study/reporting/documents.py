@@ -7,10 +7,10 @@ from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport
-from tslab.study.outcome import counts_live
 from tslab.study.plan import JobGroup
-from tslab.study.report import resources_of
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.outcome import counts_live
+from tslab.study.reporting.report import resources_of
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
 

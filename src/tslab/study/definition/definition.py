@@ -19,7 +19,7 @@ from tslab.core.paths import NAME_PART_PATTERN
 from tslab.study.definition.settings import check_paths, Settings, SettingValue
 
 if TYPE_CHECKING:
-    from tslab.study.result_table import ResultRow
+    from tslab.study.reporting.result_table import ResultRow
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
@@ -270,7 +270,7 @@ class Study:
             instances; the runs of every grid, in expansion order.
         """
         # why: imported here, not at the top, because the result table imports this module
-        from tslab.study.result_table import study_results  # noqa: PLC0415
+        from tslab.study.reporting.result_table import study_results  # noqa: PLC0415
 
         return study_results(study=self, machine=machine, environment=environment)
 

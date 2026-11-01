@@ -1,6 +1,6 @@
 {
   "module_imports_both": {
-    "src/tslab/study/failures.py": 1
+    "src/tslab/study/reporting/failures.py": 1
   },
   "name_comparisons": {},
   "none_checks": {},

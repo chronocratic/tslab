@@ -18,9 +18,9 @@ from tslab.cli.study import (
     _warn_no_runs,
 )
 from tslab.study.commands import resubmit, run_one
-from tslab.study.documents import launch_document
 from tslab.study.launchers import backend_for, LaunchReport
 from tslab.study.plan import JobGroup
+from tslab.study.reporting.documents import launch_document
 
 __all__ = ['Resubmit', 'RunOne']
 

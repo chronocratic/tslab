@@ -16,8 +16,8 @@ from tslab.study.launchers import backend_for, JobPhase, OnLaunch
 from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
-from tslab.study.report import log_problems
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.report import log_problems
+from tslab.study.reporting.state import RunReport, StudyState
 
 if TYPE_CHECKING:
     from tslab.study.launchers import Backend

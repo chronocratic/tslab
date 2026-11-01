@@ -18,7 +18,8 @@ from tests.unit.study.helpers import (
 )
 from tslab.core.status import InstanceState, RunState, utc_now_iso
 from tslab.study.launchers.slurm.states import followup_job_ids
-from tslab.study.outcome import (
+from tslab.study.records import append_job, JobRecord, submission_in_progress
+from tslab.study.reporting.outcome import (
     EXIT_DONE,
     EXIT_LIVE,
     EXIT_RETRY,
@@ -26,8 +27,7 @@ from tslab.study.outcome import (
     states_exit_code,
     study_exit_code,
 )
-from tslab.study.records import append_job, JobRecord, submission_in_progress
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 
 def _job_record(

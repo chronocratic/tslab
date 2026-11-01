@@ -18,8 +18,8 @@ from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
 from tslab.jobs.slurm import SlurmJobUsage
 from tslab.study.context import Context
-import tslab.study.usage as usage_module
-from tslab.study.usage import log_usage, usage_document
+import tslab.study.reporting.usage as usage_module
+from tslab.study.reporting.usage import log_usage, usage_document
 
 USAGE_MACHINE = """\
 launcher = "slurm"
@@ -209,7 +209,7 @@ def test_local_usage_log_shows_no_limit_and_dash(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     document = usage_document(context=_local_usage_context(project=project))
-    with caplog.at_level('INFO', logger='tslab.study.usage'):
+    with caplog.at_level('INFO', logger='tslab.study.reporting.usage'):
         log_usage(document=document, suggests_memory=False)
     assert '1:00:00/no limit' in caplog.text
     assert 'local: suggest timeout=1:12:00' in caplog.text

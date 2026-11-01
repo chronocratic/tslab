@@ -32,7 +32,7 @@ from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError
 from tslab.study.plan import _slurm_for, JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = ['SlurmBackend']
 

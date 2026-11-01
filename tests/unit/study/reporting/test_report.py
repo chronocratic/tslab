@@ -6,7 +6,7 @@ from tslab.core.text import format_table
 from tslab.study.launchers import LaunchReport
 from tslab.study.launchers.local.backend import LocalResources
 from tslab.study.machine import SlurmSettings
-from tslab.study.report import log_launch, log_problems, resources_of
+from tslab.study.reporting.report import log_launch, log_problems, resources_of
 
 
 def test_format_table_gives_every_row_the_same_widths() -> None:

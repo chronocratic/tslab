@@ -32,7 +32,7 @@ from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import RunReport
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['LocalBackend', 'LocalResources']
 
