@@ -12,7 +12,8 @@ from tslab.jobs.slurm import SlurmError
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
 from tslab.study.launchers import backend_for, OnLaunch
-from tslab.study.plan import assign_indices, next_job_file, plan_jobs, study_folder, validate_jobs
+from tslab.study.paths import next_job_file, study_folder
+from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import JobRecord, read_jobs, submission_lock
 from tslab.study.report import log_launch, log_problems
 from tslab.study.state import RunReport, StudyState

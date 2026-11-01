@@ -13,12 +13,13 @@ from pathlib import Path
 
 from tslab.core.artifact import Metrics
 from tslab.core.files import atomic_write_text
-from tslab.core.paths import META_FILE, require_path
+from tslab.core.paths import META_FILE
 from tslab.core.status import InstanceRecord, InstanceState
 from tslab.core.text import first_line
 from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
 from tslab.study.launchers import available_cpus
+from tslab.study.paths import instance_directory
 from tslab.study.state import RunReport
 
 __all__ = [
@@ -26,7 +27,6 @@ __all__ = [
     'ResultRow',
     'collect_results',
     'format_results_csv',
-    'instance_directory',
     'study_results',
     'write_results_csv',
 ]
@@ -153,21 +153,6 @@ def _instance_row(
             )
         )
     return row
-
-
-def instance_directory(*, run_directory: Path, instance_id: str) -> Path:
-    """The folder of one instance: ``stage[a/b]`` maps to ``stage/a/b``.
-
-    Args:
-        run_directory: The folder of the run.
-        instance_id: The instance name from ``status.json``.
-
-    Returns:
-        The folder that holds the instance artifacts.
-    """
-    require_path(value=run_directory, parameter='run_directory')
-    stage, _, name = instance_id.partition('[')
-    return run_directory.joinpath(stage, *name.rstrip(']').split('/'))
 
 
 def _metrics_of(*, instance_directory: Path) -> dict[str, str | float | None]:

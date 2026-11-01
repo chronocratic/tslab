@@ -11,7 +11,8 @@ from tslab.study.definition import expand_runs
 from tslab.study.launchers import launch as _launch, LaunchReport
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
+from tslab.study.paths import study_folder
+from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
 from tslab.study.records import read_jobs
 
 

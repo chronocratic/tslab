@@ -30,7 +30,7 @@ from tslab.jobs.slurm import parse_slurm_memory, SlurmJobUsage
 from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.failures import collect_failures, failure_hint, log_failures
-from tslab.study.result_table import instance_directory
+from tslab.study.paths import instance_directory
 from tslab.study.state import RunReport, StudyState
 
 

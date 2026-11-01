@@ -21,6 +21,7 @@ from tslab.study.definition import (
 )
 from tslab.study.expansion import expand_setting
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
 from tslab.study.settings import check_paths, settings_to_args, SettingValue
 
@@ -34,12 +35,9 @@ __all__ = [
     'assign_indices',
     'check_machine',
     'expansion_env',
-    'log_file_of',
-    'next_job_file',
     'plan_jobs',
     'resolve_runs',
     'run_arguments',
-    'study_folder',
     'validate_arguments',
     'validate_jobs',
 ]
@@ -355,29 +353,6 @@ def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> di
         indices[run.run_path] = highest.get(run.grid, -1) + 1
         highest[run.grid] = indices[run.run_path]
     return indices
-
-
-def study_folder(*, machine: MachineProfile, study: Study) -> Path:
-    """The hidden folder of the study: ``<output_root>/<study>/.study``."""
-    return machine.output_root / study.name / '.study'
-
-
-def log_file_of(*, folder: Path, short_name: str, index: int) -> Path:
-    """The log file of one task: ``<folder>/logs/<short name>_<index>.out``."""
-    return folder / 'logs' / f'{short_name}_{index}.out'
-
-
-def next_job_file(*, study_folder: Path) -> int:
-    """The next job file number: one past the largest on disk, else 1."""
-    numbers = 1
-    for suffix in ('.sbatch', '.tasks'):
-        for path in (study_folder / 'jobs').glob(f'*{suffix}'):
-            try:
-                number = int(path.name.removesuffix(suffix))
-            except ValueError:
-                continue
-            numbers = max(numbers, number + 1)
-    return numbers
 
 
 def _task_error(*, grid_name: str, run_path: str, index: int, max_array_size: int) -> str:

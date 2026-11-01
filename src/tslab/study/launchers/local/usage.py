@@ -7,7 +7,7 @@ from pathlib import Path
 from tslab.core.files import read_json_object
 from tslab.study.context import Context
 from tslab.study.launchers import SlurmJobUsage
-from tslab.study.plan import log_file_of, study_folder
+from tslab.study.paths import log_file_of, study_folder
 
 __all__ = ['usage']
 
