@@ -1,7 +1,7 @@
 """Wait for a study to finish or reach a state that needs attention."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import logging
 import time
 
@@ -55,7 +55,7 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
     start = clock()
     poll = _Poll(gap=min(_FIRST_GAP_SECONDS, interval))
     while True:
-        result = _step(
+        result, poll = _step(
             poll=poll,
             load=load,
             interval=interval,
@@ -68,7 +68,7 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
             return result
 
 
-@dataclass(kw_only=True)
+@dataclass(frozen=True, kw_only=True)
 class _Poll:
     """What the wait loop remembers from one check to the next."""
 
@@ -88,40 +88,44 @@ def _step(  # noqa: PLR0913 # why: the wait controls, passed on from wait_for_st
     keep_going: bool,
     sleep: Callable[[float], None],
     elapsed: Callable[[], float],
-) -> tuple[int, Context, float] | None:
-    """One check: the final result when the wait is over, else ``None`` after the pause."""
+) -> tuple[tuple[int, Context, float] | None, _Poll]:
+    """One check: the final result (or ``None`` after the pause) and the next poll state."""
     try:
         context = load()
         code = study_exit_code(context=context)
-        poll.last_context, poll.last_code = context, code
-        _note_progress(poll=poll, context=context, code=code, interval=interval)
+        poll = _note_progress(
+            poll=replace(poll, last_context=context, last_code=code),
+            context=context,
+            code=code,
+            interval=interval,
+        )
         waited = elapsed()
         if _should_stop(context=context, code=code, keep_going=keep_going):
-            return code, context, waited
+            return (code, context, waited), poll
         if timeout is not None and waited + poll.gap > timeout:
-            return EXIT_TIMEOUT, context, waited
+            return (EXIT_TIMEOUT, context, waited), poll
         sleep(poll.gap)
     except KeyboardInterrupt:
         if poll.last_context is None or poll.last_code is None:
             raise
-        return poll.last_code, poll.last_context, elapsed()
-    return None
+        return (poll.last_code, poll.last_context, elapsed()), poll
+    return None, poll
 
 
-def _note_progress(*, poll: _Poll, context: Context, code: int, interval: float) -> None:
-    """Log a changed count line, once the unknown-state warning, and set the next gap."""
+def _note_progress(*, poll: _Poll, context: Context, code: int, interval: float) -> _Poll:
+    """Log a changed count line and the unknown-state warning once; the poll with its next gap."""
     counts = _counts(context=context)
     if counts != poll.previous_counts:
         _LOGGER.info('%s %s', time.strftime('%H:%M'), _counts_line(counts=counts))
-        poll.previous_counts = counts
-        poll.gap = min(_FIRST_GAP_SECONDS, interval)
+        poll = replace(poll, previous_counts=counts, gap=min(_FIRST_GAP_SECONDS, interval))
     else:
-        poll.gap = min(poll.gap * 2, interval)
+        poll = replace(poll, gap=min(poll.gap * 2, interval))
     if code == EXIT_UNKNOWN and not poll.warned_unknown:
         _LOGGER.warning('job states unknown; still waiting')
-        poll.warned_unknown = True
-    elif code != EXIT_UNKNOWN:
-        poll.warned_unknown = False
+        return replace(poll, warned_unknown=True)
+    if code != EXIT_UNKNOWN:
+        return replace(poll, warned_unknown=False)
+    return poll
 
 
 def _should_stop(*, context: Context, code: int, keep_going: bool) -> bool:

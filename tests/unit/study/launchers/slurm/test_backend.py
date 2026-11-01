@@ -108,6 +108,7 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
         '1000_0': 'SLURM TIMEOUT',
         '1000_1': 'SLURM PREEMPTED',
         '1000_2': 'SLURM COMPLETED',
+        '1000_3': 'SLURM CANCELLED',
     }
     assert states.flags == {
         '1000_0': frozenset({JobFlag.TIME_LIMIT}),
