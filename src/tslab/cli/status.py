@@ -23,7 +23,6 @@ import tyro
 from tslab.cli.console import watch
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
-from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import (
     InstanceRecord,
@@ -31,6 +30,7 @@ from tslab.core.status import (
     read_status,
     RunState,
     RunStatusSnapshot,
+    shown_run_state,
     StatusFileError,
 )
 from tslab.core.text import log_table
@@ -147,7 +147,7 @@ def _run_status_entry(
 ) -> tuple[dict[str, object], StudyState]:
     folder = read_folder(run_directory=directory)
     state, _ = study_state(job_state=None, folder=folder)
-    run_state = run_state_shown(directory=directory, snapshot=snapshot)
+    run_state = shown_run_state(directory=directory, snapshot=snapshot)
     instances = [
         {
             'instance': instance_id,
@@ -173,18 +173,6 @@ def _status_document(
         'exit_code': states_exit_code(states=states, live=False),
         'runs': entries,
     }
-
-
-def run_state_shown(*, directory: Path, snapshot: RunStatusSnapshot) -> str:
-    """Return the run state to display: ``interrupted`` for a dead ``running`` run.
-
-    Args:
-        directory: The run folder.
-        snapshot: Its ``status.json``.
-    """
-    if snapshot.run_state is RunState.RUNNING and not is_run_active(directory=directory):
-        return _INTERRUPTED
-    return snapshot.run_state.value
 
 
 def _stage_of(*, instance_id: str) -> str:
@@ -225,7 +213,7 @@ def _note(*, record: InstanceRecord) -> str:
 
 
 def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | None) -> None:
-    run_state = run_state_shown(directory=directory, snapshot=snapshot)
+    run_state = shown_run_state(directory=directory, snapshot=snapshot)
     selected = _selected(snapshot=snapshot, stage=stage)
     rows = [
         (
@@ -287,7 +275,7 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
             continue
         if snapshot is None:  # removed while scanning
             continue
-        run_state = run_state_shown(directory=directory, snapshot=snapshot)
+        run_state = shown_run_state(directory=directory, snapshot=snapshot)
         totals[run_state] += 1
         # Raw instance states: a dead run still shows its in-flight instances.
         counts = Counter(record.state for _, record in _selected(snapshot=snapshot, stage=stage))

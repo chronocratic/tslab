@@ -25,11 +25,13 @@ __all__ = [
     'format_instance_id',
     'parse_instance_id',
     'read_status',
+    'shown_run_state',
     'utc_now_iso',
     'write_status',
 ]
 
 STATUS_FORMAT_VERSION = 1
+_INTERRUPTED = 'interrupted'
 
 
 class StatusFileError(JsonFileError):
@@ -260,3 +262,19 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
         },
     }
     atomic_write_json(path=path, document=document)
+
+
+def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> str:
+    """Return the run state to display: ``interrupted`` for a dead ``running`` run.
+
+    Args:
+        directory: The run folder.
+        snapshot: Its ``status.json``.
+    """
+    # why: core.meta.instance imports core.status at module level and core.lock
+    # imports core.meta, so a module-level import back would cycle
+    from tslab.core.lock import is_run_active  # noqa: PLC0415
+
+    if snapshot.run_state is RunState.RUNNING and not is_run_active(directory=directory):
+        return _INTERRUPTED
+    return snapshot.run_state.value
