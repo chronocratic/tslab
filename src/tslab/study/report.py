@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 import logging
 import shlex
 
-from tslab.helpers.text import log_table
+from tslab.core.text import log_table
 from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study

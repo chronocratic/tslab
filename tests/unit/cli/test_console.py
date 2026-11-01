@@ -9,7 +9,7 @@ import pytest
 import tslab.cli.console as console_module
 from tslab.cli.console import ConsoleHandler, make_console, watch
 from tslab.cli.usage import UsageError
-from tslab.helpers.text import log_table
+from tslab.core.text import log_table
 
 
 @pytest.fixture

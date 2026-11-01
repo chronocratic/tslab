@@ -9,7 +9,7 @@ import time
 from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
-from tslab.helpers.text import first_line
+from tslab.core.text import first_line
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 

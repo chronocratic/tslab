@@ -14,7 +14,7 @@ import tyro
 
 from tslab.cli.output import print_json
 from tslab.cli.usage import UsageError
-from tslab.helpers.text import log_table
+from tslab.core.text import log_table
 from tslab.study.machine import (
     load_machine,
     MachineProfileError,

@@ -11,7 +11,7 @@ from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import finish_run, submit_study, write_run_status
 from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
-from tslab.helpers.text import TextTable
+from tslab.core.text import TextTable
 
 
 def run_main(*args: str) -> int:
