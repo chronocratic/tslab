@@ -47,6 +47,7 @@ src/tslab/
     models/            chronocratic-models as TSLab models and encoders
     datasets/          chronocratic-datasets as TSLab data sources, study helpers
   study/               studies: grids, machine profiles, SLURM and local launch, results
+     launchers/         the launch backends: one per launcher, SLURM and local apart
   cli/                 `tslab new | status | study | wandb-sync`
   templates/project/   the files `tslab new` copies (see section 3)
 tests/
