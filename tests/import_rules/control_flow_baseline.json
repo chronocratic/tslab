@@ -61,7 +61,7 @@
     "src/tslab/study/failures.py": 4,
     "src/tslab/study/followups.py": 1,
     "src/tslab/study/job_script.py": 1,
-    "src/tslab/study/launch.py": 2,
+    "src/tslab/study/launch.py": 1,
     "src/tslab/study/machine/local.py": 1,
     "src/tslab/study/machine/register.py": 1,
     "src/tslab/study/machine/slurm.py": 2,

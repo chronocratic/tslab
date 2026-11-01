@@ -10,7 +10,7 @@ import types
 
 import pytest
 
-from tslab.jobs.local import busy_gpus, gpu_lock_folder, try_lease_gpu, visible_gpus
+from tslab.jobs.local import busy_gpus, gpu_lock_folder, select_gpus, try_lease_gpu, visible_gpus
 
 _LOCK_CHILD = (
     'import fcntl, os, sys, time\n'
@@ -172,3 +172,56 @@ def test_busy_gpus_maps_uuids(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
     monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
     assert busy_gpus(gpu_ids=('0', '1')) == frozenset({'1'})
+
+
+def test_select_gpus_auto_uses_visible_gpus() -> None:
+    environment = {'CUDA_VISIBLE_DEVICES': '1,3'}
+    assert select_gpus(gpus='auto', skip_busy=False, environment=environment) == ('1', '3')
+
+
+def test_select_gpus_keeps_the_given_ids_in_order() -> None:
+    assert select_gpus(gpus=('1', '0'), skip_busy=False, environment={}) == ('1', '0')
+
+
+def test_select_gpus_skip_busy_leaves_busy_out(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        "  echo 'GPU-BUSY-1'\n"
+        'else\n'
+        "  echo '0,GPU-BUSY-0'\n"
+        "  echo '1,GPU-BUSY-1'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert select_gpus(gpus=('0', '1'), skip_busy=True, environment={}) == ('0',)
+
+
+def test_select_gpus_all_busy_fails(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        "  echo 'GPU-BUSY-1'\n"
+        'else\n'
+        "  echo '1,GPU-BUSY-1'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    with pytest.raises(ValueError, match='all local GPUs are busy: 1'):
+        select_gpus(gpus=('1',), skip_busy=True, environment={})
+
+
+def test_select_gpus_skip_busy_without_nvidia_gpus_fails(
+    *, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('PATH', '/nonexistent-bin-dir')
+    monkeypatch.setattr(platform, 'system', lambda: 'Linux')
+    monkeypatch.setattr(platform, 'machine', lambda: 'x86_64')
+    with pytest.raises(ValueError, match='needs NVIDIA GPUs'):
+        select_gpus(gpus='auto', skip_busy=True, environment={'CUDA_VISIBLE_DEVICES': ''})
+    with pytest.raises(ValueError, match='needs NVIDIA GPUs'):
+        select_gpus(gpus=('mps',), skip_busy=True, environment={})
