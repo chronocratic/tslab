@@ -258,7 +258,7 @@ def test_unknown_slurm_states_refuse_to_submit(
 ) -> None:
     submit_study(project=project)
     ctx = context(project=project, machine_file='cluster.toml')
-    unknown = dataclasses.replace(ctx, job_states_known=False)
+    unknown = dataclasses.replace(ctx, job_states=dataclasses.replace(ctx.job_states, known=False))
     with caplog.at_level('ERROR'):
         code = resubmit(context=unknown, states=tuple(StudyState), sleep=no_sleep)
     assert code == 1

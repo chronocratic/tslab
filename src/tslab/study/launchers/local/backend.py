@@ -32,12 +32,12 @@ class LocalResources:
 
 
 def _phase_of(*, job_state: str | None) -> JobPhase:
-    """The phase of one local task state, the SLURM-shaped words of the pid file."""
+    """The phase of one local task state from the pid file."""
     if job_state is None:
         return JobPhase.UNKNOWN
-    if job_state == 'PENDING':
+    if job_state == 'pending':
         return JobPhase.QUEUED
-    if job_state == 'RUNNING':
+    if job_state == 'running':
         return JobPhase.RUNNING
     return JobPhase.ENDED
 

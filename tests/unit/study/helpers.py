@@ -1,8 +1,10 @@
 """Helpers shared by the study command tests: contexts, submissions, run folders."""
 
+from collections.abc import Mapping
 from pathlib import Path
 import subprocess
 import sys
+from types import MappingProxyType
 
 from tslab.core.files import atomic_write_json
 from tslab.core.status import (
@@ -15,6 +17,7 @@ from tslab.core.status import (
 )
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
+from tslab.study.launchers import JobPhase, JobStates
 from tslab.study.local_launch import LAUNCH_FILE
 from tslab.study.records import append_job, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
@@ -23,6 +26,7 @@ __all__ = [
     'finish_run',
     'finished_pid',
     'jobs_of',
+    'make_job_states',
     'no_sleep',
     'record_local_job',
     'study_directory',
@@ -34,6 +38,22 @@ __all__ = [
 
 def no_sleep(_seconds: float) -> None:
     """Skip the submission pause."""
+
+
+def make_job_states(
+    *,
+    states: Mapping[str, str],
+    phases: Mapping[str, JobPhase],
+    known: bool = True,
+    followup_live_job_ids: tuple[str, ...] = (),
+) -> JobStates:
+    """Build a read-only snapshot of backend states for study tests."""
+    return JobStates(
+        known=known,
+        states=MappingProxyType(dict(states)),
+        phases=MappingProxyType(dict(phases)),
+        followup_live_job_ids=followup_live_job_ids,
+    )
 
 
 def study_directory(*, project: Path) -> Path:

@@ -39,7 +39,7 @@ def log_status(
         starts: When given, the lines of queued runs end with their expected
             start time, as reported by the scheduler.
     """
-    if context.machine.launcher == 'slurm' and not context.job_states_known:
+    if not context.job_states.known:
         _LOGGER.info(
             'SLURM commands not found: job states unknown; states come from run folders only'
         )

@@ -16,7 +16,6 @@ from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import process_alive, start_detached, tail_lines
 from tslab.study.launchers import OnTaskState
-from tslab.study.state import LOCAL_ENDED
 
 __all__ = [
     'LAUNCH_FILE',
@@ -32,7 +31,7 @@ __all__ = [
 
 LAUNCH_FILE = 'local-launch.json'
 LAUNCH_LOG = 'local-launch.log'
-_JOB_STATES = {'pending': 'PENDING', 'running': 'RUNNING', 'ended': LOCAL_ENDED}
+_JOB_STATES = frozenset(('pending', 'running', 'ended'))
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -179,7 +178,7 @@ def local_job_states(*, study_folder: Path) -> dict[str, str]:
     launch = read_launch(study_folder=study_folder)
     if launch is None or not launch_is_live(launch=launch):
         return {}
-    return {key: _JOB_STATES[state] for key, state in launch.tasks if state in _JOB_STATES}
+    return {key: state for key, state in launch.tasks if state in _JOB_STATES}
 
 
 def _log_tail(*, path: Path, lines: int = 20) -> str:

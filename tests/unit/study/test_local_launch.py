@@ -30,7 +30,7 @@ from tslab.study.local_launch import (
     LocalLaunchError,
     read_launch,
 )
-from tslab.study.state import LOCAL_ENDED, StudyState
+from tslab.study.state import StudyState
 
 
 def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:
@@ -84,9 +84,9 @@ def test_local_job_states_map_pending_and_running(tmp_path: Path) -> None:
         tasks={'j_0': 'pending', 'j_1': 'running', 'j_2': 'ended'},
     )
     assert local_job_states(study_folder=tmp_path) == {
-        'j_0': 'PENDING',
-        'j_1': 'RUNNING',
-        'j_2': LOCAL_ENDED,
+        'j_0': 'pending',
+        'j_1': 'running',
+        'j_2': 'ended',
     }
     launch = read_launch(study_folder=tmp_path)
     assert launch is not None
