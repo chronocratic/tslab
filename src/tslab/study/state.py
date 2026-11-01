@@ -6,8 +6,8 @@ from enum import StrEnum
 from pathlib import Path
 import time
 
+from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
-from tslab.core.run import is_run_active
 from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
 from tslab.helpers.text import first_line
 from tslab.study.definition import StudyRun

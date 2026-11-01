@@ -17,7 +17,7 @@ from pathlib import Path
 import shutil
 import time
 import traceback
-from typing import Any, cast, ClassVar, get_type_hints, override, Protocol, runtime_checkable
+from typing import Any, cast, ClassVar, get_type_hints, override
 import uuid
 
 from tslab.core.artifact import (
@@ -44,7 +44,8 @@ from tslab.core.paths import (
     replace_directory,
     validate_stage_name,
 )
-from tslab.core.run import is_writer_process, JobTimeLimitSignal, Run, slurm_task_count
+from tslab.core.ranks import is_writer_process, RankAgreement, slurm_task_count
+from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
@@ -54,21 +55,13 @@ from tslab.core.status import (
 )
 from tslab.core.text import describe_error, qualified_name
 
-__all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'RankAgreement', 'Stage', 'stage']
+__all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'Stage', 'stage']
 
 _LOGGER = logging.getLogger(__name__)
 _AGREEMENT_SEQUENCE = count()
 INSTANCE_META_FORMAT_VERSION = 1
 _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
-
-
-@runtime_checkable
-class RankAgreement(Protocol):
-    """Broadcast a stage decision from rank zero to the other ranks."""
-
-    def agree_across_ranks(self, *, key: str, value: bool) -> bool:
-        """Return the decision of rank zero, waiting for it on other ranks."""
 
 
 @dataclass(frozen=True, kw_only=True)

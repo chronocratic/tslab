@@ -10,20 +10,17 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
-import json
 import logging
-import os
 from pathlib import Path
 import signal
 import sys
 import threading
-import time
 from types import FrameType, TracebackType
 from typing import Literal, Self
-import uuid
 
 from tslab.core.config import config_to_data, config_to_yaml, save_config
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.core.lock import acquire_lock, Heartbeat, release_lock
 from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
 from tslab.core.paths import (
     atomic_write_json,
@@ -37,6 +34,7 @@ from tslab.core.paths import (
     validate_relative_path,
     validate_stage_name,
 )
+from tslab.core.ranks import is_writer_process
 from tslab.core.seeding import seed_everything
 from tslab.core.status import (
     format_instance_id,
@@ -51,23 +49,9 @@ from tslab.core.status import (
 )
 from tslab.core.tracker import LocalTracker, RunStatus, Tracker
 
-__all__ = [
-    'LOCK_FILE',
-    'JobTimeLimitSignal',
-    'Run',
-    'RunLockedError',
-    'RunOptions',
-    'is_run_active',
-    'is_writer_process',
-]
+__all__ = ['LOCK_FILE', 'JobTimeLimitSignal', 'Run', 'RunOptions']
 
 _LOGGER = logging.getLogger(__name__)
-_RANK_VARIABLES = ('RANK', 'SLURM_PROCID', 'LOCAL_RANK')
-_HEARTBEAT_SECONDS = 60.0
-_STALE_AFTER_SECONDS = 600.0
-_TAKEOVER_GUARD_SECONDS = 30.0
-_LOCK_ATTEMPTS = 50
-_LOCK_RETRY_SECONDS = 0.05
 _SIGTERM_EXIT_CODE = 128 + signal.SIGTERM
 _LOG_FILE = Path(LOGS_DIRECTORY) / 'run.log'
 _LOG_FORMAT = '%(asctime)s %(levelname)s %(name)s: %(message)s'
@@ -105,27 +89,8 @@ class RunOptions:
         return
 
 
-class RunLockedError(RuntimeError):
-    """Raised when another live process owns the run folder."""
-
-
 class JobTimeLimitSignal(SystemExit):
     """The SLURM time limit is near; resubmit the run to resume."""
-
-
-def is_writer_process() -> bool:
-    """Return ``True`` unless this process is a non-zero rank of a distributed job.
-
-    Every rank variable that is set must be ``0``. Checking all of them covers
-    both ``srun`` tasks (``SLURM_PROCID``) and processes started by Lightning
-    inside one SLURM task (``LOCAL_RANK``).
-    """
-    return all(os.environ.get(variable, '0') == '0' for variable in _RANK_VARIABLES)
-
-
-def slurm_task_count() -> int:
-    """Return the number of tasks in this SLURM job, or one off SLURM."""
-    return int(os.environ.get('SLURM_NTASKS', '1'))
 
 
 class Run:
@@ -200,7 +165,7 @@ class Run:
         self._executing = False
         self._called_single_rank = False
         self._lock_nonce: str | None = None
-        self._heartbeat: _Heartbeat | None = None
+        self._heartbeat: Heartbeat | None = None
         self._entered = False
         self._meta: dict[str, object] = {}
         self._environment: dict[str, object] | None = None
@@ -435,8 +400,8 @@ class Run:
             seed_everything(seed=self._seed)
             if self.writes_files:
                 self._directory.mkdir(parents=True, exist_ok=True)
-                self._lock_nonce = _acquire_lock(path=self._directory / LOCK_FILE)
-                self._heartbeat = _Heartbeat(
+                self._lock_nonce = acquire_lock(path=self._directory / LOCK_FILE)
+                self._heartbeat = Heartbeat(
                     path=self._directory / LOCK_FILE, nonce=self._lock_nonce
                 )
                 self._attach_file_log()
@@ -633,7 +598,7 @@ class Run:
             self._heartbeat.stop()
             self._heartbeat = None
         if self._lock_nonce is not None:
-            _release_lock(path=self._directory / LOCK_FILE, nonce=self._lock_nonce)
+            release_lock(path=self._directory / LOCK_FILE, nonce=self._lock_nonce)
             self._lock_nonce = None
         if self._previous_sigterm is not None:
             signal.signal(signal.SIGTERM, self._previous_sigterm)
@@ -702,191 +667,3 @@ def _project_directory() -> Path:
     if isinstance(script, str) and Path(script).resolve().parent.is_dir():
         return Path(script).resolve().parent
     return Path.cwd()
-
-
-@dataclass(frozen=True, kw_only=True)
-class _LockOwner:
-    """Contents of the ``.lock`` file.
-
-    ``nonce`` is random per ``Run``: it lets a process check that the lock it is
-    about to touch is still its own, even if its pid was reused or a stale lock
-    was taken over.
-    """
-
-    pid: int
-    host: str
-    nonce: str | None = None
-
-
-class _Heartbeat:
-    """Touch the lock file every ``_HEARTBEAT_SECONDS`` from a daemon thread.
-
-    The modification time of the lock then tells any host whether its owner is
-    still alive: a job killed by SLURM stops touching it. The thread stops
-    touching the file once another process owns it.
-    """
-
-    def __init__(self, *, path: Path, nonce: str) -> None:
-        self._path = path
-        self._nonce = nonce
-        self._stopped = threading.Event()
-        self._thread = threading.Thread(target=self._beat, name='tslab-heartbeat', daemon=True)
-        self._thread.start()
-
-    def _beat(self) -> None:
-        while not self._stopped.wait(timeout=_HEARTBEAT_SECONDS):
-            owner = _read_lock_owner(path=self._path)
-            if owner is None or owner.nonce != self._nonce:
-                _LOGGER.warning(
-                    '%s is no longer owned by this run; stopped refreshing it', self._path
-                )
-                return
-            try:
-                os.utime(self._path)
-            except OSError as error:
-                _LOGGER.warning('could not refresh %s: %s', self._path.as_posix(), error)
-
-    def stop(self) -> None:
-        """Stop beating and wait for the thread to end."""
-        self._stopped.set()
-        self._thread.join()
-
-
-def is_run_active(*, directory: Path) -> bool:
-    """Return whether a live process holds the lock of a run folder.
-
-    A lock is live when its heartbeat is recent and, on this host, its process
-    still exists. A process of another host cannot be checked, so there only the
-    heartbeat counts.
-
-    Args:
-        directory: The run folder.
-    """
-    path = directory / LOCK_FILE
-    try:
-        age = time.time() - path.stat().st_mtime
-    except FileNotFoundError:
-        return False
-    return not _lock_is_stale(owner=_read_lock_owner(path=path), age=age)
-
-
-def _lock_is_stale(*, owner: _LockOwner | None, age: float) -> bool:
-    if age > _STALE_AFTER_SECONDS:
-        return True
-    return owner is not None and owner.host == hostname() and not _pid_alive(pid=owner.pid)
-
-
-def _acquire_lock(*, path: Path) -> str:
-    """Create the lock file atomically, replacing it once if it is stale.
-
-    ``O_CREAT | O_EXCL`` makes creation atomic: exactly one process succeeds.
-    A lock is stale when its heartbeat stopped more than ``_STALE_AFTER_SECONDS``
-    ago (any host), or when its process is dead (this host). Removing a stale
-    lock goes through ``_remove_stale_lock``, so two processes cannot both remove
-    it and then both create their own.
-
-    Returns:
-        The nonce stored in the lock; pass it to ``_release_lock``.
-
-    Raises:
-        RunLockedError: If a live process owns the lock.
-    """
-    nonce = uuid.uuid4().hex
-    payload = json.dumps({'pid': os.getpid(), 'host': hostname(), 'nonce': nonce})
-    for _attempt in range(_LOCK_ATTEMPTS):
-        try:
-            descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            owner = _read_lock_owner(path=path)
-            try:
-                age = time.time() - path.stat().st_mtime
-            except FileNotFoundError:
-                continue
-            if _lock_is_stale(owner=owner, age=age):
-                if not _remove_stale_lock(path=path):
-                    time.sleep(_LOCK_RETRY_SECONDS)  # another process is deciding; look again
-                continue
-            message = (
-                f'{path.parent.as_posix()} is in use by {owner or "an unknown process"}; '
-                f'if no such process exists, delete {path.as_posix()}'
-            )
-            raise RunLockedError(message) from None
-        with os.fdopen(descriptor, mode='w', encoding='utf-8') as handle:
-            handle.write(payload)
-        return nonce
-    message = f'could not acquire {path.as_posix()}'
-    raise RunLockedError(message)
-
-
-def _remove_stale_lock(*, path: Path) -> bool:
-    """Delete a lock that is still stale, while holding the takeover guard.
-
-    The guard file serializes takeovers. Without it, two processes could both
-    judge the same lock stale, one could delete it and create its own, and the
-    other could then delete that fresh lock. Under the guard the staleness is
-    checked again before the delete.
-
-    Returns:
-        ``False`` if another process holds the guard, ``True`` otherwise.
-    """
-    guard = path.with_name(f'{path.name}.takeover')
-    try:
-        descriptor = os.open(guard, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-    except FileExistsError:
-        try:
-            if time.time() - guard.stat().st_mtime > _TAKEOVER_GUARD_SECONDS:
-                guard.unlink(missing_ok=True)  # its holder died mid-takeover
-        except FileNotFoundError:
-            pass
-        return False
-    os.close(descriptor)
-    try:
-        owner = _read_lock_owner(path=path)
-        try:
-            age = time.time() - path.stat().st_mtime
-        except FileNotFoundError:
-            return True
-        if _lock_is_stale(owner=owner, age=age):
-            _LOGGER.warning(
-                'removing stale lock %s left by %s (last heartbeat %.0f s ago)',
-                path.as_posix(),
-                owner or 'an unknown process',
-                age,
-            )
-            path.unlink(missing_ok=True)
-    finally:
-        guard.unlink(missing_ok=True)
-    return True
-
-
-def _release_lock(*, path: Path, nonce: str) -> None:
-    """Delete the lock file, but only if this run still owns it."""
-    owner = _read_lock_owner(path=path)
-    if owner is not None and owner.nonce == nonce:
-        path.unlink(missing_ok=True)
-    elif path.exists():
-        _LOGGER.warning('%s now belongs to another process; leaving it in place', path.as_posix())
-
-
-def _read_lock_owner(*, path: Path) -> _LockOwner | None:
-    """Return the lock owner, or ``None`` if the file is unreadable or malformed."""
-    try:
-        document = json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
-        return None
-    if not isinstance(document, dict):
-        return None
-    pid, host, nonce = document.get('pid'), document.get('host'), document.get('nonce')
-    if not isinstance(pid, int) or not isinstance(host, str):
-        return None
-    return _LockOwner(pid=pid, host=host, nonce=nonce if isinstance(nonce, str) else None)
-
-
-def _pid_alive(*, pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
