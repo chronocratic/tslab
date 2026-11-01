@@ -1,13 +1,14 @@
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 import threading
 import time
 
 import pytest
 
-from tslab.jobs.local import run_process, stop_on_signals
+from tslab.jobs.local import process_alive, run_process, stop_on_signals
 
 
 def test_run_process_returns_exit_code_and_lines(*, tmp_path: Path) -> None:
@@ -145,3 +146,14 @@ def test_stop_on_signals_records_signal() -> None:
         assert request.event.is_set()
         assert request.signal_number == signal.SIGUSR1
     assert signal.getsignal(signal.SIGUSR1) is previous
+
+
+def test_process_alive_for_this_process() -> None:
+    assert process_alive(pid=os.getpid())
+
+
+def test_process_alive_for_a_reaped_child() -> None:
+    with subprocess.Popen([sys.executable, '-c', 'pass']) as child:
+        child.wait()
+        pid = child.pid
+    assert not process_alive(pid=pid)

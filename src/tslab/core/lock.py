@@ -18,6 +18,7 @@ import uuid
 
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
+from tslab.jobs.local import process_alive
 
 __all__ = [
     'Heartbeat',
@@ -116,7 +117,7 @@ def is_run_active(*, directory: Path) -> bool:
 def _lock_is_stale(*, owner: _LockOwner | None, age: float) -> bool:
     if age > _STALE_AFTER_SECONDS:
         return True
-    return owner is not None and owner.host == hostname() and not _pid_alive(pid=owner.pid)
+    return owner is not None and owner.host == hostname() and not process_alive(pid=owner.pid)
 
 
 def acquire_lock(*, path: Path) -> str:
@@ -223,13 +224,3 @@ def read_lock_owner(*, path: Path) -> _LockOwner | None:
     if not isinstance(pid, int) or not isinstance(host, str):
         return None
     return _LockOwner(pid=pid, host=host, nonce=nonce if isinstance(nonce, str) else None)
-
-
-def _pid_alive(*, pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
