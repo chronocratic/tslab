@@ -30,6 +30,12 @@ def resolve_device(*, device: str) -> torch.device:
     return torch.device(device)
 
 
+# why: the canonical type name stays at the pre-move location, so the
+# fingerprints of cached encodings do not change when the class moved to
+# tslab.stages.encoders
+_LEGACY_TYPE_NAME = 'tslab.interfaces.encoder.ModelAsEncoder'
+
+
 @dataclass(frozen=True, kw_only=True)
 class ModelAsEncoder:
     """Encoder factory for models that already have ``encode(*, inputs)``.
@@ -57,6 +63,14 @@ class ModelAsEncoder:
         if self.batch_size is not None and self.batch_size <= 0:
             message = f'batch_size must be positive or None, got {self.batch_size}'
             raise ValueError(message)
+
+    def fingerprint_settings(self) -> dict[str, object]:
+        """Return the settings that change the result.
+
+        The ``__type__`` spelling is the pre-move module path (see
+        ``_LEGACY_TYPE_NAME``); a new result-changing field must be added here.
+        """
+        return {'__type__': _LEGACY_TYPE_NAME, 'batch_size': self.batch_size}
 
     def __call__(self, model: Encoder) -> Encoder:
         """Wrap ``model``; nothing moves until the first encode call.
