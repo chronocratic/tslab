@@ -1,5 +1,6 @@
 """Local study launch tests."""
 
+from collections.abc import Mapping
 from io import StringIO
 import json
 import os
@@ -9,17 +10,50 @@ import subprocess
 import sys
 import threading
 import time
+from typing import TextIO
 
 import pytest
 
 from tests.unit.study.configs import grid
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
-from tslab.study.launchers import launch as _launch, LaunchReport
-from tslab.study.launchers.local.run import LocalLauncher, write_job_files
+from tslab.study.launchers import launch as _launch, LaunchReport, OnTaskState
+from tslab.study.launchers.local.run import (
+    local_job_id,
+    LocalLauncher as _LocalLauncher,
+    write_job_files,
+)
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
 from tslab.study.records import read_jobs
+
+
+class LocalLauncher(_LocalLauncher):
+    """A local launcher test adapter with fixed process metadata."""
+
+    def __init__(  # noqa: PLR0913 # why: test adapter mirrors the launcher constructor inputs
+        self,
+        *,
+        project_root: Path,
+        env: Mapping[str, str],
+        local: LocalSettings,
+        gpu_ids: tuple[str, ...] = (),
+        stream: TextIO | None = None,
+        on_task_state: OnTaskState | None = None,
+        grace_seconds: float = 30.0,
+    ) -> None:
+        super().__init__(
+            project_root=project_root,
+            env=env,
+            local=local,
+            pid=123,
+            host='test-host',
+            now=lambda: '2026-01-02T03:04:05+00:00',
+            gpu_ids=gpu_ids,
+            stream=stream,
+            on_task_state=on_task_state,
+            grace_seconds=grace_seconds,
+        )
 
 
 @pytest.fixture
@@ -39,7 +73,7 @@ def study() -> Study:
 
 def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     return plan_jobs(
         study=study,
         machine=machine,
@@ -48,7 +82,12 @@ def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
         extra_args={},
         attempts={},
         first_job_file=3,
+        environment={},
     )
+
+
+def test_local_job_id_uses_given_process_id() -> None:
+    assert local_job_id(job_file=4, pid=123) == 'local-123-4'
 
 
 def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
@@ -70,6 +109,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
         project_root=project_root,
         dry_run=dry_run,
         begin=begin,
+        now=lambda: '2026-01-02T03:04:05+00:00',
     )
 
 
@@ -94,7 +134,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         name='s', grids={'g': grid(short_name='g1', command=(sys.executable, str(script)))}
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -103,6 +143,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
     assert len(groups) == 1
     report = launch(
@@ -130,6 +171,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         extra_args={},
         attempts=attempts,
         first_job_file=2,
+        environment={},
     )
     launch(
         launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
@@ -173,11 +215,12 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
     groups = plan_jobs(
         study=study,
         machine=machine,
-        resolved=resolve_runs(study=study, machine=machine, runs=runs),
+        resolved=resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1),
         indices=assign_indices(runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
     report = launch(
         launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings()),
@@ -196,7 +239,7 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
 
 def _local_groups(study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     return plan_jobs(
         study=study,
         machine=machine,
@@ -205,6 +248,7 @@ def _local_groups(study: Study, machine: MachineProfile) -> list[JobGroup]:
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
 
 
@@ -347,7 +391,8 @@ def test_local_two_launchers_never_share_a_gpu(
         '    grid="g", job_name="g", resources=LocalResources(cpus=1),\n'
         '    job_file=1, tasks=(task,)\n'
         ')\n'
-        'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",)).submit(\n'
+        'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",), '
+        'pid=123, host="test-host", now=lambda: "2026-01-02T03:04:05+00:00").submit(\n'
         '    group=group, study_folder=root, record=lambda job_id: None\n'
         ')\n'
     )

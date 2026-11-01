@@ -261,6 +261,8 @@ def test_submit_stops_before_writing_when_a_run_does_not_parse(
             machine_path=project / 'cluster.toml',
             selection=Selection(),
             project_root=Path.cwd(),
+            local_cpus=1,
+            environment=os.environ,
         )
     (project / 'bad_parse.py').write_text(PARSE_BAD_STUDIES.lstrip('\n'))
     with caplog.at_level('INFO'):
@@ -270,6 +272,8 @@ def test_submit_stops_before_writing_when_a_run_does_not_parse(
                 machine_path=project / 'cluster.toml',
                 selection=Selection(),
                 project_root=Path.cwd(),
+                local_cpus=1,
+                environment=os.environ,
             ),
             include_done=False,
             dry_run=False,
@@ -568,6 +572,8 @@ def test_local_submit_runs_everything(project: Path, caplog: pytest.LogCaptureFi
         machine_path=project / 'local.toml',
         selection=Selection(),
         project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
     ).reports
     assert {report.state for report in reports} == {StudyState.DONE}
     with caplog.at_level('INFO'):

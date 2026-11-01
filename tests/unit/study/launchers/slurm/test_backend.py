@@ -164,12 +164,14 @@ def test_resources_applies_grid_overrides(*, project: Path, fake: FakeSlurm) -> 
     override = MachineOverride(match={'grid': ('g',)}, slurm={'cpus_per_task': 4})
     backend = SlurmBackend()
 
-    base = backend.resources(machine=ctx.machine, overrides=(), grid_name='g', values={})
+    base = backend.resources(
+        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=1
+    )
     matched = backend.resources(
-        machine=ctx.machine, overrides=(override,), grid_name='g', values={}
+        machine=ctx.machine, overrides=(override,), grid_name='g', values={}, local_cpus=1
     )
     unmatched = backend.resources(
-        machine=ctx.machine, overrides=(override,), grid_name='h', values={}
+        machine=ctx.machine, overrides=(override,), grid_name='h', values={}, local_cpus=1
     )
 
     assert base.cpus == 1
@@ -184,7 +186,9 @@ def test_resources_rejects_profile_without_slurm_table(*, project: Path, fake: F
     machine = replace(ctx.machine, slurm=None)
 
     with pytest.raises(MachineProfileError, match=r'a slurm launcher needs the \[slurm\] table'):
-        SlurmBackend().resources(machine=machine, overrides=(), grid_name='g', values={})
+        SlurmBackend().resources(
+            machine=machine, overrides=(), grid_name='g', values={}, local_cpus=1
+        )
 
 
 def test_cancellable_job_ids_returns_live_runs(*, project: Path, fake: FakeSlurm) -> None:
@@ -228,6 +232,9 @@ def test_launch_delegates_to_shared_launch(
         sleep=no_sleep,
         task_stream=None,
         environment={},
+        pid=123,
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
     )
 
     assert report is expected

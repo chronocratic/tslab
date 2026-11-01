@@ -1,7 +1,7 @@
 """The shared TOML table checks of a machine profile."""
 
+from collections.abc import Mapping
 import dataclasses
-import os
 from pathlib import Path
 import re
 from typing import cast
@@ -150,13 +150,16 @@ def string_tuple(
     return tuple(cast('list[str]', value))
 
 
-def expand_env(*, table: dict[str, object], path: Path, lenient: bool) -> dict[str, str]:
+def expand_env(
+    *, table: dict[str, object], path: Path, lenient: bool, environment: Mapping[str, str]
+) -> dict[str, str]:
     """Expand the values of the ``[env]`` table of ``table`` from the environment.
 
     Args:
         table: The raw TOML table that holds the ``[env]`` table.
         path: The profile file, named in the error.
         lenient: Keep a value with an unset variable as it is instead of raising.
+        environment: The process environment used to expand profile values.
 
     Returns:
         The expanded name to value mapping.
@@ -174,7 +177,7 @@ def expand_env(*, table: dict[str, object], path: Path, lenient: bool) -> dict[s
             )
             raise MachineProfileError(message)
         try:
-            expanded[name] = expand_variables(text=item, env={**os.environ, **expanded})
+            expanded[name] = expand_variables(text=item, env={**environment, **expanded})
         except ValueError as error:
             if not lenient:
                 message = f'{path}: [env] value for {name!r}: {error}'

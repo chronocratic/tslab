@@ -1,6 +1,7 @@
 """Helpers shared by the study command tests: contexts, submissions, run folders."""
 
 from collections.abc import Mapping
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -68,6 +69,8 @@ def context(*, project: Path, machine_file: str) -> Context:
         machine_path=project / machine_file,
         selection=Selection(),
         project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
     )
 
 

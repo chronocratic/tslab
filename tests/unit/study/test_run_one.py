@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 import dataclasses
+import os
 from pathlib import Path
 import shlex
 
@@ -30,6 +31,8 @@ def _one_run_context(*, project: Path, machine_file: str, only: tuple[str, ...])
         machine_path=project / machine_file,
         selection=Selection(only=only),
         project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
     )
 
 

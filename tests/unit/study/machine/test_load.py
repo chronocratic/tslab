@@ -6,9 +6,10 @@ from typing import Literal
 
 import pytest
 
-from tests.unit.study.machine.helpers import BASE_SLURM, LOCAL, write
-from tslab.study.machine import load_machine, LocalSettings, MachineProfileError, SlurmSettings
+from tests.unit.study.machine.helpers import BASE_SLURM, load_profile as load_machine, LOCAL, write
+from tslab.study.machine import LocalSettings, MachineProfileError, SlurmSettings
 import tslab.study.machine.load as machine_load
+from tslab.study.machine.load import load_machine as _load_machine
 
 
 def test_profile_backends_are_keyed_by_their_declared_table() -> None:
@@ -33,10 +34,23 @@ def test_load_machine_uses_selected_backend_settings_loader(
 
     monkeypatch.setitem(machine_load.PROFILE_BACKENDS, 'local', LocalProfileBackend())
 
-    profile = load_machine(path=write(tmp_path, LOCAL))
+    profile = _load_machine(
+        path=write(tmp_path, LOCAL), environment={'HOME': str(tmp_path), 'ROOT': 'profile-root'}
+    )
 
     assert profile.local == LocalSettings(timeout='00:05:00')
     assert calls == [{'launcher': 'local', 'output_root': 'runs'}]
+
+
+def test_load_machine_expands_profile_values_from_the_given_environment(tmp_path: Path) -> None:
+    path = write(
+        tmp_path, 'launcher = "local"\noutput_root = "${ROOT}/runs"\n[env]\nDATA = "${ROOT}/data"\n'
+    )
+
+    profile = _load_machine(path=path, environment={'ROOT': str(tmp_path)})
+
+    assert profile.output_root == tmp_path / 'runs'
+    assert profile.env == {'DATA': f'{tmp_path}/data'}
 
 
 CLUSTER_TOML = """\
@@ -93,9 +107,8 @@ def cluster_toml(tmp_path: Path) -> Path:
     return path
 
 
-def test_full_example_loads(cluster_toml: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('SCRATCH', '/scratch/me')
-    profile = load_machine(path=cluster_toml)
+def test_full_example_loads(cluster_toml: Path) -> None:
+    profile = _load_machine(path=cluster_toml, environment={'SCRATCH': '/scratch/me'})
     assert profile.output_root == Path('/scratch/me/exps')
     assert profile.env['UCR_ROOT'] == '/scratch/me/data/UCR'
     assert profile.settings == {

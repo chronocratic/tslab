@@ -4,8 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.machine.helpers import BASE_SLURM, SLURM_TABLE, write
-from tslab.study.machine import load_machine, MachineProfileError, SlurmSettings
+from tests.unit.study.machine.helpers import (
+    BASE_SLURM,
+    load_profile as load_machine,
+    SLURM_TABLE,
+    write,
+)
+from tslab.study.machine import MachineProfileError, SlurmSettings
 import tslab.study.machine.slurm as slurm_machine
 
 

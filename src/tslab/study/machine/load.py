@@ -2,7 +2,6 @@
 
 from collections.abc import Mapping
 import dataclasses
-import os
 from pathlib import Path
 import tomllib
 from typing import cast, Literal, Protocol
@@ -57,7 +56,9 @@ PROFILE_BACKENDS: dict[str, ProfileBackend] = {
 }
 
 
-def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
+def load_machine(
+    *, path: Path, lenient_env: bool = False, environment: Mapping[str, str]
+) -> MachineProfile:
     """The machine profile a TOML file holds, checked key by key.
 
     Args:
@@ -65,6 +66,7 @@ def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
         lenient_env: Keep an ``[env]`` value with an unset ``${VAR}`` as it is
             instead of raising, for commands that only read state and never
             launch a job (``output_root`` is always expanded strictly).
+        environment: The process environment used to expand profile values.
 
     Returns:
         The profile, with ``output_root`` and the ``[env]`` values expanded
@@ -85,10 +87,14 @@ def load_machine(*, path: Path, lenient_env: bool = False) -> MachineProfile:
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         message = f'{path}: the TOML does not parse: {error}'
         raise MachineProfileError(message) from error
-    return _machine_profile(path=path, table=table, lenient_env=lenient_env)
+    return _machine_profile(
+        path=path, table=table, lenient_env=lenient_env, environment=environment
+    )
 
 
-def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool) -> MachineProfile:
+def _machine_profile(
+    *, path: Path, table: dict[str, object], lenient_env: bool, environment: Mapping[str, str]
+) -> MachineProfile:
     unknown = [name for name in table if name not in _TOP_LEVEL_KEYS]
     if unknown:
         problem = unknown_key_message(location='', key=unknown[0], valid=_TOP_LEVEL_KEYS)
@@ -100,7 +106,7 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         message = f'{path}: launcher must be "slurm" or "local", got {launcher!r}'
         raise MachineProfileError(message)
     output_root = string_field(table=table, name='output_root', path=path)
-    env = expand_env(table=table, path=path, lenient=lenient_env)
+    env = expand_env(table=table, path=path, lenient=lenient_env, environment=environment)
     _reject_other_backend_tables(backend=backend, table=table, path=path)
     _reject_unsupported_followups(backend=backend, table=table, path=path)
     backend_settings = backend.settings_from(table=table, path=path)
@@ -118,7 +124,7 @@ def _machine_profile(*, path: Path, table: dict[str, object], lenient_env: bool)
         for position, entry in enumerate(_overrides_table(table=table, path=path))
     )
     try:
-        root = expand_variables(text=output_root, env={**os.environ, **env})
+        root = expand_variables(text=output_root, env={**environment, **env})
     except ValueError as error:
         message = f'{path}: output_root: {error}'
         raise MachineProfileError(message) from error

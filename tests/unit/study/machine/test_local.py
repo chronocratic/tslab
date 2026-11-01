@@ -4,10 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.machine.helpers import BASE_SLURM, LOCAL, SLURM_TABLE, write
+from tests.unit.study.machine.helpers import (
+    BASE_SLURM,
+    load_profile as load_machine,
+    LOCAL,
+    SLURM_TABLE,
+    write,
+)
 from tslab.study.machine import (
     FollowupSettings,
-    load_machine,
     LocalSettings,
     MachineProfileError,
     timeout_seconds,

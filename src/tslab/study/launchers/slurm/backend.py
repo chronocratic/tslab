@@ -6,6 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
+from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -122,6 +123,7 @@ class SlurmBackend:
         overrides: Sequence[MachineOverride],
         grid_name: str,
         values: Mapping[str, str],
+        local_cpus: int,  # noqa: ARG002 # why: the Backend signature
     ) -> Resources:
         """The resources of one grid on the machine, with its overrides applied."""
         settings = _slurm_for(
@@ -143,6 +145,9 @@ class SlurmBackend:
         sleep: Callable[[float], None],
         task_stream: TextIO | None,  # noqa: ARG002 # why: the Backend launch signature
         environment: Mapping[str, str],  # noqa: ARG002 # why: the SLURM writer uses the profile env
+        pid: int,  # noqa: ARG002 # why: the Backend launch signature
+        host: str,  # noqa: ARG002 # why: the Backend launch signature
+        now: Callable[[], str],
     ) -> LaunchReport | None:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
         return launch(
@@ -154,6 +159,7 @@ class SlurmBackend:
             project_root=context.project_root,
             dry_run=dry_run,
             begin=begin,
+            now=now,
         )
 
     def after_submit(
@@ -170,7 +176,10 @@ class SlurmBackend:
         from tslab.study.launchers.slurm.followups import queue_followups  # noqa: PLC0415
 
         code, _ = queue_followups(
-            context=context, job_ids=[record.job_id for record in submitted], sleep=sleep
+            context=context,
+            job_ids=[record.job_id for record in submitted],
+            now=utc_now_iso,
+            sleep=sleep,
         )
         return code
 

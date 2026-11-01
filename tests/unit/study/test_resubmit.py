@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -308,6 +309,8 @@ def _local_retry_context(*, project: Path, max_attempts: int) -> Context:
         machine_path=local,
         selection=Selection(only=('model=small', 'seed=1')),
         project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
     )
 
 

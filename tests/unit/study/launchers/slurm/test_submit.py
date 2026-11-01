@@ -38,7 +38,7 @@ def study() -> Study:
 
 def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     return plan_jobs(
         study=study,
         machine=machine,
@@ -47,6 +47,7 @@ def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
         extra_args={},
         attempts={},
         first_job_file=3,
+        environment={},
     )
 
 
@@ -67,6 +68,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
         groups=groups,
         project_root=project_root,
         dry_run=dry_run,
+        now=lambda: '2026-01-02T03:04:05+00:00',
     )
 
 

@@ -6,9 +6,7 @@ import dataclasses
 from dataclasses import dataclass, replace
 from io import StringIO
 import logging
-import os
 from pathlib import Path
-import sys
 from typing import cast, TYPE_CHECKING
 
 import tslab
@@ -70,6 +68,7 @@ def resolve_runs(
     study: Study,
     machine: MachineProfile,
     runs: Sequence[StudyRun],
+    local_cpus: int,
     warned: set[str] | None = None,
 ) -> list[ResolvedRun]:
     """Every run with the settings and resources of the machine applied.
@@ -82,6 +81,7 @@ def resolve_runs(
         study: The study the runs came from.
         machine: The machine the runs run on.
         runs: The runs to resolve, e.g. ``expand_runs``' output.
+        local_cpus: The CPUs available to a local launch.
         warned: Forwarded to ``check_machine`` so a command that already
             checked the machine does not hear the same warning twice.
 
@@ -108,7 +108,11 @@ def resolve_runs(
                 values=run.values,
             ),
             resources=backend.resources(
-                machine=machine, overrides=machine.overrides, grid_name=run.grid, values=run.values
+                machine=machine,
+                overrides=machine.overrides,
+                grid_name=run.grid,
+                values=run.values,
+                local_cpus=local_cpus,
             ),
         )
         for run in runs
@@ -274,17 +278,9 @@ def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str |
     return None
 
 
-def expansion_env(*, machine: MachineProfile) -> dict[str, str]:
+def expansion_env(*, machine: MachineProfile, environment: Mapping[str, str]) -> dict[str, str]:
     """The variables a run expands: the process environment, profile wins."""
-    return {**os.environ, **machine.env}
-
-
-def _usable_cpus() -> int:
-    """The CPUs this process may run on; a local launch runs its tasks here."""
-    # why: the affinity mask honours taskset and container limits; macOS has no such call
-    if sys.platform == 'linux':
-        return len(os.sched_getaffinity(0))
-    return os.cpu_count() or 1
+    return {**environment, **machine.env}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -400,6 +396,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     extra_args: Mapping[str, tuple[str, ...]],
     attempts: Mapping[str, int],
     first_job_file: int,
+    environment: Mapping[str, str],
     uncounted: Mapping[str, tuple[int, int]] | None = None,
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
@@ -417,6 +414,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             command.
         attempts: The run path to attempts already made; 0 when absent.
         first_job_file: The first job file number to number groups from.
+        environment: The process environment used to expand run settings.
         uncounted: The run path to ``(uncounted attempts, uncounted in a row)``,
             see ``TaskRecord``; ``(0, 0)`` when absent.
 
@@ -429,7 +427,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     lookup: dict[tuple[str, Resources], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
-    env = expansion_env(machine=machine)
+    env = expansion_env(machine=machine, environment=environment)
     counters = uncounted or {}
     for run in resolved:
         grid = study.grids[run.run.grid]

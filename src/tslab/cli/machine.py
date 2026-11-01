@@ -51,8 +51,11 @@ class MachineAdd:
             if not file.is_file():
                 message = f'machine profile {file} does not exist; pass the path of a TOML file'
                 raise MachineProfileError(message)  # noqa: TRY301 # why: one handler for all checks
-            load_machine(path=file, lenient_env=True)
-            write_register(entries={**read_register(), self.name: file})
+            load_machine(path=file, lenient_env=True, environment=os.environ)
+            write_register(
+                entries={**read_register(environment=os.environ), self.name: file},
+                environment=os.environ,
+            )
         except MachineProfileError as error:
             raise UsageError(str(error)) from error
         _LOGGER.info('registered %s -> %s', self.name, file.as_posix())
@@ -75,7 +78,7 @@ class MachineList:
     def run(self) -> int:
         """Print a table of names and return the exit code."""
         try:
-            registered = read_register()
+            registered = read_register(environment=os.environ)
         except MachineProfileError as error:
             raise UsageError(str(error)) from error
         project = _project_machines(start=Path.cwd())
@@ -160,13 +163,13 @@ class MachineRemove:
     def run(self) -> int:
         """Remove the name and return the exit code."""
         try:
-            entries = read_register()
+            entries = read_register(environment=os.environ)
             if self.name not in entries:
                 known = ', '.join(sorted(entries)) or 'none'
                 message = f'machine {self.name!r} is not registered; registered names: {known}'
                 raise MachineProfileError(message)  # noqa: TRY301 # why: one handler for all checks
             del entries[self.name]
-            write_register(entries=entries)
+            write_register(entries=entries, environment=os.environ)
         except MachineProfileError as error:
             raise UsageError(str(error)) from error
         _LOGGER.info('removed %s', self.name)

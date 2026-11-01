@@ -258,11 +258,12 @@ class Study:
                 message = f'grid {grid_name!r} has no runs; every run is excluded'
                 raise ValueError(message)
 
-    def results(self, *, machine: Path) -> 'list[ResultRow]':
+    def results(self, *, machine: Path, environment: Mapping[str, str]) -> 'list[ResultRow]':
         """The rows of the results table of every run of the study.
 
         Args:
             machine: The machine profile the runs run on.
+            environment: The process environment used by the machine profile.
 
         Returns:
             One row per (run, instance), and one row per run without
@@ -271,7 +272,7 @@ class Study:
         # why: imported here, not at the top, because the result table imports this module
         from tslab.study.result_table import study_results  # noqa: PLC0415
 
-        return study_results(study=self, machine=machine)
+        return study_results(study=self, machine=machine, environment=environment)
 
 
 def _grid_match_problems(*, grid_name: str, grid: Grid, matches: Sequence[Match]) -> list[str]:

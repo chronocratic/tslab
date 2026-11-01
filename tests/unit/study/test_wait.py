@@ -3,6 +3,7 @@
 import dataclasses
 import json
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -349,7 +350,9 @@ def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlur
             machine_path=project / 'cluster.toml',
             selection=Selection(),
             project_root=Path.cwd(),
+            local_cpus=1,
             ended_states=ended,
+            environment=os.environ,
         )
     queries = fake.calls('sacct')[prior:]
     assert _query_ids(queries[0]) == ids
@@ -366,6 +369,8 @@ def test_failed_query_leaves_the_cache_unchanged(project: Path, fake: FakeSlurm)
         machine_path=project / 'cluster.toml',
         selection=Selection(),
         project_root=Path.cwd(),
+        local_cpus=1,
         ended_states=ended,
+        environment=os.environ,
     )
     assert ended == {}

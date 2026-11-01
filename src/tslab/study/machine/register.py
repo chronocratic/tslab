@@ -3,7 +3,6 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 import json
-import os
 from pathlib import Path
 import re
 import tomllib
@@ -25,18 +24,19 @@ _REGISTER_VARIABLE = 'TSLAB_MACHINES_FILE'
 _NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]+')
 
 
-def register_file() -> Path:
+def register_file(*, environment: Mapping[str, str]) -> Path:
     """The register of machine names: ``tslab machine add`` writes it.
 
     Returns:
         ``$TSLAB_MACHINES_FILE`` when set, else ``$XDG_CONFIG_HOME/tslab/machines.toml``,
         else ``~/.config/tslab/machines.toml``.
     """
-    override = os.environ.get(_REGISTER_VARIABLE, '')
+    override = environment.get(_REGISTER_VARIABLE, '')
     if override != '':
         return Path(override)
-    config = os.environ.get('XDG_CONFIG_HOME', '')
-    base = Path(config) if config != '' else Path.home() / '.config'
+    config = environment.get('XDG_CONFIG_HOME', '')
+    home = environment.get('HOME')
+    base = Path(config) if config != '' else Path(home or '~') / '.config'
     return base / 'tslab' / 'machines.toml'
 
 
@@ -61,7 +61,7 @@ def validate_machine_name(*, name: str) -> str:
     return name
 
 
-def read_register() -> dict[str, Path]:
+def read_register(*, environment: Mapping[str, str]) -> dict[str, Path]:
     """The registered machine names and their profile files.
 
     Returns:
@@ -70,7 +70,7 @@ def read_register() -> dict[str, Path]:
     Raises:
         MachineProfileError: If the register is not a table of name to path strings.
     """
-    path = register_file()
+    path = register_file(environment=environment)
     if not path.is_file():
         return {}
     try:
@@ -84,13 +84,14 @@ def read_register() -> dict[str, Path]:
     return {name: Path(cast('str', value)) for name, value in table.items()}
 
 
-def write_register(*, entries: Mapping[str, Path]) -> None:
+def write_register(*, entries: Mapping[str, Path], environment: Mapping[str, str]) -> None:
     """Replace the register with ``entries``, atomically.
 
     Args:
         entries: The name to absolute path mapping to store.
+        environment: The process environment used to choose the register path.
     """
-    path = register_file()
+    path = register_file(environment=environment)
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [f'{name} = {json.dumps(file.as_posix())}\n' for name, file in sorted(entries.items())]
     atomic_write_text(path=path, text=''.join(lines))
@@ -110,7 +111,9 @@ class MachineLocation:
     project_root: Path
 
 
-def resolve_machine(*, machine: str, start: Path) -> MachineLocation:
+def resolve_machine(
+    *, machine: str, start: Path, environment: Mapping[str, str]
+) -> MachineLocation:
     """Find the profile file a ``--machine`` value names.
 
     A value with a path separator, a ``.toml`` suffix or that is an existing
@@ -121,6 +124,7 @@ def resolve_machine(*, machine: str, start: Path) -> MachineLocation:
     Args:
         machine: The name or the path given on the command line.
         start: The folder to search from, usually the working directory.
+        environment: The process environment used to locate the machine register.
 
     Returns:
         The absolute profile path and the folder the jobs run in.
@@ -135,7 +139,7 @@ def resolve_machine(*, machine: str, start: Path) -> MachineLocation:
     for folder in folders:
         if (folder / f'{machine}.toml').is_file():
             return MachineLocation(path=folder / f'{machine}.toml', project_root=folder.parent)
-    registered = read_register()
+    registered = read_register(environment=environment)
     if machine in registered:
         path = registered[machine]
         if not path.is_file():

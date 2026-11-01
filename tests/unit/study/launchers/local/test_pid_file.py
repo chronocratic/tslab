@@ -40,7 +40,13 @@ from tslab.study.state import StudyState
 
 
 def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:
-    with hold_launch(study_folder=tmp_path, task_ids=['j_0', 'j_1']) as set_state:
+    with hold_launch(
+        study_folder=tmp_path,
+        task_ids=['j_0', 'j_1'],
+        pid=os.getpid(),
+        host=hostname(),
+        now=utc_now_iso(),
+    ) as set_state:
         launch = read_launch(study_folder=tmp_path)
         assert launch is not None
         assert launch.pid == os.getpid()
@@ -52,11 +58,25 @@ def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:
     assert read_launch(study_folder=tmp_path) is None
 
 
+def test_hold_launch_uses_given_pid_host_and_time(tmp_path: Path) -> None:
+    started = '2026-01-02T03:04:05+00:00'
+
+    with hold_launch(
+        study_folder=tmp_path, task_ids=['job_0'], pid=123, host='test-host', now=started
+    ):
+        launch = read_launch(study_folder=tmp_path)
+
+    assert launch is not None
+    assert (launch.pid, launch.hostname, launch.started) == (123, 'test-host', started)
+
+
 def test_hold_launch_refuses_live_launch(tmp_path: Path) -> None:
     write_launch(folder=tmp_path, pid=os.getppid(), host=hostname(), tasks={})
     with (
         pytest.raises(LocalLaunchError, match=rf'{os.getppid()}.*tslab study cancel'),
-        hold_launch(study_folder=tmp_path, task_ids=[]),
+        hold_launch(
+            study_folder=tmp_path, task_ids=[], pid=os.getpid(), host=hostname(), now=utc_now_iso()
+        ),
     ):
         pytest.fail('must not enter')
 
@@ -65,7 +85,16 @@ def test_hold_launch_removes_stale_file_with_warning(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     write_launch(folder=tmp_path, pid=finished_pid(), host=hostname(), tasks={'old_0': 'running'})
-    with caplog.at_level('WARNING'), hold_launch(study_folder=tmp_path, task_ids=['j_0']):
+    with (
+        caplog.at_level('WARNING'),
+        hold_launch(
+            study_folder=tmp_path,
+            task_ids=['j_0'],
+            pid=os.getpid(),
+            host=hostname(),
+            now=utc_now_iso(),
+        ),
+    ):
         launch = read_launch(study_folder=tmp_path)
         assert launch is not None
         assert launch.pid == os.getpid()
@@ -76,7 +105,9 @@ def test_hold_launch_refuses_other_host(tmp_path: Path) -> None:
     write_launch(folder=tmp_path, pid=1, host='elsewhere', tasks={})
     with (
         pytest.raises(LocalLaunchError, match=rf'elsewhere.*{LAUNCH_FILE}'),
-        hold_launch(study_folder=tmp_path, task_ids=[]),
+        hold_launch(
+            study_folder=tmp_path, task_ids=[], pid=os.getpid(), host=hostname(), now=utc_now_iso()
+        ),
     ):
         pytest.fail('must not enter')
     assert (tmp_path / LAUNCH_FILE).exists()
@@ -89,19 +120,19 @@ def test_local_job_states_map_pending_and_running(tmp_path: Path) -> None:
         host=hostname(),
         tasks={'j_0': 'pending', 'j_1': 'running', 'j_2': 'ended'},
     )
-    assert local_job_states(study_folder=tmp_path) == {
+    assert local_job_states(study_folder=tmp_path, host=hostname()) == {
         'j_0': 'pending',
         'j_1': 'running',
         'j_2': 'ended',
     }
     launch = read_launch(study_folder=tmp_path)
     assert launch is not None
-    assert launch_is_live(launch=launch)
+    assert launch_is_live(launch=launch, host=hostname())
 
 
 def test_local_job_states_without_live_launch_is_empty(tmp_path: Path) -> None:
     write_launch(folder=tmp_path, pid=finished_pid(), host=hostname(), tasks={'j_0': 'running'})
-    assert local_job_states(study_folder=tmp_path) == {}
+    assert local_job_states(study_folder=tmp_path, host=hostname()) == {}
 
 
 def test_status_reads_local_launch_states(project: Path) -> None:

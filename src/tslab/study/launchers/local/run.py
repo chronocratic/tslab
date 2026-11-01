@@ -10,8 +10,6 @@ import sys
 from typing import TextIO
 
 from tslab.core.files import atomic_write_text
-from tslab.core.meta import hostname
-from tslab.core.status import utc_now_iso
 from tslab.jobs.local import (
     gpu_lock_folder,
     PoolCommand,
@@ -53,13 +51,14 @@ def write_job_files(
         )
 
 
-def local_job_id(*, job_file: int) -> str:
+def local_job_id(*, job_file: int, pid: int) -> str:
     """The job id of the local launch of one group file.
 
     Args:
         job_file: The group file number of the launch.
+        pid: The process id of the launch.
     """
-    return f'local-{os.getpid()}-{job_file}'
+    return f'local-{pid}-{job_file}'
 
 
 def usage_file(*, log_file: Path) -> Path:
@@ -107,6 +106,9 @@ class LocalLauncher:
         project_root: Path,
         env: Mapping[str, str],
         local: LocalSettings,
+        pid: int,
+        host: str,
+        now: Callable[[], str],
         gpu_ids: tuple[str, ...] = (),
         stream: TextIO | None = None,
         on_task_state: OnTaskState | None = None,
@@ -118,6 +120,9 @@ class LocalLauncher:
             project_root: The directory the tasks run in.
             env: The ``[env]`` of the machine.
             local: The ``[local]`` table: time limit, signals, parallelism.
+            pid: The process id of the launch.
+            host: The host name of the launch.
+            now: Return the current UTC ISO timestamp.
             gpu_ids: The resolved GPU ids the tasks lease; the caller
                 resolves ``"auto"``. Empty for CPU-only slots.
             stream: Console output stream; standard output when omitted.
@@ -129,6 +134,9 @@ class LocalLauncher:
         self._project_root = project_root
         self._env = env
         self._local = local
+        self._pid = pid
+        self._host = host
+        self._now = now
         self._gpu_ids = gpu_ids
         self._stream = stream
         self._on_task_state = on_task_state
@@ -157,7 +165,7 @@ class LocalLauncher:
         Raises:
             LaunchStopped: If a stop signal was caught, with its number.
         """
-        job_id = local_job_id(job_file=group.job_file)
+        job_id = local_job_id(job_file=group.job_file, pid=self._pid)
         record(job_id)
         stream = sys.stdout if self._stream is None else self._stream
         if self._gpu_ids:
@@ -169,7 +177,7 @@ class LocalLauncher:
         def task_header(key: str) -> str:
             task = by_key[key]
             header = (
-                f'=== tslab attempt {task.attempt} | job {job_id} | {hostname()} | {utc_now_iso()}'
+                f'=== tslab attempt {task.attempt} | job {job_id} | {self._host} | {self._now()}'
             )
             if self._gpu_ids:
                 header += f' | gpus {",".join(self._gpu_ids)}'
