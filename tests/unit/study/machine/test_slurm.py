@@ -6,6 +6,20 @@ import pytest
 
 from tests.unit.study.machine.helpers import BASE_SLURM, SLURM_TABLE, write
 from tslab.study.machine import load_machine, MachineProfileError, SlurmSettings
+import tslab.study.machine.slurm as slurm_machine
+
+
+def test_slurm_settings_from_normalizes_its_profile_table(tmp_path: Path) -> None:
+    slurm = slurm_machine.settings_from(
+        table={'slurm': {'partition': 'p', 'sbatch_extra': {'mail-type': 'END'}}},
+        path=tmp_path / 'cluster.toml',
+    )
+
+    assert ('slurm', frozenset({'auto_retry', 'wandb_sync', 'time'})) == (
+        slurm_machine.TABLE,
+        slurm_machine.FOLLOWUP_KEYS,
+    )
+    assert slurm == SlurmSettings(partition='p', sbatch_extra=(('mail_type', 'END'),))
 
 
 def test_slurm_time_has_the_documented_default(tmp_path: Path) -> None:

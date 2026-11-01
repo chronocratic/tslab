@@ -2,11 +2,7 @@
   "module_imports_both": {
     "src/tslab/study/failures.py": 1
   },
-  "name_comparisons": {
-    "src/tslab/study/machine/load.py": 5,
-    "src/tslab/study/machine/local.py": 2,
-    "src/tslab/study/machine/slurm.py": 2
-  },
+  "name_comparisons": {},
   "none_checks": {},
   "test_imports_both": {}
 }

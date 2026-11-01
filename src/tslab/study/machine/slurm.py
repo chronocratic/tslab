@@ -1,14 +1,31 @@
 """The ``[slurm]`` table of a machine profile."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
+from typing import Literal
 
-from tslab.study.machine.tables import check_keys, check_range, decode, MachineProfileError
+from tslab.study.machine.tables import (
+    check_keys,
+    check_range,
+    decode,
+    from_table,
+    MachineProfileError,
+)
 
-__all__ = ['SlurmSettings', 'reject_local', 'sbatch_extra', 'slurm_overrides']
+__all__ = [
+    'FOLLOWUP_KEYS',
+    'TABLE',
+    'SlurmSettings',
+    'sbatch_extra',
+    'settings_from',
+    'slurm_overrides',
+]
 
+TABLE: Literal['slurm'] = 'slurm'
+FOLLOWUP_KEYS = frozenset(('auto_retry', 'wandb_sync', 'time'))
 _SBATCH_NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 
 
@@ -70,6 +87,28 @@ class SlurmSettings:
         if self.gpus:
             parts.append(f'gpus={self.gpus}')
         return ', '.join(parts)
+
+
+def settings_from(*, table: Mapping[str, object], path: Path) -> SlurmSettings:
+    """Read and validate this profile's SLURM settings table."""
+    slurm_table = table.get(TABLE)
+    if isinstance(slurm_table, dict) and 'sbatch_extra' in slurm_table:
+        slurm_table = {
+            **slurm_table,
+            'sbatch_extra': [
+                list(pair)
+                for pair in sbatch_extra(
+                    value=slurm_table['sbatch_extra'], location='slurm.sbatch_extra', path=path
+                )
+            ],
+        }
+    slurm = from_table(
+        cls=SlurmSettings, table=slurm_table, location=TABLE, path=path, required=True
+    )
+    if slurm is None:
+        message = f'{path}: the {TABLE} table is required'
+        raise MachineProfileError(message)
+    return slurm
 
 
 def sbatch_extra(
@@ -142,19 +181,3 @@ def slurm_overrides(*, table: object, location: str, path: Path) -> dict[str, ob
         values[key] = getattr(probe, key)
         check_range(key=key, value=values[key], location=f'{location}.slurm.{key}', path=path)
     return values
-
-
-def reject_local(*, table: dict[str, object], path: Path) -> None:
-    """A SLURM launcher has no local settings: [local] tables would be silently half-applied."""
-    if 'local' in table:
-        message = f'{path}: local is not used by launcher "slurm"; remove the [local] table'
-        raise MachineProfileError(message)
-    entries = table.get('overrides')
-    if not isinstance(entries, list):
-        return
-    for position, entry in enumerate(entries):
-        if isinstance(entry, dict) and 'local' in entry:
-            message = (
-                f'{path}: overrides[{position}].local is not used by launcher "slurm"; remove it'
-            )
-            raise MachineProfileError(message)

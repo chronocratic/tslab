@@ -12,6 +12,19 @@ from tslab.study.machine import (
     MachineProfileError,
     timeout_seconds,
 )
+import tslab.study.machine.local as local_machine
+
+
+def test_local_settings_from_loads_its_profile_table(tmp_path: Path) -> None:
+    local = local_machine.settings_from(
+        table={'local': {'timeout': '00:05:00', 'gpus': 'auto'}}, path=tmp_path / 'local.toml'
+    )
+
+    assert ('local', frozenset({'auto_retry'})) == (
+        local_machine.TABLE,
+        local_machine.FOLLOWUP_KEYS,
+    )
+    assert local == LocalSettings(timeout='00:05:00', gpus='auto')
 
 
 def test_local_profile_needs_little(tmp_path: Path) -> None:

@@ -1,11 +1,43 @@
 """``load_machine``: a machine profile, read from TOML strictly."""
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
 from tests.unit.study.machine.helpers import BASE_SLURM, LOCAL, write
-from tslab.study.machine import load_machine, MachineProfileError, SlurmSettings
+from tslab.study.machine import load_machine, LocalSettings, MachineProfileError, SlurmSettings
+import tslab.study.machine.load as machine_load
+
+
+def test_profile_backends_are_keyed_by_their_declared_table() -> None:
+    assert {name: backend.TABLE for name, backend in machine_load.PROFILE_BACKENDS.items()} == {
+        'local': 'local',
+        'slurm': 'slurm',
+    }
+
+
+def test_load_machine_uses_selected_backend_settings_loader(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[Mapping[str, object]] = []
+
+    class LocalProfileBackend:
+        TABLE: Literal['local'] = 'local'
+        FOLLOWUP_KEYS: frozenset[str] = frozenset({'auto_retry'})
+
+        def settings_from(self, *, table: Mapping[str, object], path: Path) -> LocalSettings:
+            calls.append(table)
+            return LocalSettings(timeout='00:05:00')
+
+    monkeypatch.setitem(machine_load.PROFILE_BACKENDS, 'local', LocalProfileBackend())
+
+    profile = load_machine(path=write(tmp_path, LOCAL))
+
+    assert profile.local == LocalSettings(timeout='00:05:00')
+    assert calls == [{'launcher': 'local', 'output_root': 'runs'}]
+
 
 CLUSTER_TOML = """\
 launcher = "slurm"
