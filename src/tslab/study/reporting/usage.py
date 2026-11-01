@@ -6,7 +6,7 @@ import logging
 import math
 from typing import cast
 
-from tslab.core.text import log_table
+from tslab.core.text import format_bytes, format_duration, log_table
 from tslab.jobs.slurm import (
     format_slurm_duration,
     format_slurm_memory,
@@ -155,7 +155,7 @@ def _is_paused(*, report: RunReport) -> bool:
 
 
 def _duration_text(*, duration: timedelta | None) -> str | None:
-    return None if duration is None else format_slurm_duration(duration=duration)
+    return None if duration is None else format_duration(seconds=duration.total_seconds())
 
 
 def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
@@ -218,14 +218,14 @@ def _memory(*, value: object) -> str | None:
     if value is None:
         return None
     # why: usage_document writes these fields as ints in bytes
-    return format_slurm_memory(size=cast('int', value))
+    return format_bytes(size=cast('int', value))
 
 
 def _seconds(*, value: object) -> str | None:
     if value is None:
         return None
     # why: usage_document writes this field as an int of seconds
-    return format_slurm_duration(duration=timedelta(seconds=cast('int', value)))
+    return format_duration(seconds=cast('int', value))
 
 
 def _text(*, value: object) -> str:
