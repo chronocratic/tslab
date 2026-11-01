@@ -33,14 +33,18 @@ from tslab.core.fingerprint import (
     FINGERPRINT_FORMAT_VERSION,
     is_not_fingerprinted,
 )
+from tslab.core.meta.instance import (
+    can_resume,
+    identity_from_meta,
+    instance_meta_document,
+    stale_reason,
+)
 from tslab.core.paths import (
     atomic_write_json,
     atomic_write_text,
     ERROR_FILE,
-    JsonFileError,
     META_FILE,
     normalize_instance_name,
-    read_json_object,
     replace_directory,
     validate_stage_name,
 )
@@ -53,13 +57,12 @@ from tslab.core.status import (
     StatusFileError,
     utc_now_iso,
 )
-from tslab.core.text import describe_error, qualified_name
+from tslab.core.text import describe_error
 
-__all__ = ['INSTANCE_META_FORMAT_VERSION', 'FunctionStage', 'Stage', 'stage']
+__all__ = ['FunctionStage', 'Stage', 'stage']
 
 _LOGGER = logging.getLogger(__name__)
 _AGREEMENT_SEQUENCE = count()
-INSTANCE_META_FORMAT_VERSION = 1
 _INCOMPLETE_MARKER = '.incomplete'
 _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
 
@@ -214,12 +217,12 @@ class Stage[Out: Artifact](ABC):
         # 4. Decide: load or run.
         invalidation = run.invalidation_reason(instance_id=instance_id)
         record = run.instance_record(instance_id=instance_id)
-        stale_reason = invalidation or _stale_reason(
+        reason = invalidation or stale_reason(
             record=record, fingerprint=fingerprint, directory=directory, inputs=inputs
         )
         if run.options.dry_run:
             return _plan_dry_run(
-                run=run, instance_id=instance_id, directory=directory, stale_reason=stale_reason
+                run=run, instance_id=instance_id, directory=directory, stale_reason=reason
             )
         agreement = (
             next((value for value in arguments.values() if isinstance(value, RankAgreement)), None)
@@ -233,13 +236,13 @@ class Stage[Out: Artifact](ABC):
             directory=directory,
             instance_id=instance_id,
             agreement_key=agreement_key,
-            stale_reason=stale_reason,
+            stale_reason=reason,
             agreement=agreement,
         )
         if loaded is not None:
             return loaded
-        if stale_reason is not None:
-            _LOGGER.info('run %s (%s)', instance_id, stale_reason)
+        if reason is not None:
+            _LOGGER.info('run %s (%s)', instance_id, reason)
         # 5. Execute, save, record.
         execution = _Execution(
             run=run,
@@ -257,7 +260,7 @@ class Stage[Out: Artifact](ABC):
             arguments=arguments,
             resume=self.in_place
             and invalidation is None
-            and _can_resume(record=record, fingerprint=fingerprint),
+            and can_resume(record=record, fingerprint=fingerprint),
         )
 
     def _cached_result(
@@ -306,7 +309,7 @@ class Stage[Out: Artifact](ABC):
     def _try_load(self, *, directory: Path, instance_id: str) -> Artifact | None:
         try:
             artifact = self.output_type.load(directory=directory)
-            identity = _identity_from_meta(directory=directory, instance_id=instance_id)
+            identity = identity_from_meta(directory=directory, instance_id=instance_id)
         except Exception:  # any load failure means "recompute", never "crash"
             _LOGGER.warning('cannot load %s; running it again', instance_id, exc_info=True)
             return None
@@ -351,7 +354,7 @@ class Stage[Out: Artifact](ABC):
                 artifact.save(directory=work_directory)
                 atomic_write_json(
                     path=work_directory / META_FILE,
-                    document=_instance_meta_document(
+                    document=instance_meta_document(
                         stage=self,
                         execution=execution,
                         artifact=artifact,
@@ -495,7 +498,7 @@ def _plan_dry_run(
     )
     if stale_reason is None:
         try:
-            identity = _identity_from_meta(directory=directory, instance_id=instance_id)
+            identity = identity_from_meta(directory=directory, instance_id=instance_id)
         except StatusFileError:
             _LOGGER.warning(
                 'cannot read result metadata of %s; its inputs stay unknown', instance_id
@@ -503,35 +506,6 @@ def _plan_dry_run(
         else:
             bind_identity(artifact=placeholder, identity=identity)
     return placeholder
-
-
-def _instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fact
-    *,
-    stage: Stage[Any],
-    execution: _Execution,
-    artifact: Artifact,
-    execution_id: str,
-    started_at: str,
-    seconds: float,
-) -> dict[str, object]:
-    """Return the content of the ``meta.json`` of one executed instance."""
-    return {
-        'format_version': INSTANCE_META_FORMAT_VERSION,
-        'instance_id': execution.instance_id,
-        'stage_version': stage.version,
-        'fingerprint': execution.fingerprint,
-        'execution_id': execution_id,
-        'artifact_type': qualified_name(cls=type(artifact)),
-        'settings': execution.settings,
-        'inputs': _describe_inputs(inputs=execution.inputs),
-        'external_inputs': _describe_external_inputs(inputs=execution.inputs),
-        # The code and package versions that made this result. A resumed run
-        # rewrites the run meta.json, so only here do they stay tied to the result.
-        'environment': execution.run.environment(),
-        'started_at': started_at,
-        'finished_at': utc_now_iso(),
-        'seconds': seconds,
-    }
 
 
 def _blocking_input(*, inputs: Mapping[str, Artifact]) -> UnavailableArtifact | None:
@@ -549,103 +523,6 @@ def _has_unknown_dry_run_input(*, inputs: Mapping[str, Artifact]) -> bool:
         isinstance(value, UnavailableArtifact) and value.tslab_identity is None
         for value in inputs.values()
     )
-
-
-def _stale_reason(
-    *,
-    record: InstanceRecord | None,
-    fingerprint: str,
-    directory: Path,
-    inputs: Mapping[str, Artifact],
-) -> str | None:
-    """Return why the cached result cannot be used, or ``None`` if it can."""
-    if record is None:
-        return 'new'
-    if record.fingerprint is not None and record.fingerprint != fingerprint:
-        return f'fingerprint changed {record.fingerprint} -> {fingerprint}'
-    if record.state is not InstanceState.DONE:
-        return f'previous state {record.state.value}'
-    meta_path = directory / META_FILE
-    if not meta_path.exists():
-        return 'result folder missing'
-    document = _read_instance_meta(path=meta_path)
-    if document is None:
-        reason = 'cannot read result metadata'
-    elif document.get('format_version') != INSTANCE_META_FORMAT_VERSION:
-        reason = 'unsupported result metadata format'
-    else:
-        # TSLab writes ``inputs`` as a mapping of dicts; the cast names that shape.
-        recorded_inputs = cast('dict[str, dict[str, str | None]]', document.get('inputs') or {})
-        reason = None
-        for key, value in inputs.items():
-            identity = value.tslab_identity
-            if identity is None or identity.instance_id is None:
-                continue
-            if recorded_inputs.get(key, {}).get('execution_id') != identity.execution_id:
-                reason = f'input {identity.instance_id} was executed again'
-                break
-    return reason
-
-
-def _can_resume(*, record: InstanceRecord | None, fingerprint: str) -> bool:
-    return (
-        record is not None
-        and record.state in {InstanceState.RUNNING, InstanceState.FAILED}
-        and record.fingerprint == fingerprint
-    )
-
-
-def _identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentity:
-    document = _read_instance_meta(path=directory / META_FILE)
-    fingerprint: object = None
-    execution_id: object = None
-    if document is not None and document.get('format_version') == INSTANCE_META_FORMAT_VERSION:
-        fingerprint = document.get('fingerprint')
-        execution_id = document.get('execution_id')
-    if not isinstance(fingerprint, str) or not isinstance(execution_id, str):
-        message = f'cannot read result metadata of {instance_id}'
-        raise StatusFileError(message)
-    return ArtifactIdentity(
-        fingerprint=fingerprint, instance_id=instance_id, execution_id=execution_id
-    )
-
-
-def _read_instance_meta(*, path: Path) -> dict[str, object] | None:
-    """Parse the ``meta.json`` of one instance; unreadable or non-object files give ``None``.
-
-    A corrupt or partial file must never crash a run: the instance recomputes
-    instead (see ``_stale_reason`` and ``_identity_from_meta``).
-    """
-    try:
-        return read_json_object(path=path)
-    except (OSError, JsonFileError):
-        _LOGGER.warning('cannot read %s; treating the result as stale', path.as_posix())
-        return None
-
-
-def _describe_inputs(*, inputs: Mapping[str, Artifact]) -> dict[str, dict[str, str | None]]:
-    described: dict[str, dict[str, str | None]] = {}
-    for key, value in inputs.items():
-        identity = value.tslab_identity
-        if identity is not None and identity.instance_id is not None:
-            described[key] = {
-                'instance_id': identity.instance_id,
-                'fingerprint': identity.fingerprint,
-                'execution_id': identity.execution_id,
-            }
-    return described
-
-
-def _describe_external_inputs(*, inputs: Mapping[str, Artifact]) -> dict[str, dict[str, str]]:
-    described: dict[str, dict[str, str]] = {}
-    for key, value in inputs.items():
-        identity = value.tslab_identity
-        if identity is not None and identity.external_path is not None:
-            described[key] = {
-                'path': identity.external_path.as_posix(),
-                'fingerprint': identity.fingerprint,
-            }
-    return described
 
 
 class FunctionStage[**P, Out: Artifact](Stage[Out]):
