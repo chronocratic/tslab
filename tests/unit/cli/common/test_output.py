@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from tslab.cli import main
-from tslab.cli.output import print_json
+from tslab.cli.common import print_json
 
 
 def run_main_raw(*args: str) -> int:

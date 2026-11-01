@@ -8,7 +8,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.output import print_json
+from tslab.cli.common import print_json
 from tslab.cli.study import _context_of, _detach, _selection_args, _selection_options, _warn_no_runs
 from tslab.study.commands import submit
 from tslab.study.documents import launch_document

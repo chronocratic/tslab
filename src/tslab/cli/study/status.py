@@ -5,10 +5,8 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.console import watch
-from tslab.cli.output import print_json
+from tslab.cli.common import print_json, UsageError, watch
 from tslab.cli.study import _context_of, _states_of, _status_hints, _usage_errors
-from tslab.cli.usage import UsageError
 from tslab.study.commands import status
 from tslab.study.context import Context, expected_starts
 from tslab.study.documents import show_document, status_document

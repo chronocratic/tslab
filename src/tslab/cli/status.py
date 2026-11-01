@@ -20,9 +20,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.console import watch
-from tslab.cli.output import print_json
-from tslab.cli.usage import UsageError
+from tslab.cli.common import print_json, UsageError, watch
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import (
     InstanceRecord,

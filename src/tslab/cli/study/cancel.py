@@ -6,7 +6,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.output import print_json
+from tslab.cli.common import print_json
 from tslab.cli.study import _context_of, _selection_args
 from tslab.study.commands import cancel
 from tslab.study.documents import cancel_document
