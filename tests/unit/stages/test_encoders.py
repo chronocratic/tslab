@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pytest
 import torch
 
@@ -85,6 +87,19 @@ def test_the_fingerprint_keeps_the_pre_move_type_name() -> None:
         '__type__': 'tslab.interfaces.encoder.ModelAsEncoder',
         'batch_size': None,
     }
+
+
+def test_a_subclass_keeps_its_own_type_name_and_fields() -> None:
+    @dataclass(frozen=True, kw_only=True)
+    class Extended(ModelAsEncoder):
+        normalized: bool = True
+
+    assert canonicalize(value=Extended()) == {
+        '__type__': f'{Extended.__module__}.{Extended.__qualname__}',
+        'normalized': True,
+        'batch_size': None,
+    }
+    assert canonicalize(value=Extended()) != canonicalize(value=ModelAsEncoder())
 
 
 @pytest.mark.parametrize('batch_size', [0, -3])
