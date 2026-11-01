@@ -16,8 +16,8 @@ from tslab.jobs.slurm import (
 from tslab.study.context import Context
 from tslab.study.launchers import backend_for, Resources
 from tslab.study.machine import SlurmSettings
-from tslab.study.report import resources_of
-from tslab.study.state import RunReport
+from tslab.study.reporting.report import resources_of
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['log_usage', 'usage_document']
 

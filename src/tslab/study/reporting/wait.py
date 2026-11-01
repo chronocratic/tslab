@@ -5,8 +5,14 @@ import logging
 import time
 
 from tslab.study.context import Context
-from tslab.study.outcome import counts_live, EXIT_LIVE, EXIT_TIMEOUT, EXIT_UNKNOWN, study_exit_code
-from tslab.study.state import StudyState
+from tslab.study.reporting.outcome import (
+    counts_live,
+    EXIT_LIVE,
+    EXIT_TIMEOUT,
+    EXIT_UNKNOWN,
+    study_exit_code,
+)
+from tslab.study.reporting.state import StudyState
 
 __all__ = ['wait_for_study']
 

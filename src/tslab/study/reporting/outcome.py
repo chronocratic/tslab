@@ -3,7 +3,7 @@
 from collections.abc import Iterable
 
 from tslab.study.context import Context
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = [
     'EXIT_DONE',

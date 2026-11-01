@@ -6,7 +6,7 @@ import logging
 from tslab.jobs.slurm import job_ended, query_expected_starts, query_job_states, SlurmError
 from tslab.study.context import Context
 from tslab.study.records import JobRecord, latest_tasks
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 __all__ = ['expected_starts', 'followup_job_ids', 'slurm_task_ids']
 

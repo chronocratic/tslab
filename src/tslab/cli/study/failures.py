@@ -9,9 +9,9 @@ import tyro
 from tslab.cli.common import print_json
 from tslab.cli.study import _context_of, _states_of
 from tslab.jobs.slurm import SlurmError
-from tslab.study.failures import collect_failures, log_failures
 from tslab.study.launchers import backend_for
-from tslab.study.usage import log_usage, usage_document
+from tslab.study.reporting.failures import collect_failures, log_failures
+from tslab.study.reporting.usage import log_usage, usage_document
 
 __all__ = ['Failures', 'Usage']
 

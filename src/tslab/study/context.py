@@ -11,7 +11,7 @@ from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun
 from tslab.study.records import JobRecord, read_jobs, submission_in_progress
-from tslab.study.state import collect_states, RunReport
+from tslab.study.reporting.state import collect_states, RunReport
 
 if TYPE_CHECKING:
     from tslab.study.launchers import JobStates

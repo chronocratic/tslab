@@ -27,7 +27,7 @@ from tslab.core.status import (
 )
 from tslab.study.commands import resubmit, submit
 from tslab.study.context import Context, load_context, refresh_context, Selection
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 
 def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:

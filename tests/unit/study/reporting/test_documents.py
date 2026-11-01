@@ -1,8 +1,11 @@
-"""Versioned JSON documents for study status."""
+"""Versioned JSON documents for study status and the ``study show`` output."""
 
 import dataclasses
+import json
 from pathlib import Path
 from typing import cast
+
+import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import (
@@ -13,10 +16,13 @@ from tests.unit.study.helpers import (
     submit_study,
     write_run_status,
 )
+from tslab.cli import main
 from tslab.core.status import InstanceState, RunState, utc_now_iso
-from tslab.study.documents import run_entry, status_document
+from tslab.core.text import TextTable
+from tslab.study.definition import expand_runs, load_study
 from tslab.study.records import append_job, JobRecord
-from tslab.study.state import StudyState
+from tslab.study.reporting.documents import run_entry, show_document, status_document
+from tslab.study.reporting.state import StudyState
 
 
 def test_status_document_counts_every_state(project: Path, fake: FakeSlurm) -> None:
@@ -93,3 +99,35 @@ def test_run_entry_names_live_auto_retry_job(project: Path, fake: FakeSlurm) -> 
     )
     ctx = context(project=project, machine_file='cluster.toml')
     assert run_entry(report=ctx.reports[0], context=ctx)['reason'] == 'auto retry queued (job 2000)'
+
+
+def test_show_document_lists_axes_and_counts(project: Path) -> None:
+    study = load_study(reference='toy_studies:study')
+    document = show_document(study=study)
+    grids = cast('list[dict[str, object]]', document['grids'])
+    assert document['schema'] == 'tslab.study-show/1'
+    assert grids[0]['axes'] == {'model': ['small', 'large'], 'seed': ['1', '2']}
+    assert grids[0]['runs'] == len(expand_runs(study=study))
+    assert document['total_runs'] == len(expand_runs(study=study))
+
+
+def test_show_cli_prints_table_without_machine(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('INFO'), pytest.raises(SystemExit) as raised:
+        main(args=['study', 'show', 'toy_studies:study'])
+    assert raised.value.code == 0
+    tables = [getattr(record, 'tslab_table', None) for record in caplog.records]
+    assert any(
+        isinstance(table, TextTable) and table.header == ('grid', 'short', 'runs', 'axes')
+        for table in tables
+    )
+    assert 'command of g:' in caplog.text
+    assert 'select with --grid <grid> or --only <axis>=<value>' in caplog.text
+
+
+def test_show_cli_prints_json(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit) as raised:
+        main(args=['study', 'show', 'toy_studies:study', '--json'])
+    assert raised.value.code == 0
+    assert json.loads(capsys.readouterr().out)['schema'] == 'tslab.study-show/1'

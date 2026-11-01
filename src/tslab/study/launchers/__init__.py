@@ -23,7 +23,7 @@ from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
-from tslab.study.state import RunReport
+from tslab.study.reporting.state import RunReport
 
 __all__ = [
     'BACKENDS',

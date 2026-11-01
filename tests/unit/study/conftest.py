@@ -25,8 +25,10 @@ def _clean_study_imports() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _no_grace_wait(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make the wait for a late ``status.json`` instant; only ``tslab.study.state`` sees it."""
-    monkeypatch.setattr('tslab.study.state.time', SimpleNamespace(sleep=lambda _seconds: None))
+    """Make the wait for a late ``status.json`` instant; only ``reporting.state`` sees it."""
+    monkeypatch.setattr(
+        'tslab.study.reporting.state.time', SimpleNamespace(sleep=lambda _seconds: None)
+    )
 
 
 @pytest.fixture

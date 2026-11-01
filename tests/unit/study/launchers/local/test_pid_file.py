@@ -36,7 +36,7 @@ from tslab.study.launchers.local.pid_file import (
     LocalLaunchError,
     read_launch,
 )
-from tslab.study.state import StudyState
+from tslab.study.reporting.state import StudyState
 
 
 def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:

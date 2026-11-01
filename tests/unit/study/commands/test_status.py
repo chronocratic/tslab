@@ -12,9 +12,9 @@ from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status
 from tslab.study.context import Context, expected_starts
-from tslab.study.documents import status_document
-from tslab.study.report import log_status
-from tslab.study.state import StudyState
+from tslab.study.reporting.documents import status_document
+from tslab.study.reporting.report import log_status
+from tslab.study.reporting.state import StudyState
 
 
 def normalized(text: str) -> str:
@@ -75,7 +75,7 @@ def test_run_lines_stop_after_a_limit(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setattr('tslab.study.report._PROBLEMS_SHOWN', 1)
+    monkeypatch.setattr('tslab.study.reporting.report._PROBLEMS_SHOWN', 1)
     submit_study(project=project)
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
     with caplog.at_level('INFO'):

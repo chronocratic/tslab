@@ -33,8 +33,8 @@ from tslab.core.status import (
 )
 from tslab.core.text import log_table
 from tslab.study.launchers import JobPhase
-from tslab.study.outcome import states_exit_code
-from tslab.study.state import read_folder, study_state, StudyState
+from tslab.study.reporting.outcome import states_exit_code
+from tslab.study.reporting.state import read_folder, study_state, StudyState
 
 __all__ = ['Status']
 

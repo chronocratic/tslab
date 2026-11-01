@@ -10,10 +10,10 @@ from tslab.cli.study import _context_of, _states_of, _status_hints, _usage_error
 from tslab.study.commands import status
 from tslab.study.context import Context, expected_starts
 from tslab.study.definition import load_study
-from tslab.study.documents import show_document, status_document
-from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
-from tslab.study.report import log_show
-from tslab.study.wait import wait_for_study
+from tslab.study.reporting.documents import show_document, status_document
+from tslab.study.reporting.outcome import EXIT_TIMEOUT, study_exit_code
+from tslab.study.reporting.report import log_show
+from tslab.study.reporting.wait import wait_for_study
 
 __all__ = ['Show', 'Status', 'Wait']
 

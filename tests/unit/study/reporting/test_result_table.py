@@ -20,8 +20,12 @@ from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
 from tslab.study.definition import expand_runs, load_study
-from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
-from tslab.study.state import collect_states, RunReport
+from tslab.study.reporting.result_table import (
+    collect_results,
+    format_results_csv,
+    write_results_csv,
+)
+from tslab.study.reporting.state import collect_states, RunReport
 
 
 @dataclass(frozen=True, kw_only=True)

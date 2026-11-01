@@ -24,7 +24,7 @@ from tslab.study import StudyRun
 from tslab.study.launchers import JobPhase
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
-from tslab.study.state import (
+from tslab.study.reporting.state import (
     _grace_wait,
     collect_states,
     FolderFacts,

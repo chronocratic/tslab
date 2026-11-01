@@ -20,7 +20,7 @@ from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
 from tslab.study.launchers import available_cpus
 from tslab.study.paths import instance_directory
-from tslab.study.state import RunReport
+from tslab.study.reporting.state import RunReport
 
 __all__ = [
     'METRICS_TYPE',

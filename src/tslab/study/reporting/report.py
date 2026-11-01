@@ -12,7 +12,7 @@ from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']
 
