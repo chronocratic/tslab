@@ -1,4 +1,4 @@
-"""Fixtures shared by the study tests: a toy project, fake SLURM, clean imports."""
+"""Fixtures shared by the study tests: a toy project, fake SLURM, a fake backend, clean imports."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.support.fake_backend import FakeBackend, install_fake_backend
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.project import write_toy_project
 
@@ -44,3 +45,9 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
     """Fake SLURM commands first on PATH."""
     return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
+
+
+@pytest.fixture
+def fake_backend(monkeypatch: pytest.MonkeyPatch) -> FakeBackend:
+    """The fake backend installed for both launchers."""
+    return install_fake_backend(monkeypatch=monkeypatch)

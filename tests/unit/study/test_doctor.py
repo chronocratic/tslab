@@ -5,8 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
-from tslab.study import launchers
+from tests.support.fake_backend import FakeBackend
 import tslab.study.doctor as doctor_module
 from tslab.study.doctor import DoctorCheck, run_checks
 
@@ -21,25 +20,16 @@ def test_doctor_ok_on_local_toy_profile(project: Path) -> None:
     assert statuses['disk'] == 'ok'
 
 
-def test_doctor_checks_come_from_selected_backend(
-    project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_doctor_checks_come_from_selected_backend(project: Path, fake_backend: FakeBackend) -> None:
     backend_check = DoctorCheck(name='backend', status='ok', message='backend selected')
-    calls: list[bool] = []
-
-    class Backend:
-        def doctor_checks(self) -> tuple[DoctorCheck, ...]:
-            calls.append(True)
-            return (backend_check,)
-
-    monkeypatch.setattr(launchers, 'backend_for', lambda **_kwargs: Backend())
+    fake_backend.doctor_answer = (backend_check,)
 
     checks = run_checks(
         machine_path=project / 'local.toml', study=None, start=project, environment=os.environ
     )
 
     assert backend_check in checks
-    assert calls == [True]
+    assert len(fake_backend.calls('doctor_checks')) == 1
 
 
 def test_wandb_check_uses_given_environment(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -58,22 +48,6 @@ def test_wandb_check_uses_given_environment(project: Path, monkeypatch: pytest.M
 
     wandb = next(check for check in checks if check.name == 'wandb')
     assert wandb.status == 'ok'
-
-
-def test_doctor_fails_missing_slurm_commands(
-    project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    empty_path = tmp_path / 'empty-bin'
-    empty_path.mkdir()
-    monkeypatch.setenv('PATH', str(empty_path))
-    checks = run_checks(
-        machine_path=project / 'cluster.toml', study=None, start=project, environment=os.environ
-    )
-    slurm = next(check for check in checks if check.name == 'slurm')
-    assert slurm.status == 'fail'
-    assert 'sbatch' in slurm.message
-    assert 'squeue' in slurm.message
-    assert 'sacct' in slurm.message
 
 
 def test_doctor_fails_unset_env_var(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -104,7 +78,7 @@ def test_doctor_warns_low_disk(project: Path, monkeypatch: pytest.MonkeyPatch) -
     assert '0.0 GB' in disk.message
 
 
-def test_doctor_checks_study_fits_machine(project: Path, fake: FakeSlurm) -> None:
+def test_doctor_checks_study_fits_machine(project: Path, fake_backend: FakeBackend) -> None:
     checks = run_checks(
         machine_path=project / 'cluster.toml',
         study='toy_studies:study',

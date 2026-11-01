@@ -65,6 +65,17 @@ def test_followup_job_ids_exclude_local_job_records() -> None:
     assert states.followup_job_ids(jobs=jobs) == ['20']
 
 
+def test_followup_job_ids_lists_only_sorted_slurm_followups() -> None:
+    jobs = [
+        _job_record(job_id='20', kind='followup', launcher='slurm'),
+        _job_record(job_id='10', kind='run', launcher='slurm'),
+        _job_record(job_id='local-123-1', kind='followup', launcher='local'),
+        _job_record(job_id='3', kind='followup', launcher='slurm'),
+    ]
+
+    assert states.followup_job_ids(jobs=jobs) == ['20', '3']
+
+
 def test_query_states_returns_new_cache_without_mutating_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
