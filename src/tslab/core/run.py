@@ -20,11 +20,11 @@ from typing import Literal, Self
 
 from tslab.core.codec import config_to_data
 from tslab.core.config import config_to_yaml, save_config
+from tslab.core.files import atomic_write_json
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.lock import acquire_lock, Heartbeat, release_lock
 from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
 from tslab.core.paths import (
-    atomic_write_json,
     CONFIG_FILE,
     InstanceName,
     LOCK_FILE,

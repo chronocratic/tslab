@@ -20,7 +20,8 @@ from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
 from tslab.core.artifact import Checkpoint
-from tslab.core.paths import atomic_write_json, require_path
+from tslab.core.files import atomic_write_json
+from tslab.core.paths import require_path
 from tslab.core.ranks import slurm_task_count
 from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.interfaces.data import DataSource

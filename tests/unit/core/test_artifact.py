@@ -14,8 +14,8 @@ from tslab.core.artifact import (
     UnavailableArtifactError,
     UnavailableReason,
 )
+from tslab.core.files import JsonFileError
 from tslab.core.fingerprint import canonicalize
-from tslab.core.paths import JsonFileError
 
 
 def test_json_round_trip(tmp_path: Path) -> None:

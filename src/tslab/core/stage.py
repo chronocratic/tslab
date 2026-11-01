@@ -27,6 +27,7 @@ from tslab.core.artifact import (
     UnavailableArtifact,
     UnavailableReason,
 )
+from tslab.core.files import atomic_write_json, atomic_write_text, replace_directory
 from tslab.core.fingerprint import (
     canonicalize,
     compute_fingerprint,
@@ -39,15 +40,7 @@ from tslab.core.meta.instance import (
     instance_meta_document,
     stale_reason,
 )
-from tslab.core.paths import (
-    atomic_write_json,
-    atomic_write_text,
-    ERROR_FILE,
-    META_FILE,
-    normalize_instance_name,
-    replace_directory,
-    validate_stage_name,
-)
+from tslab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
 from tslab.core.ranks import is_writer_process, RankAgreement, slurm_task_count
 from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.core.status import (

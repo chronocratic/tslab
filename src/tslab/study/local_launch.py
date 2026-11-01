@@ -11,8 +11,8 @@ import threading
 import time
 from typing import cast
 
+from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
-from tslab.core.paths import atomic_write_json, read_json_object
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import start_detached
 from tslab.study.state import LOCAL_ENDED

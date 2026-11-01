@@ -4,7 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from tslab.core.paths import atomic_write_json
+from tslab.core.files import atomic_write_json
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
