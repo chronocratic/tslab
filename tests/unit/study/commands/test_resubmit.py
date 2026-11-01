@@ -1,6 +1,7 @@
 """``tslab study resubmit``: the interrupted, missing and failed runs again."""
 
 import dataclasses
+import importlib
 import json
 import os
 from pathlib import Path
@@ -345,7 +346,9 @@ def test_local_auto_retry_stops_at_max_attempts(
 def test_local_no_retry_after_signal(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ctx = _local_retry_context(project=project, max_attempts=3)
     calls: list[object] = []
-    monkeypatch.setattr('tslab.study.commands.submit_runs', lambda **_: (143, []))
+    # the door re-exports `submit` (the function), shadowing the submodule; reach it by name
+    submit_module = importlib.import_module('tslab.study.commands.submit')
+    monkeypatch.setattr(submit_module, 'submit_runs', lambda **_: (143, []))
     monkeypatch.setattr('tslab.study.commands.resubmit', lambda **kwargs: calls.append(kwargs))
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
     assert code == 143
