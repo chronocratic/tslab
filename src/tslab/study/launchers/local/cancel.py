@@ -7,7 +7,7 @@ import signal as signal_module
 from tslab.core.meta import hostname
 from tslab.study.context import Context
 from tslab.study.launchers.local.pid_file import launch_is_live, read_launch
-from tslab.study.plan import study_folder
+from tslab.study.paths import study_folder
 
 __all__ = ['cancel_local']
 

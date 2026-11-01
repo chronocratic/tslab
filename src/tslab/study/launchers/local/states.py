@@ -4,7 +4,7 @@ from tslab.core.meta import hostname
 from tslab.study.definition import Study
 from tslab.study.launchers.local.pid_file import local_job_states
 from tslab.study.machine import MachineProfile
-from tslab.study.plan import study_folder
+from tslab.study.paths import study_folder
 from tslab.study.records import JobRecord, latest_tasks
 
 __all__ = ['_is_local_job_id', '_local_states']

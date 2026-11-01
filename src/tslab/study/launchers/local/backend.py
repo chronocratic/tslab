@@ -29,7 +29,8 @@ from tslab.study.launchers.local.run import (
 )
 from tslab.study.launchers.local.states import _local_states
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
-from tslab.study.plan import JobGroup, study_folder
+from tslab.study.paths import study_folder
+from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.state import RunReport
 

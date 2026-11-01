@@ -21,9 +21,10 @@ from tslab.jobs.local import (
 )
 from tslab.study.launchers import LaunchStopped, OnTaskState, RecordJob
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
+from tslab.study.paths import usage_file
 from tslab.study.plan import JobGroup
 
-__all__ = ['LocalLauncher', 'local_job_id', 'resolve_local_gpus', 'usage_file', 'write_job_files']
+__all__ = ['LocalLauncher', 'local_job_id', 'resolve_local_gpus', 'write_job_files']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,15 +60,6 @@ def local_job_id(*, job_file: int, pid: int) -> str:
         pid: The process id of the launch.
     """
     return f'local-{pid}-{job_file}'
-
-
-def usage_file(*, log_file: Path) -> Path:
-    """The usage file written next to the log of one local task.
-
-    Args:
-        log_file: The log file of the task.
-    """
-    return log_file.with_name(log_file.name + '.usage.json')
 
 
 def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) -> tuple[str, ...]:

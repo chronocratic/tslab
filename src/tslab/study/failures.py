@@ -10,8 +10,7 @@ from tslab.jobs.slurm import format_slurm_memory, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.documents import run_entry
 from tslab.study.machine import SlurmSettings
-from tslab.study.plan import study_folder
-from tslab.study.result_table import instance_directory
+from tslab.study.paths import instance_directory, study_folder
 from tslab.study.state import RunReport, StudyState
 from tslab.study.usage import _requested_memory
 

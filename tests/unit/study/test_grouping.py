@@ -10,7 +10,8 @@ from tslab.core.status import utc_now_iso
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.plan import assign_indices, next_job_file, plan_jobs, resolve_runs, validate_jobs
+from tslab.study.paths import next_job_file
+from tslab.study.plan import assign_indices, plan_jobs, resolve_runs, validate_jobs
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 
 

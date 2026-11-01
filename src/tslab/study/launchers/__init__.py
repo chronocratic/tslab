@@ -20,7 +20,8 @@ from tslab.jobs.slurm import SlurmError, SlurmJobUsage
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.plan import JobGroup, study_folder
+from tslab.study.paths import study_folder
+from tslab.study.plan import JobGroup
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 from tslab.study.state import RunReport
 

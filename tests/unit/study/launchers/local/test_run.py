@@ -24,7 +24,8 @@ from tslab.study.launchers.local.run import (
     write_job_files,
 )
 from tslab.study.machine import LocalSettings, MachineProfile
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, study_folder
+from tslab.study.paths import study_folder
+from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
 from tslab.study.records import read_jobs
 
 

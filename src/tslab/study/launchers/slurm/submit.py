@@ -12,7 +12,8 @@ from tslab.jobs.slurm import sbatch
 from tslab.study.launchers import RecordJob
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
-from tslab.study.plan import JobGroup, next_job_file
+from tslab.study.paths import next_job_file
+from tslab.study.plan import JobGroup
 from tslab.study.records import append_job, JobRecord
 
 __all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']

@@ -9,7 +9,7 @@ import time
 from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context
 from tslab.study.launchers.slurm.submit import submit_helper_job
-from tslab.study.plan import study_folder
+from tslab.study.paths import study_folder
 from tslab.study.records import JobRecord, submission_lock
 
 __all__ = ['queue_followups']
