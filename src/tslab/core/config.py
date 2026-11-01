@@ -26,7 +26,8 @@ from typing import Annotated, Any, Union
 import tyro
 import yaml
 
-from tslab.core.paths import atomic_write_text, require_path
+from tslab.core.files import atomic_write_text
+from tslab.core.paths import require_path
 from tslab.core.text import qualified_name
 
 __all__ = [

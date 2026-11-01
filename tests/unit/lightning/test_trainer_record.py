@@ -9,7 +9,7 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from tslab.core.paths import read_json_object
+from tslab.core.files import read_json_object
 from tslab.core.run import Run
 from tslab.interfaces import Batch
 from tslab.lightning.config import LightningTrainerConfig

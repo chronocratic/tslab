@@ -9,7 +9,7 @@ import re
 import tomllib
 from typing import cast
 
-from tslab.core.paths import atomic_write_text
+from tslab.core.files import atomic_write_text
 from tslab.study.machine.tables import MachineProfileError
 
 __all__ = [

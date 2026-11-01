@@ -17,7 +17,8 @@ import sys
 import time
 from typing import TextIO
 
-from tslab.core.paths import atomic_write_text, LOCK_FILE
+from tslab.core.files import atomic_write_text
+from tslab.core.paths import LOCK_FILE
 from tslab.jobs.local import start_keep_awake, stop_keep_awake
 from tslab.jobs.slurm import scancel, SlurmError
 from tslab.study.context import Context, refresh_context

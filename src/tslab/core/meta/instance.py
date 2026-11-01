@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
 from tslab.core.artifact import Artifact, ArtifactIdentity
-from tslab.core.paths import JsonFileError, META_FILE, read_json_object
+from tslab.core.files import JsonFileError, read_json_object
+from tslab.core.paths import META_FILE
 from tslab.core.status import InstanceRecord, InstanceState, StatusFileError, utc_now_iso
 from tslab.core.text import qualified_name
 

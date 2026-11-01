@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 from typing import cast
 
-from tslab.core.paths import read_json_object
+from tslab.core.files import read_json_object
 from tslab.core.text import log_table
 from tslab.jobs.slurm import (
     format_slurm_duration,

@@ -17,7 +17,8 @@ from typing import override
 
 import yaml
 
-from tslab.core.paths import atomic_write_text, TRACKERS_DIRECTORY
+from tslab.core.files import atomic_write_text
+from tslab.core.paths import TRACKERS_DIRECTORY
 from tslab.core.status import RunState
 
 __all__ = ['LocalTracker', 'RunStatus', 'Tracker']

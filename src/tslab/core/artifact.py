@@ -21,8 +21,9 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 import torch
 
+from tslab.core.files import atomic_write_json, atomic_write_text, read_json_object
 from tslab.core.fingerprint import compute_fingerprint, hash_path_contents
-from tslab.core.paths import atomic_write_json, atomic_write_text, read_json_object, require_path
+from tslab.core.paths import require_path
 from tslab.core.text import qualified_name
 
 __all__ = [

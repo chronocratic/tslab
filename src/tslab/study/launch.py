@@ -14,8 +14,8 @@ import time
 from typing import Protocol, TextIO
 from uuid import uuid4
 
+from tslab.core.files import atomic_write_json, atomic_write_text
 from tslab.core.meta import hostname
-from tslab.core.paths import atomic_write_json, atomic_write_text
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import (
     busy_gpus,

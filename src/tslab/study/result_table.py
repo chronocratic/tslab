@@ -12,7 +12,8 @@ import json
 from pathlib import Path
 
 from tslab.core.artifact import Metrics
-from tslab.core.paths import atomic_write_text, META_FILE, require_path
+from tslab.core.files import atomic_write_text
+from tslab.core.paths import META_FILE, require_path
 from tslab.core.status import InstanceRecord, InstanceState
 from tslab.core.text import first_line
 from tslab.study.context import context_for, Selection
