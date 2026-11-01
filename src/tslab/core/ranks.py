@@ -9,7 +9,7 @@ to the other ranks.
 import os
 from typing import Protocol, runtime_checkable
 
-__all__ = ['RankAgreement', 'is_writer_process', 'slurm_task_count']
+__all__ = ['RankAgreement', 'is_writer_process']
 
 _RANK_VARIABLES = ('RANK', 'SLURM_PROCID', 'LOCAL_RANK')
 
@@ -30,8 +30,3 @@ def is_writer_process() -> bool:
     inside one SLURM task (``LOCAL_RANK``).
     """
     return all(os.environ.get(variable, '0') == '0' for variable in _RANK_VARIABLES)
-
-
-def slurm_task_count() -> int:
-    """Return the number of tasks in this SLURM job, or one off SLURM."""
-    return int(os.environ.get('SLURM_NTASKS', '1'))

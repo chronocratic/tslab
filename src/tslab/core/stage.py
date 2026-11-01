@@ -41,7 +41,7 @@ from tslab.core.meta.instance import (
     stale_reason,
 )
 from tslab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
-from tslab.core.ranks import is_writer_process, RankAgreement, slurm_task_count
+from tslab.core.ranks import is_writer_process, RankAgreement
 from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.core.status import (
     format_instance_id,
@@ -51,6 +51,7 @@ from tslab.core.status import (
     utc_now_iso,
 )
 from tslab.core.text import describe_error
+from tslab.jobs.slurm import task_count
 
 __all__ = ['FunctionStage', 'Stage', 'stage']
 
@@ -163,7 +164,7 @@ class Stage[Out: Artifact](ABC):
         name_parts = normalize_instance_name(name=raw_name)
         instance_id = format_instance_id(stage_name=stage_name, name_parts=name_parts)
         called_single_rank = run.note_stage_call(all_ranks=self.all_ranks)
-        if called_single_rank and self.all_ranks and slurm_task_count() > 1:
+        if called_single_rank and self.all_ranks and task_count(environment=os.environ) > 1:
             # why: other ranks already exited, so training now would hang waiting for DDP peers
             message = (
                 f'{instance_id}: training stages must come before other stages in a multi-GPU '

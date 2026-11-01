@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.core.ranks import is_writer_process, slurm_task_count
+from tslab.core.ranks import is_writer_process
 
 
 def test_is_writer_process_is_true_when_all_rank_variables_are_zero_or_unset(
@@ -20,10 +20,3 @@ def test_is_writer_process_is_false_on_a_non_zero_rank(monkeypatch: pytest.Monke
     monkeypatch.setenv('SLURM_PROCID', '0')
     monkeypatch.setenv('LOCAL_RANK', '0')
     assert is_writer_process()
-
-
-def test_slurm_task_count_reads_slurm_ntasks(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('SLURM_NTASKS', raising=False)
-    assert slurm_task_count() == 1
-    monkeypatch.setenv('SLURM_NTASKS', '8')
-    assert slurm_task_count() == 8

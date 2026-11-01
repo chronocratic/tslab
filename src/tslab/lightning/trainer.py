@@ -22,11 +22,10 @@ import torch
 from tslab.core.artifact import Checkpoint
 from tslab.core.files import atomic_write_json
 from tslab.core.paths import require_path
-from tslab.core.ranks import slurm_task_count
 from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
-from tslab.jobs.slurm import parse_slurm_duration
+from tslab.jobs.slurm import parse_slurm_duration, task_count
 from tslab.lightning.callbacks import _SignalStop, build_callbacks
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
@@ -126,7 +125,7 @@ class LightningTrainer(Trainer[LightningModule]):
         Returns:
             The decision chosen by rank zero.
         """
-        if slurm_task_count() <= 1:
+        if task_count(environment=os.environ) <= 1:
             return value
         return agree(key=key, value=value, environment=os.environ)
 
