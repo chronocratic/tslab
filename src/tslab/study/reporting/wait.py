@@ -70,7 +70,7 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
             else:
                 gap = min(gap * 2, interval)
             if code == EXIT_UNKNOWN and not warned_unknown:
-                _LOGGER.warning('SLURM job states unknown; still waiting')
+                _LOGGER.warning('job states unknown; still waiting')
                 warned_unknown = True
             elif code != EXIT_UNKNOWN:
                 warned_unknown = False

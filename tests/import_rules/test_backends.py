@@ -375,3 +375,56 @@ def test_neutral_study_code_names_no_slurm_type() -> None:
         if leaks:
             problems.append(f'{path.relative_to(ROOT).as_posix()}: {sorted(set(leaks))}')
     assert problems == []
+
+
+#: The scheduler state words that only a backend may spell.
+STATE_WORDS = frozenset(
+    (
+        'TIMEOUT',
+        'PREEMPTED',
+        'NODE_FAIL',
+        'OUT_OF_MEMORY',
+        'PENDING',
+        'RUNNING',
+        'COMPLETED',
+        'FAILED',
+        'CANCELLED',
+    )
+)
+
+
+def _docstring_nodes(*, tree: ast.Module) -> set[int]:
+    """The ids of the string constants that are docstrings."""
+    found = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        first = node.body[0] if node.body else None
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+            found.add(id(first.value))
+    return found
+
+
+def test_neutral_study_code_has_no_slurm_state_words() -> None:
+    """Backend-neutral study code spells no SLURM state and says no ``SLURM`` in a string."""
+    problems = []
+    for path in _source_files():
+        if not path.is_relative_to(SOURCE / 'study'):
+            continue
+        if any(path == exempt or path.is_relative_to(exempt) for exempt in NEUTRAL_EXEMPT):
+            continue
+        tree = _parse(path=path)
+        docstrings = _docstring_nodes(tree=tree)
+        words = sorted(
+            {
+                node.value
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings
+                and ('SLURM' in node.value or node.value in STATE_WORDS)
+            }
+        )
+        if words:
+            problems.append(f'{path.relative_to(ROOT).as_posix()}: {words}')
+    assert problems == []

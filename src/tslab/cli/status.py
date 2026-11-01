@@ -145,7 +145,7 @@ def _run_status_entry(
     *, directory: Path, snapshot: RunStatusSnapshot, stage: str | None
 ) -> tuple[dict[str, object], StudyState]:
     folder = read_folder(run_directory=directory)
-    state, _ = study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)
+    state, _ = study_state(job_reason=None, job_phase=JobPhase.UNKNOWN, folder=folder)
     run_state = shown_run_state(directory=directory, snapshot=snapshot)
     instances = [
         {

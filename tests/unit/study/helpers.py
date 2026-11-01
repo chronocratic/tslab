@@ -18,7 +18,7 @@ from tslab.core.status import (
 )
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers import JobPhase, JobStates
+from tslab.study.launchers import JobFlag, JobPhase, JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.records import append_job, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
@@ -41,11 +41,13 @@ def no_sleep(_seconds: float) -> None:
     """Skip the submission pause."""
 
 
-def make_job_states(
+def make_job_states(  # noqa: PLR0913 # why: one keyword per JobStates field
     *,
     states: Mapping[str, str],
     phases: Mapping[str, JobPhase],
     known: bool = True,
+    reasons: Mapping[str, str] | None = None,
+    flags: Mapping[str, frozenset[JobFlag]] | None = None,
     followup_live_job_ids: tuple[str, ...] = (),
 ) -> JobStates:
     """Build a read-only snapshot of backend states for study tests."""
@@ -53,6 +55,8 @@ def make_job_states(
         known=known,
         states=MappingProxyType(dict(states)),
         phases=MappingProxyType(dict(phases)),
+        reasons=MappingProxyType(dict(reasons or {})),
+        flags=MappingProxyType(dict(flags or {})),
         followup_live_job_ids=followup_live_job_ids,
     )
 

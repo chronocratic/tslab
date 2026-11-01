@@ -28,6 +28,7 @@ __all__ = [
     'BACKENDS',
     'SIGNAL_EXIT_BASE',
     'Backend',
+    'JobFlag',
     'JobPhase',
     'JobStates',
     'JobUsage',
@@ -115,6 +116,15 @@ class JobPhase(StrEnum):
     UNKNOWN = 'unknown'
 
 
+class JobFlag(StrEnum):
+    """What a backend says a job state means for the state logic."""
+
+    #: The job stopped at its time limit.
+    TIME_LIMIT = 'time_limit'
+    #: The machine, not the run, ended the job; the attempt does not count toward the cap.
+    NOT_COUNTED = 'not_counted'
+
+
 @dataclass(frozen=True, kw_only=True)
 class JobStates:
     """The states of the jobs of one study, as one backend reports them.
@@ -124,12 +134,16 @@ class JobStates:
             asked and the state logic works from the run folders only.
         states: The raw state text per job or task id; shown to the user.
         phases: The phase per id; what the state logic reads.
+        reasons: The one-line reason per id, shown when the run folder gives none.
+        flags: The flags per id; only ids that have a flag.
         followup_live_job_ids: The ids of the queued or running follow-up jobs.
     """
 
     known: bool
     states: Mapping[str, str]
     phases: Mapping[str, JobPhase]
+    reasons: Mapping[str, str]
+    flags: Mapping[str, frozenset[JobFlag]]
     followup_live_job_ids: tuple[str, ...]
 
 

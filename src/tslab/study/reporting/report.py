@@ -8,7 +8,7 @@ import shlex
 from tslab.core.text import format_index_ranges, log_table
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers import LaunchReport, Resources, SIGNAL_EXIT_BASE
+from tslab.study.launchers import JobFlag, LaunchReport, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport, StudyState
@@ -38,7 +38,7 @@ def log_status(
     """
     if not context.job_states.known:
         _LOGGER.info(
-            'SLURM commands not found: job states unknown; states come from run folders only'
+            'scheduler commands not found: job states unknown; states come from run folders only'
         )
     counts: dict[str, Counter[StudyState]] = {}
     for report in context.reports:
@@ -78,7 +78,10 @@ def log_status(
         1
         for report in context.reports
         if report.state is StudyState.INTERRUPTED
-        and (report.job_state == 'TIMEOUT' or (report.reason or '').startswith('TrainingPaused:'))
+        and (
+            JobFlag.TIME_LIMIT in report.job_flags
+            or (report.reason or '').startswith('TrainingPaused:')
+        )
     )
     if limited:
         _LOGGER.info(

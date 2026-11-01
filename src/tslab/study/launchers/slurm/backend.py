@@ -23,6 +23,7 @@ from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import (
+    JobFlag,
     JobPhase,
     JobStates,
     JobUsage,
@@ -71,12 +72,24 @@ def _phase_of(*, job_state: str | None) -> JobPhase:
     return JobPhase.ENDED
 
 
+#: What the SLURM states mean for the state logic; other states carry no flag.
+_FLAGS: Mapping[str, frozenset[JobFlag]] = MappingProxyType(
+    {
+        'TIMEOUT': frozenset({JobFlag.TIME_LIMIT}),
+        'PREEMPTED': frozenset({JobFlag.NOT_COUNTED}),
+        'NODE_FAIL': frozenset({JobFlag.NOT_COUNTED}),
+    }
+)
+
+
 def _unknown_states() -> JobStates:
     """The states when the scheduler cannot be asked."""
     return JobStates(
         known=False,
         states=MappingProxyType({}),
         phases=MappingProxyType({}),
+        reasons=MappingProxyType({}),
+        flags=MappingProxyType({}),
         followup_live_job_ids=(),
     )
 
@@ -120,6 +133,16 @@ class SlurmBackend:
                 known=True,
                 states=MappingProxyType(states),
                 phases=MappingProxyType(phases),
+                reasons=MappingProxyType(
+                    {
+                        task_id: f'SLURM {state}'
+                        for task_id, state in states.items()
+                        if state.isupper()
+                    }
+                ),
+                flags=MappingProxyType(
+                    {task_id: _FLAGS[state] for task_id, state in states.items() if state in _FLAGS}
+                ),
                 followup_live_job_ids=live,
             ),
             new_cache,

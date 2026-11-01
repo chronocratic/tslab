@@ -15,7 +15,7 @@ from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import JobPhase, JobStates
+    from tslab.study.launchers import JobFlag, JobPhase, JobStates
 
 __all__ = ['FolderFacts', 'RunReport', 'StudyState', 'collect_states', 'read_folder', 'study_state']
 
@@ -80,6 +80,8 @@ class RunReport:
             ``None`` when the run was never submitted.
         job_state: The raw state of that task id, when queried.
         job_phase: The backend phase of the task, or ``UNKNOWN`` when absent.
+        job_reason: The one-line reason the backend gives for that task id.
+        job_flags: What the backend says that state means for the state logic.
         attempt: The attempt of the latest submission; 0 when never submitted.
         task: The latest submitted task of the run.
         folder: The facts of the run folder.
@@ -94,9 +96,11 @@ class RunReport:
     attempt: int
     task: TaskRecord | None
     folder: FolderFacts
+    job_reason: str | None = None
+    job_flags: 'frozenset[JobFlag]' = frozenset()
 
 
-def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
+def _reason(*, folder: FolderFacts, job_reason: str | None) -> str | None:
     snapshot = folder.snapshot
     if snapshot is not None:
         for record in snapshot.instances.values():
@@ -104,19 +108,17 @@ def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
                 return first_line(text=record.error)
     if folder.read_error is not None:
         return folder.read_error
-    if job_state is not None and job_state.isupper():
-        return f'SLURM {job_state}'
-    return None
+    return job_reason
 
 
 def study_state(
-    *, job_state: str | None, job_phase: 'JobPhase', folder: FolderFacts
+    *, job_reason: str | None, job_phase: 'JobPhase', folder: FolderFacts
 ) -> tuple[StudyState, str | None]:
     """The state of one run, from its folder and the phase of its latest job.
 
     Args:
-        job_state: The raw state of the latest task id of the run, or ``None``
-            when the run was never submitted or the backend has no state.
+        job_reason: The reason the backend gives for the latest task id of the
+            run, or ``None`` when the run was never submitted or it gives none.
         job_phase: The backend phase of the latest task id of the run.
         folder: The facts of the run folder.
 
@@ -154,7 +156,7 @@ def study_state(
     interrupted = (stale_running and not killed) or job_phase is JobPhase.INTERRUPTED
     interrupted = interrupted or time_limited
     if interrupted:
-        return StudyState.INTERRUPTED, _reason(folder=folder, job_state=job_state)
+        return StudyState.INTERRUPTED, _reason(folder=folder, job_reason=job_reason)
     failed = snapshot is not None and (
         snapshot.run_state is RunState.FAILED
         or (
@@ -168,7 +170,7 @@ def study_state(
     failed = failed or killed or folder.read_error is not None
     failed = failed or (snapshot is None and job_phase is JobPhase.FAILED)
     if failed:
-        return StudyState.FAILED, _reason(folder=folder, job_state=job_state)
+        return StudyState.FAILED, _reason(folder=folder, job_reason=job_reason)
     return StudyState.MISSING, None
 
 
@@ -264,21 +266,23 @@ def collect_states(
             task_id = f'{job.job_id}_{task.index}'
             job_id = task_id
         job_state = None if task_id is None else job_states.states.get(task_id)
+        job_reason = None if task_id is None else job_states.reasons.get(task_id)
+        job_flags = frozenset() if task_id is None else job_states.flags.get(task_id, frozenset())
         job_phase = (
             JobPhase.UNKNOWN
             if task_id is None
             else job_states.phases.get(task_id, JobPhase.UNKNOWN)
         )
-        entries.append((run, job_id, job_state, job_phase, task))
+        entries.append((run, job_id, job_state, job_reason, job_flags, job_phase, task))
         if _needs_grace(job_phase=job_phase, folder=folders[run.run_path]):
             waiting[run.run_path] = directory
     folders.update(
         _grace_wait(directories=waiting, completed_phase=JobPhase.COMPLETED, sleep=sleep)
     )
     reports: list[RunReport] = []
-    for run, job_id, job_state, job_phase, task in entries:
+    for run, job_id, job_state, job_reason, job_flags, job_phase, task in entries:
         folder = folders[run.run_path]
-        state, reason = study_state(job_state=job_state, job_phase=job_phase, folder=folder)
+        state, reason = study_state(job_reason=job_reason, job_phase=job_phase, folder=folder)
         reports.append(
             RunReport(
                 run=run,
@@ -287,6 +291,8 @@ def collect_states(
                 job_id=job_id,
                 job_state=job_state,
                 job_phase=job_phase,
+                job_reason=job_reason,
+                job_flags=job_flags,
                 attempt=task.attempt if task is not None else 0,
                 task=task,
                 folder=folder,
