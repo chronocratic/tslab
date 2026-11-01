@@ -73,6 +73,22 @@ def _run_pool(  # noqa: PLR0913 # why: one keyword per pool setting the test ove
     starts: list[tuple[str, str | None]] = []
     waits: list[str] = []
     ends: list[tuple[str, str | None, object]] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        starts.append((key, gpu_id))
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        waits.append(key)
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        ends.append((key, gpu_id, outcome))
+
     commands = [
         _command_of(tmp_path=tmp_path, key=key, sleep_seconds=sleep_seconds) for key in keys
     ]
@@ -85,11 +101,11 @@ def _run_pool(  # noqa: PLR0913 # why: one keyword per pool setting the test ove
         stop=stop or threading.Event(),
         timeout_seconds=None,
         signal_seconds=0,
-        on_start=lambda key, gpu_id: starts.append((key, gpu_id)),
-        on_line=lambda _key, _line: None,
-        on_event=lambda _key, _text: None,
-        on_wait=waits.append,
-        on_end=lambda key, gpu_id, outcome: ends.append((key, gpu_id, outcome)),
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
         gpu_poll_seconds=gpu_poll_seconds,
     )
     return never_started, starts, waits, ends
@@ -117,6 +133,68 @@ def _seen_gpus(*, tmp_path: Path, keys: Sequence[str]) -> set[str]:
         if len(parts) > 2:
             seen.add(parts[2])
     return seen
+
+
+def test_callbacks_get_keyword_arguments(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    holder = _hold_gpu_zero(folder=folder)
+    timer = threading.Timer(0.5, holder.kill)
+    timer.start()
+    events: list[str] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        events.append(f'start {key} {gpu_id}')
+
+    def on_line(*, key: str, line: str) -> None:
+        events.append(f'line {key}')
+
+    def on_event(*, key: str, text: str) -> None:
+        events.append(f'event {key}')
+
+    def on_wait(*, key: str) -> None:
+        events.append(f'wait {key}')
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        events.append(f'end {key}')
+
+    command = PoolCommand(
+        key='k0',
+        command=(
+            sys.executable,
+            '-c',
+            'import signal, time\n'
+            'signal.signal(signal.SIGUSR2, lambda *args: None)\n'
+            'print("line", flush=True)\n'
+            'time.sleep(0.4)\n',
+        ),
+        cwd=tmp_path,
+        environment=os.environ,
+    )
+    never_started = run_commands(
+        commands=[command],
+        slots=1,
+        gpu_ids=('0',),
+        tasks_per_gpu=1,
+        lock_folder=folder,
+        stop=threading.Event(),
+        timeout_seconds=1.0,
+        signal_seconds=0.9,
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
+        gpu_poll_seconds=0.2,
+    )
+    holder.wait()
+    timer.cancel()
+    assert never_started == ()
+    assert events[0] == 'wait k0'
+    assert 'start k0 0' in events
+    assert 'line k0' in events
+    assert 'event k0' in events
+    assert events[-1] == 'end k0'
 
 
 def test_pool_three_slots_overlap_at_most_three(*, tmp_path: Path) -> None:
@@ -206,6 +284,22 @@ def test_pool_waits_for_gpu_held_elsewhere(*, tmp_path: Path) -> None:
 
 def test_pool_start_error_reaches_on_end(*, tmp_path: Path) -> None:
     ends: list[tuple[str, str | None, object]] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        pass
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        pass
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        ends.append((key, gpu_id, outcome))
+
     commands = [
         PoolCommand(
             key='k0',
@@ -224,11 +318,11 @@ def test_pool_start_error_reaches_on_end(*, tmp_path: Path) -> None:
         stop=threading.Event(),
         timeout_seconds=None,
         signal_seconds=0,
-        on_start=lambda _key, _gpu_id: None,
-        on_line=lambda _key, _line: None,
-        on_event=lambda _key, _text: None,
-        on_wait=lambda _key: None,
-        on_end=lambda key, gpu_id, outcome: ends.append((key, gpu_id, outcome)),
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
     )
     assert never_started == ()
     by_key = {key: outcome for key, _gpu_id, outcome in ends}

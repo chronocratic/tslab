@@ -30,6 +30,8 @@ from tslab.study.launch import (
     LaunchReport,
     local_job_id,
     LocalLauncher,
+    OnLaunch,
+    OnTaskState,
     resolve_local_gpus,
     SIGNAL_EXIT_BASE,
     SlurmLauncher,
@@ -114,7 +116,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
     dry_run: bool,
     extra_args: tuple[str, ...],
     sleep: Callable[[float], None] = time.sleep,
-    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
 ) -> int:
     """Submit the runs that need submitting, on the machine of the context.
@@ -293,7 +295,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     extra_args: tuple[str, ...] | None = None,
     auto: bool = False,
     sleep: Callable[[float], None] = time.sleep,
-    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
 ) -> int:
     """Submit the runs in the given states again, one attempt further on.
@@ -613,7 +615,7 @@ def _launcher_of(  # noqa: PLR0913 # why: keyword-only private helper; one keywo
     sleep: Callable[[float], None],
     task_stream: TextIO | None = None,
     gpu_ids: tuple[str, ...] = (),
-    on_task_state: Callable[[str, str], None] | None = None,
+    on_task_state: OnTaskState | None = None,
 ) -> Launcher:
     if machine.launcher == 'slurm':
         return SlurmLauncher(sleep=sleep)
@@ -704,7 +706,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     sleep: Callable[[float], None],
     begin: str | None = None,
     before_launch: Callable[[], None] | None = None,
-    on_launch: Callable[[LaunchReport, Sequence[JobGroup]], None] | None = None,
+    on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
 ) -> tuple[int, list[JobRecord]]:
     """Plan, validate and launch the given runs; the shared tail of the commands.
@@ -773,5 +775,5 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if report is None:
             return 1, []
         if on_launch is not None:
-            on_launch(report, groups)
+            on_launch(report=report, groups=groups)
     return log_launch(report=report, groups=groups)

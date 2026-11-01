@@ -39,7 +39,7 @@ def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:
         assert launch is not None
         assert launch.pid == os.getpid()
         assert launch.tasks == (('j_0', 'pending'), ('j_1', 'pending'))
-        set_state('j_0', 'running')
+        set_state(task_id='j_0', state='running')
         written = read_launch(study_folder=tmp_path)
         assert written is not None
         assert written.tasks == (('j_0', 'running'), ('j_1', 'pending'))

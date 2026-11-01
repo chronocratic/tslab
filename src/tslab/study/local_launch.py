@@ -1,6 +1,6 @@
 """The pid file of a local launch: which tasks of the study run, wait or ended."""
 
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Generator, Sequence
 import contextlib
 from dataclasses import dataclass
 import logging
@@ -15,6 +15,7 @@ from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
 from tslab.core.status import utc_now_iso
 from tslab.jobs.local import process_alive, start_detached, tail_lines
+from tslab.study.launch import OnTaskState
 from tslab.study.state import LOCAL_ENDED
 
 __all__ = [
@@ -128,9 +129,7 @@ def _check_free(*, study_folder: Path) -> None:
 
 
 @contextlib.contextmanager
-def hold_launch(
-    *, study_folder: Path, task_ids: Sequence[str]
-) -> Generator[Callable[[str, str], None]]:
+def hold_launch(*, study_folder: Path, task_ids: Sequence[str]) -> Generator[OnTaskState]:
     """Hold the pid file of the study while a launch runs.
 
     Args:
@@ -138,7 +137,8 @@ def hold_launch(
         task_ids: The ids of the tasks the launch will run; all start ``pending``.
 
     Yields:
-        A setter ``(task_id, state)`` that rewrites the file; safe across threads.
+        The setter, called with ``task_id=`` and ``state=``, that rewrites
+        the file; safe across threads.
 
     Raises:
         LocalLaunchError: If a live launch, or a launch of another host, holds the file.
@@ -157,7 +157,7 @@ def hold_launch(
             ),
         )
 
-    def set_state(task_id: str, state: str) -> None:
+    def set_state(*, task_id: str, state: str) -> None:
         with lock:
             states[task_id] = state
             write()
