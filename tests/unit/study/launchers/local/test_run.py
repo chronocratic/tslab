@@ -99,7 +99,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
     groups: list[JobGroup],
     project_root: Path,
     dry_run: bool,
-    begin: str | None = None,
+    start_delay_seconds: int | None = None,
 ) -> LaunchReport:
     return _launch(
         launcher=launcher,
@@ -109,7 +109,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
         groups=groups,
         project_root=project_root,
         dry_run=dry_run,
-        begin=begin,
+        start_delay_seconds=start_delay_seconds,
         now=lambda: '2026-01-02T03:04:05+00:00',
     )
 

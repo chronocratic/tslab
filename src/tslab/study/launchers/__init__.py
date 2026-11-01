@@ -213,7 +213,7 @@ class WriteJobFiles(Protocol):
         groups: Sequence[JobGroup],
         machine: MachineProfile,
         project_root: Path,
-        begin: str | None = None,
+        start_delay_seconds: int | None = None,
     ) -> None:
         """Write files needed by one backend's launch."""
         ...
@@ -229,7 +229,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     project_root: Path,
     dry_run: bool,
     now: Callable[[], str],
-    begin: str | None = None,
+    start_delay_seconds: int | None = None,
 ) -> LaunchReport:
     """Write backend files, then submit groups one by one.
 
@@ -245,14 +245,18 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
         project_root: The directory the jobs run in.
         dry_run: Write files and stop without submitting.
         now: Return the current UTC ISO timestamp for each submitted group.
-        begin: A SLURM ``--begin`` value, when set.
+        start_delay_seconds: Seconds the jobs wait before they may start, when set.
 
     Returns:
         What was submitted, what was not, and any error or stopping signal.
     """
     folder = study_folder(machine=machine, study=study)
     write_job_files(
-        study_folder=folder, groups=groups, machine=machine, project_root=project_root, begin=begin
+        study_folder=folder,
+        groups=groups,
+        machine=machine,
+        project_root=project_root,
+        start_delay_seconds=start_delay_seconds,
     )
     if dry_run:
         return LaunchReport(submitted=(), not_submitted=tuple(groups), error=None)
@@ -360,7 +364,7 @@ class Backend(Protocol):
         groups: Sequence[JobGroup],
         folder: Path,
         dry_run: bool,
-        begin: str | None,
+        start_delay_seconds: int | None,
         sleep: Callable[[float], None],
         task_stream: TextIO | None,
         environment: Mapping[str, str],

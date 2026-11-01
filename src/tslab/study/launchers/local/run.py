@@ -38,7 +38,7 @@ def write_job_files(
     groups: Sequence[JobGroup],
     machine: MachineProfile,  # noqa: ARG001 # why: the shared writer signature
     project_root: Path,  # noqa: ARG001 # why: the shared writer signature
-    begin: str | None = None,  # noqa: ARG001 # why: the shared writer signature
+    start_delay_seconds: int | None = None,  # noqa: ARG001 # why: the shared writer signature
 ) -> None:
     """Write one task file per group before running local tasks."""
     (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
