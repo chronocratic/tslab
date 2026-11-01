@@ -27,7 +27,6 @@ CORE_MODULES = (
     'tslab.core.status',
     'tslab.interfaces',
     'tslab.stages',
-    'tslab.tracking',
 )
 FORBIDDEN_IN_CORE = (
     'lightning',
@@ -76,6 +75,7 @@ FORBIDDEN_IN_TASKS = (
     'tslab.lightning',
 )
 TRACKER_SDKS = ('wandb', 'mlflow', 'tensorboard')
+FORBIDDEN_IN_TRACKING = ('lightning', 'pytorch_lightning', *TRACKER_SDKS)
 FORBIDDEN_IN_MODELS_ADAPTER = (
     'chronocratic.datasets',
     'tslab.adapters.chronocratic.datasets',
@@ -132,6 +132,13 @@ def test_lightning_package_loads_no_tracker_sdk_or_time_series_layer() -> None:
     loaded = loaded_by(module='tslab.lightning')
     assert 'lightning' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_LIGHTNING) == []
+
+
+def test_tracking_package_loads_no_lightning_or_tracker_sdk() -> None:
+    # The door of tslab.tracking stays importable without Lightning or a
+    # tracker SDK; build_trackers imports the concrete trackers.
+    loaded = loaded_by(module='tslab.tracking')
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_TRACKING) == []
 
 
 @pytest.mark.slow

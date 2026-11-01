@@ -64,11 +64,14 @@ changelog.d/           towncrier fragments, one per pull request
 
 ### Dependency direction (enforced by `tests/import_rules/`)
 
-- `core`, `interfaces`, `stages` and `tracking` never import Lightning,
+- `core`, `interfaces` and `stages` never import Lightning,
   scikit-learn, any tracker SDK, chronocratic, or `tslab.adapters`,
   `tslab.lightning`, `tslab.tasks`, `tslab.probes`, `tslab.study`, `tslab.cli`.
   Tracker SDKs are imported lazily, inside the tracker that needs them.
-- Only `tslab.lightning` imports Lightning.
+- `tslab.lightning` builds on Lightning; `tslab.tracking` (trackers wrap
+  Lightning loggers) and `tslab.adapters.chronocratic` import it in their
+  submodules, but importing `tslab.tracking` itself loads no Lightning and
+  no tracker SDK.
 - Only `tslab.probes` imports scikit-learn.
 - Only `tslab.adapters.chronocratic` imports chronocratic; the models adapter
   never imports the datasets adapter and the other way round.
