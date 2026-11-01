@@ -1,12 +1,14 @@
 """The ``[slurm]`` table of a machine profile."""
 
 from collections.abc import Mapping
+import dataclasses
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from typing import Literal
+from typing import cast, Literal
 
+from tslab.jobs.slurm import parse_slurm_memory
 from tslab.study.machine.tables import (
     check_keys,
     check_range,
@@ -75,6 +77,15 @@ class SlurmSettings:
         """The maximum number of tasks in one array."""
         return self.max_array_size
 
+    @property
+    def requested_memory(self) -> int | None:
+        """The total memory in bytes one task requests, or ``None`` when unbounded."""
+        return _requested_memory(settings=self)
+
+    def as_record(self) -> dict[str, object]:
+        """The resource fields of the group, for the submission record."""
+        return cast('dict[str, object]', dataclasses.asdict(self))
+
     def describe(self) -> str:
         """The resource line of the settings, for the dry run printout."""
         # why: the fields mirror SlurmSettings, named in display order
@@ -87,6 +98,14 @@ class SlurmSettings:
         if self.gpus:
             parts.append(f'gpus={self.gpus}')
         return ', '.join(parts)
+
+
+def _requested_memory(*, settings: SlurmSettings) -> int | None:
+    """The requested memory in bytes of one run, from the settings."""
+    if settings.mem_per_cpu is None:
+        return None
+    per_cpu = parse_slurm_memory(text=settings.mem_per_cpu)
+    return None if per_cpu is None else per_cpu * settings.cpus_per_task
 
 
 def settings_from(*, table: Mapping[str, object], path: Path) -> SlurmSettings:

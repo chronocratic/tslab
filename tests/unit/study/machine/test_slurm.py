@@ -121,3 +121,13 @@ def test_sbatch_extra_table_rejects_newlines(tmp_path: Path) -> None:
     text = BASE_SLURM + SLURM_TABLE + '[slurm.sbatch_extra]\nx = "a\\nrm -rf x"\n'
     with pytest.raises(MachineProfileError, match='sbatch_extra'):
         load_machine(path=write(tmp_path, text))
+
+
+def test_slurm_settings_describe_their_record_and_requested_memory() -> None:
+    settings = SlurmSettings(partition='gpu', cpus_per_task=2, mem_per_cpu='2G')
+    record = settings.as_record()
+    assert record['partition'] == 'gpu'
+    assert record['cpus_per_task'] == 2
+    assert record['mem_per_cpu'] == '2G'
+    assert settings.requested_memory == 2 * 2 * 1024**3
+    assert SlurmSettings(partition='gpu').requested_memory is None

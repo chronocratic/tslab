@@ -46,9 +46,18 @@ class LocalResources:
     cpus: int
     max_tasks_per_job: int | None = None
 
+    @property
+    def requested_memory(self) -> int | None:
+        """A local launch requests no memory."""
+        return None
+
     def describe(self) -> str:
         """The resource line of the machine, for the dry run printout."""
         return 'local'
+
+    def as_record(self) -> dict[str, object]:
+        """A local launch records no resource fields."""
+        return {}
 
 
 def _phase_of(*, job_state: str | None) -> JobPhase:
