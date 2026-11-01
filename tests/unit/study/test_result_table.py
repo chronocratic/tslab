@@ -19,8 +19,7 @@ from tslab.core.status import (
 from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
-from tslab.study.definition import expand_runs
-from tslab.study.loading import load_study
+from tslab.study.definition import expand_runs, load_study
 from tslab.study.result_table import collect_results, format_results_csv, write_results_csv
 from tslab.study.state import collect_states, RunReport
 

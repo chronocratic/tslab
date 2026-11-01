@@ -4,7 +4,7 @@ import importlib
 from pathlib import Path
 import sys
 
-from tslab.study.definition import Study
+from tslab.study.definition.definition import Study
 
 __all__ = ['load_study']
 

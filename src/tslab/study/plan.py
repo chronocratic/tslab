@@ -11,19 +11,21 @@ from typing import cast, TYPE_CHECKING
 
 import tslab
 from tslab.study.definition import (
+    check_paths,
+    expand_setting,
     Grid,
     match_problems,
     matching_in_order,
     merge_overrides,
     merge_settings,
+    settings_to_args,
+    SettingValue,
     Study,
     StudyRun,
 )
-from tslab.study.expansion import expand_setting
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
-from tslab.study.settings import check_paths, settings_to_args, SettingValue
 
 if TYPE_CHECKING:
     from tslab.study.launchers import Resources

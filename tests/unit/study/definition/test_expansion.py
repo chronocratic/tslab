@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study.expansion import expand_placeholders, expand_setting, expand_variables
+from tslab.study.definition import expand_placeholders, expand_setting, expand_variables
 
 
 def test_variables() -> None:

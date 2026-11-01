@@ -7,7 +7,7 @@ import tomllib
 from typing import cast, Literal, Protocol
 
 from tslab.core.text import unknown_key_message
-from tslab.study.expansion import expand_variables
+from tslab.study.definition import expand_variables
 import tslab.study.machine.local as machine_local
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile

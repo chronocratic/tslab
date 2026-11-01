@@ -11,7 +11,7 @@ import tempfile
 from typing import Literal
 
 from tslab.core.paths import require_path
-from tslab.study.loading import load_study
+from tslab.study.definition import load_study
 from tslab.study.machine import load_machine, MachineProfile, MachineProfileError
 from tslab.study.plan import check_machine
 

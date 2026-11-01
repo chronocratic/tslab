@@ -9,14 +9,18 @@ submodules (``tslab.study.commands``, ``tslab.study.context``, ...).
 """
 
 from tslab.study.definition import (
+    check_paths,
     DEFAULT_RUN_SETTINGS,
+    from_presets,
     Grid,
     Override,
     setting_axis,
+    Settings,
+    settings_to_args,
+    SettingValue,
     Study,
     StudyRun,
 )
-from tslab.study.settings import check_paths, from_presets, Settings, settings_to_args, SettingValue
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',

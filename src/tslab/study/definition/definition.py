@@ -16,7 +16,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.core.paths import NAME_PART_PATTERN
-from tslab.study.settings import check_paths, Settings, SettingValue
+from tslab.study.definition.settings import check_paths, Settings, SettingValue
 
 if TYPE_CHECKING:
     from tslab.study.result_table import ResultRow
