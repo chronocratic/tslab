@@ -10,7 +10,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import torch
 
-from tslab.probes._protocol import (
+from tslab.probes.metrics import classification_metrics
+from tslab.probes.sklearn_probe import (
     cap_samples,
     fit_on_predefined_split,
     PROTOCOL_RANDOM_STATE,
@@ -19,7 +20,6 @@ from tslab.probes._protocol import (
     to_float64,
     to_numpy,
 )
-from tslab.probes.metrics import classification_metrics
 
 __all__ = ['SVMProbe', 'SVMProbeSettings']
 

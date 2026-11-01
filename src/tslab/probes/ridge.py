@@ -11,7 +11,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import torch
 
-from tslab.probes._protocol import (
+from tslab.probes.metrics import forecasting_metrics
+from tslab.probes.sklearn_probe import (
     cap_samples,
     fit_on_predefined_split,
     PROTOCOL_RANDOM_STATE,
@@ -20,7 +21,6 @@ from tslab.probes._protocol import (
     to_float64,
     to_numpy,
 )
-from tslab.probes.metrics import forecasting_metrics
 
 __all__ = ['RidgeProbe', 'RidgeProbeSettings']
 
