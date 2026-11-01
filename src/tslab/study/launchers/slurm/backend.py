@@ -87,8 +87,8 @@ class SlurmBackend:
     #: The launcher of the machines this backend serves.
     name = 'slurm'
 
-    #: Whether the usage output suggests a memory size.
-    suggests_memory = True
+    #: Whether the jobs of this backend have a time limit.
+    has_time_limit = True
 
     def job_states(
         self,

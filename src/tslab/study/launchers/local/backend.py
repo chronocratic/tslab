@@ -79,8 +79,8 @@ class LocalBackend:
     #: The launcher of the machines this backend serves.
     name = 'local'
 
-    #: Whether the usage output suggests a memory size.
-    suggests_memory = False
+    #: Whether the jobs of this backend have a time limit.
+    has_time_limit = False
 
     def job_states(
         self,

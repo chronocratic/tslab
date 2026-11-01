@@ -188,7 +188,7 @@ def test_usage_document_uses_selected_backend(
     calls: list[Context] = []
 
     class Backend:
-        suggests_memory = False
+        has_time_limit = False
 
         def suggest_sizing(self, *, elapsed: object, peak_per_cpu: object) -> tuple[None, None]:
             return None, None
@@ -211,7 +211,7 @@ def test_local_usage_log_shows_no_limit_and_dash(
 ) -> None:
     document = usage_document(context=_local_usage_context(project=project))
     with caplog.at_level('INFO', logger='tslab.study.reporting.usage'):
-        log_usage(document=document, suggests_memory=False)
+        log_usage(document=document, has_time_limit=False)
     assert '1:00:00/no limit' in caplog.text
     assert 'suggest' not in caplog.text
     assert '-/no limit' in caplog.text

@@ -130,12 +130,13 @@ def _duration_text(*, duration: timedelta | None) -> str | None:
     return None if duration is None else format_duration(seconds=duration.total_seconds())
 
 
-def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
+def log_usage(*, document: Mapping[str, object], has_time_limit: bool) -> None:
     """Log the usage table, the paused runs, and one suggestion line per group.
 
     Args:
         document: The study-usage document from ``usage_document``.
-        suggests_memory: Whether this backend can size memory from past usage.
+        has_time_limit: Whether the jobs of this backend have a time limit; a missing
+            one shows as ``-``, else as ``no limit``.
     """
     runs = _mappings(value=document.get('runs'))
     log_table(
@@ -149,7 +150,7 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
                 _pair(
                     first=run['elapsed'],
                     second=run['time_limit'],
-                    missing='-' if suggests_memory else 'no limit',
+                    missing='-' if has_time_limit else 'no limit',
                 ),
                 _pair(
                     first=_memory(value=run['max_rss']),
