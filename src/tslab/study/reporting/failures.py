@@ -6,9 +6,8 @@ import logging
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import InstanceState
 from tslab.jobs.local import tail_lines
-from tslab.jobs.slurm import format_slurm_memory
 from tslab.study.context import Context
-from tslab.study.launchers import JobUsage
+from tslab.study.launchers import Backend, backend_for, JobUsage, Resources
 from tslab.study.paths import instance_directory, study_folder
 from tslab.study.reporting.documents import run_entry
 from tslab.study.reporting.state import RunReport, StudyState
@@ -34,7 +33,6 @@ def collect_failures(
     """
     selected_states = states or _DEFAULT_STATES
     reports = [report for report in context.reports if report.state in selected_states]
-    from tslab.study.launchers import backend_for  # noqa: PLC0415
 
     usage = backend_for(machine=context.machine).failure_usage(context=context, reports=reports)
     return [
@@ -48,46 +46,37 @@ def collect_failures(
     ]
 
 
+_REASON_HINTS = (
+    ('JobTimeLimitSignal:', 'stopped before the time limit; resubmit continues it, or raise time'),
+    (
+        'TrainingPaused:',
+        (
+            'training used its share of the job (job_time_share); '
+            'resubmit continues it, or raise time to train longer per job'
+        ),
+    ),
+)
+
+
 def failure_hint(
-    *, report: RunReport, usage: JobUsage | None, requested_memory: int | None
+    *, report: RunReport, usage: JobUsage | None, backend: Backend, resources: Resources
 ) -> str | None:
-    """One hint for a failed or interrupted run; first match wins.
+    """One hint for a failed or interrupted run; the reason of the run comes first.
 
     Args:
         report: The state report for the run.
         usage: The accounting usage of the run, when queried.
-        requested_memory: The memory requested by the run in bytes, when set.
+        backend: The backend of the machine, for the hint of the scheduler state.
+        resources: The resources of the run.
 
     Returns:
         The hint text, or ``None`` when the error is in the code.
     """
     reason = report.reason or ''
-    if reason.startswith('JobTimeLimitSignal:'):
-        hint = 'stopped before the time limit; resubmit continues it, or raise time'
-    elif reason.startswith('TrainingPaused:'):
-        hint = (
-            'training used its share of the job (job_time_share); '
-            'resubmit continues it, or raise time to train longer per job'
-        )
-    elif report.job_state == 'OUT_OF_MEMORY':
-        if usage is not None and usage.max_rss is not None and requested_memory is not None:
-            hint = (
-                'raise mem_per_cpu; peak '
-                f'{format_slurm_memory(size=usage.max_rss)} '
-                f'of {format_slurm_memory(size=requested_memory)} requested'
-            )
-        else:
-            hint = 'raise mem_per_cpu'
-    elif report.job_state == 'TIMEOUT':
-        hint = (
-            'raise time, or check that the timeout signal is on (signal_seconds), '
-            'or lower job_time_share so the stages after training fit'
-        )
-    elif report.job_state in {'PREEMPTED', 'NODE_FAIL'}:
-        hint = 'not caused by the code; resubmit'
-    else:
-        hint = None
-    return hint
+    reason_hint = next((hint for prefix, hint in _REASON_HINTS if reason.startswith(prefix)), None)
+    if reason_hint is not None:
+        return reason_hint
+    return backend.failure_hint(report=report, usage=usage, resources=resources)
 
 
 def _failure_entry(
@@ -132,7 +121,10 @@ def _failure_entry(
             'run_log': run_log_path.resolve().as_posix(),
             'run_log_tail': tail_lines(path=run_log_path, lines=lines),
             'hint': failure_hint(
-                report=report, usage=usage, requested_memory=resources.requested_memory
+                report=report,
+                usage=usage,
+                backend=backend_for(machine=context.machine),
+                resources=resources,
             ),
         }
     )

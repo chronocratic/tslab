@@ -123,6 +123,16 @@ class LocalBackend:
         """The CPUs of the machine; a local launch holds no array limit."""
         return LocalResources(cpus=local_cpus)
 
+    def failure_hint(
+        self,
+        *,
+        report: RunReport,  # noqa: ARG002 # why: the Backend signature
+        usage: JobUsage | None,  # noqa: ARG002 # why: the Backend signature
+        resources: Resources,  # noqa: ARG002 # why: the Backend signature
+    ) -> str | None:
+        """A local machine has no scheduler state to hint about."""
+        return None
+
     def suggest_sizing(
         self,
         *,

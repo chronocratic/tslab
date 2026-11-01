@@ -351,6 +351,12 @@ class Backend(Protocol):
         """The resources of one grid, with the machine overrides applied."""
         ...
 
+    def failure_hint(
+        self, *, report: RunReport, usage: JobUsage | None, resources: Resources
+    ) -> str | None:
+        """The hint the scheduler state of a failed run gives; ``None`` when it has none."""
+        ...
+
     def suggest_sizing(
         self, *, elapsed: timedelta | None, peak_per_cpu: int | None
     ) -> tuple[str | None, str | None]:

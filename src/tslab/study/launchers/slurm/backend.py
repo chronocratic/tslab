@@ -32,6 +32,7 @@ from tslab.study.launchers import (
     Resources,
 )
 from tslab.study.launchers.slurm.doctor import slurm_check
+from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.launchers.slurm.states import (
     _query_states,
@@ -235,6 +236,12 @@ class SlurmBackend:
         """
         message = '--detach is for local machines; SLURM jobs already run in the background'
         raise ValueError(message)
+
+    def failure_hint(
+        self, *, report: RunReport, usage: JobUsage | None, resources: Resources
+    ) -> str | None:
+        """The hint of the final SLURM state of the run."""
+        return state_hint(job_state=report.job_state, usage=usage, resources=resources)
 
     def suggest_sizing(
         self, *, elapsed: timedelta | None, peak_per_cpu: int | None

@@ -26,7 +26,6 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.jobs.slurm import parse_slurm_memory
 from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage
@@ -143,15 +142,13 @@ def _report(project: Path, fake: FakeSlurm) -> RunReport:
     return ctx.reports[0]
 
 
-def _oom_usage(*, max_rss: int | None) -> JobUsage:
-    return JobUsage(
-        state='OUT_OF_MEMORY',
-        elapsed=None,
-        time_limit=None,
-        total_cpu=None,
-        max_rss=max_rss,
-        alloc_cpus=None,
-        gpus=0,
+def _hint(*, report: RunReport, project: Path, fake: FakeSlurm) -> str | None:
+    ctx = context(project=project, machine_file='cluster.toml')
+    return failure_hint(
+        report=report,
+        usage=None,
+        backend=launchers.backend_for(machine=ctx.machine),
+        resources=ctx.resolved[report.run.run_path].resources,
     )
 
 
@@ -161,7 +158,7 @@ def test_hint_for_signal_stop(project: Path, fake: FakeSlurm) -> None:
         reason='JobTimeLimitSignal: step 1000_0 received signal USR2',
         job_state='COMPLETED',
     )
-    assert failure_hint(report=report, usage=None, requested_memory=None) == (
+    assert _hint(report=report, project=project, fake=fake) == (
         'stopped before the time limit; resubmit continues it, or raise time'
     )
 
@@ -172,43 +169,17 @@ def test_hint_for_paused_training(project: Path, fake: FakeSlurm) -> None:
         reason='TrainingPaused: job time share reached',
         job_state='COMPLETED',
     )
-    assert failure_hint(report=report, usage=None, requested_memory=None) == (
+    assert _hint(report=report, project=project, fake=fake) == (
         'training used its share of the job (job_time_share); '
         'resubmit continues it, or raise time to train longer per job'
     )
-
-
-def test_hint_for_oom_with_numbers(project: Path, fake: FakeSlurm) -> None:
-    report = dataclasses.replace(_report(project, fake), job_state='OUT_OF_MEMORY')
-    hint = failure_hint(
-        report=report,
-        usage=_oom_usage(max_rss=parse_slurm_memory(text='3G')),
-        requested_memory=parse_slurm_memory(text='2G'),
-    )
-    assert hint == 'raise mem_per_cpu; peak 3072M of 2048M requested'
-
-
-def test_hint_for_timeout(project: Path, fake: FakeSlurm) -> None:
-    report = dataclasses.replace(_report(project, fake), job_state='TIMEOUT')
-    assert failure_hint(report=report, usage=None, requested_memory=None) == (
-        'raise time, or check that the timeout signal is on (signal_seconds), '
-        'or lower job_time_share so the stages after training fit'
-    )
-
-
-def test_hint_for_preempted_and_node_fail(project: Path, fake: FakeSlurm) -> None:
-    for job_state in ('PREEMPTED', 'NODE_FAIL'):
-        report = dataclasses.replace(_report(project, fake), job_state=job_state)
-        assert failure_hint(report=report, usage=None, requested_memory=None) == (
-            'not caused by the code; resubmit'
-        )
 
 
 def test_no_hint_for_python_error(project: Path, fake: FakeSlurm) -> None:
     report = dataclasses.replace(
         _report(project, fake), reason='ValueError: bad', job_state='FAILED'
     )
-    assert failure_hint(report=report, usage=None, requested_memory=None) is None
+    assert _hint(report=report, project=project, fake=fake) is None
 
 
 def test_failures_json_has_hint(
