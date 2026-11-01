@@ -7,7 +7,7 @@ commit, so the baseline only ever goes down.
 """
 
 import ast
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 import json
 from pathlib import Path
 
@@ -97,7 +97,12 @@ def _body_depth(*, branch: ast.If) -> int:
 def _statement_depth(*, statement: ast.stmt) -> int:
     if isinstance(statement, ast.If):
         return 1 + max(_body_depth(branch=branch) for branch in _elif_chain(statement=statement))
-    if isinstance(statement, (ast.For, ast.While, ast.With)):
+    if isinstance(statement, (ast.For, ast.While, ast.AsyncFor)):
+        # The else of a loop is at the same level as its body (rule 7).
+        return 1 + max(
+            _max_depth(statements=statement.body), _max_depth(statements=statement.orelse)
+        )
+    if isinstance(statement, (ast.With, ast.AsyncWith)):
         return 1 + _max_depth(statements=statement.body)
     if isinstance(statement, ast.Try):
         inner = _max_depth(statements=statement.body)
@@ -176,6 +181,37 @@ def _kind_switches(*, tree: ast.Module) -> int:
     return chains + matches
 
 
+def _baseline_problems(
+    *, kind: str, counts: Mapping[str, int], baseline: Mapping[str, int]
+) -> list[str]:
+    """Compare one kind's counts to its baseline.
+
+    A count above the baseline is a new violation. A count below it means the
+    baseline was not lowered. A baseline key with no file (a moved or deleted
+    module) and a zero entry (the format omits files with 0) are both stale.
+    """
+    problems = []
+    for name in sorted(set(counts) | set(baseline)):
+        count = counts.get(name, 0)
+        allowed = baseline.get(name, 0)
+        if count > allowed:
+            problems.append(
+                f'{name}: {kind} {count} above baseline {allowed}; '
+                'remove the nested if or kind switch (CODING_RULES.md Part III '
+                'rules 6, 7 and 50)'
+            )
+        elif count < allowed:
+            problems.append(
+                f'{name}: {kind} {count} below baseline {allowed}; '
+                'lower the baseline in the same commit'
+            )
+        elif name in baseline and allowed == 0:
+            problems.append(
+                f'{name}: {kind} baseline entry is zero; lower the baseline in the same commit'
+            )
+    return problems
+
+
 def test_elif_chain_is_not_nesting() -> None:
     tree = _parse(source='if a:\n    x\nelif b:\n    y\nelse:\n    z\n')
     assert _nested_ifs(tree=tree) == 0
@@ -232,28 +268,61 @@ def test_depth_three_function_is_deep() -> None:
     assert _deep_functions(tree=flat) == 0
 
 
+def test_for_else_body_counts_at_the_loop_level() -> None:
+    tree = _parse(
+        source='def f():\n'
+        '    for a in x:\n'
+        '        pass\n'
+        '    else:\n'
+        '        for b in y:\n'
+        '            if c:\n'
+        '                z\n'
+    )
+    assert _deep_functions(tree=tree) == 1
+
+
+def test_async_for_and_async_with_count() -> None:
+    tree = _parse(
+        source='async def f():\n'
+        '    async with y:\n'
+        '        async for a in x:\n'
+        '            if b:\n'
+        '                z\n'
+    )
+    assert _deep_functions(tree=tree) == 1
+
+
+def test_baseline_rejects_stale_and_zero_entries() -> None:
+    problems = _baseline_problems(
+        kind='nested_if',
+        counts={'src/tslab/ok.py': 2, 'src/tslab/zero.py': 0},
+        baseline={'src/tslab/ok.py': 2, 'src/tslab/gone.py': 3, 'src/tslab/zero.py': 0},
+    )
+    assert [line.split(':', 1)[0] for line in problems] == [
+        'src/tslab/gone.py',
+        'src/tslab/zero.py',
+    ]
+    assert 'lower the baseline in the same commit' in problems[0]
+    assert 'zero' in problems[1]
+
+
 def test_control_flow_matches_baseline() -> None:
     baseline = json.loads(BASELINE.read_text())
-    problems = []
+    counts: dict[str, dict[str, int]] = {}
     for path in _source_files():
         tree = _parse(source=path.read_text())
-        counts = {
+        counts[path.relative_to(ROOT).as_posix()] = {
             'nested_if': _nested_ifs(tree=tree),
             'deep_functions': _deep_functions(tree=tree),
             'kind_switches': _kind_switches(tree=tree),
         }
-        for kind in KINDS:
-            count = counts[kind]
-            allowed = baseline[kind].get(path.relative_to(ROOT).as_posix(), 0)
-            if count > allowed:
-                problems.append(
-                    f'{path.relative_to(ROOT)}: {kind} {count} above baseline {allowed}; '
-                    'remove the nested if or kind switch (CODING_RULES.md Part III '
-                    'rules 6, 7 and 50)'
-                )
-            elif count < allowed:
-                problems.append(
-                    f'{path.relative_to(ROOT)}: {kind} {count} below baseline {allowed}; '
-                    'lower the baseline in the same commit'
-                )
+    problems = []
+    for kind in KINDS:
+        problems.extend(
+            _baseline_problems(
+                kind=kind,
+                counts={name: values[kind] for name, values in counts.items()},
+                baseline=baseline[kind],
+            )
+        )
     assert problems == []
