@@ -16,7 +16,7 @@ from typing import Any, override
 from lightning.pytorch.loggers import Logger
 from lightning.pytorch.utilities import rank_zero_only
 
-from tslab.interfaces.tracker import RunStatus, Tracker
+from tslab.core.tracker import RunStatus, Tracker
 
 __all__ = ['LightningLoggerTracker', 'TrackerLogger', 'lightning_loggers']
 

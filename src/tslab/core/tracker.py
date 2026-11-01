@@ -1,9 +1,9 @@
 """The experiment-tracker interface and the local tracker every run has.
 
 ``Run`` talks to trackers only through ``Tracker``. The interface lives in
-``core`` because the engine depends on it; ``tslab.interfaces.tracker``
-re-exports it for users who write their own tracker. ``LocalTracker`` needs no
-service and no extra package, so ``Run`` can always add it.
+``core`` because the engine depends on it; users import it from ``tslab``.
+``LocalTracker`` needs no service and no extra package, so ``Run`` can always
+add it.
 """
 
 from abc import ABC, abstractmethod

@@ -32,7 +32,8 @@ A failed instance does not raise out of the run, so a script that needs to know
 reads `status.json`:
 
 ```python
-from tslab.core.status import InstanceState, read_status, STATUS_FILE
+from tslab.core.paths import STATUS_FILE
+from tslab.core.status import InstanceState, read_status
 
 snapshot = read_status(path=run_folder / STATUS_FILE)
 failed = [

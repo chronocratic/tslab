@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from tslab.interfaces.tracker import Tracker
+from tslab.core.tracker import Tracker
 
 __all__ = ['TrackingOptions', 'build_trackers']
 

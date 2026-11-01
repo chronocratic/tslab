@@ -6,7 +6,7 @@ from typing import Any, override
 from lightning.pytorch.loggers import Logger
 import pytest
 
-from tslab.interfaces.tracker import RunStatus, Tracker
+from tslab.core.tracker import RunStatus, Tracker
 from tslab.tracking import mlflow_tracker
 from tslab.tracking.lightning_bridge import lightning_loggers, LightningLoggerTracker
 from tslab.tracking.mlflow_tracker import MLflowTracker

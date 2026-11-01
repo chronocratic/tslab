@@ -8,7 +8,7 @@ from lightning.pytorch.loggers import CSVLogger, WandbLogger
 import pytest
 
 from tslab.core.run import Run
-from tslab.interfaces.tracker import RunStatus
+from tslab.core.tracker import RunStatus
 from tslab.tracking.wandb import tracker as wandb_tracker_module
 from tslab.tracking.wandb.log import read_exit_codes, read_records
 from tslab.tracking.wandb.tracker import WandbTracker

@@ -20,7 +20,8 @@ from tslab.lightning.callbacks import (
     resolve_early_stopping_patience,
 )
 from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.trainer import _defer_time_limit_signals, TrainingPaused
+from tslab.lightning.exceptions import TrainingPaused
+from tslab.lightning.trainer import _defer_time_limit_signals
 
 
 @pytest.mark.parametrize(
