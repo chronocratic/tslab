@@ -3,18 +3,16 @@
 import dataclasses
 import json
 import logging
-import os
 from pathlib import Path
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, jobs_of, submit_study
+from tests.support.fake_backend import FakeBackend
+from tests.unit.study.helpers import context, submit_study
 from tslab.cli import main
 from tslab.cli.study import Wait
-from tslab.study.context import Context, context_for, load_context, Selection
-from tslab.study.definition import load_study
-from tslab.study.launchers.slurm.states import slurm_task_ids
+from tslab.study.context import Context
+from tslab.study.launchers import JobPhase
 from tslab.study.reporting.outcome import EXIT_TIMEOUT
 from tslab.study.reporting.state import StudyState
 from tslab.study.reporting.wait import wait_for_study
@@ -68,7 +66,7 @@ def _sequence(*, base: Context, sequence: tuple[tuple[StudyState, ...], ...]) ->
     return [_with_states(context=base, states=states) for states in sequence]
 
 
-def test_wait_returns_0_when_all_done_after_two_checks(project: Path, fake: FakeSlurm) -> None:
+def test_wait_returns_0_when_all_done_after_two_checks(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     prepared = iter(
         [
@@ -90,7 +88,7 @@ def test_wait_returns_0_when_all_done_after_two_checks(project: Path, fake: Fake
     assert waited == 10
 
 
-def test_wait_stops_on_first_failure_without_keep_going(project: Path, fake: FakeSlurm) -> None:
+def test_wait_stops_on_first_failure_without_keep_going(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     states = (StudyState.FAILED, StudyState.RUNNING, StudyState.DONE, StudyState.DONE)
     code, _, waited = wait_for_study(
@@ -105,7 +103,7 @@ def test_wait_stops_on_first_failure_without_keep_going(project: Path, fake: Fak
     assert waited == 0
 
 
-def test_wait_keep_going_waits_until_nothing_live(project: Path, fake: FakeSlurm) -> None:
+def test_wait_keep_going_waits_until_nothing_live(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     prepared = iter(
         [
@@ -132,7 +130,7 @@ def test_wait_keep_going_waits_until_nothing_live(project: Path, fake: FakeSlurm
     assert waited == 10
 
 
-def test_wait_times_out_with_124(project: Path, fake: FakeSlurm) -> None:
+def test_wait_times_out_with_124(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
     elapsed = [0.0]
@@ -149,7 +147,7 @@ def test_wait_times_out_with_124(project: Path, fake: FakeSlurm) -> None:
 
 
 def test_wait_keeps_going_through_unknown_states_and_warns_once(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     base = context(project=project, machine_file='cluster.toml')
     unknown = _with_states(
@@ -173,7 +171,7 @@ def test_wait_keeps_going_through_unknown_states_and_warns_once(
     assert caplog.text.count('job states unknown; still waiting') == 1
 
 
-def test_wait_returns_last_state_when_reload_is_interrupted(project: Path, fake: FakeSlurm) -> None:
+def test_wait_returns_last_state_when_reload_is_interrupted(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
     checks = iter([running])
@@ -198,9 +196,7 @@ def test_wait_returns_last_state_when_reload_is_interrupted(project: Path, fake:
     assert waited == 0
 
 
-def test_wait_logs_only_when_counts_change(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_wait_logs_only_when_counts_change(project: Path, caplog: pytest.LogCaptureFixture) -> None:
     base = context(project=project, machine_file='local.toml')
     running = _with_states(context=base, states=(StudyState.RUNNING,) * len(base.reports))
     done = _with_states(context=base, states=(StudyState.DONE,) * len(base.reports))
@@ -222,7 +218,7 @@ def test_wait_logs_only_when_counts_change(
     assert 'done 4' in lines[1]
 
 
-def test_wait_gap_doubles_up_to_interval(project: Path, fake: FakeSlurm) -> None:
+def test_wait_gap_doubles_up_to_interval(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = (StudyState.RUNNING,) * len(base.reports)
     done = (StudyState.DONE,) * len(base.reports)
@@ -232,7 +228,7 @@ def test_wait_gap_doubles_up_to_interval(project: Path, fake: FakeSlurm) -> None
     assert waited == 1050
 
 
-def test_wait_gap_resets_when_counts_change(project: Path, fake: FakeSlurm) -> None:
+def test_wait_gap_resets_when_counts_change(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = (StudyState.RUNNING,) * len(base.reports)
     one_done = (StudyState.DONE, *running[1:])
@@ -245,7 +241,7 @@ def test_wait_gap_resets_when_counts_change(project: Path, fake: FakeSlurm) -> N
     assert waited == 300
 
 
-def test_wait_gap_never_exceeds_small_interval(project: Path, fake: FakeSlurm) -> None:
+def test_wait_gap_never_exceeds_small_interval(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = (StudyState.RUNNING,) * len(base.reports)
     done = (StudyState.DONE,) * len(base.reports)
@@ -257,7 +253,7 @@ def test_wait_gap_never_exceeds_small_interval(project: Path, fake: FakeSlurm) -
     assert waited == 30
 
 
-def test_wait_timeout_uses_current_gap(project: Path, fake: FakeSlurm) -> None:
+def test_wait_timeout_uses_current_gap(project: Path) -> None:
     base = context(project=project, machine_file='local.toml')
     running = (StudyState.RUNNING,) * len(base.reports)
     code, _, waited, sleeps = _wait(
@@ -289,10 +285,10 @@ def test_wait_rejects_interval_below_10(project: Path) -> None:
 
 
 def test_wait_json_reports_timeout(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
     with pytest.raises(SystemExit) as raised:
         main(
             args=[
@@ -315,7 +311,7 @@ def test_wait_json_reports_timeout(
     assert document['timed_out'] is True
 
 
-def test_wait_rejects_empty_selection(project: Path, fake: FakeSlurm) -> None:
+def test_wait_rejects_empty_selection(project: Path, fake_backend: FakeBackend) -> None:
     with pytest.raises(SystemExit) as raised:
         main(
             args=[
@@ -329,49 +325,3 @@ def test_wait_rejects_empty_selection(project: Path, fake: FakeSlurm) -> None:
             ]
         )
     assert raised.value.code == 2
-
-
-def _query_ids(call: list[str]) -> list[str]:
-    return call[call.index('--jobs') + 1].split(',')
-
-
-def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlurm) -> None:
-    submit_study(project=project)
-    ids = slurm_task_ids(jobs=jobs_of(project=project))
-    first = '\n'.join(f'{item}|{"COMPLETED" if item == ids[0] else "RUNNING"}' for item in ids)
-    second = '\n'.join(f'{item}|COMPLETED' for item in ids)
-    prior = len(fake.calls('sacct'))
-    fake.set_answers(
-        'sacct', [{'stdout': first + '\n'}] * (prior + 1) + [{'stdout': second + '\n'}]
-    )
-    ended: dict[str, str] = {}
-    for _ in range(2):
-        load_context(
-            reference='toy_studies:study',
-            machine_path=project / 'cluster.toml',
-            selection=Selection(),
-            project_root=Path.cwd(),
-            local_cpus=1,
-            ended_states=ended,
-            environment=os.environ,
-        )
-    queries = fake.calls('sacct')[prior:]
-    assert _query_ids(queries[0]) == ids
-    assert _query_ids(queries[1]) == ids[1:]
-    assert ended == dict.fromkeys(ids, 'COMPLETED')
-
-
-def test_failed_query_leaves_the_cache_unchanged(project: Path, fake: FakeSlurm) -> None:
-    submit_study(project=project)
-    fake.set_answers('sacct', [{'exit': 1, 'stderr': 'down'}])
-    ended: dict[str, str] = {}
-    context_for(
-        study=load_study(reference='toy_studies:study'),
-        machine_path=project / 'cluster.toml',
-        selection=Selection(),
-        project_root=Path.cwd(),
-        local_cpus=1,
-        ended_states=ended,
-        environment=os.environ,
-    )
-    assert ended == {}

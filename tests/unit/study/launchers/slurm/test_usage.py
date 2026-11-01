@@ -12,6 +12,8 @@ from tests.unit.study.helpers import context, submit_study
 from tslab.jobs.slurm import SlurmJobUsage
 from tslab.study.launchers import JobUsage
 import tslab.study.launchers.slurm.usage as slurm_usage
+from tslab.study.reporting.failures import collect_failures
+from tslab.study.reporting.state import StudyState
 
 
 def test_usage_queries_all_selected_job_ids(
@@ -45,3 +47,28 @@ def test_usage_queries_all_selected_job_ids(
     converted = usage[expected[0]]
     assert isinstance(converted, JobUsage)
     assert dataclasses.asdict(converted) == dataclasses.asdict(returned[expected[0]])
+
+
+def test_oom_hint_without_numbers_when_sacct_fails(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': (
+                    '1000_0|OUT_OF_MEMORY\n1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'
+                ),
+            },
+            {'exit': 1, 'stderr': 'sacct: error: down'},
+        ],
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    with caplog.at_level('WARNING', logger='tslab.study.reporting.failures'):
+        failures = collect_failures(context=ctx, states=(), lines=30)
+    assert 'sacct' in caplog.text
+    (failure,) = failures
+    assert failure['state'] == StudyState.FAILED.value
+    assert failure['hint'] == 'raise mem_per_cpu'

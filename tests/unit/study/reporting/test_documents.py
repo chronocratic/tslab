@@ -7,7 +7,7 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import (
     context,
     finish_run,
@@ -20,12 +20,13 @@ from tslab.cli import main
 from tslab.core.status import InstanceState, RunState, utc_now_iso
 from tslab.core.text import TextTable
 from tslab.study.definition import expand_runs, load_study
+from tslab.study.launchers import JobPhase
 from tslab.study.records import append_job, JobRecord
 from tslab.study.reporting.documents import run_entry, show_document, status_document
 from tslab.study.reporting.state import StudyState
 
 
-def test_status_document_counts_every_state(project: Path, fake: FakeSlurm) -> None:
+def test_status_document_counts_every_state(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     finish_run(project=project, model='small', seed=1)
     ctx = context(project=project, machine_file='cluster.toml')
@@ -39,7 +40,7 @@ def test_status_document_counts_every_state(project: Path, fake: FakeSlurm) -> N
 
 
 def test_run_entry_contains_absolute_directory_and_run_values(
-    project: Path, fake: FakeSlurm
+    project: Path, fake_backend: FakeBackend
 ) -> None:
     submit_study(project=project)
     ctx = context(project=project, machine_file='cluster.toml')
@@ -62,7 +63,7 @@ def test_run_entry_contains_absolute_directory_and_run_values(
     assert entry['values'] == dict(ctx.reports[0].run.values)
 
 
-def test_run_entry_names_submission_in_progress(project: Path, fake: FakeSlurm) -> None:
+def test_run_entry_names_submission_in_progress(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     ctx = dataclasses.replace(
         context(project=project, machine_file='cluster.toml'), submission_in_progress=True
@@ -70,7 +71,7 @@ def test_run_entry_names_submission_in_progress(project: Path, fake: FakeSlurm) 
     assert run_entry(report=ctx.reports[0], context=ctx)['reason'] == 'submission in progress'
 
 
-def test_run_entry_names_live_auto_retry_job(project: Path, fake: FakeSlurm) -> None:
+def test_run_entry_names_live_auto_retry_job(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     job = jobs_of(project=project)[0]
     task = job.tasks[0]
@@ -87,18 +88,21 @@ def test_run_entry_names_live_auto_retry_job(project: Path, fake: FakeSlurm) -> 
         submission_id='followup',
         time=utc_now_iso(),
         launcher='slurm',
-        job_id='2000',
+        job_id='job-9',
         job_file=1,
         tasks=(),
     )
     append_job(
         path=study_directory(project=project) / '.study' / 'submissions.jsonl', record=followup
     )
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': f'{job.job_id}_{task.index}|TIMEOUT\n2000|PENDING\n'}]
+    fake_backend.set_states(
+        phases={f'{job.job_id}_{task.index}': JobPhase.INTERRUPTED},
+        followup_live_job_ids=('job-9',),
     )
     ctx = context(project=project, machine_file='cluster.toml')
-    assert run_entry(report=ctx.reports[0], context=ctx)['reason'] == 'auto retry queued (job 2000)'
+    assert (
+        run_entry(report=ctx.reports[0], context=ctx)['reason'] == 'auto retry queued (job job-9)'
+    )
 
 
 def test_show_document_lists_axes_and_counts(project: Path) -> None:
