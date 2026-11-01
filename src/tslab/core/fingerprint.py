@@ -102,7 +102,11 @@ def is_not_fingerprinted(*, annotation: object) -> bool:
 def _canonicalize_dataclass(*, value: 'DataclassInstance') -> dict[str, object]:
     value_type = type(value)
     type_hints = get_type_hints(value_type, include_extras=True)
-    canonical: dict[str, object] = {'__type__': qualified_name(cls=value_type)}
+    # why: a class can pin the __type__ spelling it wants in fingerprints; the
+    # pin is only honored when defined on the exact class, so subclasses keep
+    # their own name and fields
+    type_name = value_type.__dict__.get('_tslab_canonical_name') or qualified_name(cls=value_type)
+    canonical: dict[str, object] = {'__type__': type_name}
     for field in dataclasses.fields(value):
         if is_not_fingerprinted(annotation=type_hints.get(field.name)):
             continue
@@ -123,7 +127,9 @@ def canonicalize(*, value: object) -> object:  # noqa: C901, PLR0911
           (created by user code, not by a stage) raises ``TypeError``.
         - ``Fingerprintable`` objects are replaced by their settings.
         - Dataclasses become a dict with a ``__type__`` key plus their fields,
-          skipping fields annotated with ``NotFingerprinted``.
+          skipping fields annotated with ``NotFingerprinted``. A class may pin
+          the ``__type__`` spelling with a ``_tslab_canonical_name`` attribute
+          defined on it (a subclass keeps its own spelling).
         - Lists and tuples become lists; mappings with ``str`` keys become
           dicts (key order is handled by sorted JSON serialization).
 

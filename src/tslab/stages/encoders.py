@@ -1,7 +1,7 @@
 """The ready ``ModelAsEncoder`` encoder and its device helpers."""
 
 from dataclasses import dataclass
-from typing import Annotated, cast, Protocol
+from typing import Annotated, cast, ClassVar, Protocol
 
 import torch
 
@@ -30,12 +30,6 @@ def resolve_device(*, device: str) -> torch.device:
     return torch.device(device)
 
 
-# why: the canonical type name stays at the pre-move location, so the
-# fingerprints of cached encodings do not change when the class moved to
-# tslab.stages.encoders
-_LEGACY_TYPE_NAME = 'tslab.interfaces.encoder.ModelAsEncoder'
-
-
 @dataclass(frozen=True, kw_only=True)
 class ModelAsEncoder:
     """Encoder factory for models that already have ``encode(*, inputs)``.
@@ -58,19 +52,15 @@ class ModelAsEncoder:
     device: Annotated[str, NotFingerprinted] = 'auto'
     batch_size: int | None = None
 
+    # why: keep the pre-move spelling in fingerprints, so cached encodings
+    # stay reusable; the pin only applies to this exact class, not subclasses
+    _tslab_canonical_name: ClassVar[str] = 'tslab.interfaces.encoder.ModelAsEncoder'
+
     def __post_init__(self) -> None:
         """Reject a ``batch_size`` that is not positive."""
         if self.batch_size is not None and self.batch_size <= 0:
             message = f'batch_size must be positive or None, got {self.batch_size}'
             raise ValueError(message)
-
-    def fingerprint_settings(self) -> dict[str, object]:
-        """Return the settings that change the result.
-
-        The ``__type__`` spelling is the pre-move module path (see
-        ``_LEGACY_TYPE_NAME``); a new result-changing field must be added here.
-        """
-        return {'__type__': _LEGACY_TYPE_NAME, 'batch_size': self.batch_size}
 
     def __call__(self, model: Encoder) -> Encoder:
         """Wrap ``model``; nothing moves until the first encode call.
