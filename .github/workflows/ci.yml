@@ -47,7 +47,7 @@ jobs:
       - name: Tests
         run: |
           if [ "$RUN_SLOW" = true ]; then skip=""; else skip=" and not slow"; fi
-          uv run pytest -m "not chronocratic$skip"
+          uv run pytest -m "not chronocratic$skip" --cov=src/tslab --cov-report=term-missing:skip-covered
 
   chronocratic:
     # Adapter tests, examples/advanced and the generated-project test.
@@ -70,7 +70,7 @@ jobs:
       - name: Tests
         run: |
           if [ "$RUN_SLOW" = true ]; then skip=""; else skip=" and not slow"; fi
-          uv run pytest -m "chronocratic$skip"
+          uv run pytest -m "chronocratic$skip" --cov=src/tslab --cov-report=term-missing:skip-covered
 
   docs:
     # Same build as Read the Docs; warnings fail it.
