@@ -80,7 +80,7 @@ def status_document(
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'study_directory': context.study_directory.resolve().as_posix(),
-        'job_states_known': context.job_states_known,
+        'job_states_known': context.job_states.known,
         'exit_code': exit_code,
         'counts': counts,
         'runs': [

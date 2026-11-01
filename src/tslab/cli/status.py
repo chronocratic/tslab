@@ -34,6 +34,7 @@ from tslab.core.status import (
     StatusFileError,
 )
 from tslab.core.text import log_table
+from tslab.study.launchers import JobPhase
 from tslab.study.outcome import states_exit_code
 from tslab.study.state import read_folder, study_state, StudyState
 
@@ -146,7 +147,7 @@ def _run_status_entry(
     *, directory: Path, snapshot: RunStatusSnapshot, stage: str | None
 ) -> tuple[dict[str, object], StudyState]:
     folder = read_folder(run_directory=directory)
-    state, _ = study_state(job_state=None, folder=folder)
+    state, _ = study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)
     run_state = shown_run_state(directory=directory, snapshot=snapshot)
     instances = [
         {

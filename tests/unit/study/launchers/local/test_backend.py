@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     ('job_state', 'phase'),
     [
-        ('PENDING', JobPhase.QUEUED),
-        ('RUNNING', JobPhase.RUNNING),
-        ('ENDED', JobPhase.ENDED),
+        ('pending', JobPhase.QUEUED),
+        ('running', JobPhase.RUNNING),
+        ('ended', JobPhase.ENDED),
         ('UNRECOGNIZED', JobPhase.ENDED),
         (None, JobPhase.UNKNOWN),
     ],
@@ -56,10 +56,10 @@ def test_job_states_reads_live_launch_and_returns_read_only_mappings(*, project:
 
     assert states.known
     assert states.states == {
-        task_ids[0]: 'RUNNING',
-        task_ids[1]: 'PENDING',
-        task_ids[2]: 'ENDED',
-        task_ids[3]: 'ENDED',
+        task_ids[0]: 'running',
+        task_ids[1]: 'pending',
+        task_ids[2]: 'ended',
+        task_ids[3]: 'ended',
     }
     assert states.phases == {
         task_ids[0]: JobPhase.RUNNING,
@@ -70,7 +70,7 @@ def test_job_states_reads_live_launch_and_returns_read_only_mappings(*, project:
     assert states.followup_live_job_ids == ()
     assert new_cache is cache
     with pytest.raises(TypeError):
-        cast('MutableMapping[str, str]', states.states)[task_ids[0]] = 'ENDED'
+        cast('MutableMapping[str, str]', states.states)[task_ids[0]] = 'ended'
     with pytest.raises(TypeError):
         cast('MutableMapping[str, JobPhase]', states.phases)[task_ids[0]] = JobPhase.ENDED
 
@@ -89,7 +89,7 @@ def test_job_states_marks_tasks_ended_when_launch_is_not_live(*, project: Path) 
         machine=ctx.machine, study=ctx.study, jobs=jobs_of(project=project), cache={}
     )
 
-    assert states.states == dict.fromkeys(task_ids, 'ENDED')
+    assert states.states == dict.fromkeys(task_ids, 'ended')
     assert states.phases == dict.fromkeys(task_ids, JobPhase.ENDED)
 
 
@@ -101,7 +101,7 @@ def test_job_states_marks_tasks_ended_without_launch_file(*, project: Path) -> N
         machine=ctx.machine, study=ctx.study, jobs=jobs_of(project=project), cache={}
     )
 
-    assert states.states == dict.fromkeys(task_ids, 'ENDED')
+    assert states.states == dict.fromkeys(task_ids, 'ended')
 
 
 def test_expected_starts_is_none(*, project: Path) -> None:

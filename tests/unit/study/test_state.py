@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.unit.study.helpers import make_job_states
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -13,7 +14,14 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.jobs.slurm import (
+    FAILING_JOB_STATES,
+    INTERRUPTING_JOB_STATES,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+)
 from tslab.study import StudyRun
+from tslab.study.launchers import JobPhase
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.state import (
     collect_states,
@@ -81,40 +89,99 @@ def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
 
 
 @pytest.mark.parametrize(
-    ('job_state', 'folder', 'expected'),
+    ('job_state', 'job_phase', 'folder', 'expected', 'reason'),
     [
-        ('PENDING', facts(), StudyState.QUEUED),
-        ('RUNNING', facts(), StudyState.RUNNING),
-        (None, facts(run_state='running', lock_live=True), StudyState.RUNNING),
-        (None, facts(run_state='finished', instances={'train': 'done'}), StudyState.DONE),
-        (None, facts(run_state='running'), StudyState.INTERRUPTED),
-        (None, facts(run_state='crashed'), StudyState.INTERRUPTED),
-        ('TIMEOUT', facts(), StudyState.INTERRUPTED),
+        *(
+            (state, JobPhase.QUEUED, facts(), StudyState.QUEUED, None)
+            for state in sorted(QUEUED_JOB_STATES)
+        ),
+        *(
+            (state, JobPhase.RUNNING, facts(), StudyState.RUNNING, None)
+            for state in sorted(RUNNING_JOB_STATES)
+        ),
+        *(
+            (state, JobPhase.INTERRUPTED, facts(), StudyState.INTERRUPTED, f'SLURM {state}')
+            for state in sorted(INTERRUPTING_JOB_STATES)
+        ),
+        *(
+            (state, JobPhase.FAILED, facts(), StudyState.FAILED, f'SLURM {state}')
+            for state in sorted(FAILING_JOB_STATES)
+        ),
         (
             None,
+            JobPhase.UNKNOWN,
+            facts(run_state='running', lock_live=True),
+            StudyState.RUNNING,
+            None,
+        ),
+        (
+            None,
+            JobPhase.UNKNOWN,
+            facts(run_state='finished', instances={'train': 'done'}),
+            StudyState.DONE,
+            None,
+        ),
+        (None, JobPhase.UNKNOWN, facts(run_state='running'), StudyState.INTERRUPTED, None),
+        (None, JobPhase.UNKNOWN, facts(run_state='crashed'), StudyState.INTERRUPTED, None),
+        (
+            None,
+            JobPhase.UNKNOWN,
             facts(run_state='finished', instances={'train': ('failed', 'TrainingPaused: 23:30')}),
             StudyState.INTERRUPTED,
+            'TrainingPaused: 23:30',
         ),
-        (None, facts(run_state='failed'), StudyState.FAILED),
-        (None, facts(run_state='finished', instances={'attack': 'skipped'}), StudyState.FAILED),
-        ('OUT_OF_MEMORY', facts(missing=True), StudyState.FAILED),
-        ('COMPLETED', facts(missing=True), StudyState.MISSING),
-        (None, facts(missing=True), StudyState.MISSING),
-        (None, facts(read_error='JSONDecodeError: x'), StudyState.FAILED),
+        (None, JobPhase.UNKNOWN, facts(run_state='failed'), StudyState.FAILED, None),
+        (
+            None,
+            JobPhase.UNKNOWN,
+            facts(run_state='finished', instances={'attack': 'skipped'}),
+            StudyState.FAILED,
+            None,
+        ),
+        ('COMPLETED', JobPhase.COMPLETED, facts(missing=True), StudyState.MISSING, None),
+        (None, JobPhase.UNKNOWN, facts(missing=True), StudyState.MISSING, None),
+        (
+            None,
+            JobPhase.UNKNOWN,
+            facts(read_error='JSONDecodeError: x'),
+            StudyState.FAILED,
+            'JSONDecodeError: x',
+        ),
+        ('UNRECOGNIZED', JobPhase.ENDED, facts(), StudyState.MISSING, None),
+        ('ended', JobPhase.ENDED, facts(run_state='failed'), StudyState.FAILED, None),
     ],
 )
-def test_state_table(job_state: str | None, folder: FolderFacts, expected: StudyState) -> None:
-    assert study_state(job_state=job_state, folder=folder)[0] is expected
+def test_state_table(
+    job_state: str | None,
+    job_phase: JobPhase,
+    folder: FolderFacts,
+    expected: StudyState,
+    reason: str | None,
+) -> None:
+    assert study_state(job_state=job_state, job_phase=job_phase, folder=folder) == (
+        expected,
+        reason,
+    )
+
+
+def test_study_state_uses_job_phase() -> None:
+    assert (
+        study_state(job_state='TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=facts())[0]
+        is StudyState.INTERRUPTED
+    )
 
 
 def test_ended_job_overrides_a_live_looking_lock() -> None:
     folder = facts(run_state='running', lock_live=True)
-    assert study_state(job_state='TIMEOUT', folder=folder)[0] is StudyState.INTERRUPTED
+    assert (
+        study_state(job_state='TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=folder)[0]
+        is StudyState.INTERRUPTED
+    )
 
 
 def test_reason_is_the_first_error_line() -> None:
     folder = facts(run_state='failed', instances={'train': ('failed', 'ValueError: bad\nmore')})
-    _, reason = study_state(job_state=None, folder=folder)
+    _, reason = study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)
     assert reason == 'ValueError: bad'
 
 
@@ -131,7 +198,10 @@ def test_collect_states_reads_folders_and_records(tmp_path: Path) -> None:
     )
     jobs = [job('7', (task(index=0, run_path='g/a/1', attempt=1),))]
     reports = collect_states(
-        study_directory=tmp_path, runs=runs, jobs=jobs, job_states={'7_0': 'COMPLETED'}
+        study_directory=tmp_path,
+        runs=runs,
+        jobs=jobs,
+        job_states=make_job_states(states={'7_0': 'COMPLETED'}, phases={'7_0': JobPhase.COMPLETED}),
     )
     assert [(r.state, r.attempt, r.job_id) for r in reports] == [
         (StudyState.DONE, 1, '7_0'),
@@ -144,7 +214,10 @@ def test_unreadable_status_is_reported_not_raised(tmp_path: Path) -> None:
     folder.mkdir(parents=True)
     (folder / 'status.json').write_text('{')
     report = collect_states(
-        study_directory=tmp_path, runs=[run('g/a/1')], jobs=[], job_states=None
+        study_directory=tmp_path,
+        runs=[run('g/a/1')],
+        jobs=[],
+        job_states=make_job_states(states={}, phases={}),
     )[0]
     assert report.state is StudyState.FAILED
     assert report.reason is not None
@@ -184,7 +257,10 @@ def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
         tasks=(local_task,),
     )
     report = collect_states(
-        study_directory=tmp_path, runs=[run('g/a/1')], jobs=[local_job], job_states=None
+        study_directory=tmp_path,
+        runs=[run('g/a/1')],
+        jobs=[local_job],
+        job_states=make_job_states(states={}, phases={}),
     )[0]
     # the local task id carries the task index, like the SLURM task ids
     assert report.job_id == 'local-1-0_0'
@@ -194,28 +270,45 @@ def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
 @pytest.mark.parametrize('job_state', ['OUT_OF_MEMORY', 'CANCELLED', 'FAILED'])
 def test_failing_job_state_beats_a_stale_running_file(job_state: str) -> None:
     folder = facts(run_state='running', instances={'train': 'running'})
-    assert study_state(job_state=job_state, folder=folder)[0] is StudyState.FAILED
+    assert (
+        study_state(job_state=job_state, job_phase=JobPhase.FAILED, folder=folder)[0]
+        is StudyState.FAILED
+    )
 
 
 def test_time_limit_beats_a_failing_job_state() -> None:
     folder = facts(run_state='running', instances={'train': ('failed', 'TrainingPaused: 1h')})
-    assert study_state(job_state='CANCELLED', folder=folder)[0] is StudyState.INTERRUPTED
+    assert (
+        study_state(job_state='CANCELLED', job_phase=JobPhase.FAILED, folder=folder)[0]
+        is StudyState.INTERRUPTED
+    )
 
 
 def test_old_training_time_limit_prefix_is_not_interrupted() -> None:
     folder = facts(
         run_state='finished', instances={'train': ('failed', 'TrainingTimeLimitReached: 1h')}
     )
-    assert study_state(job_state=None, folder=folder)[0] is StudyState.FAILED
+    assert (
+        study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)[0]
+        is StudyState.FAILED
+    )
 
 
-@pytest.mark.parametrize('job_state', ['FAILED', 'TIMEOUT', 'CANCELLED', None])
-def test_job_time_limit_signal_is_interrupted(job_state: str | None) -> None:
+@pytest.mark.parametrize(
+    ('job_state', 'job_phase'),
+    [
+        ('FAILED', JobPhase.FAILED),
+        ('TIMEOUT', JobPhase.INTERRUPTED),
+        ('CANCELLED', JobPhase.FAILED),
+        (None, JobPhase.UNKNOWN),
+    ],
+)
+def test_job_time_limit_signal_is_interrupted(job_state: str | None, job_phase: JobPhase) -> None:
     folder = facts(
         run_state='crashed',
         instances={'train': ('failed', 'JobTimeLimitSignal: SIGUSR2 before the time limit')},
     )
-    state, reason = study_state(job_state=job_state, folder=folder)
+    state, reason = study_state(job_state=job_state, job_phase=job_phase, folder=folder)
     assert state is StudyState.INTERRUPTED
     assert reason == 'JobTimeLimitSignal: SIGUSR2 before the time limit'
 
@@ -233,14 +326,14 @@ def _write_status(folder: Path, run_state: RunState, instance_state: InstanceSta
 
 
 def _collect_after_completion(
-    tmp_path: Path, *, job_state: str, sleep: Callable[[float], None]
+    tmp_path: Path, *, job_state: str, job_phase: JobPhase, sleep: Callable[[float], None]
 ) -> list[RunReport]:
     jobs = [job('7', (task(index=0, run_path='g/a/1', attempt=1),))]
     return collect_states(
         study_directory=tmp_path,
         runs=[run('g/a/1')],
         jobs=jobs,
-        job_states={'7_0': job_state},
+        job_states=make_job_states(states={'7_0': job_state}, phases={'7_0': job_phase}),
         sleep=sleep,
     )
 
@@ -255,7 +348,9 @@ def test_grace_wait_rereads_a_completed_run_until_status_settles(tmp_path: Path)
         if len(calls) == 3:
             _write_status(folder, RunState.FINISHED, InstanceState.DONE)
 
-    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=sleep)
+    reports = _collect_after_completion(
+        tmp_path, job_state='COMPLETED', job_phase=JobPhase.COMPLETED, sleep=sleep
+    )
     assert reports[0].state is StudyState.DONE
     assert calls == [1, 1, 1]
 
@@ -263,7 +358,9 @@ def test_grace_wait_rereads_a_completed_run_until_status_settles(tmp_path: Path)
 def test_grace_wait_gives_up_after_15_seconds(tmp_path: Path) -> None:
     _write_status(tmp_path / 'g' / 'a' / '1', RunState.RUNNING, InstanceState.RUNNING)
     calls: list[float] = []
-    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=calls.append)
+    reports = _collect_after_completion(
+        tmp_path, job_state='COMPLETED', job_phase=JobPhase.COMPLETED, sleep=calls.append
+    )
     assert len(calls) == 15
     assert reports[0].state is StudyState.INTERRUPTED
 
@@ -271,13 +368,17 @@ def test_grace_wait_gives_up_after_15_seconds(tmp_path: Path) -> None:
 def test_grace_wait_skips_other_ended_states(tmp_path: Path) -> None:
     _write_status(tmp_path / 'g' / 'a' / '1', RunState.RUNNING, InstanceState.RUNNING)
     calls: list[float] = []
-    _collect_after_completion(tmp_path, job_state='TIMEOUT', sleep=calls.append)
+    _collect_after_completion(
+        tmp_path, job_state='TIMEOUT', job_phase=JobPhase.INTERRUPTED, sleep=calls.append
+    )
     assert calls == []
 
 
 def test_grace_wait_survives_a_missing_run_folder(tmp_path: Path) -> None:
     calls: list[float] = []
-    reports = _collect_after_completion(tmp_path, job_state='COMPLETED', sleep=calls.append)
+    reports = _collect_after_completion(
+        tmp_path, job_state='COMPLETED', job_phase=JobPhase.COMPLETED, sleep=calls.append
+    )
     assert len(calls) == 30
     assert reports[0].state is StudyState.MISSING
 
@@ -299,7 +400,10 @@ def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:
         study_directory=tmp_path,
         runs=[run('g/a/1'), run('g/a/2')],
         jobs=[record],
-        job_states={'local-1-1_1': 'RUNNING', 'local-1-1_2': 'PENDING'},
+        job_states=make_job_states(
+            states={'local-1-1_1': 'running', 'local-1-1_2': 'pending'},
+            phases={'local-1-1_1': JobPhase.RUNNING, 'local-1-1_2': JobPhase.QUEUED},
+        ),
     )
     assert [report.job_id for report in reports] == ['local-1-1_1', 'local-1-1_2']
-    assert [report.job_state for report in reports] == ['RUNNING', 'PENDING']
+    assert [report.job_state for report in reports] == ['running', 'pending']

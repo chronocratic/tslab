@@ -4,29 +4,18 @@ import dataclasses
 from dataclasses import dataclass
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from tslab.jobs.slurm import (
-    job_ended,
-    query_expected_starts,
-    query_job_states,
-    QUEUED_JOB_STATES,
-    RUNNING_JOB_STATES,
-    slurm_available,
-    SlurmError,
-)
+from tslab.jobs.slurm import job_ended, query_expected_starts, query_job_states, SlurmError
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun, study_folder
 from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_in_progress
-from tslab.study.state import (
-    collect_states,
-    followup_job_ids,
-    LOCAL_ENDED,
-    RunReport,
-    slurm_task_ids,
-    StudyState,
-)
+from tslab.study.state import collect_states, RunReport, StudyState
+
+if TYPE_CHECKING:
+    from tslab.study.launchers import JobStates
 
 __all__ = [
     'Context',
@@ -67,7 +56,7 @@ class Context:
         resolved: The selected runs with the machine applied, by run path.
         jobs: The job records of the study, in submission order.
         reports: The state of every selected run.
-        job_states_known: Whether the SLURM states the reports use are real.
+        job_states: The raw states and phases reported by the machine backend.
         submission_in_progress: Whether another process is submitting runs.
         followup_live: Whether a SLURM follow-up job is queued or running.
         followup_live_job_ids: The ids of queued or running SLURM follow-up jobs.
@@ -82,15 +71,23 @@ class Context:
     resolved: dict[str, ResolvedRun]
     jobs: list[JobRecord]
     reports: list[RunReport]
-    job_states_known: bool
+    job_states: 'JobStates'
     submission_in_progress: bool = False
-    followup_live: bool = False
-    followup_live_job_ids: tuple[str, ...] = ()
 
     @property
     def study_directory(self) -> Path:
         """The ``<output_root>/<study>`` folder that holds the runs."""
         return self.machine.output_root / self.study.name
+
+    @property
+    def followup_live(self) -> bool:
+        """Whether a backend reports a live follow-up job."""
+        return bool(self.job_states.followup_live_job_ids)
+
+    @property
+    def followup_live_job_ids(self) -> tuple[str, ...]:
+        """The queued or running follow-up jobs reported by the backend."""
+        return self.job_states.followup_live_job_ids
 
 
 def expected_starts(*, context: Context) -> dict[str, str | None] | None:
@@ -166,27 +163,16 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
     resolved = resolve_runs(study=study, machine=machine, runs=runs, warned=warned)
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
-    job_states: dict[str, str] | None = None
-    job_states_known = True
-    followup_live_job_ids: tuple[str, ...] = ()
-    if machine.launcher == 'slurm':
-        job_states_known = slurm_available()
-        if job_states_known:
-            try:
-                followups = followup_job_ids(jobs=jobs)
-                job_states = _query_states(
-                    job_ids=slurm_task_ids(jobs=jobs) + followups, ended_states=ended_states
-                )
-                followup_live_job_ids = tuple(
-                    job_id
-                    for job_id in followups
-                    if job_states.get(job_id) in QUEUED_JOB_STATES | RUNNING_JOB_STATES
-                )
-            except SlurmError as error:
-                _LOGGER.warning('%s', error)
-                job_states_known = False
-    if machine.launcher == 'local':
-        job_states = _local_states(machine=machine, study=study, jobs=jobs)
+    # why: the launcher door imports Context, so this import must wait until calls
+    from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+    cache = {} if ended_states is None else ended_states
+    job_states, new_cache = backend_for(machine=machine).job_states(
+        machine=machine, study=study, jobs=jobs, cache=cache
+    )
+    if ended_states is not None:
+        # why: study wait owns this cache across repeated context loads
+        ended_states.update(new_cache)
     reports = collect_states(
         study_directory=machine.output_root / study.name,
         runs=runs,
@@ -203,12 +189,10 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         resolved={item.run.run_path: item for item in resolved},
         jobs=jobs,
         reports=reports,
-        job_states_known=job_states_known,
+        job_states=job_states,
         submission_in_progress=submission_in_progress(
             study_folder=study_folder(machine=machine, study=study)
         ),
-        followup_live=bool(followup_live_job_ids),
-        followup_live_job_ids=followup_live_job_ids,
     )
 
 
@@ -222,7 +206,7 @@ def _local_states(
     live = local_job_states(study_folder=study_folder(machine=machine, study=study))
     # why: a local task outside a live launch is over, whatever its folder says
     ended = {
-        f'{job.job_id}_{task.index}': LOCAL_ENDED
+        f'{job.job_id}_{task.index}': 'ended'
         for job, task in latest_tasks(jobs=jobs).values()
         if job.launcher == 'local'
     }
@@ -241,13 +225,16 @@ def refresh_context(*, context: Context) -> Context:
     jobs = read_jobs(
         path=study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
     )
-    reports = collect_states(
-        study_directory=context.study_directory,
-        runs=context.runs,
-        jobs=jobs,
-        job_states=_local_states(machine=context.machine, study=context.study, jobs=jobs),
+    # why: the launcher door imports Context, so this import must wait until calls
+    from tslab.study.launchers import backend_for  # noqa: PLC0415
+
+    job_states, _ = backend_for(machine=context.machine).job_states(
+        machine=context.machine, study=context.study, jobs=jobs, cache={}
     )
-    return dataclasses.replace(context, jobs=jobs, reports=reports)
+    reports = collect_states(
+        study_directory=context.study_directory, runs=context.runs, jobs=jobs, job_states=job_states
+    )
+    return dataclasses.replace(context, jobs=jobs, job_states=job_states, reports=reports)
 
 
 def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) -> dict[str, str]:

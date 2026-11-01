@@ -28,8 +28,9 @@ def _with_states(
     return dataclasses.replace(
         context,
         reports=reports,
-        job_states_known=(
-            context.job_states_known if job_states_known is None else job_states_known
+        job_states=dataclasses.replace(
+            context.job_states,
+            known=context.job_states.known if job_states_known is None else job_states_known,
         ),
     )
 

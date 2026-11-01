@@ -1,27 +1,23 @@
-"""The state of each study run, decided from its folder and its SLURM job."""
+"""The state of each study run, decided from its folder and backend job state."""
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 import time
+from typing import TYPE_CHECKING
 
 from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
 from tslab.core.text import first_line
-from tslab.jobs.slurm import (
-    FAILING_JOB_STATES,
-    INTERRUPTING_JOB_STATES,
-    job_ended,
-    QUEUED_JOB_STATES,
-    RUNNING_JOB_STATES,
-)
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
+if TYPE_CHECKING:
+    from tslab.study.launchers import JobPhase, JobStates
+
 __all__ = [
-    'LOCAL_ENDED',
     'FolderFacts',
     'RunReport',
     'StudyState',
@@ -32,8 +28,6 @@ __all__ = [
     'study_state',
 ]
 
-#: The job state of a local task that is not in a live launch.
-LOCAL_ENDED = 'ENDED'
 _INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
 
@@ -93,7 +87,8 @@ class RunReport:
         reason: A one-line reason, when the state is not obvious.
         job_id: ``<job>_<index>`` for SLURM arrays, the local id otherwise;
             ``None`` when the run was never submitted.
-        job_state: The SLURM state of that task id, when queried.
+        job_state: The raw state of that task id, when queried.
+        job_phase: The backend phase of the task, or ``UNKNOWN`` when absent.
         attempt: The attempt of the latest submission; 0 when never submitted.
         task: The latest submitted task of the run.
         folder: The facts of the run folder.
@@ -104,6 +99,7 @@ class RunReport:
     reason: str | None
     job_id: str | None
     job_state: str | None
+    job_phase: 'JobPhase'
     attempt: int
     task: TaskRecord | None
     folder: FolderFacts
@@ -117,27 +113,33 @@ def _reason(*, folder: FolderFacts, job_state: str | None) -> str | None:
                 return first_line(text=record.error)
     if folder.read_error is not None:
         return folder.read_error
-    if job_state is not None and job_state != LOCAL_ENDED:
+    if job_state is not None and job_state.isupper():
         return f'SLURM {job_state}'
     return None
 
 
-def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudyState, str | None]:
-    """The state of one run, from its folder and the state of its SLURM task.
+def study_state(
+    *, job_state: str | None, job_phase: 'JobPhase', folder: FolderFacts
+) -> tuple[StudyState, str | None]:
+    """The state of one run, from its folder and the phase of its latest job.
 
     Args:
-        job_state: The SLURM state of the latest task id of the run, or ``None``
-            when the run was never submitted or SLURM is unavailable.
+        job_state: The raw state of the latest task id of the run, or ``None``
+            when the run was never submitted or the backend has no state.
+        job_phase: The backend phase of the latest task id of the run.
         folder: The facts of the run folder.
 
     Returns:
         The state and a one-line reason, in the order of spec §7.
     """
+    # why: the launcher door imports this module's RunReport during initialization
+    from tslab.study.launchers import JobPhase  # noqa: PLC0415
+
     snapshot = folder.snapshot
-    if job_state in QUEUED_JOB_STATES:
+    if job_phase is JobPhase.QUEUED:
         return StudyState.QUEUED, None
-    live = folder.lock_live and (job_state is None or not job_ended(job_state=job_state))
-    if job_state in RUNNING_JOB_STATES or live:
+    live = folder.lock_live and job_phase is JobPhase.UNKNOWN
+    if job_phase is JobPhase.RUNNING or live:
         return StudyState.RUNNING, None
     if (
         snapshot is not None
@@ -157,8 +159,8 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
     )
     # why: a job that ended out of memory or cancelled left a stale ``running`` file;
     # it failed, so the automatic retry must not restart it (spec section 8)
-    killed = stale_running and job_state in FAILING_JOB_STATES and not time_limited
-    interrupted = (stale_running and not killed) or job_state in INTERRUPTING_JOB_STATES
+    killed = stale_running and job_phase is JobPhase.FAILED and not time_limited
+    interrupted = (stale_running and not killed) or job_phase is JobPhase.INTERRUPTED
     interrupted = interrupted or time_limited
     if interrupted:
         return StudyState.INTERRUPTED, _reason(folder=folder, job_state=job_state)
@@ -173,7 +175,7 @@ def study_state(*, job_state: str | None, folder: FolderFacts) -> tuple[StudySta
         )
     )
     failed = failed or killed or folder.read_error is not None
-    failed = failed or (snapshot is None and job_state in FAILING_JOB_STATES)
+    failed = failed or (snapshot is None and job_phase is JobPhase.FAILED)
     if failed:
         return StudyState.FAILED, _reason(folder=folder, job_state=job_state)
     return StudyState.MISSING, None
@@ -215,10 +217,13 @@ def _pause(seconds: float) -> None:
     time.sleep(seconds)
 
 
-def _needs_grace(*, job_state: str | None, folder: FolderFacts) -> bool:
+def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
     # why: on shared storage the final ``status.json`` of a completed job can reach this
     # node after the SLURM state does
-    if job_state != 'COMPLETED':
+    # why: the launcher door imports this module's RunReport during initialization
+    from tslab.study.launchers import JobPhase  # noqa: PLC0415
+
+    if job_phase is not JobPhase.COMPLETED:
         return False
     if folder.snapshot is None:
         return folder.read_error is None
@@ -226,7 +231,11 @@ def _needs_grace(*, job_state: str | None, folder: FolderFacts) -> bool:
 
 
 def _grace_wait(
-    *, directories: dict[str, Path], facts: dict[str, FolderFacts], sleep: Callable[[float], None]
+    *,
+    directories: dict[str, Path],
+    facts: dict[str, FolderFacts],
+    completed_phase: 'JobPhase',
+    sleep: Callable[[float], None],
 ) -> None:
     """Re-read the listed folders until each settles, at most 15 rounds (30 after a chmod error)."""
     limit = 15
@@ -243,7 +252,7 @@ def _grace_wait(
         rounds += 1
         for key, directory in list(pending.items()):
             facts[key] = read_folder(run_directory=directory)
-            if not _needs_grace(job_state='COMPLETED', folder=facts[key]):
+            if not _needs_grace(job_phase=completed_phase, folder=facts[key]):
                 del pending[key]
 
 
@@ -252,7 +261,7 @@ def collect_states(
     study_directory: Path,
     runs: Sequence[StudyRun],
     jobs: Sequence[JobRecord],
-    job_states: Mapping[str, str] | None,
+    job_states: 'JobStates',
     sleep: Callable[[float], None] = _pause,
 ) -> list[RunReport]:
     """The state report of every run of one study.
@@ -265,13 +274,15 @@ def collect_states(
         study_directory: The ``<output_root>/<study>`` directory.
         runs: The runs of the study, in grid order.
         jobs: The job records of the study, in submission order.
-        job_states: The SLURM states per task id, or ``None`` when SLURM is
-            unavailable.
+        job_states: The raw states and phases reported by the machine backend.
         sleep: The wait between two reads; injected for the tests.
 
     Returns:
         One report per run, in the order of ``runs``.
     """
+    # why: the launcher door imports this module's RunReport during initialization
+    from tslab.study.launchers import JobPhase  # noqa: PLC0415
+
     latest = latest_tasks(jobs=jobs)
     entries = []
     folders: dict[str, FolderFacts] = {}
@@ -285,15 +296,20 @@ def collect_states(
         if job is not None and task is not None:
             task_id = f'{job.job_id}_{task.index}'
             job_id = task_id
-        job_state = None if job_states is None or task_id is None else job_states.get(task_id)
-        entries.append((run, job_id, job_state, task))
-        if _needs_grace(job_state=job_state, folder=folders[run.run_path]):
+        job_state = None if task_id is None else job_states.states.get(task_id)
+        job_phase = (
+            JobPhase.UNKNOWN
+            if task_id is None
+            else job_states.phases.get(task_id, JobPhase.UNKNOWN)
+        )
+        entries.append((run, job_id, job_state, job_phase, task))
+        if _needs_grace(job_phase=job_phase, folder=folders[run.run_path]):
             waiting[run.run_path] = directory
-    _grace_wait(directories=waiting, facts=folders, sleep=sleep)
+    _grace_wait(directories=waiting, facts=folders, completed_phase=JobPhase.COMPLETED, sleep=sleep)
     reports: list[RunReport] = []
-    for run, job_id, job_state, task in entries:
+    for run, job_id, job_state, job_phase, task in entries:
         folder = folders[run.run_path]
-        state, reason = study_state(job_state=job_state, folder=folder)
+        state, reason = study_state(job_state=job_state, job_phase=job_phase, folder=folder)
         reports.append(
             RunReport(
                 run=run,
@@ -301,6 +317,7 @@ def collect_states(
                 reason=reason,
                 job_id=job_id,
                 job_state=job_state,
+                job_phase=job_phase,
                 attempt=task.attempt if task is not None else 0,
                 task=task,
                 folder=folder,

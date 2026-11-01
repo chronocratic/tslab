@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.helpers import no_sleep
+from tests.unit.study.helpers import make_job_states, no_sleep
 import tslab
 from tslab.core.status import (
     InstanceRecord,
@@ -79,7 +79,7 @@ def reports_of(*, study_directory: Path) -> list[RunReport]:
         study_directory=study_directory,
         runs=expand_runs(study=study_definition),
         jobs=[],
-        job_states=None,
+        job_states=make_job_states(states={}, phases={}),
     )
 
 

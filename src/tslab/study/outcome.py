@@ -85,7 +85,7 @@ def study_exit_code(*, context: Context) -> int:
     Returns:
         The code matching the study state and any pending work.
     """
-    if context.machine.launcher == 'slurm' and not context.job_states_known:
+    if not context.job_states.known:
         return EXIT_UNKNOWN
     return states_exit_code(
         states=(report.state for report in context.reports),

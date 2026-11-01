@@ -731,7 +731,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         run or when nothing was submitted.
     """
     machine = context.machine
-    if machine.launcher == 'slurm' and not context.job_states_known and not dry_run:
+    if not context.job_states.known and not dry_run:
         _LOGGER.error('the SLURM job states could not be read; not submitting, to avoid duplicates')
         return 1, []
     runs = [report.run for report in reports]

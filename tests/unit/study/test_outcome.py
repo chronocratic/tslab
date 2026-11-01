@@ -72,7 +72,7 @@ def test_missing_only_needs_retry() -> None:
 def test_unknown_slurm_states_exit_6(
     project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.study.context.slurm_available', lambda: False)
+    monkeypatch.setattr('tslab.study.launchers.slurm.backend.slurm_available', lambda: False)
     assert (
         study_exit_code(context=context(project=project, machine_file='cluster.toml'))
         == EXIT_UNKNOWN
