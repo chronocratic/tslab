@@ -8,8 +8,7 @@ import tyro
 
 from tslab.cli.common import print_json
 from tslab.cli.study import _context_of, _states_of
-from tslab.jobs.slurm import SlurmError
-from tslab.study.launchers import backend_for
+from tslab.study.launchers import backend_for, LaunchError
 from tslab.study.reporting.failures import collect_failures, log_failures
 from tslab.study.reporting.usage import log_usage, usage_document
 
@@ -94,7 +93,7 @@ class Usage:
         )
         try:
             document = usage_document(context=context)
-        except SlurmError as error:
+        except LaunchError as error:
             _LOGGER.error('%s', error)  # noqa: TRY400 # why: scheduler errors are shown, not raised
             return 1
         if self.json:

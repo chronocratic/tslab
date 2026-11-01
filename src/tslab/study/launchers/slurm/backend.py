@@ -19,7 +19,15 @@ from tslab.jobs.slurm import (
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, JobStates, JobUsage, launch, LaunchReport, Resources
+from tslab.study.launchers import (
+    JobPhase,
+    JobStates,
+    JobUsage,
+    launch,
+    LaunchError,
+    LaunchReport,
+    Resources,
+)
 from tslab.study.launchers.slurm.doctor import slurm_check
 from tslab.study.launchers.slurm.states import (
     _query_states,
@@ -196,8 +204,7 @@ class SlurmBackend:
         try:
             scancel(job_ids=job_ids, signal=signal)
         except SlurmError as error:
-            _LOGGER.error('%s', error)  # noqa: TRY400 # why: cancellation failures need no traceback
-            return 1, []
+            raise LaunchError(str(error)) from error
         _log_cancelled(job_ids=job_ids, signal=signal)
         return 0, job_ids
 
@@ -233,11 +240,19 @@ class SlurmBackend:
         return failure_usage(context=context, reports=reports)
 
     def usage(self, *, context: Context) -> tuple[Mapping[str, JobUsage], Mapping[str, str | None]]:
-        """The accounting usage of every submitted run; no GPU ids on SLURM."""
+        """The accounting usage of every submitted run; no GPU ids on SLURM.
+
+        Raises:
+            LaunchError: If the accounting query fails; the message is the
+                scheduler error.
+        """
         from tslab.study.launchers.slurm.usage import usage  # noqa: PLC0415
 
         no_gpus: dict[str, str | None] = {}
-        return usage(context=context), no_gpus
+        try:
+            return usage(context=context), no_gpus
+        except SlurmError as error:
+            raise LaunchError(str(error)) from error
 
     def doctor_checks(self) -> tuple[DoctorCheck, ...]:
         """The readiness checks of a SLURM machine."""

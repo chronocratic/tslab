@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 import json
+import logging
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
@@ -19,7 +20,7 @@ from tslab.jobs.slurm import (
 from tslab.study.commands import cancel
 from tslab.study.context import Context
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, JobUsage, LaunchReport
+from tslab.study.launchers import JobPhase, JobUsage, LaunchError, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.machine import MachineOverride, MachineProfileError
@@ -298,6 +299,27 @@ def test_cancel_scancels_live_runs_only(project: Path, fake: FakeSlurm) -> None:
     assert code == 0
     assert cancelled == ['1000_0', '1000_1']
     assert fake.calls('scancel') == [['1000_0', '1000_1']]
+
+
+def test_backend_cancel_raises_launch_error_on_scancel_failure(
+    project: Path, fake: FakeSlurm
+) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    fake.set_answers('scancel', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id'}])
+    with pytest.raises(LaunchError, match='Invalid job id'):
+        SlurmBackend().cancel(context=ctx, dry_run=False, signal=None)
+
+
+def test_cancel_failure_logs_and_returns_error_code(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = _context_with_live_runs(project=project, fake=fake)
+    fake.set_answers('scancel', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id'}])
+    with caplog.at_level(logging.ERROR):
+        code, cancelled = cancel(context=ctx, dry_run=False)
+    assert code == 1
+    assert cancelled == []
+    assert any(record.levelno == logging.ERROR for record in caplog.records)
 
 
 def test_cancel_dry_run_calls_nothing(project: Path, fake: FakeSlurm) -> None:
