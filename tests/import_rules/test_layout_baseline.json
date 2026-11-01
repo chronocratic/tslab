@@ -6,11 +6,7 @@
   "tests/unit/study/test_grouping.py",
   "tests/unit/study/test_match.py",
   "tests/unit/study/test_resolve.py",
-  "tests/unit/study/test_resubmit.py",
-  "tests/unit/study/test_run_one.py",
   "tests/unit/study/test_select.py",
   "tests/unit/study/test_show.py",
-  "tests/unit/study/test_status_command.py",
-  "tests/unit/study/test_study_cli_run.py",
-  "tests/unit/study/test_submit.py"
+  "tests/unit/study/test_study_cli_run.py"
 ]
