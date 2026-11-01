@@ -351,6 +351,15 @@ class Backend(Protocol):
         """The resources of one grid, with the machine overrides applied."""
         ...
 
+    def suggest_sizing(
+        self, *, elapsed: timedelta | None, peak_per_cpu: int | None
+    ) -> tuple[str | None, str | None]:
+        """The suggested time limit and memory per CPU, from the past usage with margin.
+
+        A backend without a time limit or memory request returns ``(None, None)``.
+        """
+        ...
+
     def foreground_script(
         self, *, context: Context, resources: Resources, command: Sequence[str]
     ) -> str:

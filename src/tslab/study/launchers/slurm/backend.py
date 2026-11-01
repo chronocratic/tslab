@@ -1,6 +1,7 @@
 """The SLURM backend: the states, resources and launch of a SLURM machine."""
 
 from collections.abc import Callable, Mapping, Sequence
+from datetime import timedelta
 import logging
 from pathlib import Path
 from types import MappingProxyType
@@ -9,6 +10,8 @@ from typing import cast, TextIO
 from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
+    format_slurm_duration,
+    format_slurm_memory,
     INTERRUPTING_JOB_STATES,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
@@ -232,6 +235,15 @@ class SlurmBackend:
         """
         message = '--detach is for local machines; SLURM jobs already run in the background'
         raise ValueError(message)
+
+    def suggest_sizing(
+        self, *, elapsed: timedelta | None, peak_per_cpu: int | None
+    ) -> tuple[str | None, str | None]:
+        """The sbatch ``--time`` and ``--mem-per-cpu`` texts of the sizes."""
+        return (
+            None if elapsed is None else format_slurm_duration(duration=elapsed),
+            None if peak_per_cpu is None else format_slurm_memory(size=peak_per_cpu),
+        )
 
     def foreground_script(
         self, *, context: Context, resources: Resources, command: Sequence[str]

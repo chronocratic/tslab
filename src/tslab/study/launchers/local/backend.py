@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 import logging
 from pathlib import Path
 from types import MappingProxyType
@@ -121,6 +122,15 @@ class LocalBackend:
     ) -> Resources:
         """The CPUs of the machine; a local launch holds no array limit."""
         return LocalResources(cpus=local_cpus)
+
+    def suggest_sizing(
+        self,
+        *,
+        elapsed: timedelta | None,  # noqa: ARG002 # why: the Backend signature
+        peak_per_cpu: int | None,  # noqa: ARG002 # why: the Backend signature
+    ) -> tuple[str | None, str | None]:
+        """A local machine has no time limit or memory request to size."""
+        return None, None
 
     def foreground_script(
         self,
