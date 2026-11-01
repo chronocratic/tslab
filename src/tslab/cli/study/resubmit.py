@@ -8,7 +8,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.output import print_json
+from tslab.cli.common import print_json, UsageError
 from tslab.cli.study import (
     _context_of,
     _detach,
@@ -17,7 +17,6 @@ from tslab.cli.study import (
     _states_of,
     _warn_no_runs,
 )
-from tslab.cli.usage import UsageError
 from tslab.study.commands import resubmit, run_one
 from tslab.study.documents import launch_document
 from tslab.study.launchers import backend_for, LaunchReport

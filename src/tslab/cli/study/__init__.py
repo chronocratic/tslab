@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import shlex
 
-from tslab.cli.usage import UsageError
+from tslab.cli.common import UsageError
 from tslab.study.commands import parse_states
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import available_cpus, backend_for

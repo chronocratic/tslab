@@ -6,7 +6,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.console import use_stderr
+from tslab.cli.common import use_stderr
 from tslab.cli.study import _context_of, _warn_no_runs
 from tslab.study.commands import results
 

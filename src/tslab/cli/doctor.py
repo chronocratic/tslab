@@ -8,8 +8,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.output import print_json
-from tslab.cli.usage import UsageError
+from tslab.cli.common import print_json, UsageError
 from tslab.core.text import log_table
 from tslab.study.doctor import run_checks
 from tslab.study.machine import resolve_machine
