@@ -14,9 +14,13 @@ from tests.unit.study.helpers import (
     finish_run,
     jobs_of,
     no_sleep,
+    record_local_job,
+    study_directory,
     submit_study,
     write_run_status,
 )
+from tslab.core.meta import hostname
+from tslab.core.paths import LOCK_FILE
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -26,8 +30,10 @@ from tslab.core.status import (
     write_status,
 )
 from tslab.study.commands import resubmit, submit
+from tslab.study.commands.resubmit import _remove_ended_locks
 from tslab.study.context import Context, load_context, refresh_context, Selection
-from tslab.study.reporting.state import StudyState
+from tslab.study.launchers import JobPhase
+from tslab.study.reporting.state import RunReport, StudyState
 
 
 def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
@@ -353,3 +359,37 @@ def test_local_no_retry_after_signal(project: Path, monkeypatch: pytest.MonkeyPa
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
     assert code == 143
     assert calls == []
+
+
+def _ended_run_with_lock(*, project: Path, host: str) -> tuple[RunReport, Path]:
+    """A local run whose job ended while its folder holds a live lock of ``host``."""
+    record_local_job(project=project)
+    ctx = context(project=project, machine_file='local.toml')
+    folder = study_directory(project=project) / ctx.runs[0].run_path
+    folder.mkdir(parents=True)
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.RUNNING)},
+        ),
+    )
+    lock = folder / LOCK_FILE
+    lock.write_text(f'{{"pid": {os.getpid()}, "host": "{host}", "nonce": "n"}}', encoding='utf-8')
+    report = context(project=project, machine_file='local.toml').reports[0]
+    assert report.job_phase is JobPhase.ENDED
+    assert report.folder.lock_live
+    return report, lock
+
+
+def test_a_live_lock_of_this_host_is_kept(project: Path) -> None:
+    report, lock = _ended_run_with_lock(project=project, host=hostname())
+    _remove_ended_locks(reports=[report], study_directory=study_directory(project=project))
+    assert lock.exists()
+
+
+def test_a_live_lock_of_another_host_with_an_ended_job_is_removed(project: Path) -> None:
+    report, lock = _ended_run_with_lock(project=project, host='other-host')
+    _remove_ended_locks(reports=[report], study_directory=study_directory(project=project))
+    assert not lock.exists()
