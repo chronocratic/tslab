@@ -1,5 +1,6 @@
 """Cancelling a live local study launch."""
 
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -97,6 +98,8 @@ def test_local_cancel_partial_selection_is_usage_error(
             machine_path=project / 'local.toml',
             selection=Selection(only=('seed=1',)),
             project_root=Path.cwd(),
+            local_cpus=1,
+            environment=os.environ,
         )
         with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
             assert cancel(context=ctx, dry_run=False) == (2, [])

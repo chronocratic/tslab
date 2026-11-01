@@ -1,6 +1,7 @@
 """``resolve_runs``: the settings and resources of each run on one machine."""
 
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -24,7 +25,7 @@ def study() -> Study:
 def _profile(tmp_path: Path, text: str) -> MachineProfile:
     path = tmp_path / 'm.toml'
     path.write_text(BASE_TOML + text)
-    return load_machine(path=path)
+    return load_machine(path=path, environment=os.environ)
 
 
 def test_merge_order_and_slurm_precedence(study: Study, tmp_path: Path) -> None:
@@ -38,7 +39,9 @@ def test_merge_order_and_slurm_precedence(study: Study, tmp_path: Path) -> None:
     )
     resolved = {
         r.run.run_path: r
-        for r in resolve_runs(study=study, machine=profile, runs=expand_runs(study=study))
+        for r in resolve_runs(
+            study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
+        )
     }
     cost = resolved['g/cost-paper/Coffee/42']
     assert isinstance(cost.resources, SlurmSettings)
@@ -59,7 +62,9 @@ def test_unknown_names_in_machine_overrides_warn(
         '[[overrides]]\nmatch = { variant = "ETTh1" }\nslurm = { gpus = 2 }\n',
     )
     with caplog.at_level(logging.WARNING, logger='tslab.study'):
-        resolved = resolve_runs(study=study, machine=profile, runs=expand_runs(study=study))
+        resolved = resolve_runs(
+            study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
+        )
     assert 'old-recipe' in caplog.text
     assert 'variant' in caplog.text
     assert any(

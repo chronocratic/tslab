@@ -13,7 +13,6 @@ from typing import cast
 
 from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
-from tslab.core.status import utc_now_iso
 from tslab.jobs.local import process_alive, start_detached, tail_lines
 from tslab.study.launchers import OnTaskState
 
@@ -84,13 +83,14 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
         raise LocalLaunchError(message) from error
 
 
-def launch_is_live(*, launch: LocalLaunch) -> bool:
+def launch_is_live(*, launch: LocalLaunch, host: str) -> bool:
     """Whether the process of the launch exists on this host.
 
     Args:
         launch: The launch to check.
+        host: The current host name.
     """
-    if launch.hostname != hostname():
+    if launch.hostname != host:
         return False
     return process_alive(pid=launch.pid)
 
@@ -107,17 +107,17 @@ def _write(*, path: Path, launch: LocalLaunch) -> None:
     )
 
 
-def _check_free(*, study_folder: Path) -> None:
+def _check_free(*, study_folder: Path, host: str) -> None:
     previous = read_launch(study_folder=study_folder)
     if previous is None:
         return
     path = study_folder / LAUNCH_FILE
-    if previous.hostname != hostname():
+    if previous.hostname != host:
         message = (
             f'a launch on host {previous.hostname} holds {path}; remove the file if it is over'
         )
         raise LocalLaunchError(message)
-    if launch_is_live(launch=previous):
+    if launch_is_live(launch=previous, host=host):
         message = (
             f'a local launch is running (pid {previous.pid}); '
             'wait for it or stop it with tslab study cancel'
@@ -128,12 +128,17 @@ def _check_free(*, study_folder: Path) -> None:
 
 
 @contextlib.contextmanager
-def hold_launch(*, study_folder: Path, task_ids: Sequence[str]) -> Generator[OnTaskState]:
+def hold_launch(
+    *, study_folder: Path, task_ids: Sequence[str], pid: int, host: str, now: str
+) -> Generator[OnTaskState]:
     """Hold the pid file of the study while a launch runs.
 
     Args:
         study_folder: The ``.study`` folder of the study.
         task_ids: The ids of the tasks the launch will run; all start ``pending``.
+        pid: The process id of the launch.
+        host: The host name of the launch.
+        now: The UTC ISO start time of the launch.
 
     Yields:
         The setter, called with ``task_id=`` and ``state=``, that rewrites
@@ -142,17 +147,17 @@ def hold_launch(*, study_folder: Path, task_ids: Sequence[str]) -> Generator[OnT
     Raises:
         LocalLaunchError: If a live launch, or a launch of another host, holds the file.
     """
-    _check_free(study_folder=study_folder)
+    _check_free(study_folder=study_folder, host=host)
     path = study_folder / LAUNCH_FILE
     states = dict.fromkeys(task_ids, 'pending')
-    started = utc_now_iso()
+    started = now
     lock = threading.Lock()
 
     def write() -> None:
         _write(
             path=path,
             launch=LocalLaunch(
-                pid=os.getpid(), hostname=hostname(), started=started, tasks=tuple(states.items())
+                pid=pid, hostname=host, started=started, tasks=tuple(states.items())
             ),
         )
 
@@ -169,14 +174,15 @@ def hold_launch(*, study_folder: Path, task_ids: Sequence[str]) -> Generator[OnT
         path.unlink(missing_ok=True)
 
 
-def local_job_states(*, study_folder: Path) -> dict[str, str]:
+def local_job_states(*, study_folder: Path, host: str) -> dict[str, str]:
     """The job state of every task of a live launch; empty without one.
 
     Args:
         study_folder: The ``.study`` folder of the study.
+        host: The current host name.
     """
     launch = read_launch(study_folder=study_folder)
-    if launch is None or not launch_is_live(launch=launch):
+    if launch is None or not launch_is_live(launch=launch, host=host):
         return {}
     return {key: state for key, state in launch.tasks if state in _JOB_STATES}
 
@@ -213,7 +219,7 @@ def detach_launch(  # why: keyword-only public API; each option is documented be
         1 on a launch file problem, a start failure or a timeout.
     """
     try:
-        _check_free(study_folder=study_folder)
+        _check_free(study_folder=study_folder, host=hostname())
         study_folder.mkdir(parents=True, exist_ok=True)
         log_path = study_folder / LAUNCH_LOG
         process = start_detached(

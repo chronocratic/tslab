@@ -1,6 +1,7 @@
 """Follow-up jobs: the automatic retry and the W&B sync behind the jobs of the study."""
 
 import dataclasses
+import os
 from pathlib import Path
 import sys
 
@@ -337,7 +338,9 @@ def test_retry_followup_needs_a_study_reference(
     with_followups(project=project)
     ctx = dataclasses.replace(context(project=project, machine_file='cluster.toml'), reference='')
     with caplog.at_level('WARNING'):
-        code, records = queue_followups(context=ctx, job_ids=['1000'], sleep=no_sleep)
+        code, records = queue_followups(
+            context=ctx, job_ids=['1000'], now=utc_now_iso, sleep=no_sleep
+        )
     assert code == 0
     assert len(records) == 1
     assert 'automatic retry follow-up is skipped' in caplog.text
@@ -349,8 +352,8 @@ def test_followup_gets_the_absolute_path_of_a_machine_resolved_by_name(
     with_followups(project=project)
     register = project / 'register.toml'
     monkeypatch.setenv('TSLAB_MACHINES_FILE', str(register))
-    write_register(entries={'cluster': project / 'cluster.toml'})
-    resolved = resolve_machine(machine='cluster', start=project).path
+    write_register(entries={'cluster': project / 'cluster.toml'}, environment=os.environ)
+    resolved = resolve_machine(machine='cluster', start=project, environment=os.environ).path
     submit_study(project=project, machine_file=resolved.name)
     retry = jobs_of(project=project)[1]
     tasks = job_file_of(project=project, job_file=retry.job_file, suffix='tasks').read_text()

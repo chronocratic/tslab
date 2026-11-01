@@ -3,7 +3,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
-import os
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
@@ -30,7 +29,7 @@ from tslab.study.launchers.local.run import (
 )
 from tslab.study.launchers.local.states import _local_states
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
-from tslab.study.plan import _usable_cpus, JobGroup, study_folder
+from tslab.study.plan import JobGroup, study_folder
 from tslab.study.records import JobRecord
 from tslab.study.state import RunReport
 
@@ -107,9 +106,10 @@ class LocalBackend:
         overrides: Sequence[MachineOverride],  # noqa: ARG002 # why: the Backend signature
         grid_name: str,  # noqa: ARG002 # why: the Backend signature
         values: Mapping[str, str],  # noqa: ARG002 # why: the Backend signature
+        local_cpus: int,
     ) -> Resources:
         """The CPUs of the machine; a local launch holds no array limit."""
-        return LocalResources(cpus=_usable_cpus())
+        return LocalResources(cpus=local_cpus)
 
     def launch(  # noqa: PLR0913 # why: the Backend signature; one keyword per launch input
         self,
@@ -122,6 +122,9 @@ class LocalBackend:
         sleep: Callable[[float], None],  # noqa: ARG002 # why: the Backend launch signature
         task_stream: TextIO | None,
         environment: Mapping[str, str],
+        pid: int,
+        host: str,
+        now: Callable[[], str],
     ) -> LaunchReport | None:
         """Run the groups in this process; ``None`` when a problem was logged."""
         machine = context.machine
@@ -136,7 +139,7 @@ class LocalBackend:
                 return None
             _LOGGER.info('local GPUs: %s', ','.join(gpu_ids) if gpu_ids else 'none')
         if not dry_run and local.keep_awake:
-            keep_awake = start_keep_awake(pid=os.getpid(), reason='tslab study launch')
+            keep_awake = start_keep_awake(pid=pid, reason='tslab study launch')
         if dry_run:
             return _launch_local_groups(
                 context=context,
@@ -147,14 +150,19 @@ class LocalBackend:
                 local=local,
                 gpu_ids=gpu_ids,
                 on_task_state=None,
+                pid=pid,
+                host=host,
+                now=now,
             )
         try:
             task_ids = [
-                f'{local_job_id(job_file=group.job_file)}_{task.index}'
+                f'{local_job_id(job_file=group.job_file, pid=pid)}_{task.index}'
                 for group in groups
                 for task in group.tasks
             ]
-            with hold_launch(study_folder=folder, task_ids=task_ids) as on_task_state:
+            with hold_launch(
+                study_folder=folder, task_ids=task_ids, pid=pid, host=host, now=now()
+            ) as on_task_state:
                 return _launch_local_groups(
                     context=context,
                     groups=groups,
@@ -164,6 +172,9 @@ class LocalBackend:
                     local=local,
                     gpu_ids=gpu_ids,
                     on_task_state=on_task_state,
+                    pid=pid,
+                    host=host,
+                    now=now,
                 )
         except LocalLaunchError as error:
             _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch-file problem is shown, not raised
@@ -246,6 +257,9 @@ def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forw
     local: LocalSettings,
     gpu_ids: tuple[str, ...],
     on_task_state: OnTaskState | None,
+    pid: int,
+    host: str,
+    now: Callable[[], str],
 ) -> LaunchReport:
     return launch(
         launcher=LocalLauncher(
@@ -253,6 +267,9 @@ def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forw
             env=context.machine.env,
             local=local,
             gpu_ids=gpu_ids,
+            pid=pid,
+            host=host,
+            now=now,
             stream=task_stream,
             on_task_state=on_task_state,
         ),
@@ -263,4 +280,5 @@ def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forw
         project_root=context.project_root,
         dry_run=dry_run,
         begin=begin,
+        now=now,
     )

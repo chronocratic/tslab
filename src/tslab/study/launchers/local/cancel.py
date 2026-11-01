@@ -4,6 +4,7 @@ import logging
 import os
 import signal as signal_module
 
+from tslab.core.meta import hostname
 from tslab.study.context import Context
 from tslab.study.launchers.local.pid_file import launch_is_live, read_launch
 from tslab.study.plan import study_folder
@@ -19,7 +20,7 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
         _LOGGER.error('cancel --signal is SLURM only')
         return 2, []
     launch = read_launch(study_folder=study_folder(machine=context.machine, study=context.study))
-    if launch is None or not launch_is_live(launch=launch):
+    if launch is None or not launch_is_live(launch=launch, host=hostname()):
         _LOGGER.info('nothing to cancel')
         return 0, []
     selected = {report.job_id for report in context.reports}

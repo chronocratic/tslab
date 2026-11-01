@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -31,18 +32,18 @@ def test_add_stores_the_absolute_path(tmp_path: Path, monkeypatch: pytest.Monkey
     monkeypatch.chdir(tmp_path)
     (tmp_path / 'local.toml').write_text(PROFILE, encoding='utf-8')
     assert _run('machine', 'add', 'mine', 'local.toml') == 0
-    assert read_register() == {'mine': tmp_path / 'local.toml'}
+    assert read_register(environment=os.environ) == {'mine': tmp_path / 'local.toml'}
 
 
 def test_add_rejects_a_missing_file(tmp_path: Path) -> None:
     assert _run('machine', 'add', 'mine', str(tmp_path / 'none.toml')) == 2
-    assert read_register() == {}
+    assert read_register(environment=os.environ) == {}
 
 
 def test_add_rejects_a_file_that_is_no_profile(tmp_path: Path) -> None:
     (tmp_path / 'bad.toml').write_text('launcher = "nope"\n', encoding='utf-8')
     assert _run('machine', 'add', 'mine', str(tmp_path / 'bad.toml')) == 2
-    assert read_register() == {}
+    assert read_register(environment=os.environ) == {}
 
 
 def test_add_rejects_a_bad_name(tmp_path: Path) -> None:
@@ -55,7 +56,7 @@ def test_add_replaces_an_existing_name(tmp_path: Path) -> None:
     for name in ('one', 'two'):
         (tmp_path / f'{name}.toml').write_text(PROFILE, encoding='utf-8')
         assert _run('machine', 'add', 'mine', str(tmp_path / f'{name}.toml')) == 0
-    assert read_register() == {'mine': tmp_path / 'two.toml'}
+    assert read_register(environment=os.environ) == {'mine': tmp_path / 'two.toml'}
 
 
 def test_list_prints_names_and_marks_missing_files(
@@ -79,7 +80,7 @@ def test_remove_deletes_an_entry_and_unknown_name_fails(tmp_path: Path) -> None:
     (tmp_path / 'local.toml').write_text(PROFILE, encoding='utf-8')
     assert _run('machine', 'add', 'mine', str(tmp_path / 'local.toml')) == 0
     assert _run('machine', 'remove', 'mine') == 0
-    assert read_register() == {}
+    assert read_register(environment=os.environ) == {}
     assert _run('machine', 'remove', 'mine') == 2
 
 

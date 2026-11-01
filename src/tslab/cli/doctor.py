@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -39,10 +40,14 @@ class Doctor:
     def run(self) -> int:
         """Run readiness checks and return the command exit code."""
         try:
-            location = resolve_machine(machine=self.machine, start=Path.cwd())
+            location = resolve_machine(
+                machine=self.machine, start=Path.cwd(), environment=os.environ
+            )
         except (ValueError, TypeError, FileNotFoundError) as error:
             raise UsageError(str(error)) from error
-        checks = run_checks(machine_path=location.path, study=self.study, start=Path.cwd())
+        checks = run_checks(
+            machine_path=location.path, study=self.study, start=Path.cwd(), environment=os.environ
+        )
         code = int(any(check.status == 'fail' for check in checks))
         if self.json:
             print_json(

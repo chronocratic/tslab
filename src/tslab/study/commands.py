@@ -10,6 +10,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import time
@@ -17,6 +18,7 @@ from typing import cast, TextIO, TYPE_CHECKING
 
 from tslab.core.files import atomic_write_text
 from tslab.core.paths import LOCK_FILE
+from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context, refresh_context
 from tslab.study.launchers import backend_for, JobPhase, OnLaunch, SIGNAL_EXIT_BASE
@@ -402,6 +404,7 @@ def run_one(
         extra_args={run.run_path: args},
         attempts={run.run_path: report.attempt},
         first_job_file=0,
+        environment=os.environ,
     )
     problems = validate_jobs(study=context.study, groups=groups)
     if problems:
@@ -596,6 +599,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             attempts={report.run.run_path: report.attempt for report in reports},
             uncounted={report.run.run_path: _uncounted(report=report) for report in reports},
             first_job_file=next_job_file(study_folder=folder),
+            environment=os.environ,
         )
         problems = validate_jobs(study=context.study, groups=groups)
         if problems:
@@ -622,6 +626,9 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             sleep=sleep,
             task_stream=task_stream,
             environment=os.environ,
+            pid=os.getpid(),
+            host=socket.gethostname(),
+            now=utc_now_iso,
         )
         if report is None:
             return 1, []

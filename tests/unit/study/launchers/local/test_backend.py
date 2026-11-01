@@ -121,17 +121,14 @@ def test_expected_starts_is_none(*, project: Path) -> None:
     assert LocalBackend().expected_starts(context=ctx) is None
 
 
-def test_resources_uses_available_local_cpus(
-    *, project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    monkeypatch.setattr(local_backend, '_usable_cpus', lambda: 7)
 
     resources = LocalBackend().resources(
-        machine=ctx.machine, overrides=(), grid_name='g', values={}
+        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=3
     )
 
-    assert resources.cpus == 7
+    assert resources.cpus == 3
     assert resources.max_tasks_per_job is None
     assert resources.describe() == 'local'
 
@@ -234,6 +231,9 @@ def test_launch_delegates_to_shared_launch(
         sleep=lambda _seconds: None,
         task_stream=None,
         environment={},
+        pid=123,
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
     )
 
     assert report is expected
@@ -252,6 +252,7 @@ def test_launch_resolves_gpus_from_given_environment(*, project: Path) -> None:
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
 
     report = LocalBackend().launch(
@@ -263,6 +264,9 @@ def test_launch_resolves_gpus_from_given_environment(*, project: Path) -> None:
         sleep=lambda _seconds: None,
         task_stream=StringIO(),
         environment={'CUDA_VISIBLE_DEVICES': '4'},
+        pid=123,
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
     )
 
     assert report is not None

@@ -1,6 +1,7 @@
 """The results table: one row per instance, every metric of every run."""
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 import pytest
@@ -183,6 +184,8 @@ def test_study_results_method(project: Path) -> None:
             machine_path=project / 'local.toml',
             selection=Selection(),
             project_root=project,
+            local_cpus=1,
+            environment=os.environ,
         ),
         include_done=False,
         dry_run=False,
@@ -190,7 +193,9 @@ def test_study_results_method(project: Path) -> None:
         sleep=no_sleep,
     )
     assert code == 0
-    rows = load_study(reference='toy_studies:study').results(machine=Path('local.toml'))
+    rows = load_study(reference='toy_studies:study').results(
+        machine=Path('local.toml'), environment=os.environ
+    )
     assert len(rows) == 4
     assert all(row['instance'] is None for row in rows)
     assert {row['study_state'] for row in rows} == {'done'}
@@ -249,6 +254,8 @@ def test_unreadable_status_file_is_an_unreadable_row(tmp_path: Path) -> None:
 
 
 def test_study_results_without_runs_lists_missing_rows(project: Path) -> None:
-    rows = load_study(reference='toy_studies:study').results(machine=Path('local.toml'))
+    rows = load_study(reference='toy_studies:study').results(
+        machine=Path('local.toml'), environment=os.environ
+    )
     assert len(rows) == 4
     assert {row['study_state'] for row in rows} == {'missing'}

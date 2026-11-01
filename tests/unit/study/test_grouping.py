@@ -63,7 +63,7 @@ def test_groups_by_grid_and_resources(
     study: Study, machine: MachineProfile, tmp_path: Path
 ) -> None:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     indices = assign_indices(runs=runs, jobs=[])
     groups = plan_jobs(
         study=study,
@@ -73,6 +73,7 @@ def test_groups_by_grid_and_resources(
         extra_args={},
         attempts={},
         first_job_file=3,
+        environment={},
     )
     assert [g.job_file for g in groups] == [3, 4]
     assert groups[0].resources.describe() == 'partition=gpu, time=01:00:00, cpus=1'
@@ -116,7 +117,7 @@ def test_index_at_max_array_size_is_a_task_error(study: Study, machine: MachineP
         overrides=(),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
         study=study,
@@ -126,6 +127,7 @@ def test_index_at_max_array_size_is_a_task_error(study: Study, machine: MachineP
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
     assert len(groups) == 1
     assert [t.index for t in groups[0].tasks] == [0, 1, 2, 3]
@@ -145,7 +147,7 @@ def test_next_job_file(tmp_path: Path) -> None:
 
 def test_extra_args_and_attempts(study: Study, machine: MachineProfile) -> None:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     run_path = runs[0].run_path
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
@@ -156,6 +158,7 @@ def test_extra_args_and_attempts(study: Study, machine: MachineProfile) -> None:
         extra_args={run_path: ('--run.rerun-from', 'evaluate')},
         attempts={run_path: 2},
         first_job_file=1,
+        environment={},
     )
     task = groups[0].tasks[0]
     assert task.command[-2:] == ('--run.rerun-from', 'evaluate')
@@ -182,7 +185,7 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
         },
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
         study=study,
@@ -192,6 +195,7 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
     problems = validate_jobs(study=study, groups=groups)
     assert [path for path, _ in problems] == [run.run_path for run in runs]

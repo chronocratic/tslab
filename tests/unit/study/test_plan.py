@@ -13,6 +13,7 @@ from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     _override_warnings,
     check_machine,
+    expansion_env,
     JobGroup,
     plan_jobs,
     resolve_runs,
@@ -35,13 +36,24 @@ def _local(tmp_path: Path, **changes: object) -> MachineProfile:
     return MachineProfile(**{**values, **changes})  # ty: ignore[invalid-argument-type]
 
 
+def test_expansion_env_uses_the_given_environment(tmp_path: Path) -> None:
+    machine = _local(tmp_path, env={'ROOT': 'profile-root', 'DATA': 'profile-data'})
+
+    assert expansion_env(machine=machine, environment={'ROOT': 'process-root'}) == {
+        'ROOT': 'profile-root',
+        'DATA': 'profile-data',
+    }
+
+
 def test_local_machine_with_a_slurm_override_resolves_without_slurm(
     study: Study, tmp_path: Path
 ) -> None:
     machine = _local(
         tmp_path, overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'gpus': 1}),)
     )
-    resolved = resolve_runs(study=study, machine=machine, runs=expand_runs(study=study))
+    resolved = resolve_runs(
+        study=study, machine=machine, runs=expand_runs(study=study), local_cpus=1
+    )
     assert all(
         run.resources.describe() == 'local' and run.resources.max_tasks_per_job is None
         for run in resolved
@@ -54,7 +66,7 @@ def test_machine_setting_that_switches_a_choice_drops_stale_children(
     machine = _local(tmp_path, settings={'model': 'cost'})
     runs = expand_runs(study=study)
     assert any('model.depth' in run.settings for run in runs)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     ts2vec = next(run for run in resolved if run.run.values['recipe'] == 'ts2vec-paper')
     assert ts2vec.settings['model'] == 'cost'
     assert not any(path.startswith('model.') for path in ts2vec.settings)
@@ -70,7 +82,9 @@ def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
     warned: set[str] = set()
     with caplog.at_level(logging.WARNING, logger='tslab.study'):
         check_machine(study=study, machine=machine, warned=warned)
-        resolve_runs(study=study, machine=machine, runs=expand_runs(study=study), warned=warned)
+        resolve_runs(
+            study=study, machine=machine, runs=expand_runs(study=study), warned=warned, local_cpus=1
+        )
     assert len([r for r in caplog.records if 'nope' in r.getMessage()]) == 1
 
 
@@ -109,7 +123,7 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
         slurm=SlurmSettings(partition='p', time='1:00:00', max_array_size=1),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -118,6 +132,7 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
     messages = dict(validate_jobs(study=study, groups=groups))
     assert 'nope' in messages[runs[1].run_path]
@@ -134,16 +149,18 @@ def _epochs_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
     }
 
 
-def _plan(study: Study, machine: MachineProfile) -> list[JobGroup]:
+def _plan(study: Study, machine: MachineProfile, *, local_cpus: int = 1) -> list[JobGroup]:
     runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=local_cpus)
     return plan_jobs(
         study=study,
         machine=machine,
-        resolved=resolve_runs(study=study, machine=machine, runs=runs),
+        resolved=resolved,
         indices={run.run_path: i for i, run in enumerate(runs)},
         extra_args={},
         attempts={},
         first_job_file=1,
+        environment={},
     )
 
 
@@ -170,15 +187,14 @@ def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -
         ),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     cost = next(run for run in resolved if run.run.values['recipe'] == 'cost-paper')
     assert isinstance(cost.resources, SlurmSettings)
     assert cost.resources.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
 
 
 def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
-    study: Study, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    study: Study, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr('tslab.study.launchers.local.backend._usable_cpus', lambda: 3)
     machine = _local(tmp_path, settings={'trainer.max_epochs': '{cpus}'})
-    assert set(_epochs_by_recipe(_plan(study, machine)).values()) == {'3'}
+    assert set(_epochs_by_recipe(_plan(study, machine, local_cpus=3)).values()) == {'3'}

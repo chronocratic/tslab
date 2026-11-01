@@ -1,5 +1,6 @@
 """The backend table: one backend per launcher, picked from the profile."""
 
+import os
 from pathlib import Path
 
 import pytest
@@ -35,4 +36,4 @@ def test_unknown_launcher_is_rejected_by_the_profile(*, tmp_path: Path) -> None:
     path = tmp_path / 'machine.toml'
     path.write_text('launcher = "kubernetes"\noutput_root = "out"\n', encoding='utf-8')
     with pytest.raises(MachineProfileError, match=r'launcher must be "slurm" or "local"'):
-        load_machine(path=path)
+        load_machine(path=path, environment=os.environ)

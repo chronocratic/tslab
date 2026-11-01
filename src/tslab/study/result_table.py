@@ -5,7 +5,7 @@ The metrics of a run live in the ``data.json`` of the done instances whose
 the table: they become an ``unreadable`` row with the error text.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import csv
 import io
 import json
@@ -18,6 +18,7 @@ from tslab.core.status import InstanceRecord, InstanceState
 from tslab.core.text import first_line
 from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
+from tslab.study.launchers import available_cpus
 from tslab.study.state import RunReport
 
 __all__ = [
@@ -73,12 +74,15 @@ def collect_results(
     return rows
 
 
-def study_results(*, study: Study, machine: Path) -> list[ResultRow]:
+def study_results(
+    *, study: Study, machine: Path, environment: Mapping[str, str]
+) -> list[ResultRow]:
     """The rows of the results table of every run of a study.
 
     Args:
         study: The study to read the results of.
         machine: The machine profile the runs run on.
+        environment: The process environment used by the machine profile.
 
     Returns:
         One row per (run, instance), and one row per run without
@@ -90,6 +94,8 @@ def study_results(*, study: Study, machine: Path) -> list[ResultRow]:
         selection=Selection(),
         project_root=Path.cwd(),
         read_only=True,
+        local_cpus=available_cpus(),
+        environment=environment,
     )
     return collect_results(
         study=study, study_directory=context.study_directory, reports=context.reports

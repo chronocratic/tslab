@@ -8,6 +8,7 @@ from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 import shlex
 import sys
@@ -23,7 +24,7 @@ from tslab.study.commands import cancel, parse_states, resubmit, results, run_on
 from tslab.study.context import Context, expected_starts, load_context, Selection
 from tslab.study.documents import cancel_document, launch_document, show_document, status_document
 from tslab.study.failures import collect_failures, log_failures
-from tslab.study.launchers import backend_for, LaunchReport
+from tslab.study.launchers import available_cpus, backend_for, LaunchReport
 from tslab.study.loading import load_study
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
@@ -62,7 +63,7 @@ def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag o
 ) -> Context:
     """The context of a study reference; a bad reference or profile is a usage error."""
     with _usage_errors(study=study):
-        location = resolve_machine(machine=machine, start=Path.cwd())
+        location = resolve_machine(machine=machine, start=Path.cwd(), environment=os.environ)
         return load_context(
             reference=study,
             machine_path=location.path,
@@ -70,6 +71,8 @@ def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag o
             project_root=location.project_root,
             read_only=read_only,
             ended_states=ended_states,
+            local_cpus=available_cpus(),
+            environment=os.environ,
         )
 
 

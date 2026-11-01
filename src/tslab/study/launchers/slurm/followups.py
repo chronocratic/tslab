@@ -18,7 +18,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def queue_followups(
-    *, context: Context, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+    *,
+    context: Context,
+    job_ids: Sequence[str],
+    now: Callable[[], str],
+    sleep: Callable[[float], None] = time.sleep,
 ) -> tuple[int, list[JobRecord]]:
     """The small helper jobs of the study, after the runs it was called for.
 
@@ -32,6 +36,7 @@ def queue_followups(
     Args:
         context: The context the runs were submitted under.
         job_ids: The job ids the helper jobs wait for; empty does nothing.
+        now: Return the current UTC ISO timestamp for each record.
         sleep: What waits out the submission pause of the cluster.
 
     Returns:
@@ -65,6 +70,7 @@ def queue_followups(
                     machine=machine,
                     project_root=context.project_root,
                     dependency=dependency,
+                    now=now,
                     sleep=sleep,
                 )
             except SlurmError as error:

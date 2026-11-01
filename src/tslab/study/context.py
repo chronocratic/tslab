@@ -1,5 +1,6 @@
 """What a study command reads before it does anything: the ``Context``."""
 
+from collections.abc import Mapping
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,6 +113,8 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     reference: str = '',
     read_only: bool = False,
     ended_states: dict[str, str] | None = None,
+    local_cpus: int,
+    environment: Mapping[str, str],
 ) -> Context:
     """The machine, runs, job records and states of one study.
 
@@ -132,6 +135,8 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         ended_states: A cache of final SLURM states by job id, kept by a caller that
             loads the context again and again. Ids in it are not queried; ids that
             ended in this query are added to it. ``None`` queries every id.
+        local_cpus: The CPUs available to a local launch.
+        environment: The process environment used to load the machine profile.
 
     Returns:
         The context of the study.
@@ -140,14 +145,16 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         MachineProfileError: If the machine file does not hold a profile.
         ValueError: If a setting path of the profile is not a field of a grid.
     """
-    machine = load_machine(path=machine_path, lenient_env=read_only)
+    machine = load_machine(path=machine_path, lenient_env=read_only, environment=environment)
     # One set per command, so a dead override warns once, not once per check.
     warned: set[str] = set()
     check_machine(study=study, machine=machine, warned=warned)
     runs = select_runs(
         study=study, runs=expand_runs(study=study), grids=selection.grids, only=selection.only
     )
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, warned=warned)
+    resolved = resolve_runs(
+        study=study, machine=machine, runs=runs, warned=warned, local_cpus=local_cpus
+    )
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     # why: the launcher door imports Context, so this import must wait until calls
     from tslab.study.launchers import backend_for  # noqa: PLC0415
@@ -214,6 +221,8 @@ def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option i
     project_root: Path,
     read_only: bool = False,
     ended_states: dict[str, str] | None = None,
+    local_cpus: int,
+    environment: Mapping[str, str],
 ) -> Context:
     """The context of a study loaded from a ``module:attribute`` reference.
 
@@ -225,6 +234,8 @@ def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option i
             ``cd`` into it.
         read_only: See ``context_for``.
         ended_states: See ``context_for``.
+        local_cpus: See ``context_for``.
+        environment: See ``context_for``.
 
     Returns:
         The context of the command.
@@ -242,4 +253,6 @@ def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option i
         reference=reference,
         read_only=read_only,
         ended_states=ended_states,
+        local_cpus=local_cpus,
+        environment=environment,
     )

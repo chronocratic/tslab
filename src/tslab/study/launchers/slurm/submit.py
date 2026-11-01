@@ -8,7 +8,6 @@ from typing import cast
 from uuid import uuid4
 
 from tslab.core.files import atomic_write_text
-from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import sbatch
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
@@ -91,6 +90,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
     machine: MachineProfile,
     project_root: Path,
     dependency: str,
+    now: Callable[[], str],
     sleep: Callable[[float], None] = time.sleep,
 ) -> JobRecord:
     """Write, submit and record one single-task helper job, e.g. a follow-up.
@@ -103,6 +103,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
         machine: The machine the job runs on; its ``[env]`` goes in the script.
         project_root: The directory the script ``cd``s into.
         dependency: The SLURM ``--dependency`` of the job.
+        now: Return the current UTC ISO timestamp for the record.
         sleep: What waits out the submission pause of the cluster.
 
     Returns:
@@ -134,7 +135,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
     record = JobRecord(
         kind='followup',
         submission_id=uuid4().hex,
-        time=utc_now_iso(),
+        time=now(),
         launcher='slurm',
         job_id=job_id,
         job_file=job_file,

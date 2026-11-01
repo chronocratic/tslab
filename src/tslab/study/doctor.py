@@ -1,11 +1,10 @@
 """Readiness checks for a study machine and project."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import importlib.util
 import logging
 import netrc
-import os
 from pathlib import Path
 import shutil
 import tempfile
@@ -42,6 +41,7 @@ def run_checks(
     machine_path: Path,
     study: str | None,
     start: Path,
+    environment: Mapping[str, str],
     free_bytes: Callable[[Path], int] = lambda path: shutil.disk_usage(path).free,
 ) -> list[DoctorCheck]:
     """Check whether a machine and project are ready for a study.
@@ -50,6 +50,7 @@ def run_checks(
         machine_path: The machine profile to check.
         study: Optional study reference to check against the profile.
         start: The working folder to search for a project marker.
+        environment: The process environment used by machine and W&B checks.
         free_bytes: Return available disk bytes at a folder.
 
     Returns:
@@ -59,7 +60,7 @@ def run_checks(
     require_path(value=start, parameter='start')
     checks: list[DoctorCheck] = []
     try:
-        machine = load_machine(path=machine_path, lenient_env=False)
+        machine = load_machine(path=machine_path, lenient_env=False, environment=environment)
     except MachineProfileError as error:
         checks.append(DoctorCheck(name='profile', status='fail', message=str(error)))
         machine = None
@@ -79,7 +80,7 @@ def run_checks(
     if study is not None and machine is not None:
         checks.append(_study_check(reference=study, machine=machine))
     if importlib.util.find_spec('wandb') is not None:
-        checks.append(_wandb_check())
+        checks.append(_wandb_check(environment=environment))
     return checks
 
 
@@ -157,8 +158,8 @@ def _study_check(*, reference: str, machine: MachineProfile) -> DoctorCheck:
     return DoctorCheck(name='study', status='ok', message='study fits machine')
 
 
-def _wandb_check() -> DoctorCheck:
-    has_key = bool(os.environ.get('WANDB_API_KEY'))
+def _wandb_check(*, environment: Mapping[str, str]) -> DoctorCheck:
+    has_key = bool(environment.get('WANDB_API_KEY'))
     try:
         has_netrc = netrc.netrc().authenticators('api.wandb.ai') is not None
     except (OSError, netrc.NetrcParseError):

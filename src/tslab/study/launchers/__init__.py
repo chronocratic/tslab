@@ -10,11 +10,12 @@ from collections.abc import Callable, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from enum import StrEnum
+import os
 from pathlib import Path
+import sys
 from typing import cast, Protocol, TextIO
 from uuid import uuid4
 
-from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import SlurmError, SlurmJobUsage
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
@@ -35,6 +36,7 @@ __all__ = [
     'OnLaunch',
     'OnTaskState',
     'Resources',
+    'available_cpus',
     'backend_for',
     'launch',
 ]
@@ -180,6 +182,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     groups: Sequence[JobGroup],
     project_root: Path,
     dry_run: bool,
+    now: Callable[[], str],
     begin: str | None = None,
 ) -> LaunchReport:
     """Write backend files, then submit groups one by one.
@@ -195,6 +198,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
         groups: Planned groups in submission order.
         project_root: The directory the jobs run in.
         dry_run: Write files and stop without submitting.
+        now: Return the current UTC ISO timestamp for each submitted group.
         begin: A SLURM ``--begin`` value, when set.
 
     Returns:
@@ -238,7 +242,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
             record = JobRecord(
                 kind='run',
                 submission_id=submission_id,
-                time=utc_now_iso(),
+                time=now(),
                 launcher=machine.launcher,
                 job_id=job_id,
                 job_file=group.job_file,
@@ -296,6 +300,7 @@ class Backend(Protocol):
         overrides: Sequence[MachineOverride],
         grid_name: str,
         values: Mapping[str, str],
+        local_cpus: int,
     ) -> Resources:
         """The resources of one grid, with the machine overrides applied."""
         ...
@@ -311,6 +316,9 @@ class Backend(Protocol):
         sleep: Callable[[float], None],
         task_stream: TextIO | None,
         environment: Mapping[str, str],
+        pid: int,
+        host: str,
+        now: Callable[[], str],
     ) -> LaunchReport | None:
         """Submit the groups; ``None`` when a problem was logged, not raised."""
         ...
@@ -359,6 +367,7 @@ class Backend(Protocol):
 
 # why: the backends import the types from this door
 from tslab.study.launchers.local import LocalBackend  # noqa: E402
+from tslab.study.launchers.local.resources import usable_cpus  # noqa: E402
 from tslab.study.launchers.slurm import SlurmBackend  # noqa: E402
 
 #: One backend per launcher; the only place beside the machine tables that
@@ -380,3 +389,11 @@ def backend_for(*, machine: MachineProfile) -> Backend:
         message = f'no backend serves launcher {machine.launcher!r}; check the machine profile'
         raise ValueError(message)
     return backend
+
+
+def available_cpus() -> int:
+    """The CPUs this process may run on; a local launch runs its tasks here."""
+    # why: the affinity mask honours taskset and container limits; macOS has no such call
+    if sys.platform == 'linux':
+        return usable_cpus(affinity=lambda: len(os.sched_getaffinity(0)))
+    return usable_cpus(affinity=lambda: os.cpu_count() or 1)
