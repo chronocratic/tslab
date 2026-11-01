@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import TextIO
 
 from tslab.jobs.slurm import SlurmJobUsage
@@ -60,11 +61,12 @@ class LocalBackend:
     ) -> tuple[JobStates, Mapping[str, str]]:
         """The states of the tasks; a local machine always knows them."""
         states = _local_states(machine=machine, study=study, jobs=list(jobs))
+        phases = {task_id: _phase_of(job_state=state) for task_id, state in states.items()}
         return (
             JobStates(
                 known=True,
-                states=states,
-                phases={task_id: _phase_of(job_state=state) for task_id, state in states.items()},
+                states=MappingProxyType(states),
+                phases=MappingProxyType(phases),
                 followup_live_job_ids=(),
             ),
             cache,

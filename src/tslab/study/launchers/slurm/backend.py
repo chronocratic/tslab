@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 import logging
 from pathlib import Path
+from types import MappingProxyType
 from typing import TextIO
 
 from tslab.jobs.slurm import (
@@ -49,7 +50,12 @@ def _phase_of(*, job_state: str | None) -> JobPhase:
 
 def _unknown_states() -> JobStates:
     """The states when the scheduler cannot be asked."""
-    return JobStates(known=False, states={}, phases={}, followup_live_job_ids=())
+    return JobStates(
+        known=False,
+        states=MappingProxyType({}),
+        phases=MappingProxyType({}),
+        followup_live_job_ids=(),
+    )
 
 
 class SlurmBackend:
@@ -86,11 +92,12 @@ class SlurmBackend:
             for job_id in followups
             if states.get(job_id) in QUEUED_JOB_STATES | RUNNING_JOB_STATES
         )
+        phases = {task_id: _phase_of(job_state=state) for task_id, state in states.items()}
         return (
             JobStates(
                 known=True,
-                states=states,
-                phases={task_id: _phase_of(job_state=state) for task_id, state in states.items()},
+                states=MappingProxyType(states),
+                phases=MappingProxyType(phases),
                 followup_live_job_ids=live,
             ),
             ended_states,
