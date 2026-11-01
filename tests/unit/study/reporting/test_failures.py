@@ -26,9 +26,10 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.jobs.slurm import parse_slurm_memory, SlurmJobUsage
+from tslab.jobs.slurm import parse_slurm_memory
 from tslab.study import launchers
 from tslab.study.context import Context
+from tslab.study.launchers import JobUsage
 from tslab.study.paths import instance_directory
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
 from tslab.study.reporting.state import RunReport, StudyState
@@ -112,9 +113,9 @@ def test_collect_failures_uses_selected_backend_usage(
     class Backend:
         def failure_usage(
             self, *, context: Context, reports: Sequence[RunReport]
-        ) -> Mapping[str, SlurmJobUsage]:
+        ) -> Mapping[str, JobUsage]:
             calls.append((context, reports))
-            no_usage: dict[str, SlurmJobUsage] = {}
+            no_usage: dict[str, JobUsage] = {}
             return no_usage
 
     backend = Backend()
@@ -142,8 +143,8 @@ def _report(project: Path, fake: FakeSlurm) -> RunReport:
     return ctx.reports[0]
 
 
-def _oom_usage(*, max_rss: int | None) -> SlurmJobUsage:
-    return SlurmJobUsage(
+def _oom_usage(*, max_rss: int | None) -> JobUsage:
+    return JobUsage(
         state='OUT_OF_MEMORY',
         elapsed=None,
         time_limit=None,

@@ -1,11 +1,13 @@
 """The backend table: one backend per launcher, picked from the profile."""
 
+import dataclasses
+from datetime import timedelta
 import os
 from pathlib import Path
 
 import pytest
 
-from tslab.study.launchers import backend_for, BACKENDS
+from tslab.study.launchers import backend_for, BACKENDS, JobUsage
 from tslab.study.machine import (
     load_machine,
     LocalSettings,
@@ -37,3 +39,25 @@ def test_unknown_launcher_is_rejected_by_the_profile(*, tmp_path: Path) -> None:
     path.write_text('launcher = "kubernetes"\noutput_root = "out"\n', encoding='utf-8')
     with pytest.raises(MachineProfileError, match=r'launcher must be "slurm" or "local"'):
         load_machine(path=path, environment=os.environ)
+
+
+def test_job_usage_is_a_frozen_neutral_record() -> None:
+    usage = JobUsage(
+        state='COMPLETED',
+        elapsed=timedelta(minutes=5),
+        time_limit=timedelta(hours=1),
+        total_cpu=timedelta(seconds=90),
+        max_rss=2 * 1024**3,
+        alloc_cpus=2,
+        gpus=1,
+    )
+    assert [field.name for field in dataclasses.fields(usage)] == [
+        'state',
+        'elapsed',
+        'time_limit',
+        'total_cpu',
+        'max_rss',
+        'alloc_cpus',
+        'gpus',
+    ]
+    assert usage.__dataclass_params__.frozen

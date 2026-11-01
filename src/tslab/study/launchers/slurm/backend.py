@@ -15,12 +15,11 @@ from tslab.jobs.slurm import (
     scancel,
     slurm_available,
     SlurmError,
-    SlurmJobUsage,
 )
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, JobStates, launch, LaunchReport, Resources
+from tslab.study.launchers import JobPhase, JobStates, JobUsage, launch, LaunchReport, Resources
 from tslab.study.launchers.slurm.doctor import slurm_check
 from tslab.study.launchers.slurm.states import (
     _query_states,
@@ -227,15 +226,13 @@ class SlurmBackend:
 
     def failure_usage(
         self, *, context: Context, reports: Sequence[RunReport]
-    ) -> Mapping[str, SlurmJobUsage]:
+    ) -> Mapping[str, JobUsage]:
         """The accounting usage of the out-of-memory runs; no numbers on a failure."""
         from tslab.study.launchers.slurm.usage import failure_usage  # noqa: PLC0415
 
         return failure_usage(context=context, reports=reports)
 
-    def usage(
-        self, *, context: Context
-    ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
+    def usage(self, *, context: Context) -> tuple[Mapping[str, JobUsage], Mapping[str, str | None]]:
         """The accounting usage of every submitted run; no GPU ids on SLURM."""
         from tslab.study.launchers.slurm.usage import usage  # noqa: PLC0415
 

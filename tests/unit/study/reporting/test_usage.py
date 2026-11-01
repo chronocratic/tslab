@@ -16,8 +16,8 @@ from tests.unit.study.helpers import (
 )
 from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
-from tslab.jobs.slurm import SlurmJobUsage
 from tslab.study.context import Context
+from tslab.study.launchers import JobUsage
 import tslab.study.reporting.usage as usage_module
 from tslab.study.reporting.usage import log_usage, usage_document
 
@@ -183,16 +183,14 @@ def test_usage_document_uses_selected_backend(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    usage: dict[str, SlurmJobUsage] = {}
+    usage: dict[str, JobUsage] = {}
     gpu_ids: dict[str, str | None] = {'job': '3'}
     calls: list[Context] = []
 
     class Backend:
         suggests_memory = False
 
-        def usage(
-            self, *, context: Context
-        ) -> tuple[dict[str, SlurmJobUsage], dict[str, str | None]]:
+        def usage(self, *, context: Context) -> tuple[dict[str, JobUsage], dict[str, str | None]]:
             calls.append(context)
             return usage, gpu_ids
 

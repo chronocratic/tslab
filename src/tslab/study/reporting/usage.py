@@ -7,14 +7,9 @@ import math
 from typing import cast
 
 from tslab.core.text import format_bytes, format_duration, log_table
-from tslab.jobs.slurm import (
-    format_slurm_duration,
-    format_slurm_memory,
-    parse_slurm_memory,
-    SlurmJobUsage,
-)
+from tslab.jobs.slurm import format_slurm_duration, format_slurm_memory, parse_slurm_memory
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, Resources
+from tslab.study.launchers import backend_for, JobUsage, Resources
 from tslab.study.machine import SlurmSettings
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport
@@ -68,13 +63,10 @@ def usage_document(*, context: Context) -> dict[str, object]:
 
 
 def _groups(
-    *,
-    context: Context,
-    selected: list[tuple[RunReport, SlurmJobUsage | None]],
-    suggests_memory: bool,
+    *, context: Context, selected: list[tuple[RunReport, JobUsage | None]], suggests_memory: bool
 ) -> list[dict[str, object]]:
     order: list[Resources] = []
-    members: dict[Resources, list[tuple[RunReport, SlurmJobUsage | None]]] = {}
+    members: dict[Resources, list[tuple[RunReport, JobUsage | None]]] = {}
     for report, usage in selected:
         resources = context.resolved[report.run.run_path].resources
         if resources not in members:
@@ -90,10 +82,7 @@ def _groups(
 
 
 def _group_entry(
-    *,
-    resources: Resources,
-    members: list[tuple[RunReport, SlurmJobUsage | None]],
-    suggests_memory: bool,
+    *, resources: Resources, members: list[tuple[RunReport, JobUsage | None]], suggests_memory: bool
 ) -> dict[str, object]:
     elapsed = [
         usage.elapsed
@@ -118,7 +107,7 @@ def _group_entry(
 
 
 def _run_entry(
-    *, context: Context, report: RunReport, usage: SlurmJobUsage | None, gpu_id: str | None
+    *, context: Context, report: RunReport, usage: JobUsage | None, gpu_id: str | None
 ) -> dict[str, object]:
     resources = context.resolved[report.run.run_path].resources
     slurm = resources if isinstance(resources, SlurmSettings) else None
