@@ -78,11 +78,12 @@ def _name_comparisons(*, tree: ast.Module) -> int:
         elif isinstance(node, ast.Match):
             for case in node.cases:
                 if any(
-                    isinstance(item, ast.MatchValue) and item.value in BACKEND_NAMES
+                    isinstance(item, ast.MatchValue)
+                    and isinstance(item.value, ast.Constant)
+                    and item.value.value in BACKEND_NAMES
                     for item in ast.walk(case.pattern)
                 ):
                     count += 1
-                    break
     return count
 
 
@@ -120,6 +121,7 @@ def _imported_modules(*, tree: ast.Module) -> frozenset[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module is not None:
             modules.add(node.module)
+            modules.update(f'{node.module}.{alias.name}' for alias in node.names)
         elif isinstance(node, ast.Import):
             modules.update(alias.name for alias in node.names)
     return frozenset(module for module in modules if module.startswith('tslab.'))
@@ -210,6 +212,24 @@ def test_baseline_rejects_stale_and_zero_entries() -> None:
     ]
     assert 'lower the baseline in the same commit' in problems[0]
     assert 'zero' in problems[1]
+
+
+def test_match_cases_count_each_backend_name() -> None:
+    """Each match case against a backend name counts; the pattern is its value."""
+    source = (
+        'match machine.launcher:\n'
+        '    case "slurm":\n'
+        '        pass\n'
+        '    case "local":\n'
+        '        pass\n'
+    )
+    assert _name_comparisons(tree=ast.parse(source)) == 2
+
+
+def test_by_name_import_of_both_backends_counts() -> None:
+    """``from tslab.jobs import slurm, local`` imports both backends."""
+    tree = ast.parse('from tslab.jobs import slurm, local')
+    assert _imports_both_backends(tree=tree) == 1
 
 
 def test_no_backend_name_comparison() -> None:
