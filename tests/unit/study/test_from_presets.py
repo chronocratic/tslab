@@ -8,7 +8,7 @@ import tyro
 
 from tests.unit.study.configs import ClassifyConfig, PRESETS, UEASettings
 import tslab
-from tslab.core.config import union_choices
+from tslab.core.codec import union_choices
 from tslab.study import from_presets, settings_to_args
 
 

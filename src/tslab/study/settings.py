@@ -14,7 +14,8 @@ from pathlib import Path
 import types
 from typing import Any, cast, get_args, get_origin, get_type_hints, Union
 
-from tslab.core.config import REQUIRED, strip_annotated, union_choices
+from tslab.core.codec import strip_annotated, union_choices
+from tslab.core.config import REQUIRED
 
 __all__ = [
     'SettingValue',

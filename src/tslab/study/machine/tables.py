@@ -6,7 +6,8 @@ from pathlib import Path
 import re
 from typing import cast
 
-from tslab.core.config import ConfigFileError, decode_dataclass
+from tslab.core.codec import decode_dataclass
+from tslab.core.config import ConfigFileError
 from tslab.core.text import unknown_key_message
 from tslab.study.expansion import expand_variables
 from tslab.study.settings import SettingValue

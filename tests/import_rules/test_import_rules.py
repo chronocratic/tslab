@@ -14,6 +14,7 @@ CORE_MODULES = (
     'tslab.core',
     'tslab.core.artifact',
     'tslab.core.config',
+    'tslab.core.codec',
     'tslab.core.fingerprint',
     'tslab.core.meta',
     'tslab.core.paths',

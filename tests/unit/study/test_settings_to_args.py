@@ -17,7 +17,7 @@ from tests.unit.study.configs import (
     UCRSettings,
 )
 import tslab
-from tslab.core.config import union_choices
+from tslab.core.codec import union_choices
 from tslab.study.settings import Settings, settings_to_args
 
 
