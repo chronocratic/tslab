@@ -3,15 +3,15 @@
 ## Core
 
 The names below are importable from `tslab` (including `tslab.REQUIRED`, the
-optional marker for preset values the preset cannot know). The interfaces it
-re-exports (`ModelAsEncoder`, `RunStatus`, `Tracker`) are listed under
-Interfaces.
+optional marker for preset values the preset cannot know). The interface it
+re-exports (`ModelAsEncoder`) is listed under Interfaces; `RunStatus` and
+`Tracker` are defined in `core` and documented here.
 
 ```{eval-rst}
 .. automodule:: tslab
    :members:
    :imported-members:
-   :exclude-members: ModelAsEncoder, RunStatus, Tracker
+   :exclude-members: ModelAsEncoder
 ```
 
 ## Interfaces

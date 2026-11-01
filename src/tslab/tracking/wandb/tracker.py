@@ -22,7 +22,7 @@ from typing import override, TYPE_CHECKING
 
 from lightning.pytorch.loggers import Logger, WandbLogger
 
-from tslab.interfaces.tracker import RunStatus
+from tslab.core.tracker import RunStatus
 from tslab.tracking.lightning_bridge import LightningLoggerTracker
 
 if TYPE_CHECKING:

@@ -32,6 +32,7 @@ from tslab.core.paths import (
     META_FILE,
     normalize_instance_name,
     require_path,
+    STATUS_FILE,
     validate_relative_path,
     validate_stage_name,
 )
@@ -44,13 +45,12 @@ from tslab.core.status import (
     read_status,
     RunState,
     RunStatusSnapshot,
-    STATUS_FILE,
     utc_now_iso,
     write_status,
 )
 from tslab.core.tracker import LocalTracker, RunStatus, Tracker
 
-__all__ = ['LOCK_FILE', 'JobTimeLimitSignal', 'Run', 'RunOptions']
+__all__ = ['JobTimeLimitSignal', 'Run', 'RunOptions']
 
 _LOGGER = logging.getLogger(__name__)
 _SIGTERM_EXIT_CODE = 128 + signal.SIGTERM

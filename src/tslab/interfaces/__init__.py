@@ -8,7 +8,6 @@ from tslab.interfaces.data import Batch, DataSource, LabeledSplits, Split, SPLIT
 from tslab.interfaces.downstream import DownstreamModel, Probe
 from tslab.interfaces.encoder import Encoder, SequenceEncoder
 from tslab.interfaces.metric import Metric
-from tslab.interfaces.tracker import RunStatus, Tracker
 from tslab.interfaces.trainer import Trainer
 
 __all__ = [
@@ -20,9 +19,7 @@ __all__ = [
     'LabeledSplits',
     'Metric',
     'Probe',
-    'RunStatus',
     'SequenceEncoder',
     'Split',
-    'Tracker',
     'Trainer',
 ]

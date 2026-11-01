@@ -18,8 +18,7 @@ from tslab.core.lock import RunLockedError
 from tslab.core.meta import hostname
 from tslab.core.run import Run, RunOptions
 from tslab.core.status import InstanceRecord, InstanceState
-from tslab.core.tracker import LocalTracker
-from tslab.interfaces.tracker import RunStatus, Tracker
+from tslab.core.tracker import LocalTracker, RunStatus, Tracker
 
 
 @dataclass(frozen=True, kw_only=True)

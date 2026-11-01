@@ -21,8 +21,8 @@ from tslab.core.paths import InstanceName
 from tslab.core.run import JobTimeLimitSignal, Run, RunOptions
 from tslab.core.stage import Stage, stage
 from tslab.core.status import InstanceState, RunState
+from tslab.core.tracker import RunStatus, Tracker
 from tslab.interfaces.encoder import ModelAsEncoder
-from tslab.interfaces.tracker import RunStatus, Tracker
 
 try:
     __version__ = version('tslab')

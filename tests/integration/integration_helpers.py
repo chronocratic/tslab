@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import tslab
-from tslab.interfaces.tracker import Tracker
+from tslab.core.tracker import Tracker
 
 
 @dataclass(frozen=True, kw_only=True)

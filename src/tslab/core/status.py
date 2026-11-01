@@ -12,16 +12,9 @@ from datetime import datetime, UTC
 from enum import StrEnum
 from pathlib import Path
 
-from tslab.core.paths import (
-    atomic_write_json,
-    JsonFileError,
-    read_json_object,
-    require_path,
-    STATUS_FILE,
-)
+from tslab.core.paths import atomic_write_json, JsonFileError, read_json_object, require_path
 
 __all__ = [
-    'STATUS_FILE',
     'STATUS_FORMAT_VERSION',
     'InstanceRecord',
     'InstanceState',

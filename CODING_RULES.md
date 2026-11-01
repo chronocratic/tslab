@@ -365,6 +365,10 @@ they have to read.
 47. A module holds one concept. Above about 400 lines, check whether it
     holds more than one, and split it by concept if so. Line count alone is
     no reason to split: a long module with one concept stays whole.
+48. A module that is not an `__init__.py` lists in `__all__` only names it
+    defines. Re-exports belong in package doors.
+49. Import a name from the module that defines it or from a package door,
+    never through another module that imported it.
 
 ## 13. Variants
 

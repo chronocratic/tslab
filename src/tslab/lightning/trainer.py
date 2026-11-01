@@ -25,16 +25,16 @@ from tslab.core.ranks import slurm_task_count
 from tslab.core.run import JobTimeLimitSignal, Run
 from tslab.interfaces.data import DataSource
 from tslab.interfaces.trainer import Trainer
+from tslab.jobs.slurm import parse_slurm_duration
 from tslab.lightning.callbacks import _SignalStop, build_callbacks
 from tslab.lightning.config import LightningTrainerConfig
 from tslab.lightning.data import LightningDataSource
-from tslab.lightning.exceptions import TrainingPaused
 from tslab.lightning.ranks import agree
 from tslab.lightning.resume import choose_resume_checkpoint
-from tslab.lightning.slurm import job_training_deadline, parse_slurm_duration
+from tslab.lightning.slurm import job_training_deadline
 from tslab.tracking.lightning_bridge import lightning_loggers
 
-__all__ = ['LightningTrainer', 'TrainingPaused']
+__all__ = ['LightningTrainer']
 
 _LOGGER = logging.getLogger(__name__)
 # Arguments that TSLab owns: replacing them would break the trackers, the time limit or resume.
