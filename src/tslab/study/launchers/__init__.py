@@ -7,19 +7,18 @@ import each other.
 """
 
 from collections.abc import Callable, Mapping, Sequence
-import dataclasses
 from dataclasses import dataclass
 from datetime import timedelta
 from enum import StrEnum
 import os
 from pathlib import Path
 import sys
-from typing import cast, Protocol, TextIO
+from typing import Protocol, TextIO
 from uuid import uuid4
 
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
@@ -170,8 +169,17 @@ class Resources(Protocol):
         """The maximum number of tasks in one job, when the launcher has one."""
         ...
 
+    @property
+    def requested_memory(self) -> int | None:
+        """The total memory in bytes one task requests, when the launcher requests any."""
+        ...
+
     def describe(self) -> str:
         """The resource line of the settings, for the dry run printout."""
+        ...
+
+    def as_record(self) -> dict[str, object]:
+        """The resource fields of the group, for the submission record."""
         ...
 
 
@@ -261,11 +269,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
                 run_path=task.resolved.run.run_path,
                 command=task.command,
                 extra_args=task.extra_args,
-                resources=(
-                    dataclasses.asdict(cast('SlurmSettings', task.resolved.resources))
-                    if task.resolved.resources.max_tasks_per_job is not None
-                    else {}
-                ),
+                resources=task.resolved.resources.as_record(),
                 attempt=task.attempt,
                 progress=take_progress(run_directory=study_directory / task.resolved.run.run_path),
                 uncounted_attempts=task.uncounted_attempts,

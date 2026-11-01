@@ -7,10 +7,9 @@ import math
 from typing import cast
 
 from tslab.core.text import format_bytes, format_duration, log_table
-from tslab.jobs.slurm import format_slurm_duration, format_slurm_memory, parse_slurm_memory
+from tslab.jobs.slurm import format_slurm_duration, format_slurm_memory
 from tslab.study.context import Context
 from tslab.study.launchers import backend_for, JobUsage, Resources
-from tslab.study.machine import SlurmSettings
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport
 
@@ -110,7 +109,6 @@ def _run_entry(
     *, context: Context, report: RunReport, usage: JobUsage | None, gpu_id: str | None
 ) -> dict[str, object]:
     resources = context.resolved[report.run.run_path].resources
-    slurm = resources if isinstance(resources, SlurmSettings) else None
     return {
         'run_path': report.run.run_path,
         'job_id': report.job_id,
@@ -118,7 +116,7 @@ def _run_entry(
         'elapsed': _duration_text(duration=usage.elapsed if usage is not None else None),
         'time_limit': _duration_text(duration=usage.time_limit if usage is not None else None),
         'max_rss': usage.max_rss if usage is not None else None,
-        'requested_memory': _requested_memory(slurm=slurm),
+        'requested_memory': resources.requested_memory,
         'total_cpu_seconds': (
             int(usage.total_cpu.total_seconds())
             if usage is not None and usage.total_cpu is not None
@@ -129,14 +127,6 @@ def _run_entry(
         'gpu_id': gpu_id,
         'paused': _is_paused(report=report),
     }
-
-
-def _requested_memory(*, slurm: SlurmSettings | None) -> int | None:
-    """The requested memory in bytes of one run, from its resolved ``[slurm]``."""
-    if slurm is None or slurm.mem_per_cpu is None:
-        return None
-    per_cpu = parse_slurm_memory(text=slurm.mem_per_cpu)
-    return None if per_cpu is None else per_cpu * slurm.cpus_per_task
 
 
 def _is_paused(*, report: RunReport) -> bool:
