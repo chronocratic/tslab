@@ -60,7 +60,7 @@ PRESETS: dict[str, tuple[str, object]] = {
 
 
 def test_recipes_times_datasets_round_trip() -> None:
-    recipes = from_presets(PRESETS, names=('ts2vec', 'cost'), without=('data',))
+    recipes = from_presets(presets=PRESETS, names=('ts2vec', 'cost'), without=('data',))
     datasets = {
         'Coffee': {
             'data': 'ucr',
@@ -93,7 +93,7 @@ def test_recipes_times_datasets_round_trip() -> None:
 
 @pytest.mark.parametrize('name', ['ts2vec', 'cost'])
 def test_whole_real_preset_round_trips(name: str) -> None:
-    settings = from_presets(PRESETS, names=(name,), without=())[name]
+    settings = from_presets(presets=PRESETS, names=(name,), without=())[name]
     args = ['no-preset', *settings_to_args(config_class=Config, settings=settings)]
     assert tslab.parse_config(config_class=Config, presets=PRESETS, args=args) == PRESETS[name][1]
 
@@ -106,4 +106,5 @@ def test_required_marker_with_real_classes(capsys: pytest.CaptureFixture[str]) -
             args=['ett-any', '--data.dataset-file-path', '/d/ETTh1.csv'],
         )
     assert '--data.variant' in capsys.readouterr().err
-    assert 'data.variant' not in from_presets(PRESETS, names=('ett-any',), without=())['ett-any']
+    settings = from_presets(presets=PRESETS, names=('ett-any',), without=())['ett-any']
+    assert 'data.variant' not in settings

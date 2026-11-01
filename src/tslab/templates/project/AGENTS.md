@@ -250,7 +250,7 @@ Writing a study:
 - A `Grid` has a `short_name` (SLURM job name, at most 8 characters), a
   `command` (the script with `no-preset`), the `config` class and `axes`.
 - Axes are mappings of value name to settings (dotted config paths:
-  `'model.depth': 10`, `'data': 'ett'`). Helpers: `from_presets(PRESETS, names=..., without=('data', 'run_path'))`
+  `'model.depth': 10`, `'data': 'ett'`). Helpers: `from_presets(presets=PRESETS, names=..., without=('data', 'run_path'))`
   for recipes, `ucr_datasets` / `uea_datasets` for datasets,
   `setting_axis(path='seed', values=(0, 1))` for sweeps; combine axes with `|`.
 - **Axis order is folder order:** runs land in

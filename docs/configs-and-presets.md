@@ -101,7 +101,7 @@ uv run python -m my_paper.classify no-preset model:ts2vec \
 ```
 
 ```python
-'recipe': from_presets(PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',))
+'recipe': from_presets(presets=PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',))
 ```
 
 ### Settings: how the values become flags

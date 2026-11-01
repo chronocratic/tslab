@@ -39,7 +39,7 @@ CHECKPOINT_LOAD_ERRORS: tuple[type[Exception], ...] = (
 )
 
 
-def _modified(path: Path) -> float:
+def _modified(*, path: Path) -> float:
     return path.stat().st_mtime
 
 
@@ -69,9 +69,9 @@ def resume_candidates(*, directory: Path, monitor: str) -> list[Path]:
         else:
             rest.append(path)
     return [
-        *sorted(last, key=_modified, reverse=True),
+        *sorted(last, key=lambda path: _modified(path=path), reverse=True),
         *(path for _, path in sorted(ranked)),
-        *sorted(rest, key=_modified, reverse=True),
+        *sorted(rest, key=lambda path: _modified(path=path), reverse=True),
     ]
 
 

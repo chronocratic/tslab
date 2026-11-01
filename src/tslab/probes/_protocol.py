@@ -1,5 +1,6 @@
 """Pieces shared by the TS2Vec evaluation protocols."""
 
+from collections.abc import Sequence
 import logging
 from typing import ClassVar, override
 
@@ -142,7 +143,7 @@ def require_validation(
 def fit_on_predefined_split(  # noqa: PLR0913 # why: each half of the split is a separate argument
     *,
     pipeline: Pipeline,
-    param_grid: dict[str, list[float]],
+    param_grid: dict[str, Sequence[float]],
     train_features: np.ndarray,
     train_labels: np.ndarray,
     val_features: np.ndarray,

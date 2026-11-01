@@ -24,7 +24,9 @@ example = Study(
                 # The recipe: one preset of the script, without its dataset (the
                 # dataset axis chooses it) and run path (the study sets run paths).
                 'recipe': from_presets(
-                    classify.PRESETS, names=('ts2vec-archive-split',), without=('data', 'run_path')
+                    presets=classify.PRESETS,
+                    names=('ts2vec-archive-split',),
+                    without=('data', 'run_path'),
                 ),
                 # The dataset: a UCR archive under the data/ folder of the project.
                 'dataset': ucr_datasets(root='data', names=('ToySpectra',)),
@@ -38,7 +40,7 @@ example = Study(
             config=forecast.ForecastConfig,
             axes={
                 'recipe': from_presets(
-                    forecast.PRESETS,
+                    presets=forecast.PRESETS,
                     names=('ts2vec-full-series', 'cost-cropped'),
                     without=('data', 'run_path'),
                 ),

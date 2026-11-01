@@ -11,6 +11,7 @@ from tslab.study import Study
 from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
+    _override_warnings,
     check_machine,
     JobGroup,
     plan_jobs,
@@ -63,10 +64,22 @@ def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
     with pytest.raises(ValueError, match=r'trainer\.max_epoch'):
         check_machine(study=study, machine=machine)
     machine = _local(tmp_path, overrides=(MachineOverride(match={'nope': ('x',)}, settings={}),))
+    warned: set[str] = set()
     with caplog.at_level(logging.WARNING, logger='tslab.study'):
-        check_machine(study=study, machine=machine)
-        resolve_runs(study=study, machine=machine, runs=expand_runs(study=study))
+        check_machine(study=study, machine=machine, warned=warned)
+        resolve_runs(study=study, machine=machine, runs=expand_runs(study=study), warned=warned)
     assert len([r for r in caplog.records if 'nope' in r.getMessage()]) == 1
+
+
+def test_override_warnings_returns_texts(study: Study, tmp_path: Path) -> None:
+    machine = _local(tmp_path, overrides=(MachineOverride(match={'nope': ('x',)}, settings={}),))
+    first = _override_warnings(study=study, machine=machine)
+    second = _override_warnings(study=study, machine=machine)
+    assert first == second
+    assert len(first) == 1
+    expected = f'machine override 0 of {machine.path} matches nothing in this study:'
+    assert first[0].startswith(expected)
+    assert 'nope' in first[0]
 
 
 @dataclass(frozen=True, kw_only=True)
