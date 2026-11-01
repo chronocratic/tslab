@@ -111,7 +111,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     """
     machine = context.machine
     if not context.job_states.known and not dry_run:
-        _LOGGER.error('the SLURM job states could not be read; not submitting, to avoid duplicates')
+        _LOGGER.error('the job states could not be read; not submitting, to avoid duplicates')
         return 1, []
     runs = [report.run for report in reports]
     folder = study_folder(machine=machine, study=context.study)

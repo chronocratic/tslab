@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from typing import TextIO
 
 from tslab.study.context import Context, refresh_context
-from tslab.study.launchers import backend_for, SIGNAL_EXIT_BASE
+from tslab.study.launchers import backend_for, JobFlag, SIGNAL_EXIT_BASE
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport, StudyState
 
@@ -27,9 +27,6 @@ __all__ = [
 
 #: The states of a run that is queued or running; submit and resubmit leave them alone.
 LIVE_STATES = (StudyState.QUEUED, StudyState.RUNNING)
-
-#: Ended SLURM states that say nothing about the run: the node or the queue failed it.
-_UNCOUNTED_JOB_STATES = frozenset({'PREEMPTED', 'NODE_FAIL'})
 
 
 def _finish_launch(
@@ -72,7 +69,7 @@ def _uncounted(*, report: RunReport) -> tuple[int, int]:
         if report.task is not None
         else (0, 0)
     )
-    if report.job_state in _UNCOUNTED_JOB_STATES:
+    if JobFlag.NOT_COUNTED in report.job_flags:
         return attempts + 1, in_row + 1
     return attempts, 0
 

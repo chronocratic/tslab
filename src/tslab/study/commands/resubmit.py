@@ -9,10 +9,10 @@ import time
 from typing import TextIO, TYPE_CHECKING
 
 from tslab.core.paths import LOCK_FILE
-from tslab.study.commands import _finish_launch, _uncounted, _UNCOUNTED_JOB_STATES, LIVE_STATES
+from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, JobPhase, OnLaunch
+from tslab.study.launchers import backend_for, JobFlag, JobPhase, OnLaunch
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
 from tslab.study.reporting.report import log_problems
@@ -261,7 +261,7 @@ def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[Ru
     max_attempts = context.machine.followup.max_attempts
     retried: list[RunReport] = []
     for report in reports:
-        if report.job_state in _UNCOUNTED_JOB_STATES:
+        if JobFlag.NOT_COUNTED in report.job_flags:
             if _uncounted(report=report)[1] > _MAX_UNCOUNTED_IN_ROW:
                 _LOGGER.info(
                     'gave up: %s preempted or node failed %d times in a row',

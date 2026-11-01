@@ -20,7 +20,7 @@ from tslab.jobs.slurm import (
 from tslab.study.commands import cancel
 from tslab.study.context import Context
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, JobUsage, LaunchError, LaunchReport
+from tslab.study.launchers import JobFlag, JobPhase, JobUsage, LaunchError, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.machine import MachineOverride, MachineProfileError
@@ -82,6 +82,37 @@ def test_job_states_returns_phases_and_read_only_mappings(
         cast('MutableMapping[str, str]', states.states)['1000_0'] = 'FAILED'
     with pytest.raises(TypeError):
         cast('MutableMapping[str, JobPhase]', states.phases)['1000_0'] = JobPhase.FAILED
+
+
+def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    ctx = _context(project=project, fake=fake)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': (
+                    '1000_0|TIMEOUT\n1000_1|PREEMPTED\n1000_2|COMPLETED\n1000_3|CANCELLED by 12\n'
+                ),
+            }
+        ],
+    )
+
+    states, _ = SlurmBackend().job_states(
+        machine=ctx.machine, study=ctx.study, jobs=jobs_of(project=project), cache={}
+    )
+
+    assert states.reasons == {
+        '1000_0': 'SLURM TIMEOUT',
+        '1000_1': 'SLURM PREEMPTED',
+        '1000_2': 'SLURM COMPLETED',
+    }
+    assert states.flags == {
+        '1000_0': frozenset({JobFlag.TIME_LIMIT}),
+        '1000_1': frozenset({JobFlag.NOT_COUNTED}),
+    }
 
 
 def test_job_states_skips_cached_ended_jobs(*, project: Path, fake: FakeSlurm) -> None:

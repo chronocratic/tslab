@@ -21,7 +21,7 @@ from tslab.jobs.slurm import (
     RUNNING_JOB_STATES,
 )
 from tslab.study import StudyRun
-from tslab.study.launchers import JobPhase
+from tslab.study.launchers import JobFlag, JobPhase
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import (
@@ -90,22 +90,28 @@ def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
 
 
 @pytest.mark.parametrize(
-    ('job_state', 'job_phase', 'folder', 'expected', 'reason'),
+    ('job_reason', 'job_phase', 'folder', 'expected', 'reason'),
     [
         *(
-            (state, JobPhase.QUEUED, facts(), StudyState.QUEUED, None)
+            (None, JobPhase.QUEUED, facts(), StudyState.QUEUED, None)
             for state in sorted(QUEUED_JOB_STATES)
         ),
         *(
-            (state, JobPhase.RUNNING, facts(), StudyState.RUNNING, None)
+            (None, JobPhase.RUNNING, facts(), StudyState.RUNNING, None)
             for state in sorted(RUNNING_JOB_STATES)
         ),
         *(
-            (state, JobPhase.INTERRUPTED, facts(), StudyState.INTERRUPTED, f'SLURM {state}')
+            (
+                f'SLURM {state}',
+                JobPhase.INTERRUPTED,
+                facts(),
+                StudyState.INTERRUPTED,
+                f'SLURM {state}',
+            )
             for state in sorted(INTERRUPTING_JOB_STATES)
         ),
         *(
-            (state, JobPhase.FAILED, facts(), StudyState.FAILED, f'SLURM {state}')
+            (f'SLURM {state}', JobPhase.FAILED, facts(), StudyState.FAILED, f'SLURM {state}')
             for state in sorted(FAILING_JOB_STATES)
         ),
         (
@@ -139,7 +145,7 @@ def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
             StudyState.FAILED,
             None,
         ),
-        ('COMPLETED', JobPhase.COMPLETED, facts(missing=True), StudyState.MISSING, None),
+        ('SLURM COMPLETED', JobPhase.COMPLETED, facts(missing=True), StudyState.MISSING, None),
         (None, JobPhase.UNKNOWN, facts(missing=True), StudyState.MISSING, None),
         (
             None,
@@ -148,18 +154,18 @@ def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
             StudyState.FAILED,
             'JSONDecodeError: x',
         ),
-        ('UNRECOGNIZED', JobPhase.ENDED, facts(), StudyState.MISSING, None),
-        ('ended', JobPhase.ENDED, facts(run_state='failed'), StudyState.FAILED, None),
+        ('SLURM UNRECOGNIZED', JobPhase.ENDED, facts(), StudyState.MISSING, None),
+        (None, JobPhase.ENDED, facts(run_state='failed'), StudyState.FAILED, None),
     ],
 )
 def test_state_table(
-    job_state: str | None,
+    job_reason: str | None,
     job_phase: JobPhase,
     folder: FolderFacts,
     expected: StudyState,
     reason: str | None,
 ) -> None:
-    assert study_state(job_state=job_state, job_phase=job_phase, folder=folder) == (
+    assert study_state(job_reason=job_reason, job_phase=job_phase, folder=folder) == (
         expected,
         reason,
     )
@@ -167,7 +173,7 @@ def test_state_table(
 
 def test_study_state_uses_job_phase() -> None:
     assert (
-        study_state(job_state='TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=facts())[0]
+        study_state(job_reason='SLURM TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=facts())[0]
         is StudyState.INTERRUPTED
     )
 
@@ -175,14 +181,14 @@ def test_study_state_uses_job_phase() -> None:
 def test_ended_job_overrides_a_live_looking_lock() -> None:
     folder = facts(run_state='running', lock_live=True)
     assert (
-        study_state(job_state='TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=folder)[0]
+        study_state(job_reason='SLURM TIMEOUT', job_phase=JobPhase.INTERRUPTED, folder=folder)[0]
         is StudyState.INTERRUPTED
     )
 
 
 def test_reason_is_the_first_error_line() -> None:
     folder = facts(run_state='failed', instances={'train': ('failed', 'ValueError: bad\nmore')})
-    _, reason = study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)
+    _, reason = study_state(job_reason=None, job_phase=JobPhase.UNKNOWN, folder=folder)
     assert reason == 'ValueError: bad'
 
 
@@ -272,7 +278,7 @@ def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
 def test_failing_job_state_beats_a_stale_running_file(job_state: str) -> None:
     folder = facts(run_state='running', instances={'train': 'running'})
     assert (
-        study_state(job_state=job_state, job_phase=JobPhase.FAILED, folder=folder)[0]
+        study_state(job_reason=f'SLURM {job_state}', job_phase=JobPhase.FAILED, folder=folder)[0]
         is StudyState.FAILED
     )
 
@@ -280,7 +286,7 @@ def test_failing_job_state_beats_a_stale_running_file(job_state: str) -> None:
 def test_time_limit_beats_a_failing_job_state() -> None:
     folder = facts(run_state='running', instances={'train': ('failed', 'TrainingPaused: 1h')})
     assert (
-        study_state(job_state='CANCELLED', job_phase=JobPhase.FAILED, folder=folder)[0]
+        study_state(job_reason='SLURM CANCELLED', job_phase=JobPhase.FAILED, folder=folder)[0]
         is StudyState.INTERRUPTED
     )
 
@@ -290,7 +296,7 @@ def test_old_training_time_limit_prefix_is_not_interrupted() -> None:
         run_state='finished', instances={'train': ('failed', 'TrainingTimeLimitReached: 1h')}
     )
     assert (
-        study_state(job_state=None, job_phase=JobPhase.UNKNOWN, folder=folder)[0]
+        study_state(job_reason=None, job_phase=JobPhase.UNKNOWN, folder=folder)[0]
         is StudyState.FAILED
     )
 
@@ -309,7 +315,11 @@ def test_job_time_limit_signal_is_interrupted(job_state: str | None, job_phase: 
         run_state='crashed',
         instances={'train': ('failed', 'JobTimeLimitSignal: SIGUSR2 before the time limit')},
     )
-    state, reason = study_state(job_state=job_state, job_phase=job_phase, folder=folder)
+    state, reason = study_state(
+        job_reason=None if job_state is None else f'SLURM {job_state}',
+        job_phase=job_phase,
+        folder=folder,
+    )
     assert state is StudyState.INTERRUPTED
     assert reason == 'JobTimeLimitSignal: SIGUSR2 before the time limit'
 
@@ -425,3 +435,19 @@ def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:
     )
     assert [report.job_id for report in reports] == ['local-1-1_1', 'local-1-1_2']
     assert [report.job_state for report in reports] == ['running', 'pending']
+
+
+def test_report_carries_job_reason_and_flags(tmp_path: Path) -> None:
+    report = collect_states(
+        study_directory=tmp_path,
+        runs=[run('g/a/1')],
+        jobs=[job('7', (task(index=0, run_path='g/a/1', attempt=1),))],
+        job_states=make_job_states(
+            states={'7_0': 'TIMEOUT'},
+            phases={'7_0': JobPhase.INTERRUPTED},
+            reasons={'7_0': 'SLURM TIMEOUT'},
+            flags={'7_0': frozenset({JobFlag.TIME_LIMIT})},
+        ),
+    )[0]
+    assert report.job_reason == 'SLURM TIMEOUT'
+    assert report.job_flags == frozenset({JobFlag.TIME_LIMIT})

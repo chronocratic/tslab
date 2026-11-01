@@ -98,6 +98,8 @@ class LocalBackend:
                 known=True,
                 states=MappingProxyType(states),
                 phases=MappingProxyType(phases),
+                reasons=MappingProxyType({}),
+                flags=MappingProxyType({}),
                 followup_live_job_ids=(),
             ),
             cache,

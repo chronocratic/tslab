@@ -78,6 +78,8 @@ def test_job_states_reads_live_launch_and_returns_read_only_mappings(*, project:
         task_ids[2]: JobPhase.ENDED,
         task_ids[3]: JobPhase.ENDED,
     }
+    assert states.reasons == {}
+    assert states.flags == {}
     assert states.followup_live_job_ids == ()
     assert new_cache is cache
     with pytest.raises(TypeError):

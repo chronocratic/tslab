@@ -170,7 +170,7 @@ def test_wait_keeps_going_through_unknown_states_and_warns_once(
             clock=lambda: elapsed[0],
         )
     assert code == 0
-    assert caplog.text.count('SLURM job states unknown; still waiting') == 1
+    assert caplog.text.count('job states unknown; still waiting') == 1
 
 
 def test_wait_returns_last_state_when_reload_is_interrupted(project: Path, fake: FakeSlurm) -> None:
