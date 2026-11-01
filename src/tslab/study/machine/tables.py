@@ -60,10 +60,10 @@ def from_table[T](
     Returns:
         The decoded instance, or ``None`` when an optional table is absent.
     """
+    if table is None and required:
+        message = f'{path}: the {location} table is required'
+        raise MachineProfileError(message)
     if table is None:
-        if required:
-            message = f'{path}: the {location} table is required'
-            raise MachineProfileError(message)
         return None
     if not isinstance(table, dict):
         message = f'{path}: {location} must be a table, got {type(table).__name__}'
@@ -175,14 +175,27 @@ def expand_env(
                 f'(letters, digits and underscores, not starting with a digit)'
             )
             raise MachineProfileError(message)
-        try:
-            expanded[name] = expand_variables(text=item, env={**environment, **expanded})
-        except ValueError as error:
-            if not lenient:
-                message = f'{path}: [env] value for {name!r}: {error}'
-                raise MachineProfileError(message) from error
-            expanded[name] = item
+        expanded[name] = _expand_value(
+            name=name,
+            text=item,
+            environment={**environment, **expanded},
+            lenient=lenient,
+            path=path,
+        )
     return expanded
+
+
+def _expand_value(
+    *, name: str, text: str, environment: Mapping[str, str], lenient: bool, path: Path
+) -> str:
+    """One ``[env]`` value expanded; a lenient read keeps the text when a variable is unset."""
+    try:
+        return expand_variables(text=text, env=environment)
+    except ValueError as error:
+        if lenient:
+            return text
+        message = f'{path}: [env] value for {name!r}: {error}'
+        raise MachineProfileError(message) from error
 
 
 def settings_of(*, table: dict[str, object], location: str, path: Path) -> dict[str, SettingValue]:

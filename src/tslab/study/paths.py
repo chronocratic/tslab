@@ -29,15 +29,21 @@ def log_file_of(*, folder: Path, short_name: str, index: int) -> Path:
 
 def next_job_file(*, study_folder: Path) -> int:
     """The next job file number: one past the largest on disk, else 1."""
-    numbers = 1
-    for suffix in ('.sbatch', '.tasks'):
-        for path in (study_folder / 'jobs').glob(f'*{suffix}'):
-            try:
-                number = int(path.name.removesuffix(suffix))
-            except ValueError:
-                continue
-            numbers = max(numbers, number + 1)
-    return numbers
+    numbers = [
+        number
+        for suffix in ('.sbatch', '.tasks')
+        for path in (study_folder / 'jobs').glob(f'*{suffix}')
+        if (number := _job_file_number(name=path.name, suffix=suffix)) is not None
+    ]
+    return max(numbers, default=0) + 1
+
+
+def _job_file_number(*, name: str, suffix: str) -> int | None:
+    """The number of a job file name, or ``None`` when the name holds no number."""
+    try:
+        return int(name.removesuffix(suffix))
+    except ValueError:
+        return None
 
 
 def instance_directory(*, run_directory: Path, instance_id: str) -> Path:

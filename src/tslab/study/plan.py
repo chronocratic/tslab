@@ -21,7 +21,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
-from tslab.study.machine import MachineProfile
+from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
 
@@ -156,16 +156,23 @@ def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
             )
             raise ValueError(message)
     for position, override in enumerate(machine.overrides):
-        for grid_name, grid in _override_grids(
-            study=study, grid_names=override.match.get('grid', ()), match=override.match
-        ):
-            bad = check_paths(config_class=grid.config, settings=override.settings)
-            if bad:
-                message = (
-                    f'{machine.path}: override {position} sets paths that are not fields '
-                    f'of {grid.config.__name__} (grid {grid_name!r}): {", ".join(bad)}'
-                )
-                raise ValueError(message)
+        _override_problems(study=study, machine=machine, position=position, override=override)
+
+
+def _override_problems(
+    *, study: Study, machine: MachineProfile, position: int, override: MachineOverride
+) -> None:
+    """Raise for the first grid an override sets a path on that is not a field of it."""
+    for grid_name, grid in _override_grids(
+        study=study, grid_names=override.match.get('grid', ()), match=override.match
+    ):
+        bad = check_paths(config_class=grid.config, settings=override.settings)
+        if bad:
+            message = (
+                f'{machine.path}: override {position} sets paths that are not fields '
+                f'of {grid.config.__name__} (grid {grid_name!r}): {", ".join(bad)}'
+            )
+            raise ValueError(message)
 
 
 def _override_grids(
@@ -449,17 +456,21 @@ def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[str
         One pair per problem, in group and task order; a task whose
         arguments could not even be built reports its building error.
     """
-    problems: list[tuple[str, str]] = []
-    for group in groups:
-        for task in group.tasks:
-            run_path = task.resolved.run.run_path
-            if task.error is not None:
-                problems.append((run_path, task.error))
-                continue
-            error = validate_arguments(
-                config_class=study.grids[group.grid].config,
-                arguments=task.command[len(study.grids[group.grid].command) :],
-            )
-            if error is not None:
-                problems.append((run_path, error.strip()))
-    return problems
+    problems = (
+        _task_problem(study=study, group=group, task=task)
+        for group in groups
+        for task in group.tasks
+    )
+    return [problem for problem in problems if problem is not None]
+
+
+def _task_problem(*, study: Study, group: JobGroup, task: PlannedTask) -> tuple[str, str] | None:
+    """The (run path, message) of a task whose arguments do not parse, else ``None``."""
+    run_path = task.resolved.run.run_path
+    if task.error is not None:
+        return run_path, task.error
+    error = validate_arguments(
+        config_class=study.grids[group.grid].config,
+        arguments=task.command[len(study.grids[group.grid].command) :],
+    )
+    return None if error is None else (run_path, error.strip())

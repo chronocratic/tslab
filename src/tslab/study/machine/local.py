@@ -142,21 +142,17 @@ def local_gpus(*, value: object, location: str, path: Path) -> list[int | str] |
         return 'auto'
     if value == ['mps']:
         return cast('list[int | str]', value)
-    if isinstance(value, list):
-        if 'mps' in value:
-            message = (
-                f'{path}: {location} must not hold "mps" next to ids: '
-                'MPS is the only GPU on a Mac, so it must stand alone'
-            )
-            raise MachineProfileError(message)
-        if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in value):
-            message = (
-                f'{path}: {location} must be "auto", a list of non-negative integers, '
-                'or exactly ["mps"]'
-            )
-            raise MachineProfileError(message)
-        return cast('list[int | str]', value)
-    message = (
+    invalid = (
         f'{path}: {location} must be "auto", a list of non-negative integers, or exactly ["mps"]'
     )
-    raise MachineProfileError(message)
+    if not isinstance(value, list):
+        raise MachineProfileError(invalid)
+    if 'mps' in value:
+        message = (
+            f'{path}: {location} must not hold "mps" next to ids: '
+            'MPS is the only GPU on a Mac, so it must stand alone'
+        )
+        raise MachineProfileError(message)
+    if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in value):
+        raise MachineProfileError(invalid)
+    return cast('list[int | str]', value)

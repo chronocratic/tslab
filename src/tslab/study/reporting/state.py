@@ -102,10 +102,17 @@ class RunReport:
 
 def _reason(*, folder: FolderFacts, job_reason: str | None) -> str | None:
     snapshot = folder.snapshot
-    if snapshot is not None:
-        for record in snapshot.instances.values():
-            if record.state is InstanceState.FAILED and record.error is not None:
-                return first_line(text=record.error)
+    failed = () if snapshot is None else snapshot.instances.values()
+    error = next(
+        (
+            record.error
+            for record in failed
+            if record.state is InstanceState.FAILED and record.error is not None
+        ),
+        None,
+    )
+    if error is not None:
+        return first_line(text=error)
     if folder.read_error is not None:
         return folder.read_error
     return job_reason
@@ -209,20 +216,30 @@ def _grace_wait(
     settled: dict[str, FolderFacts] = {}
     rounds = 0
     while pending and rounds < limit:
-        for directory in pending.values():
-            try:
-                # why: a chmod to the same mode makes a network file system refresh its cache
-                directory.chmod(directory.stat().st_mode)
-            except OSError:
-                limit = 30
+        if any(_refresh_failed(directory=directory) for directory in list(pending.values())):
+            limit = 30
         sleep(1)
         rounds += 1
-        for key, directory in list(pending.items()):
-            folder = read_folder(run_directory=directory)
-            settled[key] = folder
-            if not _needs_grace(job_phase=completed_phase, folder=folder):
-                del pending[key]
+        settled.update(_reread(pending=pending, completed_phase=completed_phase))
     return settled
+
+
+def _refresh_failed(*, directory: Path) -> bool:
+    """Whether a chmod to the same mode failed; it makes a network file system refresh its cache."""
+    try:
+        directory.chmod(directory.stat().st_mode)
+    except OSError:
+        return True
+    return False
+
+
+def _reread(*, pending: dict[str, Path], completed_phase: 'JobPhase') -> dict[str, FolderFacts]:
+    """Read the pending folders again; the ones that settled leave ``pending``."""
+    read = {key: read_folder(run_directory=directory) for key, directory in pending.items()}
+    for key, folder in read.items():
+        if not _needs_grace(job_phase=completed_phase, folder=folder):
+            del pending[key]
+    return read
 
 
 def collect_states(

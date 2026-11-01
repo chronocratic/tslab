@@ -55,25 +55,7 @@ def log_status(
     ]
     # why: a study that never ran has thousands of missing runs; the table already counts them
     if listed and not all(report.state is StudyState.MISSING for report in context.reports):
-        lines = [
-            ' '.join(
-                part
-                for part in (
-                    report.run.run_path,
-                    report.state.value,
-                    None if report.job_id is None else f'job {report.job_id}',
-                    report.reason,
-                    _start_suffix(report=report, starts=starts),
-                )
-                if part is not None and part != ''
-            )
-            for report in listed
-        ]
-        for line in lines[:_PROBLEMS_SHOWN]:
-            _LOGGER.info('  %s', line)
-        hidden = len(lines) - _PROBLEMS_SHOWN
-        if hidden > 0:
-            _LOGGER.info('  … and %d more; narrow with --states, --grid or --only', hidden)
+        _log_run_lines(reports=listed, starts=starts)
     limited = sum(
         1
         for report in context.reports
@@ -89,6 +71,31 @@ def log_status(
             'or cap training with --trainer.max-training-time',
             limited,
         )
+
+
+def _log_run_lines(
+    *, reports: Sequence[RunReport], starts: Mapping[str, str | None] | None
+) -> None:
+    """Log one line per listed run, the first few of them, then how many are hidden."""
+    lines = [
+        ' '.join(
+            part
+            for part in (
+                report.run.run_path,
+                report.state.value,
+                None if report.job_id is None else f'job {report.job_id}',
+                report.reason,
+                _start_suffix(report=report, starts=starts),
+            )
+            if part is not None and part != ''
+        )
+        for report in reports
+    ]
+    for line in lines[:_PROBLEMS_SHOWN]:
+        _LOGGER.info('  %s', line)
+    hidden = len(lines) - _PROBLEMS_SHOWN
+    if hidden > 0:
+        _LOGGER.info('  … and %d more; narrow with --states, --grid or --only', hidden)
 
 
 def log_show(*, study: Study) -> None:
@@ -175,10 +182,9 @@ def log_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> tuple[int
             for group in groups
         ]
         log_table(logger=_LOGGER, header=('job', 'runs', 'resources'), rows=rows)
-        for group in groups:
-            if group.tasks:
-                _LOGGER.info('first command of %s:', group.job_name)
-                _LOGGER.info('  %s', shlex.join(group.tasks[0].command))
+        for group in (group for group in groups if group.tasks):
+            _LOGGER.info('first command of %s:', group.job_name)
+            _LOGGER.info('  %s', shlex.join(group.tasks[0].command))
         return 0, []
     rows = [
         (

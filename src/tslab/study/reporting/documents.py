@@ -1,18 +1,35 @@
 """JSON documents for study commands."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import shlex
+from types import MappingProxyType
 
 from tslab.core.text import format_index_ranges
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport
 from tslab.study.plan import JobGroup
+from tslab.study.records import JobRecord
 from tslab.study.reporting.outcome import counts_live
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport, StudyState
 
 __all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
+
+
+def _submission_reason(*, context: Context) -> str:  # noqa: ARG001 # why: the table signature
+    return 'submission in progress'
+
+
+def _retry_reason(*, context: Context) -> str:
+    job_id = context.followup_live_job_ids[0] if context.followup_live_job_ids else None
+    return 'auto retry queued' if job_id is None else f'auto retry queued (job {job_id})'
+
+
+#: The reason of a run that counts as live work, by its state.
+_LIVE_REASONS: Mapping[StudyState, Callable[..., str]] = MappingProxyType(
+    {StudyState.MISSING: _submission_reason, StudyState.INTERRUPTED: _retry_reason}
+)
 
 
 def run_entry(
@@ -30,12 +47,9 @@ def run_entry(
         The run entry with absolute paths.
     """
     reason = report.reason
-    if counts_live(report=report, context=context):
-        if report.state is StudyState.MISSING:
-            reason = 'submission in progress'
-        elif report.state is StudyState.INTERRUPTED:
-            job_id = context.followup_live_job_ids[0] if context.followup_live_job_ids else None
-            reason = 'auto retry queued' if job_id is None else f'auto retry queued (job {job_id})'
+    live_reason = _LIVE_REASONS.get(report.state)
+    if live_reason is not None and counts_live(report=report, context=context):
+        reason = live_reason(context=context)
     entry: dict[str, object] = {
         'run_path': report.run.run_path,
         'grid': report.run.grid,
@@ -143,6 +157,32 @@ def cancel_document(
     }
 
 
+def _launch_jobs(
+    *, report: LaunchReport | None, groups: Sequence[JobGroup], dry_run: bool
+) -> list[dict[str, object]]:
+    """The job entries of a launch: every group on a dry run, else the submitted ones."""
+    if report is None:
+        return []
+    records = {record.job_file: record for record in report.submitted}
+    return [
+        _job_entry(group=group, record=records.get(group.job_file), dry_run=dry_run)
+        for group in groups
+        if dry_run or group.job_file in records
+    ]
+
+
+def _job_entry(*, group: JobGroup, record: JobRecord | None, dry_run: bool) -> dict[str, object]:
+    """The entry of one job group in a launch document."""
+    return {
+        'job_name': group.job_name,
+        'job_id': None if dry_run or record is None else record.job_id,
+        'runs': len(group.tasks),
+        'indices': format_index_ranges(indices=[task.index for task in group.tasks]),
+        'resources': resources_of(resources=group.resources),
+        'first_command': shlex.join(group.tasks[0].command) if group.tasks else None,
+    }
+
+
 def launch_document(
     *,
     report: LaunchReport | None,
@@ -163,23 +203,7 @@ def launch_document(
     Returns:
         The versioned study-launch document.
     """
-    jobs = []
-    if report is not None:
-        records = {record.job_file: record for record in report.submitted}
-        for group in groups:
-            record = records.get(group.job_file)
-            if not dry_run and record is None:
-                continue
-            jobs.append(
-                {
-                    'job_name': group.job_name,
-                    'job_id': None if dry_run else record.job_id if record is not None else None,
-                    'runs': len(group.tasks),
-                    'indices': format_index_ranges(indices=[task.index for task in group.tasks]),
-                    'resources': resources_of(resources=group.resources),
-                    'first_command': shlex.join(group.tasks[0].command) if group.tasks else None,
-                }
-            )
+    jobs = _launch_jobs(report=report, groups=groups, dry_run=dry_run)
     return {
         'schema': 'tslab.study-launch/1',
         'dry_run': dry_run,

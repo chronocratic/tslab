@@ -202,20 +202,25 @@ class Grid:
             )
             raise TypeError(message)
         for axis_name, values in self.axes.items():
-            if not isinstance(values, Mapping):
-                message = (
-                    f'axis {axis_name!r} must map value names to settings, '
-                    f'got {_kind(value=values)}; for one setting use '
-                    f'setting_axis(path=..., values=...)'
-                )
-                raise TypeError(message)
-            for value_name, settings in values.items():
-                if not isinstance(settings, Mapping):
-                    message = (
-                        f'axis {axis_name!r} value {value_name!r} must be a mapping of '
-                        f'setting path to value, got {_kind(value=settings)}'
-                    )
-                    raise TypeError(message)
+            _check_axis_values(axis_name=axis_name, values=values)
+
+
+def _check_axis_values(*, axis_name: str, values: object) -> None:
+    """Raise unless the axis maps value names to settings mappings."""
+    if not isinstance(values, Mapping):
+        message = (
+            f'axis {axis_name!r} must map value names to settings, '
+            f'got {_kind(value=values)}; for one setting use '
+            f'setting_axis(path=..., values=...)'
+        )
+        raise TypeError(message)
+    for value_name, settings in values.items():
+        if not isinstance(settings, Mapping):
+            message = (
+                f'axis {axis_name!r} value {value_name!r} must be a mapping of '
+                f'setting path to value, got {_kind(value=settings)}'
+            )
+            raise TypeError(message)
 
 
 def _kind(*, value: object) -> str:
@@ -305,24 +310,26 @@ def normalize_match(*, match: Match) -> dict[str, tuple[str, ...]]:
         ValueError: If a value list is empty.
         TypeError: If a value list holds a non-string.
     """
-    normalized: dict[str, tuple[str, ...]] = {}
-    for key, value in match.items():
-        if not isinstance(key, str):
-            message = f'match keys are axis names, got {key!r}'
+    return {key: _normalized_names(key=key, value=value) for key, value in match.items()}
+
+
+def _normalized_names(*, key: object, value: str | Sequence[str]) -> tuple[str, ...]:
+    """The value names of one match key as a tuple, checked."""
+    if not isinstance(key, str):
+        message = f'match keys are axis names, got {key!r}'
+        raise TypeError(message)
+    if not isinstance(value, str | Sequence):
+        message = f'match key {key!r} must be a name or a list of names, got {value!r}'
+        raise TypeError(message)
+    values = (value,) if isinstance(value, str) else tuple(value)
+    if not values:
+        message = f'match key {key!r} has no values'
+        raise ValueError(message)
+    for item in values:
+        if not isinstance(item, str):
+            message = f'match key {key!r} holds a non-string value {item!r}'
             raise TypeError(message)
-        if not isinstance(value, str | Sequence):
-            message = f'match key {key!r} must be a name or a list of names, got {value!r}'
-            raise TypeError(message)
-        values = (value,) if isinstance(value, str) else tuple(value)
-        if not values:
-            message = f'match key {key!r} has no values'
-            raise ValueError(message)
-        for item in values:
-            if not isinstance(item, str):
-                message = f'match key {key!r} holds a non-string value {item!r}'
-                raise TypeError(message)
-        normalized[key] = values
-    return normalized
+    return values
 
 
 def match_problems(*, grids: Mapping[str, Grid], match: Match) -> list[str]:
@@ -341,22 +348,23 @@ def match_problems(*, grids: Mapping[str, Grid], match: Match) -> list[str]:
     """
     problems: list[str] = []
     for key, value in normalize_match(match=match).items():
-        if key == 'grid':
-            unknown = [name for name in value if name not in grids]
-            if unknown:
-                problems.append(
-                    f'grid {", ".join(repr(name) for name in unknown)} is not a grid of this study'
-                )
-            continue
-        axis_grids = [grid for grid in grids.values() if key in grid.axes]
-        if not axis_grids:
-            problems.append(f'{key} is not an axis of any grid')
-            continue
-        known = {name for grid in axis_grids for name in grid.axes[key]}
-        unknown = [name for name in value if name not in known]
-        if unknown:
-            problems.append(f'{key} has no value {", ".join(repr(name) for name in unknown)}')
+        problems += _key_problems(grids=grids, key=key, value=value)
     return problems
+
+
+def _key_problems(*, grids: Mapping[str, Grid], key: str, value: tuple[str, ...]) -> list[str]:
+    """The problems of one match key against the grids."""
+    if key == 'grid':
+        unknown = [name for name in value if name not in grids]
+        names = ', '.join(repr(name) for name in unknown)
+        return [f'grid {names} is not a grid of this study'] if unknown else []
+    axis_grids = [grid for grid in grids.values() if key in grid.axes]
+    if not axis_grids:
+        return [f'{key} is not an axis of any grid']
+    known = {name for grid in axis_grids for name in grid.axes[key]}
+    unknown = [name for name in value if name not in known]
+    names = ', '.join(repr(name) for name in unknown)
+    return [f'{key} has no value {names}'] if unknown else []
 
 
 def run_matches(*, grid_name: str, values: Mapping[str, str], match: Match) -> bool:
@@ -411,11 +419,18 @@ def merge_settings(
     result = dict(base)
     for path, value in update.items():
         if path in result and result[path] != value:
-            prefix = f'{path}.'
-            for stale in [key for key in result if key.startswith(prefix) and key not in update]:
-                del result[stale]
+            _drop_children(result=result, path=path, keep=update)
         result[path] = value
     return result
+
+
+def _drop_children(
+    *, result: dict[str, SettingValue], path: str, keep: Mapping[str, SettingValue]
+) -> None:
+    """Remove the paths below ``path`` from ``result`` unless ``keep`` sets them."""
+    prefix = f'{path}.'
+    for stale in [key for key in result if key.startswith(prefix) and key not in keep]:
+        del result[stale]
 
 
 def matching_in_order(
@@ -497,26 +512,29 @@ def expand_runs(*, study: Study) -> list[StudyRun]:
         The runs, one per point of the axis product of every grid that is not
         excluded, in grid order and then axis order.
     """
-    runs: list[StudyRun] = []
-    for grid_name, grid in study.grids.items():
-        overrides = [(override.match, override.settings) for override in grid.overrides]
-        for values in _grid_runs(grid_name=grid_name, grid=grid):
-            settings: dict[str, SettingValue] = {}
-            for name in grid.axes:
-                settings = merge_settings(base=settings, update=grid.axes[name][values[name]])
-            settings = merge_settings(base=settings, update=grid.run_settings)
-            settings = merge_overrides(
-                base=settings, overrides=overrides, grid_name=grid_name, values=values
-            )
-            runs.append(
-                StudyRun(
-                    grid=grid_name,
-                    values=values,
-                    run_path='/'.join([grid_name, *values.values()]),
-                    settings=settings,
-                )
-            )
-    return runs
+    return [
+        _study_run(grid_name=grid_name, grid=grid, values=values)
+        for grid_name, grid in study.grids.items()
+        for values in _grid_runs(grid_name=grid_name, grid=grid)
+    ]
+
+
+def _study_run(*, grid_name: str, grid: Grid, values: Mapping[str, str]) -> StudyRun:
+    """The run of one point of the axis product of a grid, with its merged settings."""
+    overrides = [(override.match, override.settings) for override in grid.overrides]
+    settings: dict[str, SettingValue] = {}
+    for name in grid.axes:
+        settings = merge_settings(base=settings, update=grid.axes[name][values[name]])
+    settings = merge_settings(base=settings, update=grid.run_settings)
+    settings = merge_overrides(
+        base=settings, overrides=overrides, grid_name=grid_name, values=values
+    )
+    return StudyRun(
+        grid=grid_name,
+        values=dict(values),
+        run_path='/'.join([grid_name, *values.values()]),
+        settings=settings,
+    )
 
 
 def select_runs(
@@ -588,25 +606,25 @@ def _grid_settings_problems(*, grid_name: str, grid: Grid) -> None:
     """Name the grid, the axis and value, or run_settings or override N, for each bad path."""
     for axis_name, values in grid.axes.items():
         for value_name, settings in values.items():
-            bad = check_paths(config_class=grid.config, settings=settings)
-            if bad:
-                message = (
-                    f'grid {grid_name!r}: axis {axis_name!r} value {value_name!r} '
-                    f'sets paths that are not fields of {grid.config.__name__}: {", ".join(bad)}'
-                )
-                raise ValueError(message)
-    bad = check_paths(config_class=grid.config, settings=grid.run_settings)
-    if bad:
-        message = (
-            f'grid {grid_name!r}: run_settings set paths that are not fields '
-            f'of {grid.config.__name__}: {", ".join(bad)}'
-        )
-        raise ValueError(message)
-    for position, override in enumerate(grid.overrides):
-        bad = check_paths(config_class=grid.config, settings=override.settings)
-        if bad:
-            message = (
-                f'grid {grid_name!r}: override {position} sets paths that are not fields '
-                f'of {grid.config.__name__}: {", ".join(bad)}'
+            _check_setting_paths(
+                grid=grid,
+                settings=settings,
+                where=f'grid {grid_name!r}: axis {axis_name!r} value {value_name!r} sets',
             )
-            raise ValueError(message)
+    _check_setting_paths(
+        grid=grid, settings=grid.run_settings, where=f'grid {grid_name!r}: run_settings set'
+    )
+    for position, override in enumerate(grid.overrides):
+        _check_setting_paths(
+            grid=grid,
+            settings=override.settings,
+            where=f'grid {grid_name!r}: override {position} sets',
+        )
+
+
+def _check_setting_paths(*, grid: Grid, settings: Mapping[str, SettingValue], where: str) -> None:
+    """Raise unless every path of ``settings`` is a field of the config of the grid."""
+    bad = check_paths(config_class=grid.config, settings=settings)
+    if bad:
+        message = f'{where} paths that are not fields of {grid.config.__name__}: {", ".join(bad)}'
+        raise ValueError(message)
