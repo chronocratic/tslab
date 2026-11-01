@@ -34,6 +34,12 @@ Test markers:
 - `chronocratic`: tests that need the `chronocratic-models` and
   `chronocratic-datasets` extras. `uv run pytest -m "not chronocratic"` skips them.
 
+CI reports test coverage as it runs the suite. The same locally:
+
+```bash
+uv run pytest --cov=src/tslab --cov-report=term-missing:skip-covered
+```
+
 ## Code style
 
 - Type hints on every function, including return types. `ty` runs in strict mode.
