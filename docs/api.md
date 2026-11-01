@@ -3,9 +3,9 @@
 ## Core
 
 The names below are importable from `tslab` (including `tslab.REQUIRED`, the
-optional marker for preset values the preset cannot know). The interface it
-re-exports (`ModelAsEncoder`) is listed under Interfaces; `RunStatus` and
-`Tracker` are defined in `core` and documented here.
+optional marker for preset values the preset cannot know). `ModelAsEncoder` is
+defined in `stages` and listed under Ready stages; `RunStatus` and `Tracker`
+are defined in `core` and documented here.
 
 ```{eval-rst}
 .. automodule:: tslab

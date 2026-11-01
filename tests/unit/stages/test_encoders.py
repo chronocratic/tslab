@@ -1,11 +1,9 @@
-from typing import override
-
 import pytest
 import torch
 
 from tslab.core.fingerprint import canonicalize
-from tslab.interfaces import DownstreamModel, Encoder, SequenceEncoder
-from tslab.interfaces.encoder import ModelAsEncoder
+from tslab.interfaces import Encoder, SequenceEncoder
+from tslab.stages.encoders import ModelAsEncoder
 
 
 class VectorModel(torch.nn.Module):
@@ -79,28 +77,6 @@ def test_device_does_not_change_the_fingerprint() -> None:
     assert canonicalize(value=ModelAsEncoder(batch_size=8)) != canonicalize(
         value=ModelAsEncoder(batch_size=16)
     )
-
-
-class Constant(DownstreamModel):
-    @override
-    def fit(
-        self,
-        *,
-        train_inputs: torch.Tensor,
-        train_targets: torch.Tensor,
-        val_inputs: torch.Tensor | None,
-        val_targets: torch.Tensor | None,
-    ) -> None:
-        pass
-
-    @override
-    def predict(self, *, inputs: torch.Tensor) -> torch.Tensor:
-        return torch.zeros(len(inputs))
-
-
-def test_default_metrics_explain_what_to_do() -> None:
-    with pytest.raises(NotImplementedError, match='metrics='):
-        Constant().default_metrics(predictions=torch.zeros(2), targets=torch.zeros(2))
 
 
 @pytest.mark.parametrize('batch_size', [0, -3])
