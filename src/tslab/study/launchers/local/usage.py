@@ -6,16 +6,16 @@ from pathlib import Path
 
 from tslab.core.files import read_json_object
 from tslab.study.context import Context
-from tslab.study.launchers import SlurmJobUsage
+from tslab.study.launchers import JobUsage
 from tslab.study.paths import log_file_of, study_folder
 
 __all__ = ['usage']
 
 
-def usage(*, context: Context) -> tuple[dict[str, SlurmJobUsage], dict[str, str | None]]:
+def usage(*, context: Context) -> tuple[dict[str, JobUsage], dict[str, str | None]]:
     """The latest local task usage, read from its usage file, with GPU ids."""
     folder = study_folder(machine=context.machine, study=context.study)
-    usage_by_job: dict[str, SlurmJobUsage] = {}
+    usage_by_job: dict[str, JobUsage] = {}
     gpu_ids: dict[str, str | None] = {}
     for report in context.reports:
         if report.job_id is None or report.task is None:
@@ -45,9 +45,9 @@ def _gpu_id_of(*, document: Mapping[str, object]) -> str | None:
     return None if value is None else str(value)
 
 
-def _local_job_usage(*, document: Mapping[str, object], state: str) -> SlurmJobUsage:
+def _local_job_usage(*, document: Mapping[str, object], state: str) -> JobUsage:
     rss = document.get('max_rss_bytes')
-    return SlurmJobUsage(
+    return JobUsage(
         state=state,
         elapsed=_seconds_of(document=document, key='elapsed_seconds'),
         time_limit=_seconds_of(document=document, key='timeout'),

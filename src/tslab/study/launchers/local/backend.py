@@ -14,11 +14,11 @@ from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import (
     JobPhase,
     JobStates,
+    JobUsage,
     launch,
     LaunchReport,
     OnTaskState,
     Resources,
-    SlurmJobUsage,
 )
 from tslab.study.launchers.local.pid_file import hold_launch, LocalLaunchError
 from tslab.study.launchers.local.run import (
@@ -230,14 +230,12 @@ class LocalBackend:
         *,
         context: Context,  # noqa: ARG002 # why: the Backend signature
         reports: Sequence[RunReport],  # noqa: ARG002 # why: the Backend signature
-    ) -> Mapping[str, SlurmJobUsage]:
+    ) -> Mapping[str, JobUsage]:
         """There is no accounting on a local machine."""
-        no_usage: dict[str, SlurmJobUsage] = {}
+        no_usage: dict[str, JobUsage] = {}
         return no_usage
 
-    def usage(
-        self, *, context: Context
-    ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
+    def usage(self, *, context: Context) -> tuple[Mapping[str, JobUsage], Mapping[str, str | None]]:
         """The usage of every local run from its usage file, with the GPU ids."""
         from tslab.study.launchers.local.usage import usage  # noqa: PLC0415
 

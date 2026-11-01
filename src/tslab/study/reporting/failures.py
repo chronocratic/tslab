@@ -6,8 +6,9 @@ import logging
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import InstanceState
 from tslab.jobs.local import tail_lines
-from tslab.jobs.slurm import format_slurm_memory, SlurmJobUsage
+from tslab.jobs.slurm import format_slurm_memory
 from tslab.study.context import Context
+from tslab.study.launchers import JobUsage
 from tslab.study.machine import SlurmSettings
 from tslab.study.paths import instance_directory, study_folder
 from tslab.study.reporting.documents import run_entry
@@ -50,7 +51,7 @@ def collect_failures(
 
 
 def failure_hint(
-    *, report: RunReport, usage: SlurmJobUsage | None, requested_memory: int | None
+    *, report: RunReport, usage: JobUsage | None, requested_memory: int | None
 ) -> str | None:
     """One hint for a failed or interrupted run; first match wins.
 
@@ -92,7 +93,7 @@ def failure_hint(
 
 
 def _failure_entry(
-    *, context: Context, report: RunReport, lines: int, usage: SlurmJobUsage | None
+    *, context: Context, report: RunReport, lines: int, usage: JobUsage | None
 ) -> dict[str, object]:
     run_directory = context.study_directory / report.run.run_path
     snapshot = report.folder.snapshot

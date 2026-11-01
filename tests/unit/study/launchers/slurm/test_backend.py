@@ -15,12 +15,11 @@ from tslab.jobs.slurm import (
     INTERRUPTING_JOB_STATES,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
-    SlurmJobUsage,
 )
 from tslab.study.commands import cancel
 from tslab.study.context import Context
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobPhase, LaunchReport
+from tslab.study.launchers import JobPhase, JobUsage, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.machine import MachineOverride, MachineProfileError
@@ -267,7 +266,7 @@ def test_usage_delegates_and_has_no_gpu_ids(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = _context(project=project, fake=fake)
-    usage: dict[str, SlurmJobUsage] = {}
+    usage: dict[str, JobUsage] = {}
     monkeypatch.setattr('tslab.study.launchers.slurm.usage.usage', lambda **_kwargs: usage)
 
     returned_usage, gpu_ids = SlurmBackend().usage(context=ctx)
@@ -280,7 +279,7 @@ def test_failure_usage_delegates_to_failures(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = _context(project=project, fake=fake)
-    usage: dict[str, SlurmJobUsage] = {}
+    usage: dict[str, JobUsage] = {}
     monkeypatch.setattr('tslab.study.launchers.slurm.usage.failure_usage', lambda **_kwargs: usage)
 
     assert SlurmBackend().failure_usage(context=ctx, reports=()) is usage

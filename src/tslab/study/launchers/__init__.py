@@ -9,6 +9,7 @@ import each other.
 from collections.abc import Callable, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import StrEnum
 import os
 from pathlib import Path
@@ -16,7 +17,7 @@ import sys
 from typing import cast, Protocol, TextIO
 from uuid import uuid4
 
-from tslab.jobs.slurm import SlurmError, SlurmJobUsage
+from tslab.jobs.slurm import SlurmError
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
@@ -31,6 +32,7 @@ __all__ = [
     'Backend',
     'JobPhase',
     'JobStates',
+    'JobUsage',
     'LaunchReport',
     'LaunchStopped',
     'Launcher',
@@ -126,6 +128,29 @@ class JobStates:
     states: Mapping[str, str]
     phases: Mapping[str, JobPhase]
     followup_live_job_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, kw_only=True)
+class JobUsage:
+    """What the accounting of one task of a job reports, whatever the scheduler.
+
+    Attributes:
+        state: The first word of the task state, such as ``COMPLETED``.
+        elapsed: The wall-clock time of the task, or ``None``.
+        time_limit: The time limit of the task, or ``None``.
+        total_cpu: The CPU seconds used, or ``None``.
+        max_rss: The peak memory in bytes over the steps, or ``None``.
+        alloc_cpus: The allocated CPUs, or ``None``.
+        gpus: The GPUs of the allocation, else ``0``.
+    """
+
+    state: str
+    elapsed: timedelta | None
+    time_limit: timedelta | None
+    total_cpu: timedelta | None
+    max_rss: int | None
+    alloc_cpus: int | None
+    gpus: int
 
 
 class Resources(Protocol):
@@ -359,13 +384,11 @@ class Backend(Protocol):
 
     def failure_usage(
         self, *, context: Context, reports: Sequence[RunReport]
-    ) -> Mapping[str, SlurmJobUsage]:
+    ) -> Mapping[str, JobUsage]:
         """The accounting usage of the failed runs, when the scheduler gives it."""
         ...
 
-    def usage(
-        self, *, context: Context
-    ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
+    def usage(self, *, context: Context) -> tuple[Mapping[str, JobUsage], Mapping[str, str | None]]:
         """The usage by job id, and the GPU id by job id."""
         ...
 
