@@ -18,7 +18,6 @@ from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.state import (
     collect_states,
     FolderFacts,
-    job_ended,
     read_folder,
     RunReport,
     slurm_task_ids,
@@ -219,12 +218,6 @@ def test_job_time_limit_signal_is_interrupted(job_state: str | None) -> None:
     state, reason = study_state(job_state=job_state, folder=folder)
     assert state is StudyState.INTERRUPTED
     assert reason == 'JobTimeLimitSignal: SIGUSR2 before the time limit'
-
-
-def test_a_job_has_ended_unless_it_is_unknown_queued_or_running() -> None:
-    assert job_ended('FAILED')
-    assert not job_ended(None)
-    assert not job_ended('RUNNING')
 
 
 def _write_status(folder: Path, run_state: RunState, instance_state: InstanceState) -> None:

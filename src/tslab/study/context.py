@@ -5,7 +5,15 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from tslab.jobs.slurm import query_expected_starts, query_job_states, slurm_available, SlurmError
+from tslab.jobs.slurm import (
+    job_ended,
+    query_expected_starts,
+    query_job_states,
+    QUEUED_JOB_STATES,
+    RUNNING_JOB_STATES,
+    slurm_available,
+    SlurmError,
+)
 from tslab.study.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.study.loading import load_study
 from tslab.study.local_launch import local_job_states
@@ -15,10 +23,7 @@ from tslab.study.records import JobRecord, latest_tasks, read_jobs, submission_i
 from tslab.study.state import (
     collect_states,
     followup_job_ids,
-    job_ended,
     LOCAL_ENDED,
-    QUEUED_JOB_STATES,
-    RUNNING_JOB_STATES,
     RunReport,
     slurm_task_ids,
     StudyState,
@@ -247,7 +252,9 @@ def _query_states(*, job_ids: list[str], ended_states: dict[str, str] | None) ->
         return query_job_states(job_ids=job_ids)
     queried = query_job_states(job_ids=[item for item in job_ids if item not in ended_states])
     # why: a failed query raised above, so the cache only ever holds states SLURM reported
-    ended_states.update({item: state for item, state in queried.items() if job_ended(state)})
+    ended_states.update(
+        {item: state for item, state in queried.items() if job_ended(job_state=state)}
+    )
     return {**ended_states, **queried}
 
 
