@@ -2,12 +2,11 @@
 
 from collections.abc import Mapping, Sequence
 from contextlib import redirect_stderr, redirect_stdout
-import dataclasses
 from dataclasses import dataclass, replace
 from io import StringIO
 import logging
 from pathlib import Path
-from typing import cast, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import tslab
 from tslab.study.definition import (
@@ -15,7 +14,6 @@ from tslab.study.definition import (
     expand_setting,
     Grid,
     match_problems,
-    matching_in_order,
     merge_overrides,
     merge_settings,
     settings_to_args,
@@ -23,7 +21,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.machine import MachineProfile
 from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
 
@@ -193,36 +191,6 @@ def _override_warnings(*, study: Study, machine: MachineProfile) -> tuple[str, .
                 f'matches nothing in this study: {"; ".join(problems)}'
             )
     return tuple(warnings)
-
-
-def _slurm_for(
-    *,
-    base: SlurmSettings | None,
-    overrides: Sequence[MachineOverride],
-    grid_name: str,
-    values: Mapping[str, str],
-) -> SlurmSettings | None:
-    if base is None:
-        return None  # why: no [slurm] table means no scheduler; overrides cannot add one
-    merged: dict[str, object] = {
-        item.name: getattr(base, item.name) for item in dataclasses.fields(base)
-    }
-    order = matching_in_order(
-        matches=[override.match for override in overrides], grid_name=grid_name, values=values
-    )
-    for position in order:
-        update = overrides[position].slurm
-        if 'sbatch_extra' in update:
-            # why: the base is a SlurmSettings field; profile overrides decode to the same type
-            base_extra = cast('tuple[tuple[str, str | int | bool], ...]', merged['sbatch_extra'])
-            override_extra = cast(
-                'tuple[tuple[str, str | int | bool], ...]', update['sbatch_extra']
-            )
-            merged['sbatch_extra'] = tuple(
-                sorted((dict(base_extra) | dict(override_extra)).items())
-            )
-        merged.update({key: value for key, value in update.items() if key != 'sbatch_extra'})
-    return SlurmSettings(**merged)  # ty: ignore[invalid-argument-type]
 
 
 def run_arguments(

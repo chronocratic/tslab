@@ -37,7 +37,8 @@ from tslab.study.launchers.slurm.states import (
 )
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError
-from tslab.study.plan import _slurm_for, JobGroup
+from tslab.study.machine.slurm import slurm_for
+from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport, StudyState
 
@@ -133,7 +134,7 @@ class SlurmBackend:
         local_cpus: int,  # noqa: ARG002 # why: the Backend signature
     ) -> Resources:
         """The resources of one grid on the machine, with its overrides applied."""
-        settings = _slurm_for(
+        settings = slurm_for(
             base=machine.slurm, overrides=overrides, grid_name=grid_name, values=values
         )
         if settings is None:

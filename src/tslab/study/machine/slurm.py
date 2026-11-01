@@ -1,14 +1,15 @@
 """The ``[slurm]`` table of a machine profile."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from typing import cast, Literal
+from typing import cast, Literal, TYPE_CHECKING
 
 from tslab.jobs.slurm import parse_slurm_memory
+from tslab.study.definition import matching_in_order
 from tslab.study.machine.tables import (
     check_keys,
     check_range,
@@ -17,12 +18,16 @@ from tslab.study.machine.tables import (
     MachineProfileError,
 )
 
+if TYPE_CHECKING:
+    from tslab.study.machine.profile import MachineOverride
+
 __all__ = [
     'FOLLOWUP_KEYS',
     'TABLE',
     'SlurmSettings',
     'sbatch_extra',
     'settings_from',
+    'slurm_for',
     'slurm_overrides',
 ]
 
@@ -106,6 +111,37 @@ def _requested_memory(*, settings: SlurmSettings) -> int | None:
         return None
     per_cpu = parse_slurm_memory(text=settings.mem_per_cpu)
     return None if per_cpu is None else per_cpu * settings.cpus_per_task
+
+
+def slurm_for(
+    *,
+    base: SlurmSettings | None,
+    overrides: Sequence['MachineOverride'],
+    grid_name: str,
+    values: Mapping[str, str],
+) -> SlurmSettings | None:
+    """The base settings with every matching profile override applied in order."""
+    if base is None:
+        return None  # why: no [slurm] table means no scheduler; overrides cannot add one
+    merged: dict[str, object] = {
+        item.name: getattr(base, item.name) for item in dataclasses.fields(base)
+    }
+    order = matching_in_order(
+        matches=[override.match for override in overrides], grid_name=grid_name, values=values
+    )
+    for position in order:
+        update = overrides[position].slurm
+        if 'sbatch_extra' in update:
+            # why: the base is a SlurmSettings field; profile overrides decode to the same type
+            base_extra = cast('tuple[tuple[str, str | int | bool], ...]', merged['sbatch_extra'])
+            override_extra = cast(
+                'tuple[tuple[str, str | int | bool], ...]', update['sbatch_extra']
+            )
+            merged['sbatch_extra'] = tuple(
+                sorted((dict(base_extra) | dict(override_extra)).items())
+            )
+        merged.update({key: value for key, value in update.items() if key != 'sbatch_extra'})
+    return SlurmSettings(**merged)  # ty: ignore[invalid-argument-type]
 
 
 def settings_from(*, table: Mapping[str, object], path: Path) -> SlurmSettings:
