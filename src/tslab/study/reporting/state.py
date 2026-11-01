@@ -216,7 +216,8 @@ def _grace_wait(
     settled: dict[str, FolderFacts] = {}
     rounds = 0
     while pending and rounds < limit:
-        if any(_refresh_failed(directory=directory) for directory in list(pending.values())):
+        refreshed = [_refresh_failed(directory=directory) for directory in pending.values()]
+        if any(refreshed):
             limit = 30
         sleep(1)
         rounds += 1
