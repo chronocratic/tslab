@@ -174,21 +174,44 @@ def _copied_default(*, field: dataclasses.Field[Any]) -> Any:  # noqa: ANN401
     return dataclasses.field()
 
 
+def _model_field(
+    *, field: dataclasses.Field[Any], hints: Mapping[str, Any], recipes: Sequence[type]
+) -> tuple[str, Any, Any] | None:
+    """The settings field of one parameter of a model, or ``None`` when it is left out."""
+    if field.name in RUNTIME_FIELDS:
+        return None
+    if field.name == 'augmentation':
+        augmentation = _augmentation_type(annotation=hints['augmentation'], recipes=recipes)
+        return (
+            None
+            if augmentation is None
+            else ('augmentation', augmentation, dataclasses.field(default=None))
+        )
+    if field.name == 'sequence_length':
+        return 'sequence_length', int | None, dataclasses.field(default=None)
+    return field.name, hints[field.name], _copied_default(field=field)
+
+
+def _check_recipe(*, name: str, recipe: object) -> None:
+    """Raise unless the augmentation recipe of the settings produces the view the model takes."""
+    if recipe is None:
+        return
+    model_view = _view_type(annotation=_hints(entry=MODELS[name]).get('augmentation'))
+    if recipe_view_type(recipe=type(recipe)) != model_view:
+        message = (
+            f'{type(recipe).__qualname__} does not fit model {name!r}, which takes '
+            f'{model_view!r}; choose a recipe that produces it'
+        )
+        raise TypeError(message)
+
+
 def _settings_class(*, entry: ModelEntry, recipes: Sequence[type]) -> type:
     hints = _hints(entry=entry)
-    fields: list[tuple[str, Any, Any]] = []
-    for field in dataclasses.fields(entry.parameters_class):
-        if field.name in RUNTIME_FIELDS:
-            continue
-        if field.name == 'augmentation':
-            augmentation = _augmentation_type(annotation=hints['augmentation'], recipes=recipes)
-            if augmentation is not None:
-                fields.append(('augmentation', augmentation, dataclasses.field(default=None)))
-            continue
-        if field.name == 'sequence_length':
-            fields.append(('sequence_length', int | None, dataclasses.field(default=None)))
-            continue
-        fields.append((field.name, hints[field.name], _copied_default(field=field)))
+    maybe_fields = (
+        _model_field(field=field, hints=hints, recipes=recipes)
+        for field in dataclasses.fields(entry.parameters_class)
+    )
+    fields = [item for item in maybe_fields if item is not None]
     # Another set of recipes gives other classes, so each set gets its own names.
     suffix = ''.join(f'_{recipe.__name__}' for recipe in recipes)
     return make_settings_class(
@@ -287,13 +310,5 @@ def model_settings(*, choice: Any, name: str, **values: object) -> Any:  # noqa:
     if unknown:
         message = f'model {name!r} has no settings {unknown}'
         raise ValueError(message)
-    recipe = values.get('augmentation')
-    if recipe is not None:
-        model_view = _view_type(annotation=_hints(entry=MODELS[name]).get('augmentation'))
-        if recipe_view_type(recipe=type(recipe)) != model_view:
-            message = (
-                f'{type(recipe).__qualname__} does not fit model {name!r}, which takes '
-                f'{model_view!r}; choose a recipe that produces it'
-            )
-            raise TypeError(message)
+    _check_recipe(name=name, recipe=values.get('augmentation'))
     return classes[name](**values)

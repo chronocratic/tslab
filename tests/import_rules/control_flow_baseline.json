@@ -1,27 +1,5 @@
 {
-  "deep_functions": {
-    "src/tslab/adapters/chronocratic/datasets/settings.py": 1,
-    "src/tslab/adapters/chronocratic/models/settings.py": 1,
-    "src/tslab/cli/new.py": 1,
-    "src/tslab/cli/status.py": 1,
-    "src/tslab/jobs/local/gpus.py": 1,
-    "src/tslab/jobs/local/pool.py": 1,
-    "src/tslab/jobs/slurm/commands.py": 2,
-    "src/tslab/lightning/trainer.py": 1,
-    "src/tslab/tracking/wandb/tracker.py": 1
-  },
+  "deep_functions": {},
   "kind_switches": {},
-  "nested_if": {
-    "src/tslab/adapters/chronocratic/datasets/settings.py": 1,
-    "src/tslab/adapters/chronocratic/models/settings.py": 2,
-    "src/tslab/cli/machine.py": 1,
-    "src/tslab/cli/status.py": 3,
-    "src/tslab/cli/study/resubmit.py": 1,
-    "src/tslab/cli/study/submit.py": 1,
-    "src/tslab/jobs/local/background.py": 1,
-    "src/tslab/jobs/slurm/commands.py": 1,
-    "src/tslab/lightning/callbacks.py": 1,
-    "src/tslab/lightning/trainer.py": 1,
-    "src/tslab/tasks/forecasting.py": 1
-  }
+  "nested_if": {}
 }

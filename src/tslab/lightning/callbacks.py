@@ -110,16 +110,20 @@ class _SignalStop(Callback):
         if not stop:
             return
         trainer.save_checkpoint(filepath=self._checkpoint_directory / 'last.ckpt')
-        if self._writer:
-            if self.signalled:
-                message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
-                raise JobTimeLimitSignal(message)
-            message = (
-                'training paused at the job_time_share deadline; resubmit to resume from '
-                f'{self._checkpoint_directory.as_posix()}'
-            )
-            raise TrainingPaused(message)
-        raise SystemExit(0)
+        if not self._writer:
+            raise SystemExit(0)
+        raise self._pause_error()
+
+    def _pause_error(self) -> JobTimeLimitSignal | TrainingPaused:
+        """The exception that ends a paused training on the process that writes the result."""
+        if self.signalled:
+            signal_message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
+            return JobTimeLimitSignal(signal_message)
+        message = (
+            'training paused at the job_time_share deadline; resubmit to resume from '
+            f'{self._checkpoint_directory.as_posix()}'
+        )
+        return TrainingPaused(message)
 
 
 class AccumulatingTimerCallback(Callback):

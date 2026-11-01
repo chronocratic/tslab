@@ -98,29 +98,33 @@ class Status:
             _LOGGER.error('%s', error)  # noqa: TRY400 # why: a traceback adds nothing
             return 1
         if snapshot is not None:
-            _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
-            if self.json or self.exit_code:
-                entry, state = _run_status_entry(
-                    directory=self.path, snapshot=snapshot, stage=self.stage
-                )
-                code = states_exit_code(states=[state], live=False)
-                if self.json:
-                    print_json(document=_status_document(entries=[entry], states=[state]))
-                return code if self.exit_code else 0
+            return self._show_run(snapshot=snapshot)
+        return self._show_runs()
+
+    def _show_run(self, *, snapshot: RunStatusSnapshot) -> int:
+        _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
+        if not (self.json or self.exit_code):
             return 0
+        entry, state = _run_status_entry(directory=self.path, snapshot=snapshot, stage=self.stage)
+        code = states_exit_code(states=[state], live=False)
+        if self.json:
+            print_json(document=_status_document(entries=[entry], states=[state]))
+        return code if self.exit_code else 0
+
+    def _show_runs(self) -> int:
         runs = sorted(status_file.parent for status_file in self.path.rglob(STATUS_FILE))
         if not runs:
             _LOGGER.warning('no runs below %s', self.path.as_posix())
             _LOGGER.info('a run folder holds status.json; pass it, or a folder above runs')
             return 1
         _print_runs(root=self.path, runs=runs, stage=self.stage)
-        if self.json or self.exit_code:
-            entries, states = _run_status_entries(runs=runs, stage=self.stage)
-            code = states_exit_code(states=states, live=False)
-            if self.json:
-                print_json(document=_status_document(entries=entries, states=states))
-            return code if self.exit_code else 0
-        return 0
+        if not (self.json or self.exit_code):
+            return 0
+        entries, states = _run_status_entries(runs=runs, stage=self.stage)
+        code = states_exit_code(states=states, live=False)
+        if self.json:
+            print_json(document=_status_document(entries=entries, states=states))
+        return code if self.exit_code else 0
 
 
 def _run_status_entries(

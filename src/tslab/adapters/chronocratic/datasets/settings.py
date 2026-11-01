@@ -93,26 +93,32 @@ def _discover_datamodules() -> dict[str, DataModuleEntry]:
     entries: dict[str, DataModuleEntry] = {}
     for class_name in chronocratic.datasets.__all__:
         candidate = getattr(chronocratic.datasets, class_name)
-        if (
-            isinstance(candidate, type)
-            and issubclass(candidate, LightningDataModule)
-            and class_name.endswith('DataModule')
-            and not class_name.startswith('Base')
-            and not inspect.isabstract(candidate)
-        ):
-            name = _subcommand(class_name=class_name)
-            if name in entries:
-                message = (
-                    f'{class_name} and {entries[name].datamodule_class.__name__} both give '
-                    f'the subcommand {name!r}'
-                )
-                raise ValueError(message)
-            entries[name] = DataModuleEntry(
-                name=name,
-                datamodule_class=candidate,
-                settings_class=_settings_class(datamodule_class=candidate),
+        if not _is_datamodule(class_name=class_name, candidate=candidate):
+            continue
+        name = _subcommand(class_name=class_name)
+        if name in entries:
+            message = (
+                f'{class_name} and {entries[name].datamodule_class.__name__} both give '
+                f'the subcommand {name!r}'
             )
+            raise ValueError(message)
+        entries[name] = DataModuleEntry(
+            name=name,
+            datamodule_class=candidate,
+            settings_class=_settings_class(datamodule_class=candidate),
+        )
     return entries
+
+
+def _is_datamodule(*, class_name: str, candidate: object) -> bool:
+    """Whether an exported name is a concrete data module of the library."""
+    return (
+        isinstance(candidate, type)
+        and issubclass(candidate, LightningDataModule)
+        and class_name.endswith('DataModule')
+        and not class_name.startswith('Base')
+        and not inspect.isabstract(candidate)
+    )
 
 
 DATAMODULES: Mapping[str, DataModuleEntry] = _discover_datamodules()

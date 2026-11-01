@@ -1,6 +1,6 @@
 """Running many commands in CPU slots, or GPU slots with lock files."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -81,6 +81,20 @@ def _check_lock_folder(*, gpu_ids: Sequence[str], lock_folder: Path | None) -> N
     if gpu_ids and lock_folder is None:
         message = 'lock_folder is required when gpu_ids is not empty'
         raise ValueError(message)
+
+
+def _add_locked(*, lock: threading.Lock, store: set[str], key: str) -> None:
+    """Add a key to a set that several worker threads share."""
+    with lock:
+        store.add(key)
+
+
+def _caught(run: Callable[[], ProcessResult]) -> ProcessResult | OSError:
+    """The result of a process run, or the ``OSError`` that kept it from starting."""
+    try:
+        return run()
+    except OSError as error:
+        return error
 
 
 def _release_lease(*, lease: GpuLease | None) -> None:
@@ -207,17 +221,14 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         lease, slot = take_lease(command=command)
         try:
             if stop.is_set():
-                with never_started_lock:
-                    never_started.add(command.key)
+                _add_locked(lock=never_started_lock, store=never_started, key=command.key)
                 return
             on_start(key=command.key, gpu_id=slot)
-            environment = _environment_of(command=command, slot=slot)
-            outcome: ProcessResult | OSError
-            try:
-                outcome = run_process(
+            outcome = _caught(
+                lambda: run_process(
                     command=command.command,
                     cwd=command.cwd,
-                    environment=environment,
+                    environment=_environment_of(command=command, slot=slot),
                     on_line=lambda line: on_line(key=command.key, line=line),
                     on_event=lambda text: on_event(key=command.key, text=text),
                     stop=stop,
@@ -226,8 +237,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
                     grace_seconds=grace_seconds,
                     pass_fds=lease.fds if lease is not None else (),
                 )
-            except OSError as error:
-                outcome = error
+            )
             on_end(key=command.key, gpu_id=slot, outcome=outcome)
         finally:
             # why: the slot and the lock must come back even when the command errors

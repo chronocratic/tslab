@@ -100,14 +100,23 @@ def create_project(*, path: Path, name: str | None = None) -> str:
     replacements = {'{{project_name}}': project_name, '{{package_name}}': package_name}
     with resources.as_file(resources.files('tslab') / 'templates' / 'project') as template:
         for source in sorted(template.rglob('*')):
-            relative = source.relative_to(template)
-            if not source.is_file() or _SKIPPED_PARTS.intersection(relative.parts):
-                continue
-            target = path / _replace(text=relative.as_posix(), replacements=replacements)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            content = source.read_text(encoding='utf-8')
-            target.write_text(_replace(text=content, replacements=replacements), encoding='utf-8')
+            _copy_template_file(
+                source=source, template=template, path=path, replacements=replacements
+            )
     return package_name
+
+
+def _copy_template_file(
+    *, source: Path, template: Path, path: Path, replacements: dict[str, str]
+) -> None:
+    """Copy one template file with its placeholders replaced; folders and skipped parts are left."""
+    relative = source.relative_to(template)
+    if not source.is_file() or _SKIPPED_PARTS.intersection(relative.parts):
+        return
+    target = path / _replace(text=relative.as_posix(), replacements=replacements)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    content = source.read_text(encoding='utf-8')
+    target.write_text(_replace(text=content, replacements=replacements), encoding='utf-8')
 
 
 def _replace(*, text: str, replacements: dict[str, str]) -> str:

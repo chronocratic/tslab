@@ -74,6 +74,13 @@ class MachineList:
 
     json: bool = False
 
+    def _list_none(self) -> int:
+        _LOGGER.info('no machines: none in machines/ above this folder, none registered')
+        _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
+        if self.json:
+            print_json(document={'schema': 'tslab.machine-list/1', 'machines': []})
+        return 0
+
     def run(self) -> int:
         """Print a table of names and return the exit code."""
         try:
@@ -82,11 +89,7 @@ class MachineList:
             raise UsageError(str(error)) from error
         project = _project_machines(start=Path.cwd())
         if not project and not registered:
-            _LOGGER.info('no machines: none in machines/ above this folder, none registered')
-            _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
-            if self.json:
-                print_json(document={'schema': 'tslab.machine-list/1', 'machines': []})
-            return 0
+            return self._list_none()
         if self.json:
             machines = [
                 {

@@ -9,7 +9,14 @@ from typing import Annotated
 import tyro
 
 from tslab.cli.common import print_json
-from tslab.cli.study import _context_of, _detach, _selection_args, _selection_options, _warn_no_runs
+from tslab.cli.study import (
+    _context_of,
+    _detach,
+    _log_next_step,
+    _selection_args,
+    _selection_options,
+    _warn_no_runs,
+)
 from tslab.study.commands import submit
 from tslab.study.launchers import LaunchReport
 from tslab.study.plan import JobGroup
@@ -95,13 +102,12 @@ class Submit:
             task_stream=sys.stderr if self.json else None,
         )
         if code == 0:
-            if self.dry_run:
-                _LOGGER.info('dry run: nothing submitted; run again without --dry-run to submit')
-            else:
-                selection = _selection_args(
+            _log_next_step(
+                dry_run=self.dry_run,
+                selection=_selection_args(
                     study=self.study, machine=self.machine, grid=self.grid, only=self.only
-                )
-                _LOGGER.info('follow progress: tslab study status %s', selection)
+                ),
+            )
         if self.json and (code == 0 or launches):
             report, groups = launches[0] if launches else (None, ())
             print_json(
