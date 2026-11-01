@@ -5,8 +5,7 @@ from collections.abc import Mapping, Sequence
 import logging
 import shlex
 
-from tslab.core.text import log_table
-from tslab.jobs.slurm import array_spec
+from tslab.core.text import format_index_ranges, log_table
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport, Resources, SIGNAL_EXIT_BASE
@@ -183,7 +182,7 @@ def log_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> tuple[int
             names.get(record.job_file, str(record.job_file)),
             record.job_id,
             str(len(record.tasks)),
-            array_spec(indices=[task.index for task in record.tasks]),
+            format_index_ranges(indices=[task.index for task in record.tasks]),
         )
         for record in report.submitted
     ]

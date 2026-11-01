@@ -328,3 +328,50 @@ def test_no_test_imports_both_backends() -> None:
         hint='split the test so one file imports only one backend',
     )
     assert problems == []
+
+
+NEUTRAL_EXEMPT = (
+    SOURCE / 'study' / 'launchers' / 'slurm',
+    SOURCE / 'study' / 'launchers' / 'local',
+    SOURCE / 'study' / 'machine' / '__init__.py',
+    SOURCE / 'study' / 'machine' / 'profile.py',
+    SOURCE / 'study' / 'machine' / 'load.py',
+    SOURCE / 'study' / 'machine' / 'slurm.py',
+)
+SLURM_TYPES = frozenset(('SlurmSettings', 'SlurmError', 'SlurmJobUsage'))
+SLURM_MODULES = ('tslab.jobs.slurm', 'tslab.study.launchers.slurm')
+
+
+def _slurm_leaks(*, tree: ast.Module, path: Path) -> list[str]:
+    """The imports of a SLURM module and the uses of a SLURM type in one file."""
+    modules = _imported_modules(tree=tree, path=path)
+    leaks = [
+        module
+        for module in sorted(modules)
+        if any(module == prefix or module.startswith(f'{prefix}.') for prefix in SLURM_MODULES)
+    ]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in SLURM_TYPES:
+            leaks.append(node.id)
+        elif isinstance(node, ast.alias) and node.name in SLURM_TYPES:
+            leaks.append(node.name)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            leaks.extend(name for name in SLURM_TYPES if name in node.value.split("'"))
+    return leaks
+
+
+def test_neutral_study_code_names_no_slurm_type() -> None:
+    """Backend-neutral study code imports no SLURM module and names no SLURM type."""
+    problems = []
+    for path in _source_files():
+        if not path.is_relative_to(SOURCE / 'study'):
+            continue
+        if any(path == exempt or path.is_relative_to(exempt) for exempt in NEUTRAL_EXEMPT):
+            continue
+        leaks = _slurm_leaks(tree=_parse(path=path), path=path)
+        if path == SOURCE / 'study' / 'launchers' / '__init__.py':
+            # why: the BACKENDS table names both backends
+            leaks = [leak for leak in leaks if not leak.startswith('tslab.study.launchers.slurm')]
+        if leaks:
+            problems.append(f'{path.relative_to(ROOT).as_posix()}: {sorted(set(leaks))}')
+    assert problems == []

@@ -3,7 +3,7 @@
 from collections.abc import Mapping, Sequence
 import shlex
 
-from tslab.jobs.slurm import array_spec
+from tslab.core.text import format_index_ranges
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport
@@ -175,7 +175,7 @@ def launch_document(
                     'job_name': group.job_name,
                     'job_id': None if dry_run else record.job_id if record is not None else None,
                     'runs': len(group.tasks),
-                    'indices': array_spec(indices=[task.index for task in group.tasks]),
+                    'indices': format_index_ranges(indices=[task.index for task in group.tasks]),
                     'resources': resources_of(resources=group.resources),
                     'first_command': shlex.join(group.tasks[0].command) if group.tasks else None,
                 }

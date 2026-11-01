@@ -11,6 +11,7 @@ __all__ = [
     'first_line',
     'format_bytes',
     'format_duration',
+    'format_index_ranges',
     'format_table',
     'log_table',
     'qualified_name',
@@ -87,6 +88,34 @@ def format_bytes(*, size: int) -> str:
         if size >= divisor:
             return f'{size / divisor:.1f} {unit}'
     return f'{size / 1024:.1f} KiB'
+
+
+def format_index_ranges(*, indices: Sequence[int]) -> str:
+    """Format indices as sorted, deduplicated ranges, e.g. ``0-3,7,9-10``.
+
+    Args:
+        indices: The indices to format.
+
+    Returns:
+        The comma-separated ranges.
+
+    Raises:
+        ValueError: If ``indices`` is empty.
+    """
+    ordered = sorted(set(indices))
+    if not ordered:
+        message = 'indices must not be empty'
+        raise ValueError(message)
+    parts: list[str] = []
+    start = previous = ordered[0]
+    for index in ordered[1:]:
+        if index == previous + 1:
+            previous = index
+            continue
+        parts.append(f'{start}-{previous}' if previous > start else str(start))
+        start = previous = index
+    parts.append(f'{start}-{previous}' if previous > start else str(start))
+    return ','.join(parts)
 
 
 def format_table(
