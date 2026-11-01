@@ -74,3 +74,12 @@ def test_same_named_union_members_are_rejected_on_save() -> None:
 
     with pytest.raises(TypeError, match=r"share the class name \['Twin'\]"):
         tslab.core.codec.config_to_data(config=Holder())
+
+
+def test_a_subcommand_without_a_name_is_an_error() -> None:
+    annotation = (
+        Annotated[Small, tyro.conf.subcommand()]
+        | Annotated[Large, tyro.conf.subcommand(name='large')]
+    )
+    with pytest.raises(ValueError, match='is unnamed'):
+        tslab.core.codec.union_choices(annotation=annotation)

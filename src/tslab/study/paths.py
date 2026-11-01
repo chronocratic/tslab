@@ -35,7 +35,7 @@ def next_job_file(*, study_folder: Path) -> int:
         for path in (study_folder / 'jobs').glob(f'*{suffix}')
         if (number := _job_file_number(name=path.name, suffix=suffix)) is not None
     ]
-    return max(numbers, default=0) + 1
+    return max([0, *numbers]) + 1
 
 
 def _job_file_number(*, name: str, suffix: str) -> int | None:
