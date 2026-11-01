@@ -261,7 +261,7 @@ class Submit:
 
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
 
-        def remember_launch(report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+        def remember_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
             launches.append((report, groups))
 
         code = submit(
@@ -712,7 +712,7 @@ class Resubmit:
         _warn_no_runs(context=context)
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
 
-        def remember_launch(report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+        def remember_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
             launches.append((report, groups))
 
         cancelled = [

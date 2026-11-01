@@ -38,6 +38,8 @@ __all__ = [
     'LaunchStopped',
     'Launcher',
     'LocalLauncher',
+    'OnLaunch',
+    'OnTaskState',
     'SlurmLauncher',
     'launch',
     'local_job_id',
@@ -143,6 +145,22 @@ class Launcher(Protocol):
         """
 
 
+class OnTaskState(Protocol):
+    """The state changes of the tasks of one local launch."""
+
+    def __call__(self, *, task_id: str, state: str) -> None:
+        """Called with the id of a task and its new state."""
+        ...
+
+
+class OnLaunch(Protocol):
+    """Called once with the result of a finished launch, dry runs included."""
+
+    def __call__(self, *, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+        """Called with the launch report and the groups the launch covered."""
+        ...
+
+
 class SlurmLauncher:
     """One ``sbatch`` per group, paused between the limits of the cluster."""
 
@@ -221,7 +239,7 @@ class LocalLauncher:
         local: LocalSettings,
         gpu_ids: tuple[str, ...] = (),
         stream: TextIO | None = None,
-        on_task_state: Callable[[str, str], None] | None = None,
+        on_task_state: OnTaskState | None = None,
         grace_seconds: float = 30.0,
     ) -> None:
         """Set up the launcher.
@@ -287,6 +305,10 @@ class LocalLauncher:
                 header += f' | gpus {",".join(self._gpu_ids)}'
             return header + ' ===\n'
 
+        def on_task_state(key: str, state: str) -> None:
+            if self._on_task_state is not None:
+                self._on_task_state(task_id=key, state=state)
+
         output = TaskOutput(
             stream=stream,
             single_slot=slots == 1,
@@ -306,7 +328,7 @@ class LocalLauncher:
                 for key, task in by_key.items()
             },
             header=task_header,
-            on_task_state=self._on_task_state,
+            on_task_state=on_task_state,
         )
         with stop_on_signals(signals=_STOP_SIGNALS) as request:
             run_commands(

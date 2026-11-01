@@ -1,18 +1,18 @@
 """Running many commands in CPU slots, or GPU slots with lock files."""
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 import queue
 import threading
 from types import MappingProxyType
-from typing import cast
+from typing import cast, Protocol
 
 from tslab.jobs.local.gpus import GpuLease, try_lease_gpu
 from tslab.jobs.local.process import ProcessResult, run_process
 
-__all__ = ['PoolCommand', 'run_commands']
+__all__ = ['OnEnd', 'OnEvent', 'OnLine', 'OnStart', 'OnWait', 'PoolCommand', 'run_commands']
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -34,6 +34,46 @@ class PoolCommand:
     def __post_init__(self) -> None:
         """Keep the environment read-only, so that frozen really means frozen."""
         object.__setattr__(self, 'environment', MappingProxyType(self.environment))
+
+
+class OnStart(Protocol):
+    """A callback of the pool, called when a command starts."""
+
+    def __call__(self, *, key: str, gpu_id: str | None) -> None:
+        """Called with the key and the GPU id when a command starts."""
+        ...
+
+
+class OnLine(Protocol):
+    """A callback of the pool, called for the lines of a command."""
+
+    def __call__(self, *, key: str, line: str) -> None:
+        """Called with the key and each line a command writes."""
+        ...
+
+
+class OnEvent(Protocol):
+    """A callback of the pool, called for the signal events of a command."""
+
+    def __call__(self, *, key: str, text: str) -> None:
+        """Called with the key and each signal event of a command."""
+        ...
+
+
+class OnWait(Protocol):
+    """A callback of the pool, called while a command waits for a GPU lease."""
+
+    def __call__(self, *, key: str) -> None:
+        """Called with the key when a command waits for a GPU lease."""
+        ...
+
+
+class OnEnd(Protocol):
+    """A callback of the pool, called when a command ends."""
+
+    def __call__(self, *, key: str, gpu_id: str | None, outcome: ProcessResult | OSError) -> None:
+        """Called with the key, the GPU id, and the outcome when a command ends."""
+        ...
 
 
 def _check_lock_folder(*, gpu_ids: Sequence[str], lock_folder: Path | None) -> None:
@@ -84,11 +124,11 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     stop: threading.Event,
     timeout_seconds: float | None,
     signal_seconds: float,
-    on_start: Callable[[str, str | None], None],
-    on_line: Callable[[str, str], None],
-    on_event: Callable[[str, str], None],
-    on_wait: Callable[[str], None],
-    on_end: Callable[[str, str | None, ProcessResult | OSError], None],
+    on_start: OnStart,
+    on_line: OnLine,
+    on_event: OnEvent,
+    on_wait: OnWait,
+    on_end: OnEnd,
     grace_seconds: float = 30.0,
     gpu_poll_seconds: float = 5.0,
 ) -> tuple[str, ...]:
@@ -101,8 +141,9 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     leased command runs with ``CUDA_VISIBLE_DEVICES`` set to the id of the
     lease, unless it is ``'mps'``, and keeps the lock while it runs.
 
-    ``on_line``, ``on_event`` and ``on_end`` are called from the worker
-    threads, not from the calling thread; the caller guards its own state.
+    The callbacks are called with keyword arguments only. ``on_line``,
+    ``on_event`` and ``on_end`` are called from the worker threads, not from
+    the calling thread; the caller guards its own state.
     An ``OSError`` from starting a command is passed to ``on_end`` and does
     not stop the pool.
 
@@ -154,7 +195,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
             lease := try_lease_gpu(folder=lock_folder, gpu_ids=(slot,), tasks_per_gpu=tasks_per_gpu)
         ) is None and not stop.is_set():
             if not waited:
-                on_wait(command.key)
+                on_wait(key=command.key)
                 waited = True
             slot_queue.put(slot)
             stop.wait(gpu_poll_seconds)
@@ -169,7 +210,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
                 with never_started_lock:
                     never_started.add(command.key)
                 return
-            on_start(command.key, slot)
+            on_start(key=command.key, gpu_id=slot)
             environment = _environment_of(command=command, slot=slot)
             outcome: ProcessResult | OSError
             try:
@@ -177,8 +218,8 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
                     command=command.command,
                     cwd=command.cwd,
                     environment=environment,
-                    on_line=lambda line: on_line(command.key, line),
-                    on_event=lambda text: on_event(command.key, text),
+                    on_line=lambda line: on_line(key=command.key, line=line),
+                    on_event=lambda text: on_event(key=command.key, text=text),
                     stop=stop,
                     timeout_seconds=timeout_seconds,
                     signal_seconds=signal_seconds,
@@ -187,7 +228,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
                 )
             except OSError as error:
                 outcome = error
-            on_end(command.key, slot, outcome)
+            on_end(key=command.key, gpu_id=slot, outcome=outcome)
         finally:
             # why: the slot and the lock must come back even when the command errors
             _release_lease(lease=lease)
