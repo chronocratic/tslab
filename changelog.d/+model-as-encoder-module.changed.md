@@ -1,1 +1,1 @@
-`ModelAsEncoder` and `resolve_device` moved from `tslab.interfaces.encoder` to `tslab.stages.encoders`; `tslab.ModelAsEncoder` is unchanged.
+`ModelAsEncoder` and `resolve_device` moved from `tslab.interfaces.encoder` to `tslab.stages.encoders`; `tslab.ModelAsEncoder` is unchanged, and its fingerprint keeps the pre-move type name, so cached encodings are reused.

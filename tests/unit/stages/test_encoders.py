@@ -79,6 +79,14 @@ def test_device_does_not_change_the_fingerprint() -> None:
     )
 
 
+def test_the_fingerprint_keeps_the_pre_move_type_name() -> None:
+    # Encodings cached before the move to tslab.stages.encoders must be reused.
+    assert canonicalize(value=ModelAsEncoder()) == {
+        '__type__': 'tslab.interfaces.encoder.ModelAsEncoder',
+        'batch_size': None,
+    }
+
+
 @pytest.mark.parametrize('batch_size', [0, -3])
 def test_non_positive_batch_size_is_rejected(batch_size: int) -> None:
     with pytest.raises(ValueError, match='batch_size must be positive'):
