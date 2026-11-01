@@ -5,7 +5,8 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm
-from tslab.study.doctor import run_checks
+from tslab.study import launchers
+from tslab.study.doctor import DoctorCheck, run_checks
 
 
 def test_doctor_ok_on_local_toy_profile(project: Path) -> None:
@@ -14,6 +15,25 @@ def test_doctor_ok_on_local_toy_profile(project: Path) -> None:
     assert statuses['profile'] == 'ok'
     assert statuses['output_root'] == 'ok'
     assert statuses['disk'] == 'ok'
+
+
+def test_doctor_checks_come_from_selected_backend(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    backend_check = DoctorCheck(name='backend', status='ok', message='backend selected')
+    calls: list[bool] = []
+
+    class Backend:
+        def doctor_checks(self) -> tuple[DoctorCheck, ...]:
+            calls.append(True)
+            return (backend_check,)
+
+    monkeypatch.setattr(launchers, 'backend_for', lambda **_kwargs: Backend())
+
+    checks = run_checks(machine_path=project / 'local.toml', study=None, start=project)
+
+    assert backend_check in checks
+    assert calls == [True]
 
 
 def test_doctor_fails_missing_slurm_commands(

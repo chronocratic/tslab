@@ -200,7 +200,9 @@ def test_usage_delegates_with_gpu_ids(*, project: Path, monkeypatch: pytest.Monk
     ctx = context(project=project, machine_file='local.toml')
     usage = {'local-1-1_0': object()}
     gpu_ids = {'local-1-1_0': '0'}
-    monkeypatch.setattr('tslab.study.usage._local_usage_of', lambda **_kwargs: (usage, gpu_ids))
+    monkeypatch.setattr(
+        'tslab.study.launchers.local.usage.usage', lambda **_kwargs: (usage, gpu_ids)
+    )
 
     returned_usage, returned_gpu_ids = LocalBackend().usage(context=ctx)
 

@@ -1,15 +1,31 @@
 """Reading SLURM task states and expected start times."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import logging
 
 from tslab.jobs.slurm import job_ended, query_expected_starts, query_job_states, SlurmError
 from tslab.study.context import Context
+from tslab.study.records import JobRecord, latest_tasks
 from tslab.study.state import StudyState
 
-__all__ = ['expected_starts']
+__all__ = ['expected_starts', 'followup_job_ids', 'slurm_task_ids']
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def slurm_task_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
+    """The sorted task ids of the latest numeric SLURM job for every run."""
+    ids = {
+        f'{job.job_id}_{task.index}'
+        for job, task in latest_tasks(jobs=jobs).values()
+        if job.job_id.isdecimal()
+    }
+    return sorted(ids)
+
+
+def followup_job_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
+    """The sorted numeric ids of recorded follow-up jobs."""
+    return sorted({job.job_id for job in jobs if job.kind == 'followup' and job.job_id.isdecimal()})
 
 
 def _query_states(

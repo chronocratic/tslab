@@ -579,7 +579,10 @@ class Usage:
         if self.json:
             print_json(document=document)
         else:
-            log_usage(document=document)
+            log_usage(
+                document=document,
+                suggests_memory=backend_for(machine=context.machine).suggests_memory,
+            )
         return 0
 
 

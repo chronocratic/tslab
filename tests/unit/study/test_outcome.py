@@ -17,6 +17,7 @@ from tests.unit.study.helpers import (
     write_run_status,
 )
 from tslab.core.status import InstanceState, RunState, utc_now_iso
+from tslab.study.launchers.slurm.states import followup_job_ids
 from tslab.study.outcome import (
     EXIT_DONE,
     EXIT_LIVE,
@@ -26,7 +27,7 @@ from tslab.study.outcome import (
     study_exit_code,
 )
 from tslab.study.records import append_job, JobRecord, submission_in_progress
-from tslab.study.state import followup_job_ids, StudyState
+from tslab.study.state import StudyState
 
 
 def _job_record(
@@ -190,7 +191,7 @@ def test_followup_job_ids_lists_only_sorted_slurm_followups() -> None:
     jobs = [
         _job_record(kind='followup', launcher='slurm', job_id='20'),
         _job_record(kind='run', launcher='slurm', job_id='10'),
-        _job_record(kind='followup', launcher='local', job_id='30'),
+        _job_record(kind='followup', launcher='local', job_id='local-123-1'),
         _job_record(kind='followup', launcher='slurm', job_id='3'),
     ]
     assert followup_job_ids(jobs=jobs) == ['20', '3']

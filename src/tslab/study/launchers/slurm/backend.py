@@ -18,14 +18,20 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.context import Context
 from tslab.study.definition import Study
-from tslab.study.doctor import _slurm_check, DoctorCheck
+from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import JobPhase, JobStates, launch, LaunchReport, Resources
-from tslab.study.launchers.slurm.states import _query_states, expected_starts
+from tslab.study.launchers.slurm.doctor import slurm_check
+from tslab.study.launchers.slurm.states import (
+    _query_states,
+    expected_starts,
+    followup_job_ids,
+    slurm_task_ids,
+)
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError
 from tslab.study.plan import _slurm_for, JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.state import followup_job_ids, RunReport, slurm_task_ids, StudyState
+from tslab.study.state import RunReport, StudyState
 
 __all__ = ['SlurmBackend']
 
@@ -214,26 +220,22 @@ class SlurmBackend:
         self, *, context: Context, reports: Sequence[RunReport]
     ) -> Mapping[str, SlurmJobUsage]:
         """The accounting usage of the out-of-memory runs; no numbers on a failure."""
-        # why: the failures module reads the report module, which reads the launch
-        # module and the backends door, so a module-level import would cycle
-        from tslab.study.failures import _usage_of  # noqa: PLC0415
+        from tslab.study.launchers.slurm.usage import failure_usage  # noqa: PLC0415
 
-        return _usage_of(context=context, reports=reports)
+        return failure_usage(context=context, reports=reports)
 
     def usage(
         self, *, context: Context
     ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
         """The accounting usage of every submitted run; no GPU ids on SLURM."""
-        # why: the usage module reads the launch module, which reads the backends
-        # door, so a module-level import would cycle
-        from tslab.study.usage import _usage_of  # noqa: PLC0415
+        from tslab.study.launchers.slurm.usage import usage  # noqa: PLC0415
 
         no_gpus: dict[str, str | None] = {}
-        return _usage_of(context=context), no_gpus
+        return usage(context=context), no_gpus
 
     def doctor_checks(self) -> tuple[DoctorCheck, ...]:
         """The readiness checks of a SLURM machine."""
-        return (_slurm_check(),)
+        return (slurm_check(),)
 
 
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:

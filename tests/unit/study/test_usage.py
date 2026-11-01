@@ -16,7 +16,9 @@ from tests.unit.study.helpers import (
 )
 from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
+from tslab.jobs.slurm import SlurmJobUsage
 from tslab.study.context import Context
+import tslab.study.usage as usage_module
 from tslab.study.usage import log_usage, usage_document
 
 USAGE_MACHINE = """\
@@ -177,12 +179,38 @@ def test_local_usage_document_reads_usage_files(project: Path) -> None:
     assert group['suggested_mem_per_cpu'] is None
 
 
+def test_usage_document_uses_selected_backend(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(project=project, machine_file='local.toml')
+    usage: dict[str, SlurmJobUsage] = {}
+    gpu_ids: dict[str, str | None] = {'job': '3'}
+    calls: list[Context] = []
+
+    class Backend:
+        suggests_memory = False
+
+        def usage(
+            self, *, context: Context
+        ) -> tuple[dict[str, SlurmJobUsage], dict[str, str | None]]:
+            calls.append(context)
+            return usage, gpu_ids
+
+    backend = Backend()
+    monkeypatch.setattr(usage_module, 'backend_for', lambda **_kwargs: backend, raising=False)
+
+    document = usage_document(context=ctx)
+
+    assert calls == [ctx]
+    assert document['runs'] == []
+
+
 def test_local_usage_log_shows_no_limit_and_dash(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     document = usage_document(context=_local_usage_context(project=project))
     with caplog.at_level('INFO', logger='tslab.study.usage'):
-        log_usage(document=document)
+        log_usage(document=document, suggests_memory=False)
     assert '1:00:00/no limit' in caplog.text
     assert 'local: suggest timeout=1:12:00' in caplog.text
     assert '-/no limit' in caplog.text

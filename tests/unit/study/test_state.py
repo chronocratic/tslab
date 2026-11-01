@@ -22,13 +22,13 @@ from tslab.jobs.slurm import (
 )
 from tslab.study import StudyRun
 from tslab.study.launchers import JobPhase
+from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.state import (
     collect_states,
     FolderFacts,
     read_folder,
     RunReport,
-    slurm_task_ids,
     study_state,
     StudyState,
 )

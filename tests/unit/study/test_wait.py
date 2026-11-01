@@ -12,9 +12,10 @@ from tests.unit.study.helpers import context, jobs_of, submit_study
 from tslab.cli import main
 from tslab.cli.study import Wait
 from tslab.study.context import Context, context_for, load_context, Selection
+from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.loading import load_study
 from tslab.study.outcome import EXIT_TIMEOUT
-from tslab.study.state import slurm_task_ids, StudyState
+from tslab.study.state import StudyState
 from tslab.study.wait import wait_for_study
 
 
