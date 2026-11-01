@@ -1,0 +1,256 @@
+"""The launch backends: one object per launcher, SLURM and local apart.
+
+A study command asks the backend of the machine it runs on, picked once by
+``backend_for`` from the profile's launcher; it never names a launcher. The
+backend code lives in the ``slurm`` and ``local`` subpackages, which never
+import each other.
+"""
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from pathlib import Path
+from typing import Protocol, TextIO
+
+from tslab.jobs.slurm import SlurmJobUsage
+from tslab.study.definition import Study
+from tslab.study.doctor import DoctorCheck
+from tslab.study.machine import MachineOverride, MachineProfile
+from tslab.study.plan import JobGroup
+from tslab.study.records import JobRecord
+from tslab.study.state import RunReport
+
+__all__ = [
+    'BACKENDS',
+    'Backend',
+    'JobPhase',
+    'JobStates',
+    'LaunchReport',
+    'LaunchStopped',
+    'OnLaunch',
+    'OnTaskState',
+    'Resources',
+    'backend_for',
+]
+
+
+class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, not an error
+    """A signal stopped the launch before every group was submitted.
+
+    Attributes:
+        signal_number: The number of the first signal that stopped the launch.
+    """
+
+    def __init__(self, *, signal_number: int) -> None:
+        """Set the number of the first signal that stopped the launch."""
+        message = f'stopped by signal {signal_number}'
+        super().__init__(message)
+        self.signal_number = signal_number
+
+
+@dataclass(frozen=True, kw_only=True)
+class LaunchReport:
+    """What one launch submitted.
+
+    Args:
+        submitted: One job record per submitted group, in order.
+        not_submitted: The groups the launch did not reach; all of them
+            on a dry run, the rest after an error or a signal.
+        error: The submission error that stopped the launch, if any.
+        stopped_signal: The signal that stopped the launch, if any.
+    """
+
+    submitted: tuple[JobRecord, ...]
+    not_submitted: tuple[JobGroup, ...]
+    error: str | None
+    stopped_signal: int | None = None
+
+
+class OnTaskState(Protocol):
+    """The state changes of the tasks of one local launch."""
+
+    def __call__(self, *, task_id: str, state: str) -> None:
+        """Called with the id of a task and its new state."""
+        ...
+
+
+class OnLaunch(Protocol):
+    """Called once with the result of a finished launch, dry runs included."""
+
+    def __call__(self, *, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
+        """Called with the launch report and the groups the launch covered."""
+        ...
+
+
+class JobPhase(StrEnum):
+    """The phase of a job state; the scheduler's words stay in ``JobStates.states``.
+
+    ``ENDED`` is over with the cause unknown; ``UNKNOWN`` was not queried.
+    """
+
+    QUEUED = 'queued'
+    RUNNING = 'running'
+    INTERRUPTED = 'interrupted'
+    FAILED = 'failed'
+    COMPLETED = 'completed'
+    ENDED = 'ended'
+    UNKNOWN = 'unknown'
+
+
+@dataclass(frozen=True, kw_only=True)
+class JobStates:
+    """The states of the jobs of one study, as one backend reports them.
+
+    Args:
+        known: Whether the states are real, or the scheduler could not be
+            asked and the state logic works from the run folders only.
+        states: The raw state text per job or task id; shown to the user.
+        phases: The phase per id; what the state logic reads.
+        followup_live_job_ids: The ids of the queued or running follow-up jobs.
+    """
+
+    known: bool
+    states: Mapping[str, str]
+    phases: Mapping[str, JobPhase]
+    followup_live_job_ids: tuple[str, ...]
+
+
+class Resources(Protocol):
+    """The resources one launch needs, whatever the launcher is."""
+
+    @property
+    def cpus(self) -> int:
+        """The CPUs one task of the launch gets."""
+        ...
+
+    @property
+    def max_tasks_per_job(self) -> int | None:
+        """The maximum number of tasks in one job, when the launcher has one."""
+        ...
+
+    def describe(self) -> str:
+        """The resource line of the settings, for the dry run printout."""
+        ...
+
+
+# why: the types above must exist first: this import reaches
+# tslab.study.local_launch, which imports OnTaskState from this door
+from tslab.study.context import Context  # noqa: E402
+
+
+class Backend(Protocol):
+    """What one launcher does for a study: its states, resources and launch.
+
+    A command picks the backend of its machine once, through ``backend_for``,
+    and calls these methods; it never compares launcher names.
+    """
+
+    name: str
+    suggests_memory: bool
+
+    def job_states(
+        self,
+        *,
+        machine: MachineProfile,
+        study: Study,
+        jobs: Sequence[JobRecord],
+        cache: Mapping[str, str],
+    ) -> tuple[JobStates, Mapping[str, str]]:
+        """The states of the jobs, with the new cache of final states second."""
+        ...
+
+    def expected_starts(self, *, context: Context) -> dict[str, str | None] | None:
+        """The expected start of the queued jobs; ``None`` without a scheduler."""
+        ...
+
+    def resources(
+        self,
+        *,
+        machine: MachineProfile,
+        overrides: Sequence[MachineOverride],
+        grid_name: str,
+        values: Mapping[str, str],
+    ) -> Resources:
+        """The resources of one grid, with the machine overrides applied."""
+        ...
+
+    def launch(  # noqa: PLR0913 # why: the Backend signature; one keyword per launch input
+        self,
+        *,
+        context: Context,
+        groups: Sequence[JobGroup],
+        folder: Path,
+        dry_run: bool,
+        begin: str | None,
+        sleep: Callable[[float], None],
+        task_stream: TextIO | None,
+        environment: Mapping[str, str],
+    ) -> LaunchReport | None:
+        """Submit the groups; ``None`` when a problem was logged, not raised."""
+        ...
+
+    def after_submit(
+        self,
+        *,
+        context: Context,
+        submitted: Sequence[JobRecord],
+        retry: Callable[..., int],
+        sleep: Callable[[float], None],
+    ) -> int:
+        """The follow-up of a finished launch, as an exit code."""
+        ...
+
+    def cancel(
+        self, *, context: Context, dry_run: bool, signal: str | None
+    ) -> tuple[int, list[str]]:
+        """Cancel the live jobs; the exit code and the touched job ids."""
+        ...
+
+    def cancellable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
+        """The job ids a cancel can reach for the reports."""
+        ...
+
+    def detach(self, *, context: Context, arguments: Sequence[str], wait_command: str) -> int:
+        """Start the launch in the background; the exit code."""
+        ...
+
+    def failure_usage(
+        self, *, context: Context, reports: Sequence[RunReport]
+    ) -> Mapping[str, SlurmJobUsage]:
+        """The accounting usage of the failed runs, when the scheduler gives it."""
+        ...
+
+    def usage(
+        self, *, context: Context
+    ) -> tuple[Mapping[str, SlurmJobUsage], Mapping[str, str | None]]:
+        """The usage by job id, and the GPU id by job id."""
+        ...
+
+    def doctor_checks(self) -> tuple[DoctorCheck, ...]:
+        """The readiness checks of the machines the backend serves."""
+        ...
+
+
+# why: the backends import the types from this door
+from tslab.study.launchers.local import LocalBackend  # noqa: E402
+from tslab.study.launchers.slurm import SlurmBackend  # noqa: E402
+
+#: One backend per launcher; the only place beside the machine tables that
+#: names both.
+BACKENDS: Mapping[str, Backend] = {'slurm': SlurmBackend(), 'local': LocalBackend()}
+
+
+def backend_for(*, machine: MachineProfile) -> Backend:
+    """The backend that serves the machine's launcher.
+
+    Args:
+        machine: The machine profile to read the launcher from.
+
+    Returns:
+        The backend object of the machine's launcher.
+    """
+    backend = BACKENDS.get(machine.launcher)
+    if backend is None:
+        message = f'no backend serves launcher {machine.launcher!r}; check the machine profile'
+        raise ValueError(message)
+    return backend

@@ -32,12 +32,11 @@ from tslab.study.commands import (
 from tslab.study.context import Context, expected_starts, load_context, Selection
 from tslab.study.documents import cancel_document, launch_document, show_document, status_document
 from tslab.study.failures import collect_failures, log_failures
-from tslab.study.launch import LaunchReport
+from tslab.study.launchers import backend_for, LaunchReport
 from tslab.study.loading import load_study
-from tslab.study.local_launch import detach_launch
 from tslab.study.machine import resolve_machine
 from tslab.study.outcome import EXIT_TIMEOUT, study_exit_code
-from tslab.study.plan import JobGroup, study_folder
+from tslab.study.plan import JobGroup
 from tslab.study.report import log_show
 from tslab.study.state import StudyState
 from tslab.study.usage import log_usage, usage_document
@@ -141,9 +140,6 @@ def _detach(  # noqa: PLR0913 # why: keyword-only private helper; one keyword pe
 ) -> int:
     """Start the command again in the background; the arguments are the original ones."""
     study, machine = request
-    if context.machine.launcher == 'slurm':
-        message = '--detach is for local machines; SLURM jobs already run in the background'
-        raise UsageError(message)
     arguments = [
         'study',
         command,
@@ -156,14 +152,17 @@ def _detach(  # noqa: PLR0913 # why: keyword-only private helper; one keyword pe
     ]
     if extra_args:
         arguments.extend(('--', *extra_args))
-    return detach_launch(
-        study_folder=study_folder(machine=context.machine, study=context.study),
-        arguments=arguments,
-        project_root=context.project_root,
-        wait_command=shlex.join(
-            ['tslab', 'study', 'wait', study, '--machine', machine, *selection_options]
-        ),
-    )
+    backend = backend_for(machine=context.machine)
+    try:
+        return backend.detach(
+            context=context,
+            arguments=arguments,
+            wait_command=shlex.join(
+                ['tslab', 'study', 'wait', study, '--machine', machine, *selection_options]
+            ),
+        )
+    except ValueError as error:
+        raise UsageError(str(error)) from error
 
 
 def _warn_no_runs(*, context: Context) -> None:

@@ -2,7 +2,6 @@
 
 from collections.abc import Callable, Mapping, Sequence
 import dataclasses
-from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
@@ -28,18 +27,15 @@ from tslab.jobs.local import (
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.definition import Study
 from tslab.study.job_script import job_script
+from tslab.study.launchers import LaunchReport, LaunchStopped, OnTaskState
 from tslab.study.machine import LocalSettings, MachineProfile, SlurmSettings, timeout_seconds
 from tslab.study.plan import JobGroup, next_job_file, study_folder
 from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 
 __all__ = [
     'SIGNAL_EXIT_BASE',
-    'LaunchReport',
-    'LaunchStopped',
     'Launcher',
     'LocalLauncher',
-    'OnLaunch',
-    'OnTaskState',
     'SlurmLauncher',
     'launch',
     'local_job_id',
@@ -56,38 +52,6 @@ SIGNAL_EXIT_BASE = 128
 
 #: The signals that stop a local launch; the records of the groups sent survive.
 _STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
-
-
-class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, not an error
-    """A signal stopped the launch before every group was submitted.
-
-    Attributes:
-        signal_number: The number of the first signal that stopped the launch.
-    """
-
-    def __init__(self, *, signal_number: int) -> None:
-        """Set the number of the first signal that stopped the launch."""
-        message = f'stopped by signal {signal_number}'
-        super().__init__(message)
-        self.signal_number = signal_number
-
-
-@dataclass(frozen=True, kw_only=True)
-class LaunchReport:
-    """What one launch submitted.
-
-    Args:
-        submitted: One job record per submitted group, in order.
-        not_submitted: The groups the launch did not reach; all of them
-            on a dry run, the rest after an error or a signal.
-        error: The submission error that stopped the launch, if any.
-        stopped_signal: The signal that stopped the launch, if any.
-    """
-
-    submitted: tuple[JobRecord, ...]
-    not_submitted: tuple[JobGroup, ...]
-    error: str | None
-    stopped_signal: int | None = None
 
 
 def write_job_files(
@@ -143,22 +107,6 @@ class Launcher(Protocol):
             record: Called with the job id as soon as the job exists, before
                 any task of it has run, so the record outlives an interrupted launch.
         """
-
-
-class OnTaskState(Protocol):
-    """The state changes of the tasks of one local launch."""
-
-    def __call__(self, *, task_id: str, state: str) -> None:
-        """Called with the id of a task and its new state."""
-        ...
-
-
-class OnLaunch(Protocol):
-    """Called once with the result of a finished launch, dry runs included."""
-
-    def __call__(self, *, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
-        """Called with the launch report and the groups the launch covered."""
-        ...
 
 
 class SlurmLauncher:

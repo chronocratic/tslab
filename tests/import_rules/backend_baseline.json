@@ -1,0 +1,29 @@
+{
+  "module_imports_both": {
+    "src/tslab/study/commands.py": 1,
+    "src/tslab/study/failures.py": 1,
+    "src/tslab/study/launch.py": 1
+  },
+  "name_comparisons": {
+    "src/tslab/cli/study.py": 1,
+    "src/tslab/study/commands.py": 6,
+    "src/tslab/study/context.py": 4,
+    "src/tslab/study/doctor.py": 1,
+    "src/tslab/study/failures.py": 1,
+    "src/tslab/study/followups.py": 1,
+    "src/tslab/study/machine/load.py": 5,
+    "src/tslab/study/machine/local.py": 2,
+    "src/tslab/study/machine/slurm.py": 2,
+    "src/tslab/study/outcome.py": 1,
+    "src/tslab/study/report.py": 1,
+    "src/tslab/study/state.py": 2,
+    "src/tslab/study/usage.py": 3
+  },
+  "none_checks": {
+    "src/tslab/study/commands.py": 1,
+    "src/tslab/study/followups.py": 1,
+    "src/tslab/study/launch.py": 3,
+    "src/tslab/study/plan.py": 2
+  },
+  "test_imports_both": {}
+}

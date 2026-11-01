@@ -9,7 +9,8 @@ from tslab.core.text import log_table
 from tslab.jobs.slurm import array_spec
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launch import LaunchReport, SIGNAL_EXIT_BASE
+from tslab.study.launch import SIGNAL_EXIT_BASE
+from tslab.study.launchers import LaunchReport
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
@@ -130,16 +131,7 @@ def resources_of(*, slurm: SlurmSettings | None) -> str:
     """The resource line of one group, for the dry run printout."""
     if slurm is None:
         return 'local'
-    # why: the fields mirror SlurmSettings, named in display order
-    parts = [f'partition={slurm.partition}', f'time={slurm.time}']
-    if slurm.qos is not None:
-        parts.append(f'qos={slurm.qos}')
-    parts.append(f'cpus={slurm.cpus_per_task}')
-    if slurm.mem_per_cpu is not None:
-        parts.append(f'mem/cpu={slurm.mem_per_cpu}')
-    if slurm.gpus:
-        parts.append(f'gpus={slurm.gpus}')
-    return ', '.join(parts)
+    return slurm.describe()
 
 
 def log_problems(*, problems: Sequence[tuple[str, str]]) -> None:

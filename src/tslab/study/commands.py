@@ -27,15 +27,13 @@ from tslab.study.job_script import foreground_script
 from tslab.study.launch import (
     launch,
     Launcher,
-    LaunchReport,
     local_job_id,
     LocalLauncher,
-    OnLaunch,
-    OnTaskState,
     resolve_local_gpus,
     SIGNAL_EXIT_BASE,
     SlurmLauncher,
 )
+from tslab.study.launchers import LaunchReport, OnLaunch, OnTaskState
 from tslab.study.local_launch import hold_launch, launch_is_live, LocalLaunchError, read_launch
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.plan import (
