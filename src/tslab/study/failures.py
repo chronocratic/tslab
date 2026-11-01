@@ -9,6 +9,7 @@ from tslab.jobs.local import tail_lines
 from tslab.jobs.slurm import format_slurm_memory, query_job_usage, SlurmError, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.documents import run_entry
+from tslab.study.machine import SlurmSettings
 from tslab.study.plan import study_folder
 from tslab.study.result_table import instance_directory
 from tslab.study.state import RunReport, StudyState
@@ -140,6 +141,8 @@ def _failure_entry(
         log_tail = tail_lines(path=job_log_path, lines=lines)
     run_log_path = run_directory / LOGS_DIRECTORY / 'run.log'
     entry = run_entry(report=report, context=context)
+    resources = context.resolved[report.run.run_path].resources
+    slurm = resources if isinstance(resources, SlurmSettings) else None
     entry.update(
         {
             'errors': errors,
@@ -148,11 +151,7 @@ def _failure_entry(
             'run_log': run_log_path.resolve().as_posix(),
             'run_log_tail': tail_lines(path=run_log_path, lines=lines),
             'hint': failure_hint(
-                report=report,
-                usage=usage,
-                requested_memory=_requested_memory(
-                    slurm=context.resolved[report.run.run_path].slurm
-                ),
+                report=report, usage=usage, requested_memory=_requested_memory(slurm=slurm)
             ),
         }
     )

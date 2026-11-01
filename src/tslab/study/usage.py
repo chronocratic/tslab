@@ -18,6 +18,7 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.context import Context
 from tslab.study.launch import usage_file
+from tslab.study.launchers import Resources
 from tslab.study.machine import SlurmSettings
 from tslab.study.plan import log_file_of, study_folder
 from tslab.study.report import resources_of
@@ -126,15 +127,15 @@ def _usage_of(*, context: Context) -> dict[str, SlurmJobUsage]:
 def _groups(
     *, context: Context, selected: list[tuple[RunReport, SlurmJobUsage | None]]
 ) -> list[dict[str, object]]:
-    order: list[SlurmSettings | None] = []
-    members: dict[SlurmSettings | None, list[tuple[RunReport, SlurmJobUsage | None]]] = {}
+    order: list[Resources] = []
+    members: dict[Resources, list[tuple[RunReport, SlurmJobUsage | None]]] = {}
     for report, usage in selected:
-        slurm = context.resolved[report.run.run_path].slurm
-        if slurm not in members:
-            members[slurm] = []
-            order.append(slurm)
-        members[slurm].append((report, usage))
-    entries = [_group_entry(slurm=slurm, members=members[slurm]) for slurm in order]
+        resources = context.resolved[report.run.run_path].resources
+        if resources not in members:
+            members[resources] = []
+            order.append(resources)
+        members[resources].append((report, usage))
+    entries = [_group_entry(resources=resources, members=members[resources]) for resources in order]
     if context.machine.launcher == 'local':
         # why: a local run has no memory request to size; only the time limit is suggested
         for entry in entries:
@@ -143,9 +144,8 @@ def _groups(
 
 
 def _group_entry(
-    *, slurm: SlurmSettings | None, members: list[tuple[RunReport, SlurmJobUsage | None]]
+    *, resources: Resources, members: list[tuple[RunReport, SlurmJobUsage | None]]
 ) -> dict[str, object]:
-    cpus = slurm.cpus_per_task if slurm is not None else 1
     elapsed = [
         usage.elapsed
         for report, usage in members
@@ -156,12 +156,14 @@ def _group_entry(
     ]
     return {
         'runs': len(members),
-        'slurm': resources_of(slurm=slurm),
+        'slurm': resources_of(resources=resources),
         'suggested_time': (
             format_slurm_duration(duration=max(elapsed) * _MARGIN) if elapsed else None
         ),
         'suggested_mem_per_cpu': (
-            format_slurm_memory(size=math.ceil(max(peak) * _MARGIN / cpus)) if peak else None
+            format_slurm_memory(size=math.ceil(max(peak) * _MARGIN / resources.cpus))
+            if peak
+            else None
         ),
     }
 
@@ -169,7 +171,8 @@ def _group_entry(
 def _run_entry(
     *, context: Context, report: RunReport, usage: SlurmJobUsage | None, gpu_id: str | None
 ) -> dict[str, object]:
-    slurm = context.resolved[report.run.run_path].slurm
+    resources = context.resolved[report.run.run_path].resources
+    slurm = resources if isinstance(resources, SlurmSettings) else None
     return {
         'run_path': report.run.run_path,
         'job_id': report.job_id,

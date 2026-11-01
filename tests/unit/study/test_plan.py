@@ -42,7 +42,10 @@ def test_local_machine_with_a_slurm_override_resolves_without_slurm(
         tmp_path, overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'gpus': 1}),)
     )
     resolved = resolve_runs(study=study, machine=machine, runs=expand_runs(study=study))
-    assert all(run.slurm is None for run in resolved)
+    assert all(
+        run.resources.describe() == 'local' and run.resources.max_tasks_per_job is None
+        for run in resolved
+    )
 
 
 def test_machine_setting_that_switches_a_choice_drops_stale_children(
@@ -169,13 +172,13 @@ def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -
     runs = expand_runs(study=study)
     resolved = resolve_runs(study=study, machine=machine, runs=runs)
     cost = next(run for run in resolved if run.run.values['recipe'] == 'cost-paper')
-    assert cost.slurm is not None
-    assert cost.slurm.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
+    assert isinstance(cost.resources, SlurmSettings)
+    assert cost.resources.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
 
 
 def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
     study: Study, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.study.plan._usable_cpus', lambda: 3)
+    monkeypatch.setattr('tslab.study.launchers.local.backend._usable_cpus', lambda: 3)
     machine = _local(tmp_path, settings={'trainer.max_epochs': '{cpus}'})
     assert set(_epochs_by_recipe(_plan(study, machine)).values()) == {'3'}

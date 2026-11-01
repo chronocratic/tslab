@@ -4,6 +4,7 @@ import pytest
 
 from tslab.core.text import format_table
 from tslab.study.launchers import LaunchReport
+from tslab.study.launchers.local.backend import LocalResources
 from tslab.study.machine import SlurmSettings
 from tslab.study.report import log_launch, log_problems, resources_of
 
@@ -18,14 +19,14 @@ def test_format_table_gives_every_row_the_same_widths() -> None:
 
 
 def test_resources_of_names_every_set_field() -> None:
-    assert resources_of(slurm=None) == 'local'
+    assert resources_of(resources=LocalResources(cpus=1)) == 'local'
     slurm = SlurmSettings(
         partition='gpu', time='01:00:00', qos='high', mem_per_cpu='4G', gpus=2, cpus_per_task=8
     )
-    text = resources_of(slurm=slurm)
+    text = resources_of(resources=slurm)
     for part in ('partition=gpu', 'qos=high', 'cpus=8', 'mem/cpu=4G', 'gpus=2'):
         assert part in text
-    assert 'qos' not in resources_of(slurm=SlurmSettings(partition='gpu', time='01:00:00'))
+    assert 'qos' not in resources_of(resources=SlurmSettings(partition='gpu', time='01:00:00'))
 
 
 def test_log_problems_cuts_off_after_twenty(caplog: pytest.LogCaptureFixture) -> None:

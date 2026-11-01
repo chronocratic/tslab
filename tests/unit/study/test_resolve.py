@@ -8,7 +8,7 @@ import pytest
 from tests.unit.study.configs import grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
-from tslab.study.machine import load_machine, MachineProfile
+from tslab.study.machine import load_machine, MachineProfile, SlurmSettings
 from tslab.study.plan import resolve_runs
 
 BASE_TOML = (
@@ -41,12 +41,12 @@ def test_merge_order_and_slurm_precedence(study: Study, tmp_path: Path) -> None:
         for r in resolve_runs(study=study, machine=profile, runs=expand_runs(study=study))
     }
     cost = resolved['g/cost-paper/Coffee/42']
-    assert cost.slurm is not None
-    assert cost.slurm.gpus == 1
-    assert cost.slurm.time == '1-00:00:00'
+    assert isinstance(cost.resources, SlurmSettings)
+    assert cost.resources.gpus == 1
+    assert cost.resources.time == '1-00:00:00'
     assert cost.settings['trainer.max_epochs'] == 1
     ts2vec = resolved['g/ts2vec-paper/Coffee/42']
-    assert ts2vec.slurm == profile.slurm
+    assert ts2vec.resources == profile.slurm
     assert ts2vec.settings['trainer.max_epochs'] == 5
 
 
@@ -62,4 +62,6 @@ def test_unknown_names_in_machine_overrides_warn(
         resolved = resolve_runs(study=study, machine=profile, runs=expand_runs(study=study))
     assert 'old-recipe' in caplog.text
     assert 'variant' in caplog.text
-    assert any(r.slurm is not None and r.slurm.gpus == 1 for r in resolved)
+    assert any(
+        isinstance(run.resources, SlurmSettings) and run.resources.gpus == 1 for run in resolved
+    )
