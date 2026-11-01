@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import cast
 
 from tslab.core.paths import read_json_object
-from tslab.helpers.text import log_table
+from tslab.core.text import log_table
 from tslab.jobs.slurm import (
     format_slurm_duration,
     format_slurm_memory,

@@ -7,7 +7,7 @@ from typing import cast
 import pytest
 
 from tslab.cli import main
-from tslab.helpers.text import TextTable
+from tslab.core.text import TextTable
 from tslab.study.definition import expand_runs
 from tslab.study.documents import show_document
 from tslab.study.loading import load_study

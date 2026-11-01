@@ -14,7 +14,7 @@ from pathlib import Path
 from tslab.core.artifact import Metrics
 from tslab.core.paths import atomic_write_text, META_FILE, require_path
 from tslab.core.status import InstanceRecord, InstanceState
-from tslab.helpers.text import first_line
+from tslab.core.text import first_line
 from tslab.study.context import context_for, Selection
 from tslab.study.definition import Study
 from tslab.study.state import RunReport

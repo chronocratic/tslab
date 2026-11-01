@@ -6,7 +6,7 @@ from pathlib import Path
 import tomllib
 from typing import cast, TYPE_CHECKING
 
-from tslab.helpers.text import unknown_key_message
+from tslab.core.text import unknown_key_message
 from tslab.study.expansion import expand_variables
 from tslab.study.machine.local import (
     check_local,

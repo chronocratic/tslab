@@ -1,0 +1,1 @@
+The text helpers of `tslab.helpers.text` (`first_line`, `unknown_key_message`, `format_table`, `log_table` and `TextTable`) moved to `tslab.core.text`, which now holds all the text helpers of the engine. The `tslab.helpers` package is removed.

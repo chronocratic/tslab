@@ -33,7 +33,7 @@ from tslab.core.status import (
     RunStatusSnapshot,
     StatusFileError,
 )
-from tslab.helpers.text import log_table
+from tslab.core.text import log_table
 from tslab.study.outcome import states_exit_code
 from tslab.study.state import read_folder, study_state, StudyState
 
