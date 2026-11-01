@@ -1,8 +1,10 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
 
+from tslab.core.meta import hostname
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
@@ -11,6 +13,7 @@ from tslab.core.status import (
     read_status,
     RunState,
     RunStatusSnapshot,
+    shown_run_state,
     StatusFileError,
     write_status,
 )
@@ -86,3 +89,20 @@ def test_every_bad_status_file_is_one_error_naming_the_file(tmp_path: Path, cont
 
 def test_status_file_error_is_a_value_error() -> None:
     assert issubclass(StatusFileError, ValueError)
+
+
+def test_shown_run_state_shows_interrupted_for_a_dead_running_run(tmp_path: Path) -> None:
+    snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t')
+    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'interrupted'
+
+
+def test_shown_run_state_shows_running_for_a_live_run(tmp_path: Path) -> None:
+    lock = tmp_path / '.lock'
+    lock.write_text(json.dumps({'pid': os.getpid(), 'host': hostname()}), encoding='utf-8')
+    snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t')
+    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'running'
+
+
+def test_shown_run_state_keeps_the_state_of_a_finished_run(tmp_path: Path) -> None:
+    snapshot = RunStatusSnapshot(run_state=RunState.FINISHED, updated_at='t')
+    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'finished'
