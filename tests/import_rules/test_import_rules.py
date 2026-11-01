@@ -17,6 +17,8 @@ CORE_MODULES = (
     'tslab.core.codec',
     'tslab.core.fingerprint',
     'tslab.core.meta',
+    'tslab.core.meta.instance',
+    'tslab.core.meta.run',
     'tslab.core.paths',
     'tslab.core.run',
     'tslab.core.seeding',
