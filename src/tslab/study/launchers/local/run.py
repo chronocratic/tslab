@@ -19,7 +19,7 @@ from tslab.jobs.local import (
     TaskInfo,
     TaskOutput,
 )
-from tslab.study.launchers import LaunchStopped, OnTaskState
+from tslab.study.launchers import LaunchStopped, OnTaskState, RecordJob
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.plan import JobGroup
 
@@ -147,7 +147,7 @@ class LocalLauncher:
         *,
         group: JobGroup,
         study_folder: Path,  # noqa: ARG002 # why: the Protocol signature
-        record: Callable[[str], None],
+        record: RecordJob,
     ) -> str:
         """Run every task in slots, continuing after a failing one; the job id.
 
@@ -166,7 +166,7 @@ class LocalLauncher:
             LaunchStopped: If a stop signal was caught, with its number.
         """
         job_id = local_job_id(job_file=group.job_file, pid=self._pid)
-        record(job_id)
+        record(job_id=job_id)
         stream = sys.stdout if self._stream is None else self._stream
         if self._gpu_ids:
             slots = len(self._gpu_ids) * self._local.tasks_per_gpu

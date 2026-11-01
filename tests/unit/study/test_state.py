@@ -25,6 +25,7 @@ from tslab.study.launchers import JobPhase
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.state import (
+    _grace_wait,
     collect_states,
     FolderFacts,
     read_folder,
@@ -381,6 +382,23 @@ def test_grace_wait_survives_a_missing_run_folder(tmp_path: Path) -> None:
     )
     assert len(calls) == 30
     assert reports[0].state is StudyState.MISSING
+
+
+def test_grace_wait_returns_new_facts(tmp_path: Path) -> None:
+    folder = tmp_path / 'g' / 'a' / '1'
+    _write_status(folder, RunState.RUNNING, InstanceState.RUNNING)
+    calls: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        calls.append(seconds)
+        _write_status(folder, RunState.FINISHED, InstanceState.DONE)
+
+    settled = _grace_wait(
+        directories={'g/a/1': folder}, completed_phase=JobPhase.COMPLETED, sleep=sleep
+    )
+    assert calls == [1]
+    assert settled['g/a/1'].snapshot is not None
+    assert settled['g/a/1'].snapshot.run_state is RunState.FINISHED
 
 
 def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:

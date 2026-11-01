@@ -172,8 +172,13 @@ def study_state(
     return StudyState.MISSING, None
 
 
-def _pause(seconds: float) -> None:
+def _pause(*, seconds: float) -> None:
     time.sleep(seconds)
+
+
+def _sleep(seconds: float) -> None:
+    # why: the sleep of collect_states is called with one positional argument
+    _pause(seconds=seconds)
 
 
 def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
@@ -190,15 +195,16 @@ def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
 
 
 def _grace_wait(
-    *,
-    directories: dict[str, Path],
-    facts: dict[str, FolderFacts],
-    completed_phase: 'JobPhase',
-    sleep: Callable[[float], None],
-) -> None:
-    """Re-read the listed folders until each settles, at most 15 rounds (30 after a chmod error)."""
+    *, directories: dict[str, Path], completed_phase: 'JobPhase', sleep: Callable[[float], None]
+) -> dict[str, FolderFacts]:
+    """Re-read the listed folders until each settles, at most 15 rounds (30 after a chmod error).
+
+    Returns:
+        The latest facts of every re-read folder.
+    """
     limit = 15
     pending = dict(directories)
+    settled: dict[str, FolderFacts] = {}
     rounds = 0
     while pending and rounds < limit:
         for directory in pending.values():
@@ -210,9 +216,11 @@ def _grace_wait(
         sleep(1)
         rounds += 1
         for key, directory in list(pending.items()):
-            facts[key] = read_folder(run_directory=directory)
-            if not _needs_grace(job_phase=completed_phase, folder=facts[key]):
+            folder = read_folder(run_directory=directory)
+            settled[key] = folder
+            if not _needs_grace(job_phase=completed_phase, folder=folder):
                 del pending[key]
+    return settled
 
 
 def collect_states(
@@ -221,7 +229,7 @@ def collect_states(
     runs: Sequence[StudyRun],
     jobs: Sequence[JobRecord],
     job_states: 'JobStates',
-    sleep: Callable[[float], None] = _pause,
+    sleep: Callable[[float], None] = _sleep,
 ) -> list[RunReport]:
     """The state report of every run of one study.
 
@@ -264,7 +272,9 @@ def collect_states(
         entries.append((run, job_id, job_state, job_phase, task))
         if _needs_grace(job_phase=job_phase, folder=folders[run.run_path]):
             waiting[run.run_path] = directory
-    _grace_wait(directories=waiting, facts=folders, completed_phase=JobPhase.COMPLETED, sleep=sleep)
+    folders.update(
+        _grace_wait(directories=waiting, completed_phase=JobPhase.COMPLETED, sleep=sleep)
+    )
     reports: list[RunReport] = []
     for run, job_id, job_state, job_phase, task in entries:
         folder = folders[run.run_path]

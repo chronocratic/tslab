@@ -35,6 +35,7 @@ __all__ = [
     'Launcher',
     'OnLaunch',
     'OnTaskState',
+    'RecordJob',
     'Resources',
     'available_cpus',
     'backend_for',
@@ -149,10 +150,17 @@ class Resources(Protocol):
 from tslab.study.context import Context  # noqa: E402
 
 
+class RecordJob(Protocol):
+    """Records the job id of one submitted group before its tasks run."""
+
+    def __call__(self, *, job_id: str) -> None:
+        """Record the id of the submitted group."""
+
+
 class Launcher(Protocol):
     """What one launch does with a written group: returns the job id."""
 
-    def submit(self, *, group: JobGroup, study_folder: Path, record: Callable[[str], None]) -> str:
+    def submit(self, *, group: JobGroup, study_folder: Path, record: RecordJob) -> str:
         """Submit one group and record its job id before tasks run."""
         ...
 
@@ -237,7 +245,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
         )
 
         def record_job(
-            job_id: str, group: JobGroup = group, tasks: tuple[TaskRecord, ...] = tasks
+            *, job_id: str, group: JobGroup = group, tasks: tuple[TaskRecord, ...] = tasks
         ) -> None:
             record = JobRecord(
                 kind='run',
