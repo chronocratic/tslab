@@ -101,9 +101,10 @@ class TaskOutput:
             log.flush()
             self._logs[key] = log
             if not self._single_slot:
-                self._console(
+                started = (
                     f'=== task {task.index} started | {task.name} | gpu {gpu_id or "none"} ===\n'
                 )
+                self._console(line=started)
         if self._on_task_state is not None:
             self._on_task_state(key, 'running')
 
@@ -113,7 +114,7 @@ class TaskOutput:
             self._logs[key].write(line)
             self._logs[key].flush()
             if self._single_slot:
-                self._console(line)
+                self._console(line=line)
 
     def on_event(self, key: str, text: str) -> None:
         """One signal event of a task, as a line."""
@@ -125,7 +126,7 @@ class TaskOutput:
         with self._lock:
             # why: the task may not have started, so its log is not open yet
             self._waits.setdefault(key, []).append(line)
-            self._console(line)
+            self._console(line=line)
 
     def on_end(self, key: str, gpu_id: str | None, outcome: ProcessResult | OSError) -> None:
         """The footer of a finished task, the usage file, and the closed log."""
@@ -136,11 +137,11 @@ class TaskOutput:
                 line = f'=== task {task.index} could not start: {outcome} ===\n'
                 log.write(line)
                 log.flush()
-                self._console(line)
+                self._console(line=line)
             else:
                 log.write(self._footer(task=task, outcome=outcome))
                 log.flush()
-                self._console(self._end_line(task=task, gpu_id=gpu_id, outcome=outcome))
+                self._console(line=self._end_line(task=task, gpu_id=gpu_id, outcome=outcome))
             log.close()
         if isinstance(outcome, ProcessResult):
             _write_json_atomic(
@@ -176,7 +177,7 @@ class TaskOutput:
             f'| gpu {gpu_id or "none"} | exit {outcome.exit_code} ===\n'
         )
 
-    def _console(self, line: str) -> None:
+    def _console(self, *, line: str) -> None:
         # why: the console output is the design
         print(line, end='', file=self._stream)
 

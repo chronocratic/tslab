@@ -165,7 +165,7 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
         document: The study-usage document from ``usage_document``.
         suggests_memory: Whether this backend can size memory from past usage.
     """
-    runs = _mappings(document.get('runs'))
+    runs = _mappings(value=document.get('runs'))
     log_table(
         logger=_LOGGER,
         header=('run', 'job', 'state', 'elapsed/limit', 'peak/requested', 'cpu time', 'gpus'),
@@ -175,12 +175,15 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
                 str(run['job_id']),
                 str(run['state']),
                 _pair(
-                    run['elapsed'],
-                    run['time_limit'],
+                    first=run['elapsed'],
+                    second=run['time_limit'],
                     missing='-' if suggests_memory else 'no limit',
                 ),
-                _pair(_memory(value=run['max_rss']), _memory(value=run['requested_memory'])),
-                _text(_seconds(value=run['total_cpu_seconds'])),
+                _pair(
+                    first=_memory(value=run['max_rss']),
+                    second=_memory(value=run['requested_memory']),
+                ),
+                _text(value=_seconds(value=run['total_cpu_seconds'])),
                 str(run['gpus']),
             )
             for run in runs
@@ -189,7 +192,7 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
     for run in runs:
         if run.get('paused'):
             _LOGGER.info('  %s paused: needs more than one job', run['run_path'])
-    for group in _mappings(document.get('groups')):
+    for group in _mappings(value=document.get('groups')):
         if not suggests_memory:
             _LOGGER.info('local: suggest timeout=%s', group['suggested_time'])
             continue
@@ -201,14 +204,14 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
         )
 
 
-def _mappings(value: object) -> list[Mapping[str, object]]:
+def _mappings(*, value: object) -> list[Mapping[str, object]]:
     if not isinstance(value, Sequence) or isinstance(value, str):
         return []
     return [item for item in value if isinstance(item, Mapping)]
 
 
-def _pair(first: object, second: object, *, missing: str = '-') -> str:
-    return f'{_text(first)}/{missing if second is None else second}'
+def _pair(*, first: object, second: object, missing: str = '-') -> str:
+    return f'{_text(value=first)}/{missing if second is None else second}'
 
 
 def _memory(*, value: object) -> str | None:
@@ -225,5 +228,5 @@ def _seconds(*, value: object) -> str | None:
     return format_slurm_duration(duration=timedelta(seconds=cast('int', value)))
 
 
-def _text(value: object) -> str:
+def _text(*, value: object) -> str:
     return '-' if value is None else str(value)

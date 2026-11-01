@@ -335,17 +335,22 @@ def _before_resubmit(
     return begin, before_launch
 
 
-def _run_in_terminal(args: list[str]) -> int:
+def _run_in_terminal(*, args: list[str]) -> int:
     """The exit code of the command with the inherited standard streams."""
     # why: inherited streams, so breakpoint() and prompts reach the terminal
     return subprocess.run(args, check=False).returncode  # noqa: S603 # why: the run command, typed by the study
+
+
+def _run_process(args: list[str]) -> int:
+    # why: the run_process of run_one is called with one positional argument
+    return _run_in_terminal(args=args)
 
 
 def run_one(
     *,
     context: Context,
     extra_args: tuple[str, ...] | None,
-    run_process: Callable[[list[str]], int] = _run_in_terminal,
+    run_process: Callable[[list[str]], int] = _run_process,
 ) -> int:
     """Run the one selected run in the foreground of this terminal.
 

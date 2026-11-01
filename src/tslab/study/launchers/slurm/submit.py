@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from tslab.core.files import atomic_write_text
 from tslab.jobs.slurm import sbatch
+from tslab.study.launchers import RecordJob
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
 from tslab.study.plan import JobGroup, next_job_file
@@ -69,12 +70,12 @@ class SlurmLauncher:
         """
         self._sleep = sleep
 
-    def submit(self, *, group: JobGroup, study_folder: Path, record: Callable[[str], None]) -> str:
+    def submit(self, *, group: JobGroup, study_folder: Path, record: RecordJob) -> str:
         """The id of the ``sbatch`` job of the group."""
         job_id = sbatch(
             script=study_folder / 'jobs' / f'{group.job_file}.sbatch', sleep=self._sleep
         )
-        record(job_id)
+        record(job_id=job_id)
         if group.resources.max_tasks_per_job is not None:
             slurm = cast('SlurmSettings', group.resources)
             self._sleep(slurm.submit_pause_seconds)
