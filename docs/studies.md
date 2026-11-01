@@ -278,8 +278,8 @@ that calls `tslab`. The optional `[local]` table sets how:
   `--signal` is for SLURM only. The stopped runs read as `interrupted`.
 - **Usage.** `tslab study usage` reads the usage file each task writes next to
   its log: the elapsed time, the peak memory, the CPU time and the GPU id. A
-  run without a limit shows `no limit`. The suggestion line is
-  `local: suggest timeout=<value>`.
+  run without a limit shows `no limit`. A local machine has no time limit or
+  memory request, so it prints no suggestion line.
 - **Automatic retry.** With `[followup] auto_retry = true`, the launch submits
   the interrupted runs that made progress again when it ends, up to
   `max_attempts` attempts each, in the same process. `wandb_sync` is for SLURM

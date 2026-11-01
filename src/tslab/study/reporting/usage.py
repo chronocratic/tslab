@@ -7,9 +7,8 @@ import math
 from typing import cast
 
 from tslab.core.text import format_bytes, format_duration, log_table
-from tslab.jobs.slurm import format_slurm_duration, format_slurm_memory
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, JobUsage, Resources
+from tslab.study.launchers import Backend, backend_for, JobUsage, Resources
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport
 
@@ -55,14 +54,12 @@ def usage_document(*, context: Context) -> dict[str, object]:
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'runs': runs,
-        'groups': _groups(
-            context=context, selected=selected, suggests_memory=backend.suggests_memory
-        ),
+        'groups': _groups(context=context, backend=backend, selected=selected),
     }
 
 
 def _groups(
-    *, context: Context, selected: list[tuple[RunReport, JobUsage | None]], suggests_memory: bool
+    *, context: Context, backend: Backend, selected: list[tuple[RunReport, JobUsage | None]]
 ) -> list[dict[str, object]]:
     order: list[Resources] = []
     members: dict[Resources, list[tuple[RunReport, JobUsage | None]]] = {}
@@ -73,15 +70,13 @@ def _groups(
             order.append(resources)
         members[resources].append((report, usage))
     return [
-        _group_entry(
-            resources=resources, members=members[resources], suggests_memory=suggests_memory
-        )
+        _group_entry(backend=backend, resources=resources, members=members[resources])
         for resources in order
     ]
 
 
 def _group_entry(
-    *, resources: Resources, members: list[tuple[RunReport, JobUsage | None]], suggests_memory: bool
+    *, backend: Backend, resources: Resources, members: list[tuple[RunReport, JobUsage | None]]
 ) -> dict[str, object]:
     elapsed = [
         usage.elapsed
@@ -91,17 +86,15 @@ def _group_entry(
     peak = [
         usage.max_rss for _, usage in members if usage is not None and usage.max_rss is not None
     ]
+    suggested_time, suggested_mem_per_cpu = backend.suggest_sizing(
+        elapsed=max(elapsed) * _MARGIN if elapsed else None,
+        peak_per_cpu=math.ceil(max(peak) * _MARGIN / resources.cpus) if peak else None,
+    )
     return {
         'runs': len(members),
         'slurm': resources_of(resources=resources),
-        'suggested_time': (
-            format_slurm_duration(duration=max(elapsed) * _MARGIN) if elapsed else None
-        ),
-        'suggested_mem_per_cpu': (
-            format_slurm_memory(size=math.ceil(max(peak) * _MARGIN / resources.cpus))
-            if suggests_memory and peak
-            else None
-        ),
+        'suggested_time': suggested_time,
+        'suggested_mem_per_cpu': suggested_mem_per_cpu,
     }
 
 
@@ -172,8 +165,7 @@ def log_usage(*, document: Mapping[str, object], suggests_memory: bool) -> None:
         if run.get('paused'):
             _LOGGER.info('  %s paused: needs more than one job', run['run_path'])
     for group in _mappings(value=document.get('groups')):
-        if not suggests_memory:
-            _LOGGER.info('local: suggest timeout=%s', group['suggested_time'])
+        if group['suggested_time'] is None and group['suggested_mem_per_cpu'] is None:
             continue
         _LOGGER.info(
             '%s: suggest time=%s mem_per_cpu=%s',

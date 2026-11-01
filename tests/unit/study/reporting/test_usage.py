@@ -175,7 +175,7 @@ def test_local_usage_document_reads_usage_files(project: Path) -> None:
     assert never['max_rss'] is None
     assert never['total_cpu_seconds'] is None
     (group,) = cast('list[dict[str, object]]', document['groups'])
-    assert group['suggested_time'] == '1:12:00'
+    assert group['suggested_time'] is None
     assert group['suggested_mem_per_cpu'] is None
 
 
@@ -189,6 +189,9 @@ def test_usage_document_uses_selected_backend(
 
     class Backend:
         suggests_memory = False
+
+        def suggest_sizing(self, *, elapsed: object, peak_per_cpu: object) -> tuple[None, None]:
+            return None, None
 
         def usage(self, *, context: Context) -> tuple[dict[str, JobUsage], dict[str, str | None]]:
             calls.append(context)
@@ -210,7 +213,7 @@ def test_local_usage_log_shows_no_limit_and_dash(
     with caplog.at_level('INFO', logger='tslab.study.reporting.usage'):
         log_usage(document=document, suggests_memory=False)
     assert '1:00:00/no limit' in caplog.text
-    assert 'local: suggest timeout=1:12:00' in caplog.text
+    assert 'suggest' not in caplog.text
     assert '-/no limit' in caplog.text
 
 
