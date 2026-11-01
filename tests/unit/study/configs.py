@@ -154,7 +154,7 @@ def grid(**changes: Any) -> Grid:  # noqa: ANN401
         'config': ClassifyConfig,
         'axes': {
             'recipe': from_presets(
-                PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
+                presets=PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
             ),
             'dataset': {'Coffee': {'data': 'ucr', 'data.dataset_folder_path': '/d/Coffee'}},
             'seed': setting_axis(path='seed', values=(42, 7)),

@@ -24,7 +24,7 @@ def run_entry(
         report: The state report for the run.
         context: The study context containing its folder and live-work state.
         starts: When given, the entry gains an ``expected_start`` field with the
-            expected start of the run's job, or ``None``.
+            expected start of the job of the run, or ``None``.
 
     Returns:
         The run entry with absolute paths.

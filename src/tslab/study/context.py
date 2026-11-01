@@ -154,11 +154,13 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         ValueError: If a setting path of the profile is not a field of a grid.
     """
     machine = load_machine(path=machine_path, lenient_env=read_only)
-    check_machine(study=study, machine=machine)
+    # One set per command, so a dead override warns once, not once per check.
+    warned: set[str] = set()
+    check_machine(study=study, machine=machine, warned=warned)
     runs = select_runs(
         study=study, runs=expand_runs(study=study), grids=selection.grids, only=selection.only
     )
-    resolved = resolve_runs(study=study, machine=machine, runs=runs)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, warned=warned)
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     job_states: dict[str, str] | None = None
     job_states_known = True

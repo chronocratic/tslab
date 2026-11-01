@@ -215,8 +215,8 @@ def settings_to_args(*, config_class: type, settings: Settings) -> list[str]:
 
 
 def from_presets(
-    presets: Mapping[str, tuple[str, object]],
     *,
+    presets: Mapping[str, tuple[str, object]],
     names: Sequence[str] | None = None,
     without: Sequence[str],
 ) -> dict[str, dict[str, SettingValue]]:
@@ -268,8 +268,7 @@ def from_presets(
     result: dict[str, dict[str, SettingValue]] = {}
     for name in selected:
         _, config = presets[name]
-        settings: dict[str, SettingValue] = {}
-        _preset_settings(config=config, base=None, prefix='', preset_name=name, out=settings)
+        settings = _preset_settings(config=config, base=None, prefix='', preset_name=name)
         result[name] = {
             path: value
             for path, value in settings.items()
@@ -298,19 +297,19 @@ def _is_setting_value(*, value: object) -> bool:
 
 
 def _preset_leaf(
-    *, item: object, path: str, preset_name: str, default: object, out: dict[str, SettingValue]
-) -> None:
+    *, item: object, path: str, preset_name: str, default: object
+) -> dict[str, SettingValue]:
     if item is REQUIRED:
-        return
+        return {}
     if default is not _NO_DEFAULT and item == default:
-        return
+        return {}
     if not _is_setting_value(value=item):
         message = (
             f'preset {preset_name}: {path} holds a value of type '
             f'{type(item).__qualname__} that settings cannot hold'
         )
         raise TypeError(message)
-    out[path] = cast('SettingValue', item)
+    return {path: cast('SettingValue', item)}
 
 
 def _has_path(*, config: object, path: str) -> bool:
@@ -333,18 +332,14 @@ def _default_of(*, field: Field[Any], base: object | None) -> object:
 
 
 def _preset_settings(
-    *,
-    config: object,
-    base: object | None,
-    prefix: str,
-    preset_name: str,
-    out: dict[str, SettingValue],
-) -> None:
+    *, config: object, base: object | None, prefix: str, preset_name: str
+) -> dict[str, SettingValue]:
     if not dataclasses.is_dataclass(config) or isinstance(config, type):
         message = f'preset {preset_name} holds a non-dataclass at {prefix or "the top level"}'
         raise TypeError(message)
     cls = type(config)
     hints = get_type_hints(cls, include_extras=True)
+    settings: dict[str, SettingValue] = {}
     for field in fields(cls):
         if not field.init:
             continue
@@ -367,23 +362,30 @@ def _preset_settings(
                     f'which is not a member of the choice'
                 )
                 raise TypeError(message)
-            out[path] = choice_name
+            settings[path] = choice_name
             if item is not None:
                 # why: tyro starts a chosen member from the default instance only when the
                 # default is a member of the same class; otherwise from the class defaults
                 member_base = default if type(default) is type(item) else None
-                _preset_settings(
-                    config=item, base=member_base, prefix=path, preset_name=preset_name, out=out
+                settings.update(
+                    _preset_settings(
+                        config=item, base=member_base, prefix=path, preset_name=preset_name
+                    )
                 )
             continue
         if dataclasses.is_dataclass(item) and not isinstance(item, type):
             if default is _NO_DEFAULT or item != default:
                 nested_base = default if type(default) is type(item) else None
-                _preset_settings(
-                    config=item, base=nested_base, prefix=path, preset_name=preset_name, out=out
+                settings.update(
+                    _preset_settings(
+                        config=item, base=nested_base, prefix=path, preset_name=preset_name
+                    )
                 )
             continue
-        _preset_leaf(item=item, path=path, preset_name=preset_name, default=default, out=out)
+        settings.update(
+            _preset_leaf(item=item, path=path, preset_name=preset_name, default=default)
+        )
+    return settings
 
 
 def check_paths(*, config_class: type, settings: Settings) -> list[str]:

@@ -45,9 +45,6 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 
-# why: commands check the machine once, then resolve; a warning is worth saying once
-_WARNED: set[tuple[Path, int, str]] = set()
-
 
 @dataclass(frozen=True, kw_only=True)
 class ResolvedRun:
@@ -67,7 +64,11 @@ class ResolvedRun:
 
 
 def resolve_runs(
-    *, study: Study, machine: MachineProfile, runs: Sequence[StudyRun]
+    *,
+    study: Study,
+    machine: MachineProfile,
+    runs: Sequence[StudyRun],
+    warned: set[str] | None = None,
 ) -> list[ResolvedRun]:
     """Every run with the settings and resources of the machine applied.
 
@@ -79,6 +80,8 @@ def resolve_runs(
         study: The study the runs came from.
         machine: The machine the runs run on.
         runs: The runs to resolve, e.g. ``expand_runs``' output.
+        warned: Forwarded to ``check_machine`` so a command that already
+            checked the machine does not hear the same warning twice.
 
     Returns:
         The resolved runs, in the order of ``runs``.
@@ -88,7 +91,7 @@ def resolve_runs(
             applies to; the error names the profile file, the override index
             or ``settings``, the grid and the paths.
     """
-    check_machine(study=study, machine=machine)
+    check_machine(study=study, machine=machine, warned=warned)
     return [
         ResolvedRun(
             run=run,
@@ -109,16 +112,20 @@ def resolve_runs(
     ]
 
 
-def check_machine(*, study: Study, machine: MachineProfile) -> None:
+def check_machine(*, study: Study, machine: MachineProfile, warned: set[str] | None = None) -> None:
     """Check the machine settings against the grids; warn about dead overrides.
 
     Every command that reads a machine should call this, not only the ones
     that submit: a profile that does not fit the study is a mistake to hear
-    about early. A warning is logged once per override.
+    about early. A warning is logged once per override per call; a command
+    that checks the machine twice passes the same ``warned`` set, so the
+    warning is said once.
 
     Args:
         study: The study the machine runs.
         machine: The machine profile to check.
+        warned: Texts already warned about in this command, so a repeated
+            check does not repeat the warning.
 
     Raises:
         ValueError: If a machine setting path is not a field of a grid it
@@ -126,7 +133,12 @@ def check_machine(*, study: Study, machine: MachineProfile) -> None:
             or ``settings``, the grid and the paths.
     """
     _settings_problems(study=study, machine=machine)
-    _override_warnings(study=study, machine=machine)
+    seen = warned if warned is not None else set()
+    for text in _override_warnings(study=study, machine=machine):
+        if text in seen:
+            continue
+        seen.add(text)
+        _LOGGER.warning('%s', text)
 
 
 def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
@@ -163,18 +175,17 @@ def _override_grids(
     ]
 
 
-def _override_warnings(*, study: Study, machine: MachineProfile) -> None:
+def _override_warnings(*, study: Study, machine: MachineProfile) -> tuple[str, ...]:
+    """The warning text of each override that matches nothing in this study."""
+    warnings: list[str] = []
     for position, override in enumerate(machine.overrides):
         problems = match_problems(grids=study.grids, match=override.match)
-        text = '; '.join(problems)
-        if problems and (machine.path, position, text) not in _WARNED:
-            _WARNED.add((machine.path, position, text))
-            _LOGGER.warning(
-                'machine override %d of %s matches nothing in this study: %s',
-                position,
-                machine.path,
-                text,
+        if problems:
+            warnings.append(
+                f'machine override {position} of {machine.path} '
+                f'matches nothing in this study: {"; ".join(problems)}'
             )
+    return tuple(warnings)
 
 
 def _slurm_for(

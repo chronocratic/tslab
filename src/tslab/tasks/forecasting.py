@@ -37,7 +37,7 @@ __all__ = [
 ]
 
 
-def _has_duplicates(values: tuple[int, ...]) -> bool:
+def _has_duplicates(*, values: tuple[int, ...]) -> bool:
     return len(set(values)) != len(values)
 
 
@@ -70,7 +70,9 @@ class TSForecastingDataInfo(TSDataInfo):
         if outside:
             message = f'channels {outside} are outside range({self.num_channels})'
             raise ValueError(message)
-        if _has_duplicates(self.target_channels) or _has_duplicates(self.covariate_channels):
+        if _has_duplicates(values=self.target_channels) or _has_duplicates(
+            values=self.covariate_channels
+        ):
             message = 'target_channels and covariate_channels must not contain duplicates'
             raise ValueError(message)
         both = sorted(set(self.target_channels) & set(self.covariate_channels))

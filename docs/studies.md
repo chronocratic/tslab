@@ -41,7 +41,9 @@ example = Study(
             config=classify.ClassifyConfig,
             axes={
                 'recipe': from_presets(
-                    classify.PRESETS, names=('ts2vec-archive-split',), without=('data', 'run_path')
+                    presets=classify.PRESETS,
+                    names=('ts2vec-archive-split',),
+                    without=('data', 'run_path'),
                 ),
                 'dataset': ucr_datasets(root='data', names=('ToySpectra',)),
                 'seed': setting_axis(path='seed', values=(0, 1)),
@@ -67,7 +69,7 @@ classification = Grid(
     config=classify.ClassifyConfig,
     axes={
         'recipe': from_presets(
-            classify.PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
+            presets=classify.PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
         ),
         'dataset': ucr_datasets(root='${UCR_ROOT}', names=UCR)
         | uea_datasets(root='${UEA_ROOT}', names=UEA),
@@ -87,7 +89,9 @@ forecasting = Grid(
     command=('uv', 'run', 'python', '-m', 'my_paper.forecast', 'no-preset'),
     config=forecast.ForecastConfig,
     axes={
-        'recipe': from_presets(forecast.PRESETS, names=('ts2vec-paper',), without=('data',)),
+        'recipe': from_presets(
+            presets=forecast.PRESETS, names=('ts2vec-paper',), without=('data',)
+        ),
         'variant': {
             v: {'data': 'ett', 'data.dataset_file_path': '${ETT_ROOT}/ETT.csv', 'data.variant': v}
             for v in ('ETTh1', 'ETTh2')

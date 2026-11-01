@@ -24,7 +24,7 @@ class _Config:
 
 def test_preset_value_equal_to_class_default_is_kept_over_instance_default() -> None:
     presets = {'p': ('keeps the class default', _Config(trainer=_Train(max_epochs=10)))}
-    settings = from_presets(presets, names=('p',), without=())['p']
+    settings = from_presets(presets=presets, names=('p',), without=())['p']
     assert settings == {'trainer.max_epochs': 10}
     args = settings_to_args(config_class=_Config, settings=settings)
     assert tslab.parse_config(config_class=_Config, args=args).trainer.max_epochs == 10
@@ -32,7 +32,7 @@ def test_preset_value_equal_to_class_default_is_kept_over_instance_default() -> 
 
 def test_preset_equal_to_the_default_instance_adds_nothing() -> None:
     presets = {'p': ('the default', _Config())}
-    assert from_presets(presets, names=('p',), without=()) == {'p': {}}
+    assert from_presets(presets=presets, names=('p',), without=()) == {'p': {}}
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -45,7 +45,7 @@ def test_choice_default_instance_is_the_base_of_the_diff() -> None:
         'p': ('class default depth', _ChoiceConfig(model=TS2VecSettings(depth=10))),
         'q': ('same as the default instance', _ChoiceConfig()),
     }
-    result = from_presets(presets, names=('p', 'q'), without=())
+    result = from_presets(presets=presets, names=('p', 'q'), without=())
     assert result['p']['model.depth'] == 10
     assert 'model.depth' not in result['q']
 
@@ -74,4 +74,4 @@ def test_string_value_starting_with_a_dash_is_one_flag_word() -> None:
 
 def test_without_naming_no_field_raises() -> None:
     with pytest.raises(ValueError, match='dta'):
-        from_presets(PRESETS, names=('cost-paper',), without=('dta',))
+        from_presets(presets=PRESETS, names=('cost-paper',), without=('dta',))

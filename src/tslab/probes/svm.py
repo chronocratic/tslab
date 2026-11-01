@@ -30,7 +30,7 @@ _MIN_CLASSES = 2
 # Near the hard margin, the dual coefficients of libsvm diverge at C=inf when
 # overlap; a finite C keeps them bounded.
 _HARD_MARGIN_C = 1e6
-_C_GRID: list[float] = [0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, _HARD_MARGIN_C]
+_C_GRID: tuple[float, ...] = (0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, _HARD_MARGIN_C)
 
 
 @dataclass(frozen=True, kw_only=True)

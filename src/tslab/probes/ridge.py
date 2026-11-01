@@ -24,7 +24,7 @@ from tslab.probes.metrics import forecasting_metrics
 
 __all__ = ['RidgeProbe', 'RidgeProbeSettings']
 
-_ALPHA_GRID: list[float] = [0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]
+_ALPHA_GRID: tuple[float, ...] = (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000)
 
 
 def _rmse_plus_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:

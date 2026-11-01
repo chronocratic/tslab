@@ -179,7 +179,7 @@ class Grid:
             raise TypeError(message)
         for match in self.exclude:
             if not isinstance(match, Mapping):
-                message = f'each grid exclude must be a match mapping, got {_kind(match)}'
+                message = f'each grid exclude must be a match mapping, got {_kind(value=match)}'
                 raise TypeError(message)
         if isinstance(self.overrides, Override):
             message = (
@@ -189,33 +189,36 @@ class Grid:
             raise TypeError(message)
         for override in self.overrides:
             if not isinstance(override, Override):
-                message = f'each grid override must be an Override, got {_kind(override)}'
+                message = f'each grid override must be an Override, got {_kind(value=override)}'
                 raise TypeError(message)
         if not isinstance(self.run_settings, Mapping):
-            message = f'grid run_settings must be a mapping, got {_kind(self.run_settings)}'
+            message = f'grid run_settings must be a mapping, got {_kind(value=self.run_settings)}'
             raise TypeError(message)
 
     def _check_axis_shapes(self) -> None:
         if not isinstance(self.axes, Mapping):
-            message = f'grid axes must be a mapping of axis name to values, got {_kind(self.axes)}'
+            message = (
+                f'grid axes must be a mapping of axis name to values, got {_kind(value=self.axes)}'
+            )
             raise TypeError(message)
         for axis_name, values in self.axes.items():
             if not isinstance(values, Mapping):
                 message = (
-                    f'axis {axis_name!r} must map value names to settings, got {_kind(values)}; '
-                    f'for one setting use setting_axis(path=..., values=...)'
+                    f'axis {axis_name!r} must map value names to settings, '
+                    f'got {_kind(value=values)}; for one setting use '
+                    f'setting_axis(path=..., values=...)'
                 )
                 raise TypeError(message)
             for value_name, settings in values.items():
                 if not isinstance(settings, Mapping):
                     message = (
                         f'axis {axis_name!r} value {value_name!r} must be a mapping of '
-                        f'setting path to value, got {_kind(settings)}'
+                        f'setting path to value, got {_kind(value=settings)}'
                     )
                     raise TypeError(message)
 
 
-def _kind(value: object) -> str:
+def _kind(*, value: object) -> str:
     return type(value).__name__
 
 
@@ -236,7 +239,7 @@ class Study:
         for grid_name, grid in self.grids.items():
             validate_name(name=grid_name, kind='grid')
             if not isinstance(grid, Grid):
-                message = f'grid {grid_name!r} must be a Grid, got {_kind(grid)}'
+                message = f'grid {grid_name!r} must be a Grid, got {_kind(value=grid)}'
                 raise TypeError(message)
             matches = (*grid.exclude, *(override.match for override in grid.overrides))
             problems = _grid_match_problems(grid_name=grid_name, grid=grid, matches=matches)

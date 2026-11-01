@@ -64,9 +64,10 @@ def _runtime_fields(
     *, entry: ModelEntry, values: dict[str, object], data_info: TSDataInfo
 ) -> dict[str, object]:
     runtime: dict[str, object] = {'input_dim': data_info.num_channels}
-    if 'sequence_length' not in values:
+    remaining = dict(values)
+    if 'sequence_length' not in remaining:
         return runtime
-    length = values.pop('sequence_length')
+    length = remaining.pop('sequence_length')
     if length is None:
         length = data_info.length
     if length is None and _requires(
@@ -112,6 +113,9 @@ def build_chronocratic_model(
         field.name: getattr(config, field.name) for field in dataclasses.fields(config)
     }
     runtime = _runtime_fields(entry=entry, values=values, data_info=data_info)
+    # _runtime_fields copied values, so drop sequence_length here: the parameter
+    # class must see it once, resolved in runtime
+    values.pop('sequence_length', None)
     recorded = {'model': entry.name, 'settings': dict(values), 'runtime': dict(runtime)}
     recipe = values.pop('augmentation', None)
     if recipe is not None:

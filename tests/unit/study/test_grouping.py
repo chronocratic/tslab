@@ -174,7 +174,9 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
             'g': grid(
                 short_name='g1',
                 axes={
-                    'recipe': from_presets(PRESETS, names=('ts2vec-paper',), without=('data',)),
+                    'recipe': from_presets(
+                        presets=PRESETS, names=('ts2vec-paper',), without=('data',)
+                    ),
                     'dataset': {'Coffee': {'data': 'ucr'}},
                 },
             )
