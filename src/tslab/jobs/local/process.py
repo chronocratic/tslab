@@ -12,7 +12,7 @@ import threading
 import time
 from types import FrameType
 
-__all__ = ['ProcessResult', 'StopRequest', 'run_process', 'stop_on_signals']
+__all__ = ['ProcessResult', 'StopRequest', 'process_alive', 'run_process', 'stop_on_signals']
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -265,3 +265,21 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
     reader.join()
     return result
+
+
+def process_alive(*, pid: int) -> bool:
+    """Return whether a process with ``pid`` still exists on this host.
+
+    A ``PermissionError`` means the process exists but belongs to another
+    user, so it counts as alive.
+
+    Args:
+        pid: The process id to check.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True

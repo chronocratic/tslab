@@ -68,6 +68,7 @@ changelog.d/           towncrier fragments, one per pull request
   scikit-learn, any tracker SDK, chronocratic, or `tslab.adapters`,
   `tslab.lightning`, `tslab.tasks`, `tslab.probes`, `tslab.study`, `tslab.cli`.
   Tracker SDKs are imported lazily, inside the tracker that needs them.
+- `core` may import `tslab.jobs.slurm` and `tslab.jobs.local`.
 - `tslab.lightning` builds on Lightning; `tslab.tracking` (trackers wrap
   Lightning loggers) and `tslab.adapters.chronocratic` import it in their
   submodules, but importing `tslab.tracking` itself loads no Lightning and
