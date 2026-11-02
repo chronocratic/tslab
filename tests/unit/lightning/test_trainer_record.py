@@ -141,7 +141,7 @@ def test_training_record_time_limit_warns(tmp_path: Path, caplog: pytest.LogCapt
             model=_ToyModel(learning_rate=0.05, seconds_per_batch=0.1),
         )
     record = read_json_object(path=checkpoint_directory / 'training.json')
-    assert record['stop_reason'] == 'time_limit'
+    assert record['stop_reason'] == 'max_training_time'
     assert 'training stopped at max_training_time' in caplog.text
 
 

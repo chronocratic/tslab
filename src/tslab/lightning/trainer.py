@@ -300,14 +300,14 @@ def _training_stop_reason(*, trainer: lightning.Trainer) -> str:
         trainer: The trainer after ``fit`` returned normally.
 
     Returns:
-        ``'time_limit'`` if the training timer ran out, ``'early_stopping'`` if an
+        ``'max_training_time'`` if the training timer ran out, ``'early_stopping'`` if an
         early-stopping callback stopped the training, otherwise ``'max_epochs'``.
     """
     callbacks = cast('_TrainerCallbacks', trainer).callbacks
     if any(
         isinstance(callback, Timer) and _timer_ran_out(timer=callback) for callback in callbacks
     ):
-        return 'time_limit'
+        return 'max_training_time'
     if any(
         isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0 for callback in callbacks
     ):
@@ -329,7 +329,7 @@ def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> No
         directory: The checkpoint directory that receives the record.
     """
     stop_reason = _training_stop_reason(trainer=trainer)
-    if stop_reason == 'time_limit':
+    if stop_reason == 'max_training_time':
         _LOGGER.warning(
             'training stopped at max_training_time after %d epochs; the result depends on '
             'hardware speed and is not reproducible from the seed; use max_epochs for '
