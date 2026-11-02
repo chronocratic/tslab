@@ -108,6 +108,9 @@ def _environment_of(*, command: PoolCommand, slot: str | None) -> dict[str, str]
     environment = {**command.environment}
     if slot is not None and slot != 'mps':
         environment['CUDA_VISIBLE_DEVICES'] = slot
+        # why: nvidia-smi ids follow the PCI bus; CUDA numbers the fastest GPU
+        # first unless told otherwise, so the slot id would name the wrong card
+        environment.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
     return environment
 
 
@@ -153,7 +156,10 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     its slot; while none is free, ``on_wait`` is called once for the command
     and the pool retries every ``gpu_poll_seconds``, waking on a stop. A
     leased command runs with ``CUDA_VISIBLE_DEVICES`` set to the id of the
-    lease, unless it is ``'mps'``, and keeps the lock while it runs.
+    lease; a numeric slot also gets ``CUDA_DEVICE_ORDER`` set to
+    ``PCI_BUS_ID`` unless the environment already sets it. The ``'mps'``
+    slot leaves the environment untouched. The command keeps the lock
+    while it runs.
 
     The callbacks are called with keyword arguments only. ``on_line``,
     ``on_event`` and ``on_end`` are called from the worker threads, not from
