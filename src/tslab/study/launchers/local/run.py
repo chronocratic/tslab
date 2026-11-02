@@ -20,7 +20,7 @@ from tslab.jobs.local import (
     TaskOutput,
     without_scheduler_variables,
 )
-from tslab.study.code_snapshot import without_code_snapshot
+from tslab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
 from tslab.study.launchers import LaunchError, LaunchStopped, OnTaskState, RecordJob
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.paths import usage_file
@@ -162,9 +162,9 @@ class LocalLauncher:
             LaunchStopped: If a stop signal was caught, with its number.
         """
         snapshot = group.code_snapshot
-        if snapshot is not None and not (snapshot.folder / 'src').is_dir():
+        if snapshot is not None and not (snapshot.folder / SRC_FOLDER).is_dir():
             message = (
-                f'code snapshot {snapshot.folder}/src is missing; '
+                f'code snapshot {snapshot.folder / SRC_FOLDER} is missing; '
                 'not running the live code; rerun with --new-code-snapshot'
             )
             raise LaunchError(message)

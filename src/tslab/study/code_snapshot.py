@@ -20,6 +20,7 @@ from tslab.core.paths import require_path
 
 __all__ = [
     'CODE_SNAPSHOTS_FOLDER',
+    'SRC_FOLDER',
     'CodeSnapshot',
     'CodeSnapshotError',
     'take_code_snapshot',
@@ -27,6 +28,7 @@ __all__ = [
 ]
 
 CODE_SNAPSHOTS_FOLDER = '.tslab-code-snapshots'
+SRC_FOLDER = 'src'
 _GIT_TIMEOUT_SECONDS = 10
 _MAX_LISTED_UNTRACKED = 20
 
@@ -97,7 +99,7 @@ class CodeSnapshot:
             ``<folder>/src``, followed by ``:`` and the current value when
             the current value is non-empty.
         """
-        source = f'{self.folder}/src'
+        source = str(self.folder / SRC_FOLDER)
         if current is None or not current:
             return source
         return f'{source}:{current}'
@@ -124,7 +126,7 @@ def without_code_snapshot(*, environ: Mapping[str, str]) -> dict[str, str]:
     pythonpath = cleaned.get('PYTHONPATH')
     if not folder or pythonpath is None:
         return cleaned
-    kept = [entry for entry in pythonpath.split(':') if entry != f'{folder}/src']
+    kept = [entry for entry in pythonpath.split(':') if entry != str(Path(folder) / SRC_FOLDER)]
     if not kept:
         cleaned.pop('PYTHONPATH')
         return cleaned
@@ -195,7 +197,7 @@ def take_code_snapshot(
     )
     if dry_run:
         return snapshot
-    if (folder / 'src').is_dir():
+    if (folder / SRC_FOLDER).is_dir():
         return snapshot
     if folder.is_dir():
         # why: a folder that lost its src (e.g. deleted by hand) is not a
@@ -239,7 +241,7 @@ def _head_commit(*, git: str, project_root: Path) -> str:
 
 
 def _check_src_layout(*, project_root: Path) -> None:
-    if (project_root / 'src').is_dir():
+    if (project_root / SRC_FOLDER).is_dir():
         return
     message = (
         f'code snapshots need the src layout: {project_root} has no src folder; '
@@ -258,7 +260,9 @@ def _untracked_files(*, git: str, project_root: Path) -> list[str]:
 
 def _list_files(*, git: str, project_root: Path, flags: tuple[str, ...]) -> list[str]:
     raw = _run_git(
-        git=git, project_root=project_root, arguments=('ls-files', '-z', *flags, '--', 'src/')
+        git=git,
+        project_root=project_root,
+        arguments=('ls-files', '-z', *flags, '--', f'{SRC_FOLDER}/'),
     )
     return [path for path in raw.split('\0') if path]
 
@@ -306,7 +310,7 @@ def _dirty_files(*, git: str, project_root: Path) -> list[str]:
     raw = _run_git(
         git=git,
         project_root=project_root,
-        arguments=('diff', '--name-only', '-z', 'HEAD', '--', 'src/'),
+        arguments=('diff', '--name-only', '-z', 'HEAD', '--', f'{SRC_FOLDER}/'),
     )
     return [path for path in raw.split('\0') if path]
 

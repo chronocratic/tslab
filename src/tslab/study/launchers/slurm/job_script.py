@@ -13,7 +13,7 @@ from tslab.jobs.slurm import (
     srun_command,
     wait_for_file_line,
 )
-from tslab.study.code_snapshot import CodeSnapshot
+from tslab.study.code_snapshot import CodeSnapshot, SRC_FOLDER
 from tslab.study.machine import SlurmSettings
 
 __all__ = ['foreground_script', 'job_script']
@@ -207,7 +207,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
 
 def _code_snapshot_lines(*, code_snapshot: CodeSnapshot) -> list[str]:
     # why: the job must not silently fall back to the live code if the snapshot was removed
-    source = f'{code_snapshot.folder}/src'
+    source = str(code_snapshot.folder / SRC_FOLDER)
     return [
         f'if [ ! -d {shlex.quote(source)} ]; then',
         f'    echo "tslab: code snapshot {source} is missing; not running the live code" >&2',

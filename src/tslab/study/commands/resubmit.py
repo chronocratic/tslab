@@ -11,7 +11,7 @@ from typing import TextIO, TYPE_CHECKING
 from tslab.core.lock import read_lock_owner
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
-from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
+from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
@@ -192,7 +192,7 @@ def _code_snapshots_of(
 def _check_reused_folders(*, snapshots: Mapping[str, CodeSnapshot | None]) -> None:
     """Every reused snapshot folder must still hold a ``src/`` copy."""
     for snapshot in dict.fromkeys(snapshots.values()):
-        if snapshot is None or (snapshot.folder / 'src').is_dir():
+        if snapshot is None or (snapshot.folder / SRC_FOLDER).is_dir():
             continue
         message = (
             f'the code snapshot folder {snapshot.folder} has no src/ left; the runs '
