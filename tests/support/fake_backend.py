@@ -123,6 +123,7 @@ class FakeBackend:
 
     name = 'fake'
     has_time_limit = True
+    knows_other_hosts = True
 
     def __init__(self) -> None:
         self.job_states_answer: JobStates = _EMPTY_STATES

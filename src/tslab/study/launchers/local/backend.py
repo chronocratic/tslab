@@ -81,6 +81,7 @@ class LocalBackend:
 
     #: Whether the jobs of this backend have a time limit.
     has_time_limit = False
+    knows_other_hosts = False
 
     def job_states(
         self,

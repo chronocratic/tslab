@@ -369,13 +369,33 @@ def _ended_run_with_lock(*, project: Path, host: str) -> tuple[RunReport, Path]:
 
 def test_a_live_lock_of_this_host_is_kept(project: Path) -> None:
     report, lock = _ended_run_with_lock(project=project, host=hostname())
-    _remove_ended_locks(reports=[report], study_directory=study_directory(project=project))
+    _remove_ended_locks(
+        reports=[report], study_directory=study_directory(project=project), knows_other_hosts=False
+    )
     assert lock.exists()
 
 
-def test_a_live_lock_of_another_host_with_an_ended_job_is_removed(project: Path) -> None:
+def test_a_live_lock_of_another_host_is_kept_on_a_local_machine(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     report, lock = _ended_run_with_lock(project=project, host='other-host')
-    _remove_ended_locks(reports=[report], study_directory=study_directory(project=project))
+    with caplog.at_level('INFO'):
+        _remove_ended_locks(
+            reports=[report],
+            study_directory=study_directory(project=project),
+            knows_other_hosts=False,
+        )
+    assert lock.exists()
+    assert f'kept the lock of {report.run.run_path}: it is live on host other-host' in caplog.text
+
+
+def test_a_live_lock_of_another_host_is_removed_when_the_backend_knows_other_hosts(
+    project: Path,
+) -> None:
+    report, lock = _ended_run_with_lock(project=project, host='other-host')
+    _remove_ended_locks(
+        reports=[report], study_directory=study_directory(project=project), knows_other_hosts=True
+    )
     assert not lock.exists()
 
 
