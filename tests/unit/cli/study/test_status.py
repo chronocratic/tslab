@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend
+from tests.support.fake_backend import FakeBackend, install_fake_backend
 from tests.unit.cli.study.helpers import toy_project
 from tests.unit.study.helpers import finish_run, submit_study
 from tslab.cli.study import Status
@@ -45,13 +45,14 @@ def test_status_suggests_following_queued_runs(
 
 
 def test_status_says_all_done_and_how_to_collect(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    fake_backend: FakeBackend,
-    caplog: pytest.LogCaptureFixture,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    submit_study(project=project)
+    # why: only the cluster submission goes through the fake; the local status
+    # runs on the real LocalBackend, as before the fake backend existed
+    with monkeypatch.context() as patch:
+        install_fake_backend(monkeypatch=patch)
+        submit_study(project=project)
     for model in ('small', 'large'):
         for seed in (1, 2):
             finish_run(project=project, model=model, seed=seed)
