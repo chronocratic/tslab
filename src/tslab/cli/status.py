@@ -33,6 +33,7 @@ from tslab.core.status import (
 )
 from tslab.core.text import log_table
 from tslab.study.launchers import JobPhase
+from tslab.study.project import load_project_settings
 from tslab.study.reporting.outcome import states_exit_code
 from tslab.study.reporting.state import read_folder, study_state, StudyState
 
@@ -57,19 +58,23 @@ class Status:
     """Show the instances of a run, or one line per run below a folder.
 
     For example:
+        tslab status
         tslab status runs/
         tslab status runs/ --stage scale
         tslab status runs/ --watch 60
 
     Attributes:
         path: A run folder, or any folder above runs (for example runs/).
+            Default: the runs folder of the nearest tslab.toml.
         stage: Count only the instances of this stage.
         watch: Refresh every this many seconds until Ctrl-C.
         json: Print one run-status JSON document.
         exit_code: Return the code for the run states.
     """
 
-    path: Annotated[Path, tyro.conf.arg(metavar='FOLDER'), tyro.conf.Positional]
+    path: Annotated[
+        Path | None, tyro.conf.arg(metavar='FOLDER', help_behavior_hint=''), tyro.conf.Positional
+    ] = None
     stage: Annotated[str | None, tyro.conf.arg(metavar='STAGE', help_behavior_hint='')] = None
     watch: Annotated[float | None, tyro.conf.arg(metavar='SECONDS', help_behavior_hint='')] = None
     json: bool = False
@@ -80,44 +85,65 @@ class Status:
 
         Returns:
             ``0`` when something was shown, ``1`` when no run was found or the
-            status file of the given run is unreadable, ``2`` when ``path`` is
-            not a folder.
+            status file of the given run is unreadable, ``2`` when the folder
+            does not exist.
         """
         if self.json and self.watch is not None:
             message = '--watch does not combine with --json'
             raise UsageError(message)
-        if not self.path.is_dir():
-            _LOGGER.error('%s is not a folder', self.path.as_posix())
+        path = self._folder()
+        if not path.is_dir():
+            _LOGGER.error('%s is not a folder', path.as_posix())
             return 2
-        return watch(seconds=self.watch, show=self._show)
 
-    def _show(self) -> int:
+        def show() -> int:
+            return self._show(path=path)
+
+        return watch(seconds=self.watch, show=show)
+
+    def _folder(self) -> Path:
+        """The folder to show: the argument, or the runs folder of tslab.toml."""
+        if self.path is not None:
+            return self.path
         try:
-            snapshot = read_status(path=self.path / STATUS_FILE)
+            settings = load_project_settings(start=Path.cwd())
+        except ValueError as error:
+            raise UsageError(str(error)) from error
+        runs = settings.runs
+        source = settings.path
+        if runs is None or source is None:
+            message = 'give a FOLDER, or set runs in tslab.toml'
+            raise UsageError(message)
+        _LOGGER.info('runs folder %s from %s', runs.as_posix(), source.as_posix())
+        return runs
+
+    def _show(self, *, path: Path) -> int:
+        try:
+            snapshot = read_status(path=path / STATUS_FILE)
         except StatusFileError as error:
             _LOGGER.error('%s', error)  # noqa: TRY400 # why: a traceback adds nothing
             return 1
         if snapshot is not None:
-            return self._show_run(snapshot=snapshot)
-        return self._show_runs()
+            return self._show_run(path=path, snapshot=snapshot)
+        return self._show_runs(path=path)
 
-    def _show_run(self, *, snapshot: RunStatusSnapshot) -> int:
-        _print_run(directory=self.path, snapshot=snapshot, stage=self.stage)
+    def _show_run(self, *, path: Path, snapshot: RunStatusSnapshot) -> int:
+        _print_run(directory=path, snapshot=snapshot, stage=self.stage)
         if not (self.json or self.exit_code):
             return 0
-        entry, state = _run_status_entry(directory=self.path, snapshot=snapshot, stage=self.stage)
+        entry, state = _run_status_entry(directory=path, snapshot=snapshot, stage=self.stage)
         code = states_exit_code(states=[state], live=False)
         if self.json:
             print_json(document=_status_document(entries=[entry], states=[state]))
         return code if self.exit_code else 0
 
-    def _show_runs(self) -> int:
-        runs = sorted(status_file.parent for status_file in self.path.rglob(STATUS_FILE))
+    def _show_runs(self, *, path: Path) -> int:
+        runs = sorted(status_file.parent for status_file in path.rglob(STATUS_FILE))
         if not runs:
-            _LOGGER.warning('no runs below %s', self.path.as_posix())
+            _LOGGER.warning('no runs below %s', path.as_posix())
             _LOGGER.info('a run folder holds status.json; pass it, or a folder above runs')
             return 1
-        _print_runs(root=self.path, runs=runs, stage=self.stage)
+        _print_runs(root=path, runs=runs, stage=self.stage)
         if not (self.json or self.exit_code):
             return 0
         entries, states = _run_status_entries(runs=runs, stage=self.stage)
