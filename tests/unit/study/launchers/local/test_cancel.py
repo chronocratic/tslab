@@ -16,6 +16,7 @@ from tests.unit.study.helpers import (
     study_directory,
     write_launch,
 )
+from tslab.cli import main
 from tslab.core.meta import hostname
 from tslab.study.commands import cancel, resubmit, submit
 from tslab.study.context import load_context, Selection
@@ -108,6 +109,15 @@ def test_local_cancel_signal_flag_is_usage_error(
     ctx = context(project=project, machine_file='local.toml')
     with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
         assert cancel(context=ctx, dry_run=False, signal='USR2') == (2, [])
+    assert 'cancel --signal is SLURM only' in caplog.text
+
+
+def test_local_cancel_signal_through_the_cli_exits_two(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('ERROR'), pytest.raises(SystemExit) as raised:
+        main(args=['study', 'cancel', 'toy_studies:study', '--machine', 'local.toml', '--signal'])
+    assert raised.value.code == 2
     assert 'cancel --signal is SLURM only' in caplog.text
 
 
