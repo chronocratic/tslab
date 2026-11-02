@@ -90,7 +90,7 @@ uv run tslab study submit "$STUDY" --machine "$MACHINE" --json
 On a local machine, submit with `--detach` and never run `submit` in the
 foreground: a foreground submit blocks until every task ends. `--detach` starts
 the launch in the background and returns once it runs; its output goes to
-`.study/local-launch.log`. Then use `wait`, `status`, `failures`, `usage` and
+`.study/local_logs/<pid>.log`. Then use `wait`, `status`, `failures`, `usage` and
 `cancel` as below.
 
 ```bash

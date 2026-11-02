@@ -38,7 +38,7 @@ from tslab.study.launchers.local.pid_file import (
     hold_launch,
     LAUNCH_FILE,
     launch_is_live,
-    LAUNCH_LOG,
+    LAUNCH_LOGS,
     local_job_states,
     LocalLaunchError,
     read_launch,
@@ -269,7 +269,9 @@ def test_detach_reports_a_supervisor_that_fails(
         )
     assert code != 0
     assert time.monotonic() - start < 10
-    assert (folder / LAUNCH_LOG).exists()
+    logs = list((folder / LAUNCH_LOGS).iterdir())
+    assert [path.name for path in logs] != []
+    assert all(not path.name.startswith('starting-') for path in logs)
     assert 'no_such_module' in caplog.text
 
 

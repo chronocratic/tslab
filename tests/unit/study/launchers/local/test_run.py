@@ -206,6 +206,31 @@ def test_local_launcher_writes_to_given_stream(machine: MachineProfile, tmp_path
     assert 'TASK-OUTPUT' in stream.getvalue()
 
 
+def test_detached_local_launcher_keeps_task_lines_out_of_the_console(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('TSLAB_DETACHED', '1')
+    local_machine = MachineProfile(
+        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+    )
+    script = tmp_path / 'echo.py'
+    script.write_text("print('TASK-OUTPUT')")
+    study = Study(
+        name='s', grids={'g': grid(short_name='g1', command=(sys.executable, str(script)))}
+    )
+    stream = StringIO()
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings(), stream=stream),
+        machine=local_machine,
+        study=study,
+        groups=groups_of(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    assert 'TASK-OUTPUT' not in stream.getvalue()
+    assert '=== task 0 started' in stream.getvalue()
+
+
 def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_command(
     machine: MachineProfile, tmp_path: Path
 ) -> None:

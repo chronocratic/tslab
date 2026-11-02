@@ -22,6 +22,7 @@ from tslab.jobs.local import (
 )
 from tslab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
 from tslab.study.launchers import LaunchError, LaunchStopped, OnTaskState, RecordJob
+from tslab.study.launchers.local.pid_file import DETACHED_VARIABLE
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.paths import usage_file
 from tslab.study.plan import JobGroup
@@ -192,7 +193,8 @@ class LocalLauncher:
 
         output = TaskOutput(
             stream=stream,
-            single_slot=slots == 1,
+            # why: a detached launch writes its console to a file; the task logs hold the lines
+            single_slot=slots == 1 and DETACHED_VARIABLE not in os.environ,
             tasks={
                 key: TaskInfo(
                     log_file=task.log_file,
