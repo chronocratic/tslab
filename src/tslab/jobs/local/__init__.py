@@ -21,6 +21,7 @@ from tslab.jobs.local.process import (
     StopRequest,
 )
 from tslab.jobs.local.shell import export_lines
+from tslab.jobs.local.watchdog import Watchdog
 
 __all__ = [
     'GpuLease',
@@ -34,6 +35,7 @@ __all__ = [
     'StopRequest',
     'TaskInfo',
     'TaskOutput',
+    'Watchdog',
     'boot_id',
     'busy_gpus',
     'export_lines',
