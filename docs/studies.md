@@ -550,6 +550,20 @@ selection and tail size. The command only reads data. See the
 uv run tslab study failures my_paper.studies:example --machine cluster --json
 ```
 
+## Read the log of a run
+
+`tslab study logs` prints the last 50 lines of `logs/run.log` of one run, found
+from the same `--grid` and `--only` flags as the other commands. The selection
+must match exactly one run; otherwise the command exits 2 and lists the
+matches. `-f` keeps printing new lines until Ctrl-C, like `tail -f`, and waits
+for a run that has not started yet. `-n N` changes the number of lines.
+`--job` shows the scheduler output of the job instead, and `--launch` the log
+of a local launch started with `--detach`.
+
+```bash
+uv run tslab study logs my_paper.studies:example --machine local --only seed=1 -f
+```
+
 ## Run one task in the foreground
 
 `tslab study run` runs exactly one run of the study in the current terminal:

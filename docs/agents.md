@@ -116,6 +116,14 @@ uv run tslab study failures "$STUDY" --machine "$MACHINE" --json
 uv run tslab study resubmit "$STUDY" --machine "$MACHINE" --states failed --json
 ```
 
+To read the log of one run while it runs, select exactly one run. Do not pass
+`-f` from an agent: it waits for new lines until Ctrl-C. Read the last lines
+again instead:
+
+```bash
+uv run tslab study logs "$STUDY" --machine "$MACHINE" --only <axis>=<value> -n 100
+```
+
 To reproduce one run in the terminal, select exactly one run. `study run`
 runs the command of the run with the environment and setup of the machine,
 prints to the terminal, and records nothing; it refuses a queued or running

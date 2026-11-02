@@ -75,6 +75,13 @@ uv run tslab study failures example --machine local --json
 uv run tslab study resubmit example --machine local --states failed --json
 ```
 
+To read the log of one run while it runs, select exactly one run. Never pass
+`-f`: it waits for new lines until Ctrl-C. Read the last lines again instead:
+
+```bash
+uv run tslab study logs example --machine local --only <axis>=<value> -n 100
+```
+
 To reproduce one run in the terminal, select exactly one run. `study run`
 runs the command of the run, prints to the terminal, and records nothing; it
 refuses a queued or running run and does not call SLURM:

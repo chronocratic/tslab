@@ -15,6 +15,7 @@ COMMANDS: list[list[str]] = [
     ['study', 'status'],
     ['study', 'resubmit'],
     ['study', 'results'],
+    ['study', 'logs'],
     ['machine', 'add'],
     ['machine', 'list'],
     ['machine', 'remove'],

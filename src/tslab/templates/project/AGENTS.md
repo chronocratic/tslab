@@ -235,6 +235,7 @@ uv run tslab study submit example --machine local --detach  # background launch;
 uv run tslab study status example --machine local  # add --watch 60 to refresh
 uv run tslab study wait example --machine local
 uv run tslab study failures example --machine local
+uv run tslab study logs example --machine local --grid classification --only <axis>=<value> -n 100  # last lines of one run log; never -f, it waits until Ctrl-C
 uv run tslab study run example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
 uv run tslab study usage example --machine local  # per-run and per-group accounting
 uv run tslab study resubmit example --machine local
