@@ -94,6 +94,44 @@ def test_meta_and_hashes(tmp_path: Path) -> None:
     assert first['finished_at'] is not None
 
 
+def test_meta_has_code_snapshot_block_from_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT', '/out/.tslab-code-snapshots/0123456789abcdef')
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT_HASH', '0123456789abcdef')
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT_COMMIT', 'a' * 40)
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT_DIRTY', 'true')
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED', 'false')
+    with Run(config=Config(seed=1), root=tmp_path, relative_path=Path('a')):
+        pass
+    meta = json.loads((tmp_path / 'a' / 'meta.json').read_text(encoding='utf-8'))
+    assert meta['code_snapshot'] == {
+        'folder': '/out/.tslab-code-snapshots/0123456789abcdef',
+        'hash': '0123456789abcdef',
+        'commit': 'a' * 40,
+        'dirty': True,
+        'untracked_copied': False,
+    }
+    assert set(meta['git']) == {'commit', 'dirty'}
+
+
+def test_meta_code_snapshot_is_null_without_variables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in (
+        'TSLAB_CODE_SNAPSHOT',
+        'TSLAB_CODE_SNAPSHOT_HASH',
+        'TSLAB_CODE_SNAPSHOT_COMMIT',
+        'TSLAB_CODE_SNAPSHOT_DIRTY',
+        'TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED',
+    ):
+        monkeypatch.delenv(name, raising=False)
+    with Run(config=Config(seed=1), root=tmp_path, relative_path=Path('a')):
+        pass
+    meta = json.loads((tmp_path / 'a' / 'meta.json').read_text(encoding='utf-8'))
+    assert meta['code_snapshot'] is None
+
+
 def test_run_options_do_not_change_config_hash(tmp_path: Path) -> None:
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         pass

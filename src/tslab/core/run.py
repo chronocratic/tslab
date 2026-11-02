@@ -11,6 +11,7 @@ from collections.abc import Callable, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 import signal
 import sys
@@ -23,7 +24,13 @@ from tslab.core.config import config_to_yaml, save_config
 from tslab.core.files import atomic_write_json
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.lock import acquire_lock, Heartbeat, release_lock
-from tslab.core.meta import collect_git_state, collect_versions, hostname, META_FORMAT_VERSION
+from tslab.core.meta import (
+    collect_code_snapshot,
+    collect_git_state,
+    collect_versions,
+    hostname,
+    META_FORMAT_VERSION,
+)
 from tslab.core.paths import (
     CONFIG_FILE,
     InstanceName,
@@ -532,6 +539,8 @@ class Run:
                 # The latest execution only; the meta.json of each instance keeps its own.
                 'versions': environment['versions'],
                 'git': environment['git'],
+                # The code the job ran; the stage instance meta.json files stay unchanged.
+                'code_snapshot': collect_code_snapshot(environ=os.environ),
                 'hostname': hostname(),
                 'started_at': utc_now_iso(),
             }
