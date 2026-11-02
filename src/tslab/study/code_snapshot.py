@@ -339,9 +339,10 @@ def _copy_atomically(*, project_root: Path, copies: list[str], folder: Path, dig
     except CodeSnapshotError:
         shutil.rmtree(temporary, ignore_errors=True)
         raise
-    except (OSError, shutil.Error):
+    except (OSError, shutil.Error) as error:
         shutil.rmtree(temporary, ignore_errors=True)
-        raise
+        message = f'cannot copy the code snapshot to {folder}: {error}'
+        raise CodeSnapshotError(message) from error
 
 
 def _check_copy_digest(*, temporary: Path, copies: list[str], digest: str) -> None:
