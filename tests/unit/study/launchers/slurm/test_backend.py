@@ -13,7 +13,7 @@ from typing import cast, TYPE_CHECKING
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
+from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tslab.cli import main
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
@@ -21,7 +21,7 @@ from tslab.jobs.slurm import (
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
 )
-from tslab.study.commands import cancel, run_one
+from tslab.study.commands import cancel, resubmit, run_one
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
 from tslab.study.doctor import DoctorCheck
@@ -565,3 +565,27 @@ def test_run_one_says_one_process_for_multi_gpu_jobs(
     assert 'study run starts one process; the job would start 2' in caplog.text
     assert len(calls) == 1
     assert calls[0][:2] == ['bash', '-c']
+
+
+def _live_cancel_setup(*, project: Path, fake: FakeSlurm) -> None:
+    """Task 0 queued and tasks 1 to 3 done, so only one run is live."""
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    for model, seed in (('small', 2), ('large', 1), ('large', 2)):
+        finish_run(project=project, model=model, seed=seed)
+
+
+def test_cancel_live_passes_only_live_job_ids(project: Path, fake: FakeSlurm) -> None:
+    _live_cancel_setup(project=project, fake=fake)
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_1|TIMEOUT\n1000_2|COMPLETED\n'}])
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        cancel_live=True,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    # why: the timed out job already ended; scancel on an ended id would fail
+    assert fake.calls('scancel') == [['1000_0']]

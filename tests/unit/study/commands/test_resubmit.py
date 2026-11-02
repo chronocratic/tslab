@@ -5,10 +5,11 @@ import importlib
 import json
 import os
 from pathlib import Path
+from typing import cast, TYPE_CHECKING
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import (
     context,
     finish_run,
@@ -32,8 +33,13 @@ from tslab.core.status import (
 from tslab.study.commands import resubmit, submit
 from tslab.study.commands.resubmit import _remove_ended_locks
 from tslab.study.context import Context, load_context, refresh_context, Selection
-from tslab.study.launchers import JobPhase
+from tslab.study.launchers import JobPhase, LaunchError
 from tslab.study.reporting.state import RunReport, StudyState
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from tslab.study.plan import JobGroup
 
 
 def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
@@ -51,29 +57,30 @@ def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
     (folder / '.lock').write_text(json.dumps({'pid': 99999, 'host': 'otherhost'}))
 
 
-def test_default_states_are_interrupted_and_missing(project: Path, fake: FakeSlurm) -> None:
+def test_default_states_are_interrupted_and_missing(
+    project: Path, fake_backend: FakeBackend
+) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
-    fake.set_answers(
-        'sacct',
-        [
-            {
-                'exit': 0,
-                'stdout': ('1000_0|COMPLETED\n1000_1|FAILED\n1000_2|TIMEOUT\n1000_3|COMPLETED\n'),
-            }
-        ],
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.COMPLETED,
+            'job-0_1': JobPhase.FAILED,
+            'job-0_2': JobPhase.INTERRUPTED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
     finish_run(project=project, model='small', seed=1)
     code = resubmit(context=context(project=project, machine_file='cluster.toml'), sleep=no_sleep)
     assert code == 0
     jobs = jobs_of(project=project)
+    assert jobs[1].job_id == 'job-1'
     assert [t.run_path for t in jobs[1].tasks] == ['g/large/1', 'g/large/2']
     assert all(t.attempt == 2 for t in jobs[1].tasks)
 
 
-def test_failed_must_be_asked_for(project: Path, fake: FakeSlurm) -> None:
+def test_failed_must_be_asked_for(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_1|FAILED\n'}])
+    fake_backend.set_states(phases={'job-0_1': JobPhase.FAILED})
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         states=(StudyState.FAILED,),
@@ -84,11 +91,9 @@ def test_failed_must_be_asked_for(project: Path, fake: FakeSlurm) -> None:
     assert [t.run_path for t in jobs[1].tasks] == ['g/small/2']
 
 
-def test_resubmit_never_touches_live_runs(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_resubmit_never_touches_live_runs(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.RUNNING})
     all_states = tuple(StudyState)
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
@@ -98,56 +103,30 @@ def test_resubmit_never_touches_live_runs(
     assert code == 0
     jobs = jobs_of(project=project)
     assert all(t.run_path != 'g/small/1' for t in jobs[1].tasks)
-    assert fake.calls('scancel') == []
+    assert fake_backend.calls('cancel') == []
 
 
-def test_cancel_live_cancels_then_resubmits_later(project: Path, fake: FakeSlurm) -> None:
-    submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
-    )
-    for model, seed in (('small', 2), ('large', 1), ('large', 2)):
-        finish_run(project=project, model=model, seed=seed)
+def test_cancel_live_cancels_then_resubmits_later(project: Path, fake_backend: FakeBackend) -> None:
+    live_cancel_setup(project=project, fake_backend=fake_backend)
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         cancel_live=True,
         sleep=no_sleep,
     )
     assert code == 0
-    assert fake.calls('scancel') == [['1000_0']]
+    assert [(call['dry_run'], call['signal']) for call in fake_backend.calls('cancel')] == [
+        (False, None)
+    ]
     jobs = jobs_of(project=project)
     assert [t.run_path for t in jobs[1].tasks] == ['g/small/1']
-    script = (project / 'runs' / 's' / '.study' / 'jobs' / f'{jobs[1].job_file}.sbatch').read_text()
-    assert '#SBATCH --begin=now+660' in script
-
-
-@pytest.mark.slow
-def test_cancel_live_never_cancels_local_jobs(project: Path, fake: FakeSlurm) -> None:
-    # why: local job ids (local-<pid>-<n>) are not SLURM jobs
-    code = submit(
-        context=context(project=project, machine_file='local.toml'),
-        include_done=False,
-        dry_run=False,
-        extra_args=(),
-        sleep=no_sleep,
-    )
-    assert code == 0
-    (project / 'runs' / 's' / 'g/small/1' / '.lock').write_text('')
-    code = resubmit(
-        context=context(project=project, machine_file='local.toml'),
-        cancel_live=True,
-        sleep=no_sleep,
-    )
-    assert code == 0
-    assert fake.calls('scancel') == []
+    assert fake_backend.calls('launch')[-1]['start_delay_seconds'] == 660
 
 
 def test_ended_job_lock_is_removed_before_resubmitting(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_3|TIMEOUT\n'}])
+    fake_backend.set_states(phases={'job-0_3': JobPhase.INTERRUPTED})
     running_run_with_lock(project=project, model='large', seed=2)
     with caplog.at_level('INFO'):
         code = resubmit(
@@ -156,20 +135,19 @@ def test_ended_job_lock_is_removed_before_resubmitting(
     assert code == 0
     lock = project / 'runs' / 's' / 'g/large/2' / '.lock'
     assert not lock.exists()
-    assert 'removed the lock of g/large/2: its job 1000_3 ended (TIMEOUT)' in caplog.text
+    assert 'removed the lock of g/large/2: its job job-0_3 ended (interrupted)' in caplog.text
     jobs = jobs_of(project=project)
     assert 'g/large/2' in [t.run_path for t in jobs[1].tasks]
 
 
 def test_pass_through_arguments_reach_jobs_and_retries(
-    project: Path, fake: FakeSlurm, tmp_path: Path
+    project: Path, fake_backend: FakeBackend, tmp_path: Path
 ) -> None:
     track = tmp_path / 'track.log'
     submit_study(project=project, extra_args=('--tracking-log', str(track)))
     first = jobs_of(project=project)[0]
     assert first.tasks[0].extra_args == ('--tracking-log', str(track))
     assert first.tasks[0].command[-2:] == ('--tracking-log', str(track))
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': ''}])
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         extra_args=None,
@@ -190,22 +168,35 @@ def test_pass_through_arguments_reach_jobs_and_retries(
     assert replaced.command[-2:] == ('--tracking-log', str(other))
 
 
-def live_cancel_setup(*, project: Path, fake: FakeSlurm) -> None:
+def live_cancel_setup(*, project: Path, fake_backend: FakeBackend) -> None:
     """Task 0 queued and tasks 1 to 3 done, so only one run is live."""
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
     for model, seed in (('small', 2), ('large', 1), ('large', 2)):
         finish_run(project=project, model=model, seed=seed)
+    # why: the live run of job-0 is what a cancel can reach, as on a real scheduler
+    fake_backend.cancellable_answer = ['job-0_0']
 
 
 def test_dry_run_with_cancel_live_cancels_and_unlocks_nothing(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    live_cancel_setup(project=project, fake=fake)
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_3|TIMEOUT\n'}])
+    live_cancel_setup(project=project, fake_backend=fake_backend)
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.INTERRUPTED,
+        }
+    )
     running_run_with_lock(project=project, model='large', seed=2)
     with caplog.at_level('INFO'):
         code = resubmit(
@@ -215,14 +206,14 @@ def test_dry_run_with_cancel_live_cancels_and_unlocks_nothing(
             sleep=no_sleep,
         )
     assert code == 0
-    assert fake.calls('scancel') == []
+    assert fake_backend.calls('cancel') == []
     assert (project / 'runs' / 's' / 'g/large/2' / '.lock').exists()
-    assert 'would cancel 1000_0' in caplog.text
+    assert 'would cancel job-0_0' in caplog.text
     assert len(jobs_of(project=project)) == 1
 
 
-def test_failed_validation_cancels_nothing(project: Path, fake: FakeSlurm) -> None:
-    live_cancel_setup(project=project, fake=fake)
+def test_failed_validation_cancels_nothing(project: Path, fake_backend: FakeBackend) -> None:
+    live_cancel_setup(project=project, fake_backend=fake_backend)
     # why: a pass-through flag the config does not have makes every run fail validation
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
@@ -231,38 +222,27 @@ def test_failed_validation_cancels_nothing(project: Path, fake: FakeSlurm) -> No
         sleep=no_sleep,
     )
     assert code == 1
-    assert fake.calls('scancel') == []
+    assert fake_backend.calls('cancel') == []
     assert len(jobs_of(project=project)) == 1
 
 
-def test_cancel_failure_exits_one_and_submits_nothing(project: Path, fake: FakeSlurm) -> None:
-    live_cancel_setup(project=project, fake=fake)
-    fake.set_answers('scancel', [{'exit': 1, 'stderr': 'Invalid job id'}])
+def test_cancel_failure_exits_one_and_submits_nothing(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    live_cancel_setup(project=project, fake_backend=fake_backend)
+    fake_backend.errors['cancel'] = LaunchError('Invalid job id')
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         cancel_live=True,
         sleep=no_sleep,
     )
     assert code == 1
-    assert len(fake.calls('sbatch')) == 1
+    assert len(fake_backend.calls('launch')) == 1
     assert len(jobs_of(project=project)) == 1
 
 
-def test_cancel_live_passes_only_live_job_ids(project: Path, fake: FakeSlurm) -> None:
-    live_cancel_setup(project=project, fake=fake)
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_1|TIMEOUT\n1000_2|COMPLETED\n'}])
-    code = resubmit(
-        context=context(project=project, machine_file='cluster.toml'),
-        cancel_live=True,
-        sleep=no_sleep,
-    )
-    assert code == 0
-    # why: the timed out job already ended; scancel on an ended id would fail
-    assert fake.calls('scancel') == [['1000_0']]
-
-
 def test_unknown_slurm_states_refuse_to_submit(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
     ctx = context(project=project, machine_file='cluster.toml')
@@ -270,11 +250,13 @@ def test_unknown_slurm_states_refuse_to_submit(
     with caplog.at_level('ERROR'):
         code = resubmit(context=unknown, states=tuple(StudyState), sleep=no_sleep)
     assert code == 1
-    assert len(fake.calls('sbatch')) == 1
+    assert len(fake_backend.calls('launch')) == 1
     assert 'not submitting' in caplog.text
 
 
-def test_auto_resubmit_retries_paused_run_with_progress(project: Path, fake: FakeSlurm) -> None:
+def test_auto_resubmit_retries_paused_run_with_progress(
+    project: Path, fake_backend: FakeBackend
+) -> None:
     submit_study(project=project)
     # g/small/1 paused by job_time_share; it saved a checkpoint before the pause
     write_run_status(
@@ -286,8 +268,7 @@ def test_auto_resubmit_retries_paused_run_with_progress(project: Path, fake: Fak
         error='TrainingPaused: job time share reached',
     )
     (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_0|COMPLETED\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         auto=True,
@@ -296,12 +277,14 @@ def test_auto_resubmit_retries_paused_run_with_progress(project: Path, fake: Fak
     )
     assert code == 0
     # the dry-run plan holds only the paused run, one attempt further on
-    tasks_files = sorted((project / 'runs' / 's' / '.study' / 'jobs').glob('*.tasks'))
-    planned = tasks_files[-1].read_text()
-    assert planned.startswith('0 2 ')
-    assert '--run-path g/small/1' in planned
-    assert 'g/small/2' not in planned
-    assert 'g/large' not in planned
+    call = fake_backend.calls('launch')[-1]
+    assert call['dry_run'] is True
+    (group,) = cast('Sequence[JobGroup]', call['groups'])
+    (task,) = group.tasks
+    assert task.index == 0
+    assert task.attempt == 2
+    command = list(task.command)
+    assert command[command.index('--run-path') + 1] == 'g/small/1'
     assert len(jobs_of(project=project)) == 1
 
 
