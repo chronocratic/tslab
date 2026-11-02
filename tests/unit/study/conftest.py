@@ -1,4 +1,4 @@
-"""Fixtures shared by the study tests: a toy project, fake SLURM, a fake backend, clean imports."""
+"""Fixtures shared by the study tests: a toy project, a fake backend, clean imports."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -8,7 +8,6 @@ from types import SimpleNamespace
 import pytest
 
 from tests.support.fake_backend import FakeBackend, install_fake_backend
-from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.project import write_toy_project
 
 _TOY_MODULES = ('toy_studies', 'toy_script')
@@ -39,12 +38,6 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # why: load_study imports from the current directory, like a user in a project
     monkeypatch.chdir(folder)
     return folder
-
-
-@pytest.fixture
-def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
-    """Fake SLURM commands first on PATH."""
-    return install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
 
 
 @pytest.fixture
