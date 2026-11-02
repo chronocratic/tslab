@@ -4,6 +4,8 @@ from collections.abc import Callable
 import logging
 import os
 from pathlib import Path
+import subprocess
+import sys
 import time
 
 import pytest
@@ -26,7 +28,9 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.study.launchers.local import pid_file
 from tslab.study.launchers.local.pid_file import (
+    _stop_detached,
     detach_launch,
     hold_launch,
     LAUNCH_FILE,
@@ -264,6 +268,49 @@ def test_detach_reports_a_supervisor_that_fails(
     assert time.monotonic() - start < 10
     assert (folder / LAUNCH_LOG).exists()
     assert 'no_such_module' in caplog.text
+
+
+def test_detach_stops_a_launch_that_does_not_start(
+    project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    started: list[subprocess.Popen[bytes]] = []
+
+    def fake_start(**_kwargs: object) -> subprocess.Popen[bytes]:
+        started.append(
+            subprocess.Popen(
+                [sys.executable, '-c', 'import time; time.sleep(60)'], start_new_session=True
+            )
+        )
+        return started[0]
+
+    monkeypatch.setattr(pid_file, 'start_detached', fake_start)
+    folder = study_directory(project=project) / '.study'
+    try:
+        with caplog.at_level(logging.ERROR):
+            code = detach_launch(
+                study_folder=folder,
+                arguments=[],
+                project_root=project,
+                wait_command='w',
+                timeout_seconds=0.5,
+            )
+        assert code == 1
+        assert started[0].poll() is not None
+        assert 'stopped' in caplog.text
+    finally:
+        process = started[0] if started else None
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def test_detach_stop_ignores_a_child_that_already_exited() -> None:
+    process = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+    process.wait()
+
+    _stop_detached(process=process)
+
+    assert process.poll() == 0
 
 
 def test_cancel_detached_launch_interrupts_run(

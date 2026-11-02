@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
+import signal
+import subprocess
 import sys
 import threading
 import time
@@ -197,13 +199,25 @@ def _log_tail(*, path: Path, lines: int = 20) -> str:
     return '\n'.join(tail) if tail is not None else ''
 
 
+def _stop_detached(*, process: subprocess.Popen[bytes]) -> None:
+    """Stop a detached launch process group and wait for its leader."""
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGTERM)
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+
 def detach_launch(  # why: keyword-only public API; each option is documented below
     *,
     study_folder: Path,
     arguments: Sequence[str],
     project_root: Path,
     wait_command: str,
-    timeout_seconds: float = 10.0,
+    timeout_seconds: float = 30.0,
 ) -> int:
     """Start ``tslab`` with the arguments in a new session and wait until it holds the pid file.
 
@@ -212,7 +226,7 @@ def detach_launch(  # why: keyword-only public API; each option is documented be
         arguments: The ``tslab`` arguments of the launch, without ``--detach``.
         project_root: The folder the process runs in.
         wait_command: The command shown to follow the launch.
-        timeout_seconds: How long to wait for the pid file.
+        timeout_seconds: How long to wait for the pid file; 30 seconds by default.
 
     Returns:
         0 once the process holds the pid file; its exit code if it ended first;
@@ -243,7 +257,10 @@ def detach_launch(  # why: keyword-only public API; each option is documented be
             _LOGGER.error('the launch ended with exit code %s:\n%s', code, _log_tail(path=log_path))
             return code
         time.sleep(0.1)
+    _stop_detached(process=process)
     _LOGGER.error(
-        'the launch did not start in %s seconds:\n%s', timeout_seconds, _log_tail(path=log_path)
+        'the launch did not start in %s seconds and was stopped:\n%s',
+        timeout_seconds,
+        _log_tail(path=log_path),
     )
     return 1
