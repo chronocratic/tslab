@@ -391,6 +391,63 @@ uv run tslab study resubmit my_paper.studies:example --machine cluster \
 - Each resubmitted task records `attempt = previous + 1`, and resources are
   resolved again from the current profile. Pass-through arguments after `--`
   are kept from the last submission of the run when new ones are not given.
+- A resubmitted run keeps the code snapshot of its latest job;
+  `--new-code-snapshot` and `--no-code-snapshot` change it: see
+  [Code snapshots](#code-snapshots).
+
+## Code snapshots
+
+A job that waits in the queue for hours runs the code of the project folder
+when it starts. A code snapshot copies the code at submit time and makes the
+jobs import that copy, so later edits never change queued or resubmitted
+runs. It is opt-in and off by default.
+
+```bash
+uv run tslab study submit my_paper.studies:example --machine cluster --code-snapshot
+```
+
+`code_snapshot = true` in [tslab.toml](project-settings.md) turns it on for
+the project; `--no-code-snapshot` turns it off for one submit.
+
+- **What is copied:** only the `src/` folder (src layout). Tracked files are
+  copied with their working-tree bytes, so uncommitted edits are included; a
+  tracked file deleted from the working tree is skipped. Ignored files are
+  never copied.
+- **Untracked files stop the submit.** With untracked files under `src/`, the
+  submit stops before writing anything (exit 2) and lists them. The ways out
+  are `git add` on them, `--code-snapshot-include-untracked` (copy them too,
+  recorded as `untracked_copied`), or `--no-code-snapshot` (run the live
+  code). `code_snapshot_check_untracked = false` in `tslab.toml` turns the
+  stop off.
+- **Where it lives:** `<output_root>/.tslab-code-snapshots/<hash>/`, the hash
+  a SHA-256 over the copied files shortened to 16 hex characters. Same code,
+  same folder: reused, never overwritten, shared across studies. Nothing
+  deletes a snapshot folder; remove one by hand once no queued or
+  resubmittable job records it.
+- **How the jobs use it:** the jobs keep the project root as working folder;
+  the snapshot's `src/` is prepended to `PYTHONPATH`, so the snapshot package
+  wins over an editable install. The job checks that the folder still holds a
+  `src/` before the task and fails the task with a clear line; there is no
+  fallback to the live code.
+- **Resubmit reuses the record.** Every resubmitted run runs the snapshot
+  recorded on its latest job, so a retry runs the same code as the first
+  attempt; the `--auto` follow-ups do the same. `--new-code-snapshot` takes a
+  fresh snapshot with the checks above, `--no-code-snapshot` drops the
+  recorded one and runs the live code. The `code_snapshot` of `tslab.toml`
+  does not apply to resubmits. Resubmitting `failed` runs warns once per
+  snapshot: "reusing the code snapshot from \<time\>; pass
+  `--new-code-snapshot` if you fixed the code". A recorded folder that is
+  gone is an error naming it and suggesting `--new-code-snapshot`.
+- **What a run used:** the run `meta.json` holds a `code_snapshot` block
+  (`folder`, `hash`, `commit`, `dirty`, `untracked_copied`) — read it for the
+  code a run used; its `commit` is the `HEAD` at submit time and `dirty` says
+  tracked files under `src/` differed from it. The existing `git` block is
+  the repository at job start.
+- **What is not frozen:** the dependencies, TSLab itself, and code outside
+  `src/` (scripts called by path, notebooks). `tslab study run` (one run in
+  the terminal) always runs the live code: it is the debugging path.
+- **`--dry-run`** runs every check and computes the hash, copies nothing, and
+  the job files name the folder the real submit would use.
 
 ## Automatic retry
 
@@ -499,7 +556,8 @@ uv run tslab study failures my_paper.studies:example --machine cluster --json
 the command of the run with the `[env]` exports and the `[slurm] setup` lines
 of the machine, standard output and error to the terminal, and the exit code
 of the command. It is a debugging step, not a submission: nothing is recorded
-in the study folder, and SLURM is never called. A done run runs again with the
+in the study folder, and SLURM is never called. It runs the live code, even
+when the study used a code snapshot. A done run runs again with the
 cached stages loaded at once; a queued or running run is refused (exit 1),
 because two writers on one run folder clash.
 

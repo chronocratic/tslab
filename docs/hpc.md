@@ -78,6 +78,9 @@ automatically; see [Studies and HPC](studies.md#resubmit). A follow-up job
 submits with the SLURM variables of its own job removed, so the new job does
 not inherit its allocation. Attempts that end `PREEMPTED` or `NODE_FAIL` do not
 use up the retries of a run; see [Studies and HPC](studies.md#resubmit).
+A queued job runs the code of the project folder when it starts; a
+[code snapshot](studies.md#code-snapshots) copies the code at submit time and
+makes the jobs import that copy.
 
 ## Many runs
 

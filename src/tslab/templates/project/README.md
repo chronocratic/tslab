@@ -64,7 +64,9 @@ out by default, picks the machine by host: uncomment it and drop `--machine`
 from every command.
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
-after `--` go to every run. Slurm: copy `machines/slurm.example.toml` to
+after `--` go to every run. Add `--code-snapshot` to a `submit` so the jobs
+run the copy of `src/` taken at submit time; the resubmits then keep that
+code. Slurm: copy `machines/slurm.example.toml` to
 `machines/cluster.toml` and fill in the values of your cluster. `--machine cluster`
 finds it from this folder or any folder below. To use the name from any folder, run
 `uv run tslab machine add cluster machines/cluster.toml`. The full guide:
