@@ -1,6 +1,7 @@
 """The ``tslab study logs`` command: one run, its log, and the follow loop."""
 
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -108,4 +109,20 @@ def test_logs_launch_without_a_launch_log_exits_2(
         code = Logs(study='toy_studies:study', machine='local.toml', launch=True).run()
 
     assert code == 2
-    assert 'no launch log at' in caplog.text
+    assert 'no launch log in' in caplog.text
+
+
+def test_logs_launch_reads_the_newest_launch_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    logs = study_directory(project=project) / '.study' / 'local_logs'
+    logs.mkdir(parents=True)
+    (logs / '200.log').write_text('old launch\n', encoding='utf-8')
+    (logs / '100.log').write_text('new launch\n', encoding='utf-8')
+    os.utime(logs / '200.log', (1, 1))
+
+    code = Logs(study='toy_studies:study', machine='local.toml', launch=True).run()
+
+    assert code == 0
+    assert capsys.readouterr().out == 'new launch\n'

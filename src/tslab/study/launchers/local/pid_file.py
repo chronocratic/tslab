@@ -19,8 +19,9 @@ from tslab.jobs.local import process_alive, start_detached, tail_lines
 from tslab.study.launchers import OnTaskState
 
 __all__ = [
+    'DETACHED_VARIABLE',
     'LAUNCH_FILE',
-    'LAUNCH_LOG',
+    'LAUNCH_LOGS',
     'LocalLaunch',
     'LocalLaunchError',
     'detach_launch',
@@ -209,7 +210,8 @@ def _stop_detached(*, process: subprocess.Popen[bytes]) -> None:
         process.poll()
         try:
             os.killpg(process.pid, 0)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
+            # why: macOS answers EPERM, not ESRCH, for a group left with only a zombie
             break
         time.sleep(0.1)
     else:
@@ -241,17 +243,24 @@ def detach_launch(  # why: keyword-only public API; each option is documented be
     """
     try:
         _check_free(study_folder=study_folder, host=hostname())
-        study_folder.mkdir(parents=True, exist_ok=True)
-        log_path = study_folder / LAUNCH_LOG
+        logs = study_folder / LAUNCH_LOGS
+        logs.mkdir(parents=True, exist_ok=True)
+        # why: the pid is known only once the process runs, so the log is renamed after
+        starting = logs / f'starting-{os.getpid()}.log'
         process = start_detached(
             command=[sys.executable, '-m', 'tslab', *arguments],
             cwd=project_root,
-            environment=os.environ,
-            log_path=log_path,
+            environment={**os.environ, DETACHED_VARIABLE: '1'},
+            log_path=starting,
         )
     except (LocalLaunchError, OSError) as error:
         _LOGGER.error('%s', error)  # noqa: TRY400 # why: a launch problem is shown, not raised
         return 1
+    log_path = logs / f'{process.pid}.log'
+    try:
+        starting.replace(log_path)  # why: the open log of the process follows the rename
+    except OSError:
+        log_path = starting
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         launch = read_launch(study_folder=study_folder)

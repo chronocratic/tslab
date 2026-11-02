@@ -15,7 +15,7 @@ from tslab.cli.study import _context_of
 from tslab.core.meta import hostname
 from tslab.core.paths import LOGS_DIRECTORY
 from tslab.study.context import Context
-from tslab.study.launchers.local.pid_file import LAUNCH_LOG
+from tslab.study.launchers.local.pid_file import LAUNCH_LOGS
 from tslab.study.paths import log_file_of, study_folder
 
 __all__ = ['Logs']
@@ -43,7 +43,7 @@ class Logs:
         follow: Keep printing new lines until Ctrl-C.
         lines: Start from the last this many lines.
         job: Show the scheduler output of the job instead of the run log.
-        launch: Show the log of a local launch started with --detach instead.
+        launch: Show the log of the latest local launch started with --detach instead.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
@@ -78,10 +78,11 @@ class Logs:
             return 0
 
     def _launch_log(self, *, context: Context) -> Path | None:
-        path = study_folder(machine=context.machine, study=context.study) / LAUNCH_LOG
-        if path.exists():
-            return path
-        _LOGGER.error('no launch log at %s; only tslab study submit --detach writes one', path)
+        folder = study_folder(machine=context.machine, study=context.study) / LAUNCH_LOGS
+        paths = list(folder.glob('*.log'))
+        if paths:
+            return max(paths, key=lambda path: path.stat().st_mtime)
+        _LOGGER.error('no launch log in %s; only tslab study submit --detach writes one', folder)
         return None
 
     def _run_log(self, *, context: Context) -> Path | None:

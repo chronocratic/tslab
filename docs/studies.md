@@ -272,8 +272,9 @@ that calls `tslab`. The optional `[local]` table sets how:
   (`SIGKILL`) of `tslab` cannot clean up and may leave tasks running; stop
   them by hand.
 - **`--detach`.** `tslab study submit --detach` (and `resubmit --detach`)
-  starts the launch in the background and returns once it runs. The output goes
-  to `.study/local-launch.log`, and `.study/local-launch.json` names the
+  starts the launch in the background and returns once it runs. Each launch writes
+  its own output to `.study/local_logs/<pid>.log` (launcher lines only; run
+  output stays in `.study/logs/`), and `.study/local-launch.json` names the
   process while it runs. Follow it with `tslab study wait` or `status`. It is
   an error on a SLURM machine, and a second launch of the same study fails
   while one is live.
@@ -558,7 +559,7 @@ must match exactly one run; otherwise the command exits 2 and lists the
 matches. `-f` keeps printing new lines until Ctrl-C, like `tail -f`, and waits
 for a run that has not started yet. `-n N` changes the number of lines.
 `--job` shows the scheduler output of the job instead, and `--launch` the log
-of a local launch started with `--detach`.
+of the latest local launch started with `--detach`.
 
 ```bash
 uv run tslab study logs my_paper.studies:example --machine local --only seed=1 -f
