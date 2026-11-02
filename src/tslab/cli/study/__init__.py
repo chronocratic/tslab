@@ -23,6 +23,7 @@ __all__ = [
     'STUDY_COMMANDS',
     'Cancel',
     'Failures',
+    'Logs',
     'Resubmit',
     'Results',
     'RunOne',
@@ -220,6 +221,7 @@ def _status_hints(
 # why: the submodules import the shared helpers from this door
 from tslab.cli.study.cancel import Cancel  # noqa: E402
 from tslab.cli.study.failures import Failures, Usage  # noqa: E402
+from tslab.cli.study.logs import Logs  # noqa: E402
 from tslab.cli.study.resubmit import Resubmit, RunOne  # noqa: E402
 from tslab.cli.study.results import Results  # noqa: E402
 from tslab.cli.study.status import Show, Status, Wait  # noqa: E402
@@ -233,6 +235,7 @@ STUDY_COMMANDS = {
     'show': Show,
     'wait': Wait,
     'failures': Failures,
+    'logs': Logs,
     'cancel': Cancel,
     'usage': Usage,
     'run': RunOne,

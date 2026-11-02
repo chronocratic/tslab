@@ -91,6 +91,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
             '  tslab study wait STUDY --machine local                        '
             'wait until done or broken\n'
             '  tslab study failures STUDY --machine local                    show errors and logs\n'
+            '  tslab study logs STUDY --machine local --only AXIS=VALUE -f   follow one run log\n'
             '  tslab study resubmit STUDY --machine local                    '
             'retry interrupted runs\n'
             '  tslab study results STUDY --machine local --out results.csv   collect metrics\n\n'
