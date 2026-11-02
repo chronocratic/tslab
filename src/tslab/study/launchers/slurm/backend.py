@@ -153,6 +153,10 @@ class SlurmBackend:
         """The expected start of the queued jobs; ``None`` when nothing is queued."""
         return expected_starts(context=context)
 
+    def launch_blocker(self, *, context: Context) -> str | None:  # noqa: ARG002 # why: Backend API
+        """A SLURM launch has no local pid file to block it."""
+        return None
+
     def resources(
         self,
         *,

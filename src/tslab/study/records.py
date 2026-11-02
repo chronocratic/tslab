@@ -227,7 +227,11 @@ def submission_lock(*, study_folder: Path) -> Generator[None]:
     """
     study_folder.mkdir(parents=True, exist_ok=True)
     with (study_folder / 'submit.lock').open('a') as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            _LOGGER.info('waiting for another submission of this study to finish')
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
             yield
         finally:

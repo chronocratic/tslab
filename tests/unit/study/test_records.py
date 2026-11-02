@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import threading
 from typing import Any
 
 import pytest
@@ -149,6 +150,17 @@ def test_submission_lock_excludes_a_second_holder(tmp_path: Path) -> None:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     with (tmp_path / 'submit.lock').open('a') as other:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def test_submission_lock_says_when_it_waits(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    other = (tmp_path / 'submit.lock').open('a')
+    fcntl.flock(other.fileno(), fcntl.LOCK_EX)
+    threading.Timer(0.3, other.close).start()
+    with caplog.at_level('INFO'), submission_lock(study_folder=tmp_path):
+        pass
+    assert caplog.text.count('waiting for another submission of this study to finish') == 1
 
 
 def test_job_record_without_code_snapshot_serializes_as_before(tmp_path: Path) -> None:

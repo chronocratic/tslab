@@ -365,6 +365,10 @@ class Backend(Protocol):
         """The expected start of the queued jobs; ``None`` without a scheduler."""
         ...
 
+    def launch_blocker(self, *, context: Context) -> str | None:
+        """Why a new launch of this study cannot start now, or ``None``."""
+        ...
+
     def resources(
         self,
         *,
