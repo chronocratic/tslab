@@ -78,6 +78,16 @@ def test_same_code_same_folder_reused(project: Path, tmp_path: Path) -> None:
     assert marker.read_text(encoding='utf-8') == 'kept\n'
 
 
+def test_reused_folder_that_lost_src_is_recopied(project: Path, tmp_path: Path) -> None:
+    out = tmp_path / 'out'
+    first = _take(project_root=project, output_root=out)
+    shutil.rmtree(first.folder / 'src')
+    second = _take(project_root=project, output_root=out)
+    assert second.folder == first.folder
+    assert (second.folder / 'src' / 'pkg' / '__init__.py').is_file()
+    assert (second.folder / 'src' / 'pkg' / 'model.py').is_file()
+
+
 def test_changed_code_new_folder_no_stale_files(project: Path, tmp_path: Path) -> None:
     first = _take(project_root=project, output_root=tmp_path / 'out')
     (project / 'src' / 'pkg' / 'model.py').unlink()

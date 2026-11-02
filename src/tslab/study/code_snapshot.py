@@ -195,8 +195,14 @@ def take_code_snapshot(
     )
     if dry_run:
         return snapshot
-    if not folder.is_dir():
-        _copy_atomically(project_root=project_root, copies=copies, folder=folder)
+    if (folder / 'src').is_dir():
+        return snapshot
+    if folder.is_dir():
+        # why: a folder that lost its src (e.g. deleted by hand) is not a
+        # complete snapshot; recopy the code instead of reusing it
+        _LOGGER.warning('code snapshot folder %s lost its src folder; recopying', folder)
+        shutil.rmtree(folder)
+    _copy_atomically(project_root=project_root, copies=copies, folder=folder)
     return snapshot
 
 
