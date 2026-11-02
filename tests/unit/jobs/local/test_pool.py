@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import itertools
 import os
 from pathlib import Path
@@ -8,6 +8,7 @@ import threading
 import time
 
 from tslab.jobs.local import PoolCommand, ProcessResult, run_commands
+from tslab.jobs.local.pool import _environment_of
 
 _LOCK_CHILD = (
     'import fcntl, os, sys, time\n'
@@ -54,6 +55,10 @@ def _command_of(*, tmp_path: Path, key: str, sleep_seconds: float) -> PoolComman
         cwd=tmp_path,
         environment={**os.environ, 'MARK': (tmp_path / f'{key}.times').as_posix()},
     )
+
+
+def _command(*, environment: Mapping[str, str]) -> PoolCommand:
+    return PoolCommand(key='k0', command=('true',), cwd=Path(), environment=environment)
 
 
 def _run_pool(  # noqa: PLR0913 # why: one keyword per pool setting the test overrides
@@ -333,6 +338,25 @@ def test_pool_start_error_reaches_on_end(*, tmp_path: Path) -> None:
     assert isinstance(first, OSError)
     assert isinstance(second, ProcessResult)
     assert second.exit_code == 0
+
+
+def test_numeric_slot_sets_pci_bus_order() -> None:
+    env = _environment_of(command=_command(environment={}), slot='1')
+    assert env['CUDA_VISIBLE_DEVICES'] == '1'
+    assert env['CUDA_DEVICE_ORDER'] == 'PCI_BUS_ID'
+
+
+def test_preset_device_order_is_kept() -> None:
+    env = _environment_of(
+        command=_command(environment={'CUDA_DEVICE_ORDER': 'FASTEST_FIRST'}), slot='1'
+    )
+    assert env['CUDA_DEVICE_ORDER'] == 'FASTEST_FIRST'
+
+
+def test_mps_slot_sets_neither() -> None:
+    env = _environment_of(command=_command(environment={}), slot='mps')
+    assert 'CUDA_VISIBLE_DEVICES' not in env
+    assert 'CUDA_DEVICE_ORDER' not in env
 
 
 def test_pool_stop_starts_nothing_new(*, tmp_path: Path) -> None:
