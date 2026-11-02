@@ -183,6 +183,8 @@ def take_code_snapshot(
         include_untracked=include_untracked,
         check_untracked=check_untracked,
     )
+    if not copies:
+        _stop_empty_copies()
     dirty = _dirty_files(git=git, project_root=project_root)
     if dirty:
         _LOGGER.info('code snapshot includes uncommitted changes in %d files', len(dirty))
@@ -304,6 +306,14 @@ def _copied_files(
         copies.extend(untracked)
         untracked_copied = True
     return copies, untracked_copied
+
+
+def _stop_empty_copies() -> NoReturn:
+    message = (
+        'the code snapshot would be empty: git tracks no file under src/; '
+        'git add the files, or rerun with --no-code-snapshot (run the live code)'
+    )
+    raise CodeSnapshotError(message)
 
 
 def _dirty_files(*, git: str, project_root: Path) -> list[str]:
