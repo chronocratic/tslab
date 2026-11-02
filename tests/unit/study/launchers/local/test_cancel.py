@@ -8,9 +8,16 @@ import time
 
 import pytest
 
-from tests.unit.study.helpers import context, record_local_job, study_directory, write_launch
+from tests.support.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import (
+    context,
+    no_sleep,
+    record_local_job,
+    study_directory,
+    write_launch,
+)
 from tslab.core.meta import hostname
-from tslab.study.commands import cancel
+from tslab.study.commands import cancel, resubmit, submit
 from tslab.study.context import load_context, Selection
 
 
@@ -125,3 +132,24 @@ def test_local_cancel_partial_selection_is_usage_error(
     finally:
         child.kill()
         child.wait()
+
+
+@pytest.mark.slow
+def test_cancel_live_never_cancels_local_jobs(project: Path, fake: FakeSlurm) -> None:
+    # why: local job ids (local-<pid>-<n>) are not SLURM jobs
+    code = submit(
+        context=context(project=project, machine_file='local.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+    assert code == 0
+    (project / 'runs' / 's' / 'g/small/1' / '.lock').write_text('')
+    code = resubmit(
+        context=context(project=project, machine_file='local.toml'),
+        cancel_live=True,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    assert fake.calls('scancel') == []

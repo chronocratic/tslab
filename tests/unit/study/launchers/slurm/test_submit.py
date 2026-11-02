@@ -217,3 +217,18 @@ def test_dry_run_writes_the_script_and_describes_resources(
     assert (project / 'runs' / 's' / '.study' / 'jobs' / '1.sbatch').is_file()
     text = ' '.join(caplog.text.split())
     assert 'g1 4 partition=' in text
+
+
+def test_write_job_files_writes_the_start_delay(
+    machine: MachineProfile, study: Study, tmp_path: Path
+) -> None:
+    folder = study_folder(machine=machine, study=study)
+    write_job_files(
+        study_folder=folder,
+        groups=groups_of(study, machine),
+        machine=machine,
+        project_root=tmp_path,
+        start_delay_seconds=660,
+    )
+    script = (folder / 'jobs' / '3.sbatch').read_text()
+    assert '#SBATCH --begin=now+660' in script

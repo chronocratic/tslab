@@ -7,11 +7,12 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import finish_run, submit_study, write_run_status
 from tslab.cli import main
 from tslab.core.status import InstanceState, RunState
 from tslab.core.text import TextTable
+from tslab.study.launchers import JobPhase
 
 
 def run_main(*args: str) -> int:
@@ -23,7 +24,7 @@ def run_main(*args: str) -> int:
 
 
 def test_status_prints_an_aligned_table(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
     finish_run(project=project, model='small', seed=1)
@@ -38,7 +39,7 @@ def test_status_prints_an_aligned_table(
 
 
 def test_status_json_prints_only_json(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = logging.getLogger()
     handlers = root.handlers[:]
@@ -56,7 +57,7 @@ def test_status_json_prints_only_json(
 
 
 def test_status_exits_0_without_exit_code_flag_even_with_failures(
-    project: Path, fake: FakeSlurm
+    project: Path, fake_backend: FakeBackend
 ) -> None:
     submit_study(project=project)
     write_run_status(
@@ -69,7 +70,9 @@ def test_status_exits_0_without_exit_code_flag_even_with_failures(
     assert run_main('status', 'toy_studies:study', '--machine', 'cluster.toml') == 0
 
 
-def test_status_exit_code_flag_returns_4_on_failure(project: Path, fake: FakeSlurm) -> None:
+def test_status_exit_code_flag_returns_4_on_failure(
+    project: Path, fake_backend: FakeBackend
+) -> None:
     submit_study(project=project)
     write_run_status(
         project=project,
@@ -82,7 +85,7 @@ def test_status_exit_code_flag_returns_4_on_failure(project: Path, fake: FakeSlu
 
 
 def test_status_json_carries_exit_code_without_flag(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     submit_study(project=project)
     code = run_main('status', 'toy_studies:study', '--machine', 'cluster.toml', '--json')
@@ -115,9 +118,9 @@ def test_status_rejects_watch_with_json(project: Path) -> None:
     )
 
 
-def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake: FakeSlurm) -> None:
+def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake_backend: FakeBackend) -> None:
     assert run_main('submit', 'toy_studies:study', '--machine', 'cluster.toml', '--dry-run') == 0
-    assert fake.calls('sbatch') == []
+    assert [call['dry_run'] for call in fake_backend.calls('launch')] == [True]
     submit_study(project=project)
     code = run_main(
         'resubmit', 'toy_studies:study', '--machine', 'cluster.toml', '--states', 'missing,failed'
@@ -126,7 +129,7 @@ def test_submit_dry_run_and_resubmit_dry_run(project: Path, fake: FakeSlurm) -> 
 
 
 def test_submit_dry_run_json_lists_jobs(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     code = run_main(
         'submit', 'toy_studies:study', '--machine', 'cluster.toml', '--dry-run', '--json'
@@ -140,11 +143,19 @@ def test_submit_dry_run_json_lists_jobs(
 
 
 def test_resubmit_json_lists_cancelled_ids(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n1000_1|PENDING\n'}])
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|COMPLETED\n'}])
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.RUNNING,
+            'job-0_1': JobPhase.QUEUED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
+    )
+    fake_backend.cancellable_answer = ['job-0_0', 'job-0_1']
+    fake_backend.cancel_answer = (0, ['job-0_0', 'job-0_1'])
     code = run_main(
         'resubmit',
         'toy_studies:study',
@@ -157,12 +168,12 @@ def test_resubmit_json_lists_cancelled_ids(
     )
     document = json.loads(capsys.readouterr().out)
     assert code == 0
-    assert document['cancelled'] == ['1000_0', '1000_1']
-    assert fake.calls('scancel') == [['1000_0', '1000_1']]
+    assert document['cancelled'] == ['job-0_0', 'job-0_1']
+    assert len(fake_backend.calls('cancel')) == 1
 
 
 def test_local_submit_json_keeps_task_output_off_stdout(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     study_file = project / 'toy_studies.py'
     source = study_file.read_text(encoding='utf-8')
@@ -188,7 +199,7 @@ def test_local_submit_json_keeps_task_output_off_stdout(
     assert 'TASK-OUTPUT' in captured.err
 
 
-def test_results_writes_the_csv(project: Path, fake: FakeSlurm, tmp_path: Path) -> None:
+def test_results_writes_the_csv(project: Path, tmp_path: Path) -> None:
     out = tmp_path / 'out.csv'
     code = run_main('results', 'toy_studies:study', '--machine', 'local.toml', '--out', str(out))
     assert code == 0
@@ -196,7 +207,7 @@ def test_results_writes_the_csv(project: Path, fake: FakeSlurm, tmp_path: Path) 
 
 
 def test_results_out_dash_writes_csv_to_stdout(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
+    project: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = logging.getLogger()
     handlers = root.handlers[:]
@@ -213,9 +224,7 @@ def test_results_out_dash_writes_csv_to_stdout(
     assert 'wrote 4 rows' in captured.err
 
 
-def test_results_json_to_stdout(
-    project: Path, fake: FakeSlurm, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_results_json_to_stdout(project: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert (
         run_main('results', 'toy_studies:study', '--machine', 'local.toml', '--out', '-', '--json')
         == 0
@@ -226,7 +235,7 @@ def test_results_json_to_stdout(
 
 
 def test_results_json_to_file(
-    project: Path, fake: FakeSlurm, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    project: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     out = tmp_path / 'rows.json'
     assert (
@@ -283,7 +292,7 @@ def _tables(*, caplog: pytest.LogCaptureFixture) -> list[TextTable]:
 
 
 def test_dry_run_and_submit_log_tables(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level('INFO'):
         run_main('submit', 'toy_studies:study', '--machine', 'cluster.toml', '--dry-run')
