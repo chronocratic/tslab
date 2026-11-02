@@ -200,15 +200,21 @@ def _log_tail(*, path: Path, lines: int = 20) -> str:
 
 
 def _stop_detached(*, process: subprocess.Popen[bytes]) -> None:
-    """Stop a detached launch process group and wait for its leader."""
+    """Stop the detached launch process group, then wait for its leader."""
     with contextlib.suppress(ProcessLookupError):
         os.killpg(process.pid, signal.SIGTERM)
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        process.poll()
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.1)
+    else:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
+    process.wait()
 
 
 def detach_launch(  # why: keyword-only public API; each option is documented below
