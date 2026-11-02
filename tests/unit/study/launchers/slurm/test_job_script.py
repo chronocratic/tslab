@@ -175,6 +175,25 @@ def test_job_script_with_code_snapshot_matches_golden() -> None:
     assert actual == expected.read_text()
 
 
+def test_job_script_code_snapshot_comes_after_setup() -> None:
+    # why: the snapshot lines come after the setup lines, so a setup that sets
+    # PYTHONPATH is kept behind the snapshot
+    slurm = SlurmSettings(partition='p', setup=('export PYTHONPATH=/setup/path',))
+    lines = job_script(
+        job_name='train',
+        slurm=slurm,
+        indices=(0,),
+        tasks_file=Path('/project/jobs/0.tasks'),
+        log_pattern=Path('/project/logs/train_%a.out'),
+        project_root=Path('/project'),
+        env={},
+        code_snapshot=_golden_code_snapshot(),
+    ).splitlines()
+    assert lines.index('export PYTHONPATH=/setup/path') < lines.index(
+        'export PYTHONPATH=/snapshots/ab12cd34/src${PYTHONPATH:+:$PYTHONPATH}'
+    )
+
+
 def test_job_script_without_code_snapshot_is_unchanged() -> None:
     actual = job_script(
         job_name='train',
