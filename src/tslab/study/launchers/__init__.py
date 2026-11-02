@@ -38,6 +38,7 @@ __all__ = [
     'Launcher',
     'OnLaunch',
     'OnTaskState',
+    'QueuedJob',
     'RecordJob',
     'Resources',
     'available_cpus',
@@ -168,6 +169,21 @@ class JobUsage:
     max_rss: int | None
     alloc_cpus: int | None
     gpus: int
+
+
+@dataclass(frozen=True, kw_only=True)
+class QueuedJob:
+    """What the scheduler reports about one queued job.
+
+    Attributes:
+        start: The expected start time, or ``None`` when the scheduler knows none.
+        reason: The pending reason, or ``None`` when the scheduler gives none.
+        stuck: Whether the reason will not clear on its own.
+    """
+
+    start: str | None
+    reason: str | None
+    stuck: bool
 
 
 class Resources(Protocol):
@@ -361,8 +377,11 @@ class Backend(Protocol):
         """The states of the jobs, with the new cache of final states second."""
         ...
 
-    def expected_starts(self, *, context: Context) -> dict[str, str | None] | None:
-        """The expected start of the queued jobs; ``None`` without a scheduler."""
+    def expected_starts(self, *, context: Context) -> Mapping[str, QueuedJob] | None:
+        """The expected start and pending reason of the queued jobs.
+
+        ``None`` without a scheduler.
+        """
         ...
 
     def launch_blocker(self, *, context: Context) -> str | None:

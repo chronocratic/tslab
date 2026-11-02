@@ -12,7 +12,7 @@ from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status
 from tslab.study.context import Context, expected_starts
-from tslab.study.launchers import JobFlag, JobPhase
+from tslab.study.launchers import JobFlag, JobPhase, QueuedJob
 from tslab.study.reporting.documents import status_document
 from tslab.study.reporting.report import log_status
 from tslab.study.reporting.state import StudyState
@@ -98,7 +98,9 @@ def _queued_context(project: Path, fake_backend: FakeBackend) -> Context:
             'job-0_3': JobPhase.COMPLETED,
         }
     )
-    fake_backend.expected_starts_answer = {'job-0_0': '2026-11-01T10:00:00'}
+    fake_backend.expected_starts_answer = {
+        'job-0_0': QueuedJob(start='2026-11-01T10:00:00', reason=None, stuck=False)
+    }
     return context(project=project, machine_file='cluster.toml')
 
 
@@ -121,6 +123,8 @@ def test_status_json_has_expected_start(project: Path, fake_backend: FakeBackend
     runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
     assert document['schema'] == 'tslab.study-status/1'
     assert runs['g/small/1']['expected_start'] == '2026-11-01T10:00:00'
+    assert runs['g/small/1']['pending_reason'] is None
+    assert runs['g/small/1']['pending_stuck'] is False
     assert runs['g/small/2']['expected_start'] is None
     assert runs['g/large/1']['expected_start'] is None
 

@@ -19,6 +19,7 @@ __all__ = [
     'QOS_WAIT_CAP_SECONDS',
     'SlurmError',
     'SlurmJobUsage',
+    'SlurmQueueEntry',
     'query_expected_starts',
     'query_job_states',
     'query_job_usage',
@@ -238,16 +239,29 @@ def _sacct_accepts(process: subprocess.CompletedProcess[str]) -> bool:
     return process.returncode == 0
 
 
-def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
-    """Return the estimated start time of each job, as ``squeue --start`` prints it.
+@dataclass(frozen=True, kw_only=True)
+class SlurmQueueEntry:
+    """What ``squeue --start`` reports about one queued task of a job.
+
+    Attributes:
+        start: The estimated start time as printed, or ``None`` for ``N/A``.
+        reason: The pending reason as printed, or ``None`` when squeue gives none.
+    """
+
+    start: str | None
+    reason: str | None
+
+
+def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, SlurmQueueEntry]:
+    """Return the expected start and pending reason of each queued job.
 
     Args:
         job_ids: Array or single job ids; empty means no calls and ``{}``.
 
     Returns:
-        ``{task id: start text or None}`` with task ids ``<job>_<index>`` or
-        ``<job>``; ``N/A`` and an empty value become ``None``, other values are
-        returned as printed.
+        ``{task id: SlurmQueueEntry}`` with task ids ``<job>_<index>`` or
+        ``<job>``; ``N/A`` and an empty start become ``None``, and an empty
+        reason becomes ``None``; other values are returned as printed.
 
     Raises:
         SlurmError: If ``squeue`` exits non-zero (squeue not knowing a purged
@@ -257,7 +271,7 @@ def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
         return {}
     ids = ','.join(job_ids)
     squeue = _query(
-        command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S'],
+        command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S|%r'],
         accept=_squeue_accepts,
     )
     if not _squeue_accepts(squeue):
@@ -266,15 +280,19 @@ def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
     return _pipe_start_lines(stdout=squeue.stdout)
 
 
-def _pipe_start_lines(*, stdout: str) -> dict[str, str | None]:
-    starts: dict[str, str | None] = {}
+def _pipe_start_lines(*, stdout: str) -> dict[str, SlurmQueueEntry]:
+    # why: split keeps at most three fields, so a reason with commas stays whole
+    starts: dict[str, SlurmQueueEntry] = {}
     for line in stdout.splitlines():
-        key, _, value = (part.strip() for part in line.partition('|'))
+        key, _, rest = line.partition('|')
+        start, _, reason = rest.partition('|')
+        key = key.strip()
         if not key:
             continue
-        start = None if value in ('', 'N/A') else value
+        start = None if start.strip() in ('', 'N/A') else start.strip()
+        reason = reason.strip() or None
         for expanded in _expand_array_key(key=key):
-            starts[expanded] = start
+            starts[expanded] = SlurmQueueEntry(start=start, reason=reason)
     return starts
 
 

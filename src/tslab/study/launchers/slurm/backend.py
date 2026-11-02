@@ -30,6 +30,7 @@ from tslab.study.launchers import (
     launch,
     LaunchError,
     LaunchReport,
+    QueuedJob,
     Resources,
 )
 from tslab.study.launchers.slurm.doctor import slurm_check
@@ -149,8 +150,11 @@ class SlurmBackend:
             new_cache,
         )
 
-    def expected_starts(self, *, context: Context) -> dict[str, str | None] | None:
-        """The expected start of the queued jobs; ``None`` when nothing is queued."""
+    def expected_starts(self, *, context: Context) -> dict[str, QueuedJob] | None:
+        """The expected start and pending reason of the queued jobs.
+
+        ``None`` when nothing is queued.
+        """
         return expected_starts(context=context)
 
     def launch_blocker(self, *, context: Context) -> str | None:  # noqa: ARG002 # why: Backend API

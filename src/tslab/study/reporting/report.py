@@ -8,7 +8,7 @@ import shlex
 from tslab.core.text import format_index_ranges, log_table
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers import JobFlag, LaunchReport, Resources, SIGNAL_EXIT_BASE
+from tslab.study.launchers import JobFlag, LaunchReport, QueuedJob, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport, StudyState
@@ -26,7 +26,7 @@ def log_status(
     *,
     context: Context,
     states: tuple[StudyState, ...] = (),
-    starts: Mapping[str, str | None] | None = None,
+    starts: Mapping[str, QueuedJob] | None = None,
 ) -> None:
     """Log the state table of the study and one line per run not done.
 
@@ -34,7 +34,7 @@ def log_status(
         context: The context to report on.
         states: When given, the listed lines are limited to these states.
         starts: When given, the lines of queued runs end with their expected
-            start time, as reported by the scheduler.
+            start time and pending reason, as reported by the scheduler.
     """
     if not context.job_states.known:
         _LOGGER.info(
@@ -73,9 +73,7 @@ def log_status(
         )
 
 
-def _log_run_lines(
-    *, reports: Sequence[RunReport], starts: Mapping[str, str | None] | None
-) -> None:
+def _log_run_lines(*, reports: Sequence[RunReport], starts: Mapping[str, QueuedJob] | None) -> None:
     """Log one line per listed run, the first few of them, then how many are hidden."""
     lines = [
         ' '.join(
@@ -127,11 +125,19 @@ def _table_row(*, name: str, grid: Counter[StudyState]) -> list[str]:
     return [name, *(str(grid[state]) for state in _TABLE_STATES), str(sum(grid.values()))]
 
 
-def _start_suffix(*, report: RunReport, starts: Mapping[str, str | None] | None) -> str | None:
+def _start_suffix(*, report: RunReport, starts: Mapping[str, QueuedJob] | None) -> str | None:
     if starts is None or report.state is not StudyState.QUEUED or report.job_id is None:
         return None
-    start = starts.get(report.job_id)
-    return None if start is None else f'starts {start}'
+    job = starts.get(report.job_id)
+    if job is None:
+        return None
+    parts: list[str] = []
+    if job.start is not None:
+        parts.append(f'starts {job.start}')
+    if job.reason is not None:
+        waiting = 'waiting: ' if not job.stuck else 'will not start: '
+        parts.append(f'{waiting}{job.reason}')
+    return ', '.join(parts) if parts else None
 
 
 def resources_of(*, resources: Resources) -> str:

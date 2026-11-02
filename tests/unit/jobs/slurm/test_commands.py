@@ -15,6 +15,7 @@ from tslab.jobs.slurm import (
     scancel,
     SlurmError,
     SlurmJobUsage,
+    SlurmQueueEntry,
     submission_environment,
 )
 from tslab.jobs.slurm.commands import _expand_array_key, _run, QOS_WAIT_CAP_SECONDS
@@ -108,27 +109,42 @@ def test_scancel_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
 
 
 def test_query_expected_starts_maps_na_to_none(fake: FakeSlurm) -> None:
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00\n1000_1|N/A\n'}])
+    fake.set_answers(
+        'squeue', [{'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00|\n1000_1|N/A|\n'}]
+    )
     assert query_expected_starts(job_ids=['1000_0', '1000_1']) == {
-        '1000_0': '2026-11-01T10:00:00',
-        '1000_1': None,
+        '1000_0': SlurmQueueEntry(start='2026-11-01T10:00:00', reason=None),
+        '1000_1': SlurmQueueEntry(start=None, reason=None),
     }
     assert fake.calls('squeue') == [
-        ['--array', '--start', '--jobs', '1000_0,1000_1', '--noheader', '--format=%i|%S']
+        ['--array', '--start', '--jobs', '1000_0,1000_1', '--noheader', '--format=%i|%S|%r']
     ]
 
 
 def test_query_expected_starts_empty_value_is_none(fake: FakeSlurm) -> None:
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|\n'}])
-    assert query_expected_starts(job_ids=['1000_0']) == {'1000_0': None}
+    assert query_expected_starts(job_ids=['1000_0']) == {
+        '1000_0': SlurmQueueEntry(start=None, reason=None)
+    }
 
 
 def test_query_expected_starts_expands_array_ranges(fake: FakeSlurm) -> None:
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_[2-3]|2026-11-01T10:00:00\n'}])
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_[2-3]|2026-11-01T10:00:00|\n'}])
     assert query_expected_starts(job_ids=['1000_2', '1000_3']) == {
-        '1000_2': '2026-11-01T10:00:00',
-        '1000_3': '2026-11-01T10:00:00',
+        '1000_2': SlurmQueueEntry(start='2026-11-01T10:00:00', reason=None),
+        '1000_3': SlurmQueueEntry(start='2026-11-01T10:00:00', reason=None),
     }
+
+
+def test_query_expected_starts_reads_the_reason(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'squeue', [{'exit': 0, 'stdout': '1000_[0-1]|N/A|ReqNodeNotAvail, UnavailableNodes:n1\n'}]
+    )
+    entries = query_expected_starts(job_ids=['1000_0', '1000_1'])
+    assert entries['1000_1'] == SlurmQueueEntry(
+        start=None, reason='ReqNodeNotAvail, UnavailableNodes:n1'
+    )
+    assert fake.calls('squeue')[0][-1] == '--format=%i|%S|%r'
 
 
 def test_query_expected_starts_empty_ids_calls_nothing(fake: FakeSlurm) -> None:

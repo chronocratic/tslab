@@ -370,9 +370,12 @@ and the output says so once; the folder-based states still work. The output
 lists per-grid counts by state, totals, then one line per non-`done` run:
 run path, state, the first line of the error, job id. A queued run ends its
 line with `starts <time>`, the estimate of the start of the job from the
-scheduler; `--json` adds `expected_start` to the runs, `null` when the
-estimate is unknown. The exit code is 0 always: a status report is not a
-failure.
+scheduler, and, when known, the pending reason: `waiting: <reason>` while
+SLURM may still start the job, and `will not start: <reason>` for reasons
+that never clear on their own (for example `PartitionTimeLimit`).
+`--json` adds `expected_start` (null when the estimate is unknown),
+`pending_reason` and `pending_stuck` to the runs. The exit code is 0 always: a
+status report is not a failure.
 
 ## Resubmit
 
