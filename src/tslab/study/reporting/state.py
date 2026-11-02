@@ -229,6 +229,9 @@ def _refresh_failed(*, directory: Path) -> bool:
     """Whether a chmod to the same mode failed; it makes a network file system refresh its cache."""
     try:
         directory.chmod(directory.stat().st_mode)
+    except FileNotFoundError:
+        # why: a missing folder has no cache to refresh
+        return False
     except OSError:
         return True
     return False
