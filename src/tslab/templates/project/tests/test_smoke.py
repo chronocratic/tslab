@@ -13,7 +13,7 @@ from tslab.lightning import LightningTrainerConfig
 
 from {{package_name}} import classify, forecast, toy_data
 
-STUDY = '{{package_name}}.studies:example'
+STUDY = 'example'
 ONE_BATCH = LightningTrainerConfig(
     max_epochs=1,
     min_epochs=0,
@@ -72,6 +72,11 @@ def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.M
     root = Path(__file__).parents[1]
     monkeypatch.setenv('UV_PROJECT', str(root))
     machine = str(root / 'machines' / 'local.toml')
+    # The working folder holds the toy data; copy the project settings there
+    # so the short study name expands against the studies module.
+    (project / 'tslab.toml').write_text(
+        (root / 'tslab.toml').read_text(encoding='utf-8'), encoding='utf-8'
+    )
     # one epoch of the toy data is a single batch, so a CPU run stays short
     extra = [
         '--trainer.max-epochs',
