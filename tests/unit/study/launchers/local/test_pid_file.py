@@ -1,9 +1,11 @@
 """The local launch pid file, task states and detach behavior."""
 
 from collections.abc import Callable
+import contextlib
 import logging
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -28,6 +30,7 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.jobs.local import process_alive
 from tslab.study.launchers.local import pid_file
 from tslab.study.launchers.local.pid_file import (
     _stop_detached,
@@ -311,6 +314,38 @@ def test_detach_stop_ignores_a_child_that_already_exited() -> None:
     _stop_detached(process=process)
 
     assert process.poll() == 0
+
+
+@pytest.mark.slow
+def test_detach_kills_a_child_that_ignores_sigterm() -> None:
+    child_code = (
+        'import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); '
+        "print('ready', flush=True); time.sleep(60)"
+    )
+    leader_code = (
+        'import subprocess, sys, time; '
+        f"child = subprocess.Popen([sys.executable, '-c', {child_code!r}], "
+        'stdout=subprocess.PIPE); '
+        'print(child.pid, flush=True); '
+        'print(child.stdout.readline().decode(), flush=True); '
+        'time.sleep(60)'
+    )
+    process = subprocess.Popen(  # noqa: S603 # why: fixed test command
+        [sys.executable, '-c', leader_code], stdout=subprocess.PIPE, start_new_session=True
+    )
+    try:
+        assert process.stdout is not None
+        child_pid = int(process.stdout.readline())
+        assert process.stdout.readline() == b'ready\n'
+
+        _stop_detached(process=process)
+
+        assert process.poll() is not None
+        _wait_until(condition=lambda: not process_alive(pid=child_pid), seconds=2)
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
 
 
 def test_cancel_detached_launch_interrupts_run(
