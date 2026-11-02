@@ -71,6 +71,27 @@ def test_unreadable_file_is_a_value_error(tmp_path: Path, monkeypatch: pytest.Mo
     assert str(tmp_path / 'tslab.toml') in str(raised.value)
 
 
+def test_snapshot_keys_default_and_read(tmp_path: Path) -> None:
+    (tmp_path / 'tslab.toml').write_text(
+        'code_snapshot = true\ncode_snapshot_check_untracked = false\n', encoding='utf-8'
+    )
+    settings = load_project_settings(start=tmp_path)
+    assert settings.code_snapshot is True
+    assert settings.code_snapshot_check_untracked is False
+    (tmp_path / 'tslab.toml').write_text('runs = "runs"\n', encoding='utf-8')
+    settings = load_project_settings(start=tmp_path)
+    assert settings.code_snapshot is False
+    assert settings.code_snapshot_check_untracked is True
+
+
+@pytest.mark.parametrize('text', ['code_snapshot = "yes"', 'code_snapshot_check_untracked = 1'])
+def test_code_snapshot_not_bool_is_an_error(tmp_path: Path, text: str) -> None:
+    (tmp_path / 'tslab.toml').write_text(text + '\n', encoding='utf-8')
+    with pytest.raises(ValueError, match='must be a boolean') as raised:
+        load_project_settings(start=tmp_path)
+    assert str(tmp_path / 'tslab.toml') in str(raised.value)
+
+
 def test_expand_study() -> None:
     settings = ProjectSettings(path=None, studies='pkg.studies')
     assert expand_study(reference='ablation', settings=settings) == 'pkg.studies:ablation'

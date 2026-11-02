@@ -11,7 +11,8 @@ import os
 from pathlib import Path
 import shlex
 
-from tslab.cli.common import UsageError
+from tslab.cli.common import Request, UsageError
+from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
 from tslab.study.commands import parse_states
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import available_cpus, backend_for
@@ -57,6 +58,40 @@ def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag o
             local_cpus=available_cpus(),
             environment=os.environ,
         )
+
+
+def take_requested_code_snapshot(
+    *, request: Request, context: Context, wanted: bool, include_untracked: bool, dry_run: bool
+) -> CodeSnapshot | None:
+    """The code snapshot the launch runs from; ``None`` when not wanted.
+
+    Args:
+        request: The resolved request; its ``tslab.toml`` names the project root
+            and the untracked check.
+        context: The context of the launch, for the machine's output root.
+        wanted: Whether the command wants a code snapshot at all.
+        include_untracked: Copy untracked files under ``src/`` too.
+        dry_run: Run every check and compute the hash, copy nothing.
+
+    Raises:
+        UsageError: If the snapshot cannot be taken; the message names the way out.
+    """
+    if not wanted:
+        return None
+    settings = request.settings
+    project_root = settings.path.parent if settings.path is not None else context.project_root
+    try:
+        taken = take_code_snapshot(
+            project_root=project_root,
+            output_root=context.machine.output_root,
+            include_untracked=include_untracked,
+            check_untracked=settings.code_snapshot_check_untracked,
+            dry_run=dry_run,
+        )
+    except CodeSnapshotError as error:
+        raise UsageError(str(error)) from error
+    _LOGGER.info('code snapshot: %s', taken.folder)
+    return taken
 
 
 @contextmanager

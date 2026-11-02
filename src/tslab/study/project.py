@@ -26,7 +26,13 @@ __all__ = [
 #: The file name the loader looks for, from the working folder upward.
 PROJECT_FILE = 'tslab.toml'
 
-_VALID_KEYS = ('studies', 'machine_by_host', 'runs')
+_VALID_KEYS = (
+    'studies',
+    'machine_by_host',
+    'runs',
+    'code_snapshot',
+    'code_snapshot_check_untracked',
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -41,6 +47,10 @@ class ProjectSettings:
             order; the first pattern that matches wins.
         runs: The default runs folder of ``tslab status``, absolute and
             resolved against the folder holding the file.
+        code_snapshot: Whether ``submit`` takes a code snapshot without
+            ``--code-snapshot``.
+        code_snapshot_check_untracked: Whether a code snapshot stops when
+            untracked files under ``src/`` would be left out.
         file_keys: The top-level keys of the file, so a key holding an
             empty value still counts as present; empty without a file.
     """
@@ -49,6 +59,8 @@ class ProjectSettings:
     studies: str | None = None
     machine_by_host: tuple[tuple[str, str], ...] = ()
     runs: Path | None = None
+    code_snapshot: bool = False
+    code_snapshot_check_untracked: bool = True
     file_keys: frozenset[str] = frozenset[str]()
 
 
@@ -145,6 +157,10 @@ def _settings_of(*, path: Path, table: Mapping[str, object]) -> ProjectSettings:
         studies=_string_of(table=table, name='studies', path=path),
         machine_by_host=_machine_table(table=table, path=path),
         runs=_runs_of(table=table, path=path),
+        code_snapshot=_bool_of(table=table, name='code_snapshot', path=path, default=False),
+        code_snapshot_check_untracked=_bool_of(
+            table=table, name='code_snapshot_check_untracked', path=path, default=True
+        ),
         file_keys=frozenset(table),
     )
 
@@ -156,6 +172,16 @@ def _string_of(*, table: Mapping[str, object], name: str, path: Path) -> str | N
     if not isinstance(value, str) or not value:
         message = f'{path}: {name} must be a non-empty string, got {value!r}'
         raise ValueError(message)
+    return value
+
+
+def _bool_of(*, table: Mapping[str, object], name: str, path: Path, default: bool) -> bool:
+    value = table.get(name)
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        message = f'{path}: {name} must be a boolean, got {value!r}'
+        raise ValueError(message)  # noqa: TRY004 # why: bad file content, not arguments
     return value
 
 
