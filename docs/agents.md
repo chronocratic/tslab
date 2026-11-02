@@ -175,3 +175,7 @@ uv run tslab study results "$STUDY" --machine "$MACHINE" --out - --json
   `--states failed`.
 - Unknown SLURM state does not mean the job stopped. Report it; do not resubmit
   or cancel based on an unknown state.
+- When a submit with a code snapshot stops (exit 2) listing untracked files
+  under `src/`, ask the researcher how to proceed: `git add` the files, pass
+  `--code-snapshot-include-untracked`, or drop the snapshot with
+  `--no-code-snapshot`. Never pick a flag on your own.

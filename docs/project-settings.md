@@ -27,6 +27,8 @@ file. Without a file, the built-in defaults hold and nothing errors.
 | `studies` | none | The module that holds the studies. A study argument without `:` expands against it: `ablation` means `my_paper.studies:ablation`. |
 | `machine_by_host` | none | Host pattern to machine name. Used when `--machine` is not passed. |
 | `runs` | none | The default folder of `tslab status` without a `FOLDER` argument. |
+| `code_snapshot` | `false` | Take a [code snapshot](studies.md#code-snapshots) of `src/` when a study is submitted, so the jobs run the code of submit time. Resubmits keep the snapshot recorded on their runs and ignore this key. |
+| `code_snapshot_check_untracked` | `true` | With a code snapshot, stop with a list of the untracked files under `src/` instead of leaving them out silently. |
 
 Precedence: a `--machine` flag wins over the table, a full `module:attribute`
 reference wins over a short name, and the file wins over the built-in

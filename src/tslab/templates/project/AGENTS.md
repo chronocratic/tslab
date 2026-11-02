@@ -250,6 +250,14 @@ from every command.
 `--grid NAME` and `--only axis=value` select a slice; arguments after `--` go
 to every run (`-- --trainer.max-epochs 1`). Always `--dry-run` first.
 
+`--code-snapshot` on `submit` (or `code_snapshot = true` in `tslab.toml`)
+copies `src/` into a code snapshot the jobs import, so queued and resubmitted
+runs keep the code of submit time; `resubmit --new-code-snapshot` and
+`--no-code-snapshot` change the code a resubmit runs. If a submit stops with
+untracked files under `src/` (exit 2 with their list), ask the researcher how
+to proceed — `git add` them, `--code-snapshot-include-untracked`, or drop the
+snapshot — and never pick the flag on your own.
+
 Writing a study:
 
 - A `Grid` has a `short_name` (SLURM job name, at most 8 characters), a
