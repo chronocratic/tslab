@@ -2,8 +2,6 @@
 
 import logging
 from pathlib import Path
-import shutil
-import subprocess
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -12,7 +10,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 from tests.support.fake_backend import FakeBackend
-from tests.unit.cli.study.helpers import toy_project
+from tests.unit.cli.study.helpers import git_project, toy_project
 from tests.unit.study.helpers import jobs_of
 from tslab.cli import main
 from tslab.cli.study import Submit
@@ -38,37 +36,10 @@ def run_main(*args: str) -> int:
     return code
 
 
-def _git_project(
-    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code_snapshot: bool = False
-) -> Path:
-    """The toy project as a committed git repository with a src layout and tslab.toml."""
-    project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    machines = project / 'machines'
-    machines.mkdir()
-    (machines / 'local.toml').write_text((project / 'local.toml').read_text(encoding='utf-8'))
-    (project / 'src' / 'pkg').mkdir(parents=True)
-    (project / 'src' / 'pkg' / '__init__.py').write_text('# package\n', encoding='utf-8')
-    toml = 'studies = "toy_studies"\n'
-    if code_snapshot:
-        toml += 'code_snapshot = true\n'
-    toml += '\n[machine_by_host]\n"*" = "local"\n'
-    (project / 'tslab.toml').write_text(toml, encoding='utf-8')
-    git = shutil.which('git')
-    assert git is not None
-    for arguments in (('init', '-q'), ('add', '-A'), ('commit', '-q', '-m', 'init')):
-        subprocess.run(  # noqa: S603 # why: fixed git command, no user input
-            [git, '-c', 'user.name=t', '-c', 'user.email=t@t', *arguments],
-            cwd=project,
-            check=True,
-            capture_output=True,
-        )
-    return project
-
-
 def test_submit_code_snapshot_records_and_copies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert run_main('submit', 'study', '--machine', 'local', '--code-snapshot') == 0
 
@@ -82,7 +53,7 @@ def test_submit_code_snapshot_records_and_copies(
 def test_code_snapshot_in_toml_turns_it_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch, code_snapshot=True)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch, code_snapshot=True)
 
     assert run_main('submit', 'study', '--machine', 'local') == 0
 
@@ -92,7 +63,7 @@ def test_code_snapshot_in_toml_turns_it_on(
 def test_no_code_snapshot_overrides_toml(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch, code_snapshot=True)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch, code_snapshot=True)
 
     assert run_main('submit', 'study', '--machine', 'local', '--no-code-snapshot') == 0
 
@@ -102,7 +73,7 @@ def test_no_code_snapshot_overrides_toml(
 def test_code_snapshot_and_no_code_snapshot_is_usage_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert (
         run_main('submit', 'study', '--machine', 'local', '--code-snapshot', '--no-code-snapshot')
@@ -116,7 +87,7 @@ def test_untracked_stop_exit_2_writes_nothing(
     fake_backend: FakeBackend,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
     (project / 'src' / 'pkg' / 'new.py').write_text('NEW = 1\n', encoding='utf-8')
     with caplog.at_level(logging.ERROR):
         code = run_main('submit', 'study', '--machine', 'local', '--code-snapshot')
@@ -130,7 +101,7 @@ def test_untracked_stop_exit_2_writes_nothing(
 def test_dry_run_code_snapshot_copies_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert run_main('submit', 'study', '--machine', 'local', '--dry-run', '--code-snapshot') == 0
 
@@ -140,7 +111,7 @@ def test_dry_run_code_snapshot_copies_nothing(
 def test_submit_from_subfolder_copies_project_src(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    project = _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
     # why: the toy study module is not installed; the real project's package is
     monkeypatch.syspath_prepend(str(project))
     monkeypatch.chdir(project / 'src' / 'pkg')
@@ -157,7 +128,7 @@ def test_submit_from_subfolder_copies_project_src(
 def test_include_untracked_without_code_snapshot_is_usage_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     assert (
         run_main('submit', 'study', '--machine', 'local', '--code-snapshot-include-untracked') == 2
@@ -167,7 +138,7 @@ def test_include_untracked_without_code_snapshot_is_usage_error(
 def test_detach_forwards_code_snapshot_flags(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:
-    _git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
 
     code = Submit(
         study='toy_studies:study',
