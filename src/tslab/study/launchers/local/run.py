@@ -20,7 +20,8 @@ from tslab.jobs.local import (
     TaskOutput,
     without_scheduler_variables,
 )
-from tslab.study.launchers import LaunchStopped, OnTaskState, RecordJob
+from tslab.study.code_snapshot import without_code_snapshot
+from tslab.study.launchers import LaunchError, LaunchStopped, OnTaskState, RecordJob
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.paths import usage_file
 from tslab.study.plan import JobGroup
@@ -156,8 +157,17 @@ class LocalLauncher:
         task starts after the signal.
 
         Raises:
+            LaunchError: If the code snapshot of the group has no ``src`` folder;
+                the live code must not be run instead, and nothing is recorded.
             LaunchStopped: If a stop signal was caught, with its number.
         """
+        snapshot = group.code_snapshot
+        if snapshot is not None and not (snapshot.folder / 'src').is_dir():
+            message = (
+                f'code snapshot {snapshot.folder}/src is missing; '
+                'not running the live code; rerun with --new-code-snapshot'
+            )
+            raise LaunchError(message)
         job_id = local_job_id(job_file=group.job_file, pid=self._pid)
         record(job_id=job_id)
         stream = sys.stdout if self._stream is None else self._stream
@@ -201,6 +211,16 @@ class LocalLauncher:
             header=task_header,
             on_task_state=on_task_state,
         )
+
+        def task_environment() -> dict[str, str]:
+            # why: a nested launch must not run from the snapshot of the launch that started it
+            env = without_code_snapshot(environ=without_scheduler_variables(environ=os.environ))
+            env.update(self._env)
+            if snapshot is not None:
+                env.update(snapshot.variables())
+                env['PYTHONPATH'] = snapshot.pythonpath(current=env.get('PYTHONPATH'))
+            return env
+
         with stop_on_signals(signals=_STOP_SIGNALS) as request:
             run_commands(
                 commands=[
@@ -208,10 +228,7 @@ class LocalLauncher:
                         key=key,
                         command=task.command,
                         cwd=self._project_root,
-                        environment={
-                            **without_scheduler_variables(environ=os.environ),
-                            **self._env,
-                        },
+                        environment=task_environment(),
                     )
                     for key, task in by_key.items()
                 ],

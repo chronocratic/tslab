@@ -1,6 +1,7 @@
 """Writing and submitting SLURM job files."""
 
 from collections.abc import Callable, Sequence
+import os
 from pathlib import Path
 import shlex
 import time
@@ -9,6 +10,7 @@ from uuid import uuid4
 
 from tslab.core.files import atomic_write_text
 from tslab.jobs.slurm import sbatch, SlurmError
+from tslab.study.code_snapshot import without_code_snapshot
 from tslab.study.launchers import LaunchError, RecordJob
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
@@ -57,6 +59,7 @@ def write_job_files(
             project_root=project_root,
             env=machine.env,
             begin=begin,
+            code_snapshot=group.code_snapshot,
         )
         atomic_write_text(path=study_folder / 'jobs' / f'{group.job_file}.sbatch', text=script)
 
@@ -79,8 +82,11 @@ class SlurmLauncher:
             LaunchError: If ``sbatch`` fails; nothing is recorded then.
         """
         try:
+            # why: a nested launch must not submit with the snapshot it itself runs from
             job_id = sbatch(
-                script=study_folder / 'jobs' / f'{group.job_file}.sbatch', sleep=self._sleep
+                script=study_folder / 'jobs' / f'{group.job_file}.sbatch',
+                sleep=self._sleep,
+                environ=without_code_snapshot(environ=os.environ),
             )
         except SlurmError as error:
             raise LaunchError(str(error)) from error
@@ -141,7 +147,9 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
             dependency=dependency,
         ),
     )
-    job_id = sbatch(script=sbatch_file, sleep=sleep)
+    job_id = sbatch(
+        script=sbatch_file, sleep=sleep, environ=without_code_snapshot(environ=os.environ)
+    )
     record = JobRecord(
         kind='followup',
         submission_id=uuid4().hex,

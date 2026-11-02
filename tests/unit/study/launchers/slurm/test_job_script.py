@@ -8,6 +8,7 @@ import time
 
 import pytest
 
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.launchers.slurm.job_script import foreground_script, job_script
 from tslab.study.machine import SlurmSettings
 
@@ -146,6 +147,45 @@ def test_job_script_is_unchanged(
         env={'EXAMPLE': 'a b'},
     )
     expected = Path(__file__).with_name('job_scripts') / f'{name}.sbatch'
+    assert actual == expected.read_text()
+
+
+def _golden_code_snapshot() -> CodeSnapshot:
+    return CodeSnapshot(
+        folder=Path('/snapshots/ab12cd34'),
+        hash='ab12cd34ef56ab12',
+        commit='c0ffee00',
+        dirty=False,
+        untracked_copied=False,
+    )
+
+
+def test_job_script_with_code_snapshot_matches_golden() -> None:
+    actual = job_script(
+        job_name='train',
+        slurm=SlurmSettings(partition='compute', time='1:00:00'),
+        indices=(0, 1, 3),
+        tasks_file=Path('/project/jobs/0.tasks'),
+        log_pattern=Path('/project/logs/train_%a.out'),
+        project_root=Path('/project'),
+        env={'EXAMPLE': 'a b'},
+        code_snapshot=_golden_code_snapshot(),
+    )
+    expected = Path(__file__).with_name('job_scripts') / 'code-snapshot.sbatch'
+    assert actual == expected.read_text()
+
+
+def test_job_script_without_code_snapshot_is_unchanged() -> None:
+    actual = job_script(
+        job_name='train',
+        slurm=SlurmSettings(partition='compute', time='1:00:00'),
+        indices=(0, 1, 3),
+        tasks_file=Path('/project/jobs/0.tasks'),
+        log_pattern=Path('/project/logs/train_%a.out'),
+        project_root=Path('/project'),
+        env={'EXAMPLE': 'a b'},
+    )
+    expected = Path(__file__).with_name('job_scripts') / 'array.sbatch'
     assert actual == expected.read_text()
 
 

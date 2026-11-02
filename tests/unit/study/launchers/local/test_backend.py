@@ -4,6 +4,7 @@ from dataclasses import replace
 from io import StringIO
 import os
 from pathlib import Path
+import sys
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -17,12 +18,15 @@ from tests.unit.study.helpers import (
     write_launch,
 )
 from tslab.core.meta import hostname
-from tslab.study.launchers import JobPhase, LaunchReport
+from tslab.study.code_snapshot import CodeSnapshot
+from tslab.study.definition import StudyRun
+from tslab.study.launchers import JobPhase, LaunchError, LaunchReport
 import tslab.study.launchers.local.backend as local_backend
-from tslab.study.launchers.local.backend import _phase_of, LocalBackend
+from tslab.study.launchers.local.backend import _phase_of, LocalBackend, LocalResources
+from tslab.study.launchers.local.run import LocalLauncher
 from tslab.study.launchers.local.states import _is_local_job_id
 from tslab.study.machine import FollowupSettings, LocalSettings
-from tslab.study.plan import plan_jobs
+from tslab.study.plan import JobGroup, plan_jobs, PlannedTask, ResolvedRun
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -283,3 +287,83 @@ def test_cancel_delegates_to_local_cancel(
     monkeypatch.setattr('tslab.study.launchers.local.cancel.cancel_local', lambda **_kwargs: result)
 
     assert LocalBackend().cancel(context=ctx, dry_run=True, signal=None) is result
+
+
+def _code_snapshot_group(*, snapshot: CodeSnapshot, log_file: Path) -> JobGroup:
+    task = PlannedTask(
+        resolved=ResolvedRun(
+            run=StudyRun(grid='g', values={}, run_path='p', settings={}),
+            settings={},
+            resources=LocalResources(cpus=1),
+        ),
+        index=1,
+        log_file=log_file,
+        command=(
+            sys.executable,
+            '-c',
+            "import os; print(os.environ['PYTHONPATH'], os.environ['TSLAB_CODE_SNAPSHOT_HASH'])",
+        ),
+        extra_args=(),
+        attempt=1,
+    )
+    return JobGroup(
+        grid='g',
+        job_name='g',
+        resources=LocalResources(cpus=1),
+        job_file=1,
+        tasks=(task,),
+        code_snapshot=snapshot,
+    )
+
+
+def _launcher(tmp_path: Path) -> LocalLauncher:
+    return LocalLauncher(
+        project_root=tmp_path,
+        env={},
+        local=LocalSettings(),
+        pid=123,
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
+    )
+
+
+def test_local_task_imports_from_code_snapshot_env(tmp_path: Path) -> None:
+    folder = tmp_path / 'snapshots' / 'abc123'
+    (folder / 'src').mkdir(parents=True)
+    snapshot = CodeSnapshot(
+        folder=folder, hash='abc123def456', commit='c0ffee00', dirty=False, untracked_copied=False
+    )
+    study_folder = tmp_path / 'study'
+    log_file = study_folder / 'logs' / 'g1_1.out'
+    log_file.parent.mkdir(parents=True)
+    group = _code_snapshot_group(snapshot=snapshot, log_file=log_file)
+    _launcher(tmp_path).submit(
+        group=group, study_folder=study_folder, record=lambda **_kwargs: None
+    )
+    lines = [line for line in log_file.read_text().splitlines() if 'abc123def456' in line]
+    assert len(lines) == 1
+    assert lines[0].startswith(f'{folder}/src')
+
+
+def test_local_missing_code_snapshot_stops_before_record(tmp_path: Path) -> None:
+    folder = tmp_path / 'snapshots' / 'missing'
+    folder.mkdir(parents=True)
+    snapshot = CodeSnapshot(
+        folder=folder, hash='deadbeef00', commit='c0ffee00', dirty=False, untracked_copied=False
+    )
+    study_folder = tmp_path / 'study'
+    log_file = study_folder / 'logs' / 'g1_1.out'
+    log_file.parent.mkdir(parents=True)
+    group = _code_snapshot_group(snapshot=snapshot, log_file=log_file)
+    recorded: list[str] = []
+
+    def record(job_id: str) -> None:
+        recorded.append(job_id)
+
+    with pytest.raises(LaunchError) as excinfo:
+        _launcher(tmp_path).submit(group=group, study_folder=study_folder, record=record)
+    assert str(excinfo.value) == (
+        f'code snapshot {folder}/src is missing; '
+        'not running the live code; rerun with --new-code-snapshot'
+    )
+    assert recorded == []

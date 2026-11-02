@@ -13,6 +13,7 @@ from tslab.jobs.slurm import (
     srun_command,
     wait_for_file_line,
 )
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.machine import SlurmSettings
 
 __all__ = ['foreground_script', 'job_script']
@@ -127,6 +128,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     env: Mapping[str, str],
     dependency: str | None = None,
     begin: str | None = None,
+    code_snapshot: CodeSnapshot | None = None,
 ) -> str:
     """The full ``.sbatch`` script of one study job.
 
@@ -140,6 +142,9 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         env: Variables to export before the command.
         dependency: A ``--dependency`` value, when given.
         begin: A ``--begin`` value, when given.
+        code_snapshot: The code snapshot the job runs from; the script checks
+            its ``src`` folder, exports its variables and puts it first on
+            ``PYTHONPATH``. ``None`` runs the live code.
 
     Returns:
         The script text, ``#SBATCH`` lines first.
@@ -194,5 +199,20 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
                 'export WANDB_CONFIG_DIR=$TMPDIR/wandb-config',
             ]
         )
+    if code_snapshot is not None:
+        lines += _code_snapshot_lines(code_snapshot=code_snapshot)
     lines.append(_task_section(array=array, tasks_file=tasks_file))
     return '\n'.join(lines) + '\n'
+
+
+def _code_snapshot_lines(*, code_snapshot: CodeSnapshot) -> list[str]:
+    # why: the job must not silently fall back to the live code if the snapshot was removed
+    source = f'{code_snapshot.folder}/src'
+    return [
+        f'if [ ! -d {shlex.quote(source)} ]; then',
+        f'    echo "tslab: code snapshot {source} is missing; not running the live code" >&2',
+        '    exit 1',
+        'fi',
+        *export_lines(env=code_snapshot.variables()),
+        f'export PYTHONPATH={shlex.quote(source)}${{PYTHONPATH:+:$PYTHONPATH}}',
+    ]
