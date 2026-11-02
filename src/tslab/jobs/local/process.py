@@ -14,6 +14,8 @@ from types import FrameType
 
 __all__ = ['ProcessResult', 'StopRequest', 'process_alive', 'run_process', 'stop_on_signals']
 
+_LEFTOVER_WAIT_SECONDS = 5.0
+
 
 @dataclass(frozen=True, kw_only=True)
 class ProcessResult:
@@ -263,7 +265,15 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
         grace_seconds=grace_seconds,
         on_event=on_event,
     )
-    reader.join()
+    reader.join(timeout=_LEFTOVER_WAIT_SECONDS)
+    if reader.is_alive():
+        # why: the process group may exit before the kill reaches it
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pid, signal.SIGKILL)
+        on_event(f'killed the leftover processes of {pid}')
+        reader.join(timeout=_LEFTOVER_WAIT_SECONDS)
+    if not reader.is_alive() and process.stdout is not None:
+        process.stdout.close()
     return result
 
 
