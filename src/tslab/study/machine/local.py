@@ -120,6 +120,13 @@ def check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path
         except ValueError as error:
             message = f'{path}: local.timeout: {error}'
             raise MachineProfileError(message) from error
+    timeout = timeout_seconds(local=local)
+    if timeout is not None and local.signal_seconds > 0 and local.signal_seconds >= timeout:
+        message = (
+            f'{path}: local.signal_seconds ({local.signal_seconds}) must be smaller than '
+            f'local.timeout ({local.timeout}); lower signal_seconds or set it to 0'
+        )
+        raise MachineProfileError(message)
     if isinstance(table.get('gpus'), list) and 'max_parallel' in table:
         message = (
             f'{path}: local.gpus is a list, so local.max_parallel is unused; remove max_parallel'

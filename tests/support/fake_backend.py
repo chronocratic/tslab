@@ -72,6 +72,10 @@ class FakeResources:
         """The resource fields of the group, for the submission record."""
         return {}
 
+    def signal_problem(self) -> str | None:
+        """A fake launch has no time-limit signal problem."""
+        return None
+
 
 class _FakeLauncher:
     """Hands out the fake job ids, one per group, through the shared launch."""

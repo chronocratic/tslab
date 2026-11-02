@@ -137,6 +137,7 @@ def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     assert resources.cpus == 3
     assert resources.max_tasks_per_job is None
     assert resources.describe() == 'local'
+    assert resources.signal_problem() is None
 
 
 def test_cancellable_job_ids_is_empty() -> None:

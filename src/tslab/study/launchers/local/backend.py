@@ -61,6 +61,14 @@ class LocalResources:
         """A local launch records no resource fields."""
         return {}
 
+    def signal_problem(self) -> str | None:
+        """A local profile checks time-limit signals when it loads.
+
+        Returns:
+            Always ``None``.
+        """
+        return None
+
 
 def _phase_of(*, job_state: str | None) -> JobPhase:
     """The phase of one local task state from the pid file."""
