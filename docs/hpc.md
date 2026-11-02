@@ -1,5 +1,13 @@
 # HPC and SLURM
 
+A cluster is a machine profile in `machines/`. The `[machine_by_host]` table
+of [tslab.toml](project-settings.md) can pick it by host, so the study
+commands of the project need no `--machine`:
+
+```bash
+uv run tslab study submit example
+```
+
 ## Time limits
 
 `LightningTrainer` uses separate limits to end training or pause it.

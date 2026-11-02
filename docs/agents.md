@@ -16,6 +16,13 @@ Paths in documents are absolute POSIX paths. `tslab status` and
 process code 0 by default. Add `--exit-code` when a shell needs the state as its
 process code. `tslab study wait` always returns the state code.
 
+Study commands take the short study name of [tslab.toml](project-settings.md);
+with its `[machine_by_host]` table, `--machine` can be dropped:
+
+```bash
+uv run tslab study submit example --json
+```
+
 ## JSON documents
 
 | Schema | Fields |
@@ -31,7 +38,7 @@ process code. `tslab study wait` always returns the state code.
 | `tslab.study-cancel/1` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
 | `tslab.study-usage/1` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
 | `tslab.study-results/1` | `rows`, the same rows as the CSV. |
-| `tslab.doctor/1` | `machine`, `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
+| `tslab.doctor/1` | `machine`, `project_settings` (`path`, `values`: each key with `value` and `source` as `flag`, `file`, or `default`), `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
 
 ## Exit codes
 
