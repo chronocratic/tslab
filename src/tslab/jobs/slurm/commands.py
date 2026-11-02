@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+import logging
 import os
 from pathlib import Path
 import re
@@ -15,6 +16,7 @@ from tslab.jobs.slurm.timing import parse_sacct_duration
 
 __all__ = [
     'QOS_LIMIT_MARKERS',
+    'QOS_WAIT_CAP_SECONDS',
     'SlurmError',
     'SlurmJobUsage',
     'query_expected_starts',
@@ -28,6 +30,11 @@ __all__ = [
 
 #: Output that marks a QoS submission limit; sbatch backs off and retries.
 QOS_LIMIT_MARKERS = ('QOSMaxSubmitJobPerUserLimit', 'Job violates accounting/QOS policy')
+
+#: How long sbatch waits through QoS limit errors before it gives up.
+QOS_WAIT_CAP_SECONDS = 7200.0
+
+_LOGGER = logging.getLogger(__name__)
 
 #: What squeue prints for job ids it no longer knows; the accounting database answers then.
 _UNKNOWN_JOB = 'Invalid job id specified'
@@ -134,6 +141,7 @@ def sbatch(
         SlurmError: If ``sbatch`` fails without a QoS limit marker.
     """
     delay = 10.0
+    waited = 0.0
     while True:
         completed = _run(
             command=['sbatch', '--parsable', str(script)],
@@ -143,10 +151,19 @@ def sbatch(
         if completed.returncode == 0:
             return completed.stdout.split(';', 1)[0].strip()
         output = completed.stdout + completed.stderr
-        if not any(marker in output for marker in QOS_LIMIT_MARKERS):
+        marker = next((name for name in QOS_LIMIT_MARKERS if name in output), None)
+        if marker is None:
             message = f'sbatch failed for {script}:\n{output}'
             raise SlurmError(message)
+        if waited + delay > QOS_WAIT_CAP_SECONDS:
+            message = (
+                f'sbatch for {script} still hits a QoS limit after {waited:g} seconds; '
+                f'check the limits with sacctmgr show qos:\n{output}'
+            )
+            raise SlurmError(message)
+        _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, delay)
         sleep(delay)
+        waited += delay
         delay = min(delay * 2, 900.0)
 
 

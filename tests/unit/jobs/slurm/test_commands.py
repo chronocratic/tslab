@@ -17,7 +17,7 @@ from tslab.jobs.slurm import (
     SlurmJobUsage,
     submission_environment,
 )
-from tslab.jobs.slurm.commands import _expand_array_key, _run
+from tslab.jobs.slurm.commands import _expand_array_key, _run, QOS_WAIT_CAP_SECONDS
 
 
 @pytest.fixture
@@ -45,6 +45,29 @@ def test_sbatch_backoff_caps_at_900(fake: FakeSlurm, tmp_path: Path) -> None:
     delays: list[float] = []
     assert sbatch(script=tmp_path / 'x.sbatch', sleep=delays.append) == '556'
     assert delays[-2:] == [900, 900]
+
+
+def test_sbatch_gives_up_after_the_qos_cap(fake: FakeSlurm, tmp_path: Path) -> None:
+    fake.set_answers('sbatch', [{'exit': 1, 'stderr': 'Job violates accounting/QOS policy'}])
+    delays: list[float] = []
+    with pytest.raises(SlurmError, match='sacctmgr show qos'):
+        sbatch(script=tmp_path / 'x.sbatch', sleep=delays.append)
+    assert sum(delays) <= QOS_WAIT_CAP_SECONDS
+    assert sum(delays) + 900 > QOS_WAIT_CAP_SECONDS
+
+
+def test_sbatch_logs_each_qos_wait(
+    fake: FakeSlurm, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    fake.set_answers(
+        'sbatch',
+        [{'exit': 1, 'stderr': 'error: QOSMaxSubmitJobPerUserLimit'}] * 2
+        + [{'exit': 0, 'stdout': '7;c'}],
+    )
+    sbatch(script=tmp_path / 'x.sbatch', sleep=lambda _: None)
+    waits = [r for r in caplog.records if 'QOSMaxSubmitJobPerUserLimit' in r.getMessage()]
+    assert len(waits) == 2
+    assert 'retrying in 10' in waits[0].getMessage()
 
 
 def test_sbatch_other_errors_raise(fake: FakeSlurm, tmp_path: Path) -> None:
