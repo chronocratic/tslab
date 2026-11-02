@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import tslab
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
     check_paths,
     expand_setting,
@@ -296,6 +297,9 @@ class JobGroup:
         resources: The resources of the job, as declared by its backend.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
+        code_snapshot: The code snapshot the jobs of the group run from;
+            ``None`` means the live code. A group has at most one, so one
+            job file carries one ``PYTHONPATH``.
     """
 
     grid: str
@@ -303,6 +307,7 @@ class JobGroup:
     resources: 'Resources'
     job_file: int
     tasks: tuple[PlannedTask, ...]
+    code_snapshot: CodeSnapshot | None = None
 
 
 def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> dict[str, int]:
@@ -350,12 +355,15 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     first_job_file: int,
     environment: Mapping[str, str],
     uncounted: Mapping[str, tuple[int, int]] | None = None,
+    code_snapshots: Mapping[str, CodeSnapshot | None] | None = None,
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
-    Runs group by (grid, resources) in first-appearance order; a group is never
-    split by count, so a group of tasks past ``max_array_size`` is reported
-    by ``validate_jobs`` instead of planned around.
+    Runs group by (grid, resources, code snapshot) in first-appearance order;
+    a group is never split by count, so a group of tasks past
+    ``max_array_size`` is reported by ``validate_jobs`` instead of planned
+    around. The code snapshot is part of the key, so a resubmit of a mixed
+    study gives each job file exactly one ``PYTHONPATH``.
 
     Args:
         study: The study the runs came from.
@@ -369,6 +377,8 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         environment: The process environment used to expand run settings.
         uncounted: The run path to ``(uncounted attempts, uncounted in a row)``,
             see ``TaskRecord``; ``(0, 0)`` when absent.
+        code_snapshots: The run path to code snapshot; ``None`` when absent,
+            which means the run submits with the live code.
 
     Returns:
         The groups, numbered from ``first_job_file`` in first-appearance
@@ -376,14 +386,16 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     """
     folder = study_folder(machine=machine, study=study)
     groups: list[JobGroup] = []
-    lookup: dict[tuple[str, Resources], int] = {}
+    lookup: dict[tuple[str, Resources, CodeSnapshot | None], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
     env = expansion_env(machine=machine, environment=environment)
     counters = uncounted or {}
+    snapshots = code_snapshots or {}
     for run in resolved:
         grid = study.grids[run.run.grid]
-        key = (run.run.grid, run.resources)
+        code_snapshot = snapshots.get(run.run.run_path)
+        key = (run.run.grid, run.resources, code_snapshot)
         if key not in lookup:
             lookup[key] = len(groups)
             tasks_of[lookup[key]] = []
@@ -394,6 +406,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     resources=run.resources,
                     job_file=next_file,
                     tasks=(),
+                    code_snapshot=code_snapshot,
                 )
             )
             next_file += 1

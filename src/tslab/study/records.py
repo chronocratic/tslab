@@ -12,6 +12,7 @@ from typing import Any, Literal
 
 from tslab.core.paths import require_path, STATUS_FILE
 from tslab.core.status import InstanceState, read_status
+from tslab.study.code_snapshot import CodeSnapshot
 
 __all__ = [
     'SUBMISSIONS_FORMAT_VERSION',
@@ -162,6 +163,8 @@ class JobRecord:
         job_id: The scheduler job id, or the local id.
         job_file: The number of the ``jobs/<n>`` files of this job.
         tasks: The run tasks; empty for a follow-up.
+        code_snapshot: The code snapshot the job runs from; ``None`` means
+            the live code, as in records written before this field.
     """
 
     kind: Literal['run', 'followup']
@@ -171,10 +174,11 @@ class JobRecord:
     job_id: str
     job_file: int
     tasks: tuple[TaskRecord, ...]
+    code_snapshot: CodeSnapshot | None = None
 
     def to_json(self) -> dict[str, object]:
         """The JSON form of the record, with the format version."""
-        return {
+        document: dict[str, object] = {
             'format_version': SUBMISSIONS_FORMAT_VERSION,
             'kind': self.kind,
             'submission_id': self.submission_id,
@@ -184,6 +188,9 @@ class JobRecord:
             'job_file': self.job_file,
             'tasks': [task.to_json() for task in self.tasks],
         }
+        if self.code_snapshot is not None:
+            document['code_snapshot'] = self.code_snapshot.to_json()
+        return document
 
     @classmethod
     def from_json(cls, *, document: Mapping[str, Any]) -> 'JobRecord':
@@ -192,6 +199,7 @@ class JobRecord:
         if version != SUBMISSIONS_FORMAT_VERSION:
             message = f'format_version {version!r} is not {SUBMISSIONS_FORMAT_VERSION}'
             raise ValueError(message)
+        code_snapshot = document.get('code_snapshot')
         return cls(
             kind=document['kind'],
             submission_id=str(document['submission_id']),
@@ -200,6 +208,9 @@ class JobRecord:
             job_id=str(document['job_id']),
             job_file=int(document['job_file']),
             tasks=tuple(TaskRecord.from_json(document=item) for item in document['tasks']),
+            code_snapshot=(
+                None if code_snapshot is None else CodeSnapshot.from_json(document=code_snapshot)
+            ),
         )
 
 

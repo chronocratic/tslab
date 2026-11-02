@@ -8,6 +8,7 @@ import pytest
 from tests.unit.study.configs import grid, PRESETS
 from tslab.core.status import utc_now_iso
 from tslab.study import from_presets, Study, StudyRun
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
@@ -88,6 +89,64 @@ def test_groups_by_grid_and_resources(
     assert task.command[:4] == study.grids['g'].command
     assert '--run-path' in task.command
     assert task.attempt == 1
+
+
+def test_plan_jobs_splits_groups_by_code_snapshot(
+    study: Study, machine: MachineProfile, tmp_path: Path
+) -> None:
+    plain = dataclasses.replace(machine, overrides=())
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
+    indices = assign_indices(runs=runs, jobs=[])
+
+    def snapshot(folder: Path) -> CodeSnapshot:
+        return CodeSnapshot(
+            folder=folder,
+            hash='0123456789abcdef',
+            commit='a' * 40,
+            dirty=False,
+            untracked_copied=False,
+        )
+
+    first = snapshot(tmp_path / 'out' / '.tslab-code-snapshots' / '0123456789abcdef')
+    second = snapshot(tmp_path / 'out' / '.tslab-code-snapshots' / 'fedcba9876543210')
+    code_snapshots = {runs[0].run_path: first, runs[1].run_path: second, runs[3].run_path: second}
+    groups = plan_jobs(
+        study=study,
+        machine=plain,
+        resolved=resolved,
+        indices=indices,
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+        environment={},
+        code_snapshots=code_snapshots,
+    )
+    assert [group.code_snapshot for group in groups] == [first, second, None]
+    assert [group.job_file for group in groups] == [1, 2, 3]
+    assert [[task.index for task in group.tasks] for group in groups] == [[0], [1, 3], [2]]
+
+
+def test_plan_jobs_without_code_snapshots_groups_as_before(
+    study: Study, machine: MachineProfile
+) -> None:
+    plain = dataclasses.replace(machine, overrides=())
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
+    indices = assign_indices(runs=runs, jobs=[])
+    groups = plan_jobs(
+        study=study,
+        machine=plain,
+        resolved=resolved,
+        indices=indices,
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+        environment={},
+    )
+    assert len(groups) == 1
+    assert groups[0].code_snapshot is None
+    assert [task.index for task in groups[0].tasks] == [0, 1, 2, 3]
 
 
 def test_indices_are_stable_when_the_grid_changes() -> None:
