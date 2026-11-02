@@ -283,7 +283,8 @@ Writing a study:
 - Training saves `last.ckpt` at the next batch boundary after `SIGUSR2`; the run is marked
   interrupted. Other stages stop without a checkpoint. Resubmit the study to resume training.
 - `[slurm.sbatch_extra]` maps sbatch long names to values. Entries replace matching defaults;
-  `false` removes an option. The old list form is rejected.
+  `false` removes an option. The old list form is rejected. `clusters` is rejected: TSLab tracks
+  jobs on the default cluster only.
 - A study holds data, not logic: no computation or branching on results.
   Every path is checked against the config class at import, and every run is
   parsed at submit, so typos fail before anything runs.
