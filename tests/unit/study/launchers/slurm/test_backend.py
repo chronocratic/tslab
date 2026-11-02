@@ -101,7 +101,7 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
                 'exit': 0,
                 'stdout': (
                     '1000_0|TIMEOUT\n1000_1|PREEMPTED\n1000_2|COMPLETED\n'
-                    '1000_3|CANCELLED by 12\n1000_4|NODE_FAIL\n'
+                    '1000_3|CANCELLED by 12\n1000_4|NODE_FAIL\n1000_5|unknown\n'
                 ),
             }
         ],
@@ -123,6 +123,7 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
         '1000_1': frozenset({JobFlag.NOT_COUNTED}),
         '1000_4': frozenset({JobFlag.NOT_COUNTED}),
     }
+    assert states.states['1000_5'] == 'unknown'
 
 
 def test_job_states_skips_cached_ended_jobs(*, project: Path, fake: FakeSlurm) -> None:
