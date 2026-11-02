@@ -88,6 +88,25 @@ def test_sbatch_extra_rejects_invalid_entries(tmp_path: Path, entry: str, messag
         load_machine(path=write(tmp_path, text))
 
 
+@pytest.mark.parametrize('key', ['clusters', 'cluster'])
+def test_sbatch_extra_rejects_clusters(tmp_path: Path, key: str) -> None:
+    with pytest.raises(
+        MachineProfileError, match=f'{key!r}.*multi-cluster submission is not supported'
+    ):
+        slurm_machine.sbatch_extra(
+            value={key: 'gpu'}, location='slurm.sbatch_extra', path=tmp_path / 'm.toml'
+        )
+
+
+def test_override_sbatch_extra_rejects_clusters(tmp_path: Path) -> None:
+    with pytest.raises(MachineProfileError, match='multi-cluster'):
+        slurm_machine.slurm_overrides(
+            table={'sbatch_extra': {'clusters': 'gpu'}},
+            location='overrides[0].slurm',
+            path=tmp_path / 'm.toml',
+        )
+
+
 @pytest.mark.parametrize(
     'line', ['gpus = -3', 'max_array_size = 0', 'max_concurrent = 0', 'cpus_per_task = 0']
 )

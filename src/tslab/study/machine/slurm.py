@@ -34,6 +34,7 @@ __all__ = [
 TABLE: Literal['slurm'] = 'slurm'
 FOLLOWUP_KEYS = frozenset(('auto_retry', 'wandb_sync', 'time'))
 _SBATCH_NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
+_UNSUPPORTED_SBATCH = frozenset({'clusters', 'cluster'})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -211,11 +212,18 @@ def sbatch_extra(
         if not _SBATCH_NAME_PATTERN.fullmatch(key):
             message = f'{path}: {location} key {key!r} must be an sbatch long name'
             raise MachineProfileError(message)
+        name = key.replace('-', '_')
+        if name in _UNSUPPORTED_SBATCH:
+            # why: sbatch --parsable then prints jobid;cluster and every later call needs --clusters
+            message = (
+                f'{path}: {location} key {key!r}: multi-cluster submission is not supported; '
+                'TSLab would not find the jobs (squeue, sacct and scancel ask the default cluster)'
+            )
+            raise MachineProfileError(message)
         if not isinstance(item, str | int | bool):
             message = f'{path}: {location}.{key} must be a string, integer, or boolean'
             raise MachineProfileError(message)
         check_range(key=key, value=item, location=f'{location}.{key}', path=path)
-        name = key.replace('-', '_')
         if name in entries:
             message = f'{path}: {location} repeats {name!r} with both - and _'
             raise MachineProfileError(message)

@@ -66,7 +66,8 @@ Set `signal_seconds = 0` to turn off this warning.
 Add site-specific options under `[slurm.sbatch_extra]`, using sbatch long
 names. For example, `account = "project"` or `exclusive = true`. An entry
 such as `time = "04:00:00"` replaces the normal time line; `no_requeue = false`
-removes that line. The old list form is not accepted.
+removes that line. The old list form is not accepted. `clusters` is rejected:
+TSLab tracks jobs on the default cluster only.
 
 ## Resubmitting
 
