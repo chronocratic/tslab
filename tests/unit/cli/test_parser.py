@@ -65,6 +65,13 @@ def test_top_help_shows_the_study_workflow(capsys: pytest.CaptureFixture[str]) -
     assert 'tslab study failures STUDY --machine local' in output
 
 
+def test_study_group_help_mentions_short_names(capsys: pytest.CaptureFixture[str]) -> None:
+    output = _help(command=['study'], capsys=capsys)
+
+    assert 'short name' in output
+    assert 'tslab.toml' in output
+
+
 def test_study_submit_help_names_the_positional(capsys: pytest.CaptureFixture[str]) -> None:
     output = _help(command=['study', 'submit'], capsys=capsys)
 

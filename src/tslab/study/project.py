@@ -41,12 +41,15 @@ class ProjectSettings:
             order; the first pattern that matches wins.
         runs: The default runs folder of ``tslab status``, absolute and
             resolved against the folder holding the file.
+        file_keys: The top-level keys of the file, so a key holding an
+            empty value still counts as present; empty without a file.
     """
 
     path: Path | None
     studies: str | None = None
     machine_by_host: tuple[tuple[str, str], ...] = ()
     runs: Path | None = None
+    file_keys: frozenset[str] = frozenset[str]()
 
 
 def find_project_file(*, start: Path) -> Path | None:
@@ -80,15 +83,18 @@ def load_project_settings(*, start: Path) -> ProjectSettings:
         ``tslab.toml`` is found.
 
     Raises:
-        ValueError: If the file does not parse, holds an unknown top-level
-            key, or holds a value of the wrong type; the message starts with
-            the path of the file.
+        ValueError: If the file cannot be read, does not parse, holds an
+            unknown top-level key, or holds a value of the wrong type; the
+            message starts with the path of the file.
     """
     path = find_project_file(start=start)
     if path is None:
         return ProjectSettings(path=None)
     try:
         table = tomllib.loads(path.read_text(encoding='utf-8'))
+    except OSError as error:
+        message = f'{path}: cannot read the file: {error}'
+        raise ValueError(message) from error
     except (tomllib.TOMLDecodeError, UnicodeDecodeError) as error:
         message = f'{path}: the TOML does not parse: {error}'
         raise ValueError(message) from error
@@ -139,6 +145,7 @@ def _settings_of(*, path: Path, table: Mapping[str, object]) -> ProjectSettings:
         studies=_string_of(table=table, name='studies', path=path),
         machine_by_host=_machine_table(table=table, path=path),
         runs=_runs_of(table=table, path=path),
+        file_keys=frozenset(table),
     )
 
 
@@ -169,9 +176,11 @@ def _machine_table(*, table: Mapping[str, object], path: Path) -> tuple[tuple[st
         raise ValueError(message)  # noqa: TRY004 # why: bad file content, not arguments
     pairs: list[tuple[str, str]] = []
     for pattern, machine in value.items():
-        if not isinstance(machine, str):
-            message = f'{path}: machine_by_host[{pattern!r}] must be a string, got {machine!r}'
-            raise ValueError(message)  # noqa: TRY004 # why: bad file content, not arguments
+        if not isinstance(machine, str) or not machine:
+            message = (
+                f'{path}: machine_by_host[{pattern!r}] must be a non-empty string, got {machine!r}'
+            )
+            raise ValueError(message)  # why: bad file content, not arguments
         # why: tomllib keeps table order, and the first matching pattern must win
         pairs.append((pattern, machine))
     return tuple(pairs)
