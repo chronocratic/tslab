@@ -5,6 +5,7 @@ later study layer group runs (``config_hash_without_seed``) and lets a reader
 reproduce a run (versions, git commit).
 """
 
+from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 import platform
@@ -13,7 +14,10 @@ import socket
 import subprocess
 
 __all__ = [
+    'CODE_SNAPSHOT_VARIABLE',
+    'CODE_SNAPSHOT_VARIABLES',
     'META_FORMAT_VERSION',
+    'collect_code_snapshot',
     'collect_git_state',
     'collect_versions',
     'hostname',
@@ -22,6 +26,14 @@ __all__ = [
 
 META_FORMAT_VERSION = 1
 _GIT_TIMEOUT_SECONDS = 10
+CODE_SNAPSHOT_VARIABLE = 'TSLAB_CODE_SNAPSHOT'
+CODE_SNAPSHOT_VARIABLES = (
+    CODE_SNAPSHOT_VARIABLE,
+    'TSLAB_CODE_SNAPSHOT_HASH',
+    'TSLAB_CODE_SNAPSHOT_COMMIT',
+    'TSLAB_CODE_SNAPSHOT_DIRTY',
+    'TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED',
+)
 
 
 def package_version(*, distribution: str) -> str | None:
@@ -44,6 +56,42 @@ def collect_versions() -> dict[str, str | None]:
         'torch': package_version(distribution='torch'),
         'lightning': package_version(distribution='lightning'),
     }
+
+
+def collect_code_snapshot(*, environ: Mapping[str, str]) -> dict[str, object] | None:
+    """Return the code snapshot block of ``meta.json`` from the job environment.
+
+    The job launcher sets the ``TSLAB_CODE_SNAPSHOT*`` variables; a run without a
+    code snapshot leaves them unset and gets ``None``. A flag that is not
+    ``'true'`` or ``'false'`` gives ``None`` for that field: metadata must never
+    stop a run.
+
+    Args:
+        environ: The environment of the job, usually ``os.environ``.
+
+    Returns:
+        Mapping with keys ``folder``, ``hash``, ``commit``, ``dirty`` and
+        ``untracked_copied``, or ``None`` when the snapshot variable is unset
+        or empty.
+    """
+    folder = environ.get(CODE_SNAPSHOT_VARIABLE, '')
+    if not folder:
+        return None
+    return {
+        'folder': folder,
+        'hash': environ.get('TSLAB_CODE_SNAPSHOT_HASH', ''),
+        'commit': environ.get('TSLAB_CODE_SNAPSHOT_COMMIT', ''),
+        'dirty': _parse_flag(value=environ.get('TSLAB_CODE_SNAPSHOT_DIRTY')),
+        'untracked_copied': _parse_flag(value=environ.get('TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED')),
+    }
+
+
+def _parse_flag(*, value: str | None) -> bool | None:
+    if value == 'true':
+        return True
+    if value == 'false':
+        return False
+    return None
 
 
 def collect_git_state(*, directory: Path) -> dict[str, object]:

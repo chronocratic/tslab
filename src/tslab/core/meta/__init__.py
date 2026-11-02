@@ -11,6 +11,9 @@ from tslab.core.meta.instance import (
     stale_reason,
 )
 from tslab.core.meta.run import (
+    CODE_SNAPSHOT_VARIABLE,
+    CODE_SNAPSHOT_VARIABLES,
+    collect_code_snapshot,
     collect_git_state,
     collect_versions,
     hostname,
@@ -19,9 +22,12 @@ from tslab.core.meta.run import (
 )
 
 __all__ = [
+    'CODE_SNAPSHOT_VARIABLE',
+    'CODE_SNAPSHOT_VARIABLES',
     'INSTANCE_META_FORMAT_VERSION',
     'META_FORMAT_VERSION',
     'can_resume',
+    'collect_code_snapshot',
     'collect_git_state',
     'collect_versions',
     'describe_external_inputs',
