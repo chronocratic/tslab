@@ -1,12 +1,16 @@
 """SLURM study launch tests."""
 
 from pathlib import Path
+import subprocess
+import sys
 
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
+from tests.unit.study.helpers import context, jobs_of, no_sleep
 from tslab.study import Study
+from tslab.study.commands import submit
 from tslab.study.definition import expand_runs
 from tslab.study.launchers import launch as _launch, LaunchError, LaunchReport
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
@@ -149,3 +153,67 @@ def test_launcher_submit_raises_launch_error_when_sbatch_fails(
         SlurmLauncher(sleep=lambda _: None).submit(
             group=groups[0], study_folder=folder, record=lambda **_kwargs: None
         )
+
+
+def run_toy(*, project: Path, model: str, seed: int) -> None:
+    """Run one toy run for real, so its status.json is a real one."""
+    subprocess.run(  # noqa: S603 # why: the toy script of the project, not external input
+        [
+            sys.executable,
+            'toy_script.py',
+            f'model:{model}',
+            '--seed',
+            str(seed),
+            # why: the runs of the study live under <output_root>/<study>
+            '--output-root',
+            str(project / 'runs' / 's'),
+            '--run-path',
+            f'g/{model}/{seed}',
+            '--data',
+            str(project / 'data'),
+        ],
+        cwd=project,
+        check=True,
+        capture_output=True,
+    )
+
+
+def test_resubmitted_task_keeps_its_array_index(project: Path, fake: FakeSlurm) -> None:
+    submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n1000_1|RUNNING\n'}])
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|TIMEOUT\n'}])
+    run_toy(project=project, model='large', seed=1)
+    submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+    jobs = jobs_of(project=project)
+    script = (project / 'runs' / 's' / '.study' / 'jobs' / f'{jobs[1].job_file}.sbatch').read_text()
+    assert '#SBATCH --array=3%100' in script
+    assert '#SBATCH --job-name=g1' in script
+    assert 'logs/g1_%a.out' in script
+
+
+def test_dry_run_writes_the_script_and_describes_resources(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level('INFO'):
+        submit(
+            context=context(project=project, machine_file='cluster.toml'),
+            include_done=False,
+            dry_run=True,
+            extra_args=(),
+            sleep=no_sleep,
+        )
+    assert (project / 'runs' / 's' / '.study' / 'jobs' / '1.sbatch').is_file()
+    text = ' '.join(caplog.text.split())
+    assert 'g1 4 partition=' in text

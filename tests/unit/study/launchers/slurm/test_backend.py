@@ -1,5 +1,6 @@
 """The behavior of the SLURM study backend."""
 
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import timedelta
 import json
@@ -20,7 +21,7 @@ from tslab.jobs.slurm import (
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
 )
-from tslab.study.commands import cancel
+from tslab.study.commands import cancel, run_one
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
 from tslab.study.doctor import DoctorCheck
@@ -511,3 +512,56 @@ def test_suggest_sizing_formats_time_and_memory() -> None:
         elapsed=timedelta(hours=2, minutes=24), peak_per_cpu=math.ceil(2 * 1024**3 * 1.2 / 2)
     ) == ('2:24:00', '1229M')
     assert SlurmBackend().suggest_sizing(elapsed=None, peak_per_cpu=None) == (None, None)
+
+
+GPUTWO_MACHINE = """\
+launcher = "slurm"
+output_root = "{output_root}"
+
+[slurm]
+partition = "CHANGE_ME"
+time = "00:10:00"
+gpus = 2
+"""
+
+
+def _write_gpu_machine(*, project: Path) -> None:
+    text = GPUTWO_MACHINE.format(output_root=(project / 'runs').as_posix())
+    (project / 'gpus.toml').write_text(text)
+
+
+def _one_run_context(*, project: Path, machine_file: str, only: tuple[str, ...]) -> Context:
+    return load_context(
+        reference='toy_studies:study',
+        machine_path=project / machine_file,
+        selection=Selection(only=only),
+        project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
+    )
+
+
+def _process(*, code: int = 3) -> tuple[list[list[str]], Callable[[list[str]], int]]:
+    calls: list[list[str]] = []
+
+    def run_process(args: list[str]) -> int:
+        calls.append(args)
+        return code
+
+    return calls, run_process
+
+
+def test_run_one_says_one_process_for_multi_gpu_jobs(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    _write_gpu_machine(project=project)
+    submit_study(project=project, machine_file='gpus.toml')
+    ctx = _one_run_context(
+        project=project, machine_file='gpus.toml', only=('model=small', 'seed=1')
+    )
+    calls, process = _process()
+    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm'):
+        run_one(context=ctx, extra_args=None, run_process=process)
+    assert 'study run starts one process; the job would start 2' in caplog.text
+    assert len(calls) == 1
+    assert calls[0][:2] == ['bash', '-c']

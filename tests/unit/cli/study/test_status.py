@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.fake_slurm import install_fake_slurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.cli.study.helpers import toy_project
 from tests.unit.study.helpers import finish_run, submit_study
 from tslab.cli.study import Status
+from tslab.study.launchers import JobPhase
 
 
 def test_status_suggests_a_dry_run_when_nothing_ran(
@@ -25,12 +26,14 @@ def test_status_suggests_a_dry_run_when_nothing_ran(
 
 
 def test_status_suggests_following_queued_runs(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_backend: FakeBackend,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    fake = install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
 
     with caplog.at_level(logging.INFO):
         Status(study='toy_studies:study', machine='cluster.toml').run()
@@ -42,10 +45,12 @@ def test_status_suggests_following_queued_runs(
 
 
 def test_status_says_all_done_and_how_to_collect(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    fake_backend: FakeBackend,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
-    install_fake_slurm(tmp_path=tmp_path, monkeypatch=monkeypatch, answers={})
     submit_study(project=project)
     for model in ('small', 'large'):
         for seed in (1, 2):

@@ -6,12 +6,13 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
 from tslab.study.commands import parse_states, status
 from tslab.study.context import Context, expected_starts
+from tslab.study.launchers import JobFlag, JobPhase
 from tslab.study.reporting.documents import status_document
 from tslab.study.reporting.report import log_status
 from tslab.study.reporting.state import StudyState
@@ -23,10 +24,10 @@ def normalized(text: str) -> str:
 
 
 def test_status_counts_and_lines(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
     finish_run(project=project, model='large', seed=1)
     with caplog.at_level('INFO'):
         assert status(context=context(project=project, machine_file='cluster.toml')) == 0
@@ -34,17 +35,17 @@ def test_status_counts_and_lines(
     assert 'grid queued running done interrupted failed missing total' in text
     assert 'g 1 0 1 0 0 2 4' in text
     assert 'all 1 0 1 0 0 2 4' in text
-    assert 'g/small/1 queued job 1000_0' in text
-    assert 'g/small/2 missing job 1000_1' in text
-    assert 'g/large/2 missing job 1000_3' in text
+    assert 'g/small/1 queued job job-0_0' in text
+    assert 'g/small/2 missing job job-0_1' in text
+    assert 'g/large/2 missing job job-0_3' in text
     assert 'g/large/1' not in text  # done runs get no line
 
 
 def test_state_filter_hides_other_lines(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
     finish_run(project=project, model='large', seed=1)
     with caplog.at_level('INFO'):
         status(
@@ -53,8 +54,8 @@ def test_state_filter_hides_other_lines(
         )
     text = normalized(caplog.text)
     assert 'g/small/1' not in text
-    assert 'g/small/2 missing job 1000_1' in text
-    assert 'g/large/2 missing job 1000_3' in text
+    assert 'g/small/2 missing job job-0_1' in text
+    assert 'g/large/2 missing job job-0_3' in text
     # why: the filter hides lines, not counts; the table stays complete
     assert 'g 1 0 1 0 0 2 4' in text
 
@@ -71,50 +72,49 @@ def test_a_study_that_never_ran_gets_no_run_lines(
 
 def test_run_lines_stop_after_a_limit(
     project: Path,
-    fake: FakeSlurm,
+    fake_backend: FakeBackend,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setattr('tslab.study.reporting.report._PROBLEMS_SHOWN', 1)
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
     with caplog.at_level('INFO'):
         status(context=context(project=project, machine_file='cluster.toml'))
     text = normalized(caplog.text)
-    assert 'g/small/1 queued job 1000_0' in text
+    assert 'g/small/1 queued job job-0_0' in text
     assert 'g/small/2' not in text
     assert '… and 3 more; narrow with --states, --grid or --only' in text
 
 
-def _queued_context(project: Path, fake: FakeSlurm) -> Context:
-    """A submitted study where 1000_0 is queued and the rest completed."""
+def _queued_context(project: Path, fake_backend: FakeBackend) -> Context:
+    """A submitted study where job-0_0 is queued and the rest completed."""
     submit_study(project=project)
-    fake.set_answers(
-        'squeue',
-        [
-            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
-            {'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00\n'},
-        ],
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
-    )
+    fake_backend.expected_starts_answer = {'job-0_0': '2026-11-01T10:00:00'}
     return context(project=project, machine_file='cluster.toml')
 
 
 def test_status_shows_expected_start_of_queued_runs(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    ctx = _queued_context(project=project, fake=fake)
+    ctx = _queued_context(project=project, fake_backend=fake_backend)
     starts = expected_starts(context=ctx)
     with caplog.at_level('INFO'):
         status(context=ctx, starts=starts)
     text = normalized(caplog.text)
-    assert 'g/small/1 queued job 1000_0 starts 2026-11-01T10:00:00' in text
+    assert 'g/small/1 queued job job-0_0 starts 2026-11-01T10:00:00' in text
 
 
-def test_status_json_has_expected_start(project: Path, fake: FakeSlurm) -> None:
-    ctx = _queued_context(project=project, fake=fake)
+def test_status_json_has_expected_start(project: Path, fake_backend: FakeBackend) -> None:
+    ctx = _queued_context(project=project, fake_backend=fake_backend)
     starts = expected_starts(context=ctx)
     document = status_document(context=ctx, exit_code=0, starts=starts)
     # why: status_document types the value as object; the runs list is a list of dicts
@@ -125,55 +125,64 @@ def test_status_json_has_expected_start(project: Path, fake: FakeSlurm) -> None:
     assert runs['g/large/1']['expected_start'] is None
 
 
-def test_status_without_queued_runs_skips_squeue_start(project: Path, fake: FakeSlurm) -> None:
+def test_status_without_queued_runs_skips_the_start_query(
+    project: Path, fake_backend: FakeBackend
+) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n'}])
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.RUNNING,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
+    fake_backend.expected_starts_answer = None
     ctx = context(project=project, machine_file='cluster.toml')
     starts = expected_starts(context=ctx)
     assert starts is None
-    assert len(fake.calls('squeue')) == 1
     document = status_document(context=ctx, exit_code=0, starts=starts)
     # why: status_document types the value as object; the runs list is a list of dicts
     for run in cast('list[dict[str, object]]', document['runs']):
         assert 'expected_start' not in run
 
 
-def test_status_keeps_working_when_squeue_start_fails(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+def test_status_keeps_working_without_expected_starts(
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    fake.set_answers(
-        'squeue',
-        [
-            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
-            {'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'},
-        ],
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
-    fake.set_answers(
-        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
-    )
+    fake_backend.expected_starts_answer = None
     ctx = context(project=project, machine_file='cluster.toml')
-    with caplog.at_level('WARNING', logger='tslab.study.launchers.slurm.states'):
-        starts = expected_starts(context=ctx)
+    starts = expected_starts(context=ctx)
     assert starts is None
-    assert 'squeue' in caplog.text
     with caplog.at_level('INFO'):
         status(context=ctx, starts=starts)
     text = normalized(caplog.text)
-    assert 'g/small/1 queued job 1000_0' in text
+    assert 'g/small/1 queued job job-0_0' in text
     assert ' starts ' not in text
 
 
-def test_time_limit_hint(project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture) -> None:
+def test_time_limit_hint(
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
     submit_study(project=project)
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_3|TIMEOUT\n'}])
+    fake_backend.set_states(
+        phases={'job-0_3': JobPhase.INTERRUPTED},
+        reasons={'job-0_3': 'stopped at the limit'},
+        flags={'job-0_3': frozenset({JobFlag.TIME_LIMIT})},
+    )
     with caplog.at_level('INFO'):
         status(context=context(project=project, machine_file='cluster.toml'))
     text = normalized(caplog.text)
-    assert 'g/large/2 interrupted job 1000_3 SLURM TIMEOUT' in text
+    assert 'g/large/2 interrupted job job-0_3 stopped at the limit' in text
     assert (
         '1 runs stopped at a time limit: raise time in a machine override, '
         'or cap training with --trainer.max-training-time' in text
@@ -199,11 +208,9 @@ def test_training_paused_displays_time_limit_hint(
 
 
 def test_unknown_job_states_are_said_once(
-    project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    (project / 'empty-bin').mkdir()
-    # why: without squeue and sacct on PATH, the SLURM states are unknown
-    monkeypatch.setenv('PATH', str(project / 'empty-bin'))
+    fake_backend.set_states(phases={}, known=False)
     with caplog.at_level('INFO'):
         status(context=context(project=project, machine_file='cluster.toml'))
     assert caplog.text.count('job states unknown') == 1
