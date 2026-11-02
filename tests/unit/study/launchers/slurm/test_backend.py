@@ -164,8 +164,9 @@ def test_job_states_returns_unknown_when_scheduler_is_unavailable(
 
 
 def test_job_states_returns_unknown_after_scheduler_error(
-    *, project: Path, fake: FakeSlurm
+    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     ctx = _context(project=project, fake=fake)
     fake.set_answers('squeue', [{'exit': 1, 'stderr': 'squeue: cannot access scheduler'}])
@@ -492,7 +493,10 @@ def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlur
     assert ended == dict.fromkeys(ids, 'COMPLETED')
 
 
-def test_failed_query_leaves_the_cache_unchanged(project: Path, fake: FakeSlurm) -> None:
+def test_failed_query_leaves_the_cache_unchanged(
+    project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers('sacct', [{'exit': 1, 'stderr': 'down'}])
     ended: dict[str, str] = {}

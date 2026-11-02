@@ -114,8 +114,12 @@ def test_expected_starts_asks_nothing_without_queued_runs(project: Path, fake: F
 
 
 def test_expected_starts_logs_and_gives_none_when_squeue_fails(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path,
+    fake: FakeSlurm,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers(
         'squeue',

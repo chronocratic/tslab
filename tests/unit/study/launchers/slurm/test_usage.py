@@ -50,8 +50,12 @@ def test_usage_queries_all_selected_job_ids(
 
 
 def test_oom_hint_without_numbers_when_sacct_fails(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path,
+    fake: FakeSlurm,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers(
         'sacct',
