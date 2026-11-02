@@ -42,6 +42,14 @@ def test_no_table_is_a_usage_error_saying_so(tmp_path: Path) -> None:
         resolve_request(study='pkg:study', machine=None, start=tmp_path, host='laptop')
 
 
+def test_empty_table_is_a_usage_error_saying_the_table_is_empty(tmp_path: Path) -> None:
+    _tslab_toml(tmp_path=tmp_path, text='[machine_by_host]\n')
+    with pytest.raises(UsageError, match='laptop') as raised:
+        resolve_request(study='pkg:study', machine=None, start=tmp_path, host='laptop')
+    assert 'has no pattern' in str(raised.value)
+    assert str(tmp_path / PROJECT_FILE) in str(raised.value)
+
+
 def test_no_file_and_no_flag_is_a_usage_error(tmp_path: Path) -> None:
     with pytest.raises(UsageError, match=r'tslab\.toml'):
         resolve_request(study='pkg:study', machine=None, start=tmp_path, host='laptop')

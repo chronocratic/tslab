@@ -89,9 +89,14 @@ def _no_machine_message(*, settings: ProjectSettings, host: str) -> str:
             f'no machine for host {host!r}: no {PROJECT_FILE} in the working folder or a '
             'folder above it; pass --machine'
         )
-    if not settings.machine_by_host:
+    if 'machine_by_host' not in settings.file_keys:
         return (
             f'no machine for host {host!r}: no [machine_by_host] in {settings.path}; pass --machine'
+        )
+    if not settings.machine_by_host:
+        return (
+            f'no machine for host {host!r}: [machine_by_host] in {settings.path} has no '
+            'pattern; pass --machine'
         )
     patterns = ', '.join(repr(pattern) for pattern, _ in settings.machine_by_host)
     return (
