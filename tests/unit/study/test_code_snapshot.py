@@ -162,6 +162,21 @@ def test_code_changed_while_copying_stops_without_folder(
     assert list((out / CODE_SNAPSHOTS_FOLDER).iterdir()) == []
 
 
+def test_copy_error_is_a_code_snapshot_error(
+    project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _broken_copy(*, project_root: Path, copies: list[str], destination: Path) -> None:
+        message = 'enospc'
+        raise OSError(message)
+
+    monkeypatch.setattr(code_snapshot_module, '_copy_files', _broken_copy)
+    out = tmp_path / 'out'
+    with pytest.raises(CodeSnapshotError) as raised:
+        _take(project_root=project, output_root=out)
+    assert 'cannot copy the code snapshot to' in str(raised.value)
+    assert list((out / CODE_SNAPSHOTS_FOLDER).iterdir()) == []
+
+
 def test_not_a_git_repository_is_an_error_naming_no_code_snapshot(tmp_path: Path) -> None:
     with pytest.raises(CodeSnapshotError) as raised:
         _take(project_root=tmp_path, output_root=tmp_path / 'out')
