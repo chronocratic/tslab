@@ -108,8 +108,8 @@ def _environment_of(*, command: PoolCommand, slot: str | None) -> dict[str, str]
     environment = {**command.environment}
     if slot is not None and slot != 'mps':
         environment['CUDA_VISIBLE_DEVICES'] = slot
-        # why: nvidia-smi ids follow the PCI bus; CUDA numbers the fastest GPU
-        # first unless told otherwise, so the slot id would name the wrong card
+        # why: nvidia-smi ids follow the PCI bus; CUDA numbers the fastest GPU first
+        # unless told otherwise
         environment.setdefault('CUDA_DEVICE_ORDER', 'PCI_BUS_ID')
     return environment
 
