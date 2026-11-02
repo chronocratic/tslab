@@ -17,6 +17,7 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.records import (
     append_job,
     JobRecord,
@@ -55,7 +56,7 @@ def job(**changes: object) -> JobRecord:
         'tasks': (),
     }
     values.update(changes)
-    return JobRecord(**values)  # type: ignore[arg-type]
+    return JobRecord(**values)  # ty: ignore[invalid-argument-type]
 
 
 def test_append_and_read_round_trip(tmp_path: Path) -> None:
@@ -148,6 +149,29 @@ def test_submission_lock_excludes_a_second_holder(tmp_path: Path) -> None:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
     with (tmp_path / 'submit.lock').open('a') as other:
         fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def test_job_record_without_code_snapshot_serializes_as_before(tmp_path: Path) -> None:
+    document = job().to_json()
+    assert 'code_snapshot' not in document
+    record = JobRecord.from_json(document=document)
+    assert record.code_snapshot is None
+    (tmp_path / 'old.jsonl').write_text(json.dumps(document) + '\n', encoding='utf-8')
+    assert read_jobs(path=tmp_path / 'old.jsonl')[0].code_snapshot is None
+
+
+def test_job_record_code_snapshot_round_trip(tmp_path: Path) -> None:
+    snapshot = CodeSnapshot(
+        folder=tmp_path / '.tslab-code-snapshots' / '0123456789abcdef',
+        hash='0123456789abcdef',
+        commit='a' * 40,
+        dirty=True,
+        untracked_copied=False,
+    )
+    record = job(code_snapshot=snapshot)
+    document = record.to_json()
+    assert document['code_snapshot'] == snapshot.to_json()
+    assert JobRecord.from_json(document=document) == record
 
 
 def test_task_record_without_counters_reads_as_zero() -> None:

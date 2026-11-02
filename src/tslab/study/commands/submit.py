@@ -8,6 +8,7 @@ import time
 from typing import TextIO
 
 from tslab.core.status import utc_now_iso
+from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
 from tslab.study.launchers import backend_for, LaunchError, OnLaunch
@@ -96,6 +97,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     before_launch: Callable[[], int] | None = None,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
+    code_snapshots: Mapping[str, CodeSnapshot | None] | None = None,
 ) -> tuple[int, list[JobRecord]]:
     """Plan, validate and launch the given runs; the shared tail of the commands.
 
@@ -115,6 +117,8 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             the command with exit code 1.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
+        code_snapshots: The run path to code snapshot; ``None`` when absent,
+            which means the run submits with the live code.
 
     Returns:
         The exit code and the submitted run jobs; empty records on a dry
@@ -138,6 +142,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             uncounted={report.run.run_path: _uncounted(report=report) for report in reports},
             first_job_file=next_job_file(study_folder=folder),
             environment=os.environ,
+            code_snapshots=code_snapshots,
         )
         problems = validate_jobs(study=context.study, groups=groups)
         if problems:

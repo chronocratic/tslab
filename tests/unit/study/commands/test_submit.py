@@ -13,7 +13,8 @@ import pytest
 
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
-from tslab.study.commands import submit
+from tslab.study.code_snapshot import CodeSnapshot
+from tslab.study.commands import submit, submit_runs
 from tslab.study.context import load_context, Selection
 from tslab.study.launchers import JobPhase
 from tslab.study.reporting.state import StudyState
@@ -165,6 +166,29 @@ def test_submit_launches_and_records(project: Path, fake_backend: FakeBackend) -
         ('g/large/2', 3),
     ]
     assert all(t.attempt == 1 for t in jobs[0].tasks)
+
+
+def test_submit_runs_records_the_code_snapshot(project: Path, fake_backend: FakeBackend) -> None:
+    snapshot = CodeSnapshot(
+        folder=project / 'runs' / 's' / '.tslab-code-snapshots' / '0123456789abcdef',
+        hash='0123456789abcdef',
+        commit='a' * 40,
+        dirty=False,
+        untracked_copied=False,
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    code, submitted = submit_runs(
+        context=ctx,
+        reports=ctx.reports,
+        dry_run=False,
+        extra_args={report.run.run_path: () for report in ctx.reports},
+        sleep=no_sleep,
+        code_snapshots={report.run.run_path: snapshot for report in ctx.reports},
+    )
+    assert code == 0
+    assert submitted
+    assert all(record.code_snapshot == snapshot for record in submitted)
+    assert jobs_of(project=project)[-1].code_snapshot == snapshot
 
 
 def test_submit_skips_done_and_live_runs(project: Path, fake_backend: FakeBackend) -> None:

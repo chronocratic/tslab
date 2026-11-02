@@ -307,6 +307,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
                 job_id=job_id,
                 job_file=group.job_file,
                 tasks=tasks,
+                code_snapshot=group.code_snapshot,
             )
             records.append(record)
             append_job(path=folder / 'submissions.jsonl', record=record)
