@@ -385,12 +385,12 @@ def test_grace_wait_skips_other_ended_states(tmp_path: Path) -> None:
     assert calls == []
 
 
-def test_grace_wait_survives_a_missing_run_folder(tmp_path: Path) -> None:
+def test_grace_wait_for_a_missing_folder_gives_up_after_15_seconds(tmp_path: Path) -> None:
     calls: list[float] = []
     reports = _collect_after_completion(
         tmp_path, job_state='COMPLETED', job_phase=JobPhase.COMPLETED, sleep=calls.append
     )
-    assert len(calls) == 30
+    assert len(calls) == 15
     assert reports[0].state is StudyState.MISSING
 
 
