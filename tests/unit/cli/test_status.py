@@ -245,3 +245,66 @@ def test_command_line_entry_point(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as raised:
         main(args=['status', str(tmp_path), '--stage', 'scale'])
     assert raised.value.code == 0
+
+
+def test_status_reads_runs_from_tslab_toml_in_a_subfolder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    project = tmp_path / 'project'
+    project.mkdir()
+    (project / 'tslab.toml').write_text('runs = "runs"\n', encoding='utf-8')
+    runs = project / 'runs'
+    runs.mkdir()
+    make_run(root=runs, relative_path=Path('ts2vec') / 'seed_1', factors=(1,))
+    source = project / 'src'
+    source.mkdir()
+    monkeypatch.chdir(source)
+    caplog.clear()
+    with caplog.at_level(logging.INFO), pytest.raises(SystemExit) as raised:
+        main(args=['status'])
+    assert raised.value.code == 0
+    assert 'ts2vec/seed_1' in caplog.text
+    line = f'runs folder {runs.as_posix()} from {(project / "tslab.toml").as_posix()}'
+    assert line in caplog.text
+
+
+def test_status_without_folder_or_setting_is_a_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    caplog.clear()
+    with caplog.at_level(logging.ERROR), pytest.raises(SystemExit) as raised:
+        main(args=['status'])
+    assert raised.value.code == 2
+    assert 'give a FOLDER, or set runs in tslab.toml' in caplog.text
+
+
+def test_folder_argument_wins_over_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    project = tmp_path / 'project'
+    runs = project / 'runs'
+    runs.mkdir(parents=True)
+    (project / 'tslab.toml').write_text('runs = "runs"\n', encoding='utf-8')
+    make_run(root=runs, relative_path=Path('from_runs'), factors=(1,))
+    other = tmp_path / 'other'
+    make_run(root=other, relative_path=Path('from_arg'), factors=(1,))
+    monkeypatch.chdir(project)
+    caplog.clear()
+    with caplog.at_level(logging.INFO), pytest.raises(SystemExit) as raised:
+        main(args=['status', str(other)])
+    assert raised.value.code == 0
+    assert 'from_arg' in caplog.text
+    assert 'from_runs' not in caplog.text
+
+
+def test_status_broken_tslab_toml_is_a_usage_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    (tmp_path / 'tslab.toml').write_text('runs = 3\n', encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    caplog.clear()
+    with caplog.at_level(logging.ERROR), pytest.raises(SystemExit) as raised:
+        main(args=['status'])
+    assert raised.value.code == 2
+    assert 'tslab.toml' in caplog.text
