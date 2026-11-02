@@ -14,7 +14,7 @@ from tslab.study.records import JobRecord, read_jobs, submission_in_progress
 from tslab.study.reporting.state import collect_states, RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import JobStates
+    from tslab.study.launchers import JobStates, QueuedJob
 
 __all__ = [
     'Context',
@@ -87,16 +87,16 @@ class Context:
         return self.job_states.followup_live_job_ids
 
 
-def expected_starts(*, context: Context) -> dict[str, str | None] | None:
-    """The expected start times of the queued runs, keyed by job id.
+def expected_starts(*, context: Context) -> Mapping[str, 'QueuedJob'] | None:
+    """The expected start and pending reason of the queued runs, keyed by job id.
 
     Args:
         context: The context to read the queued runs from.
 
     Returns:
-        The expected start of every queued run, keyed by its SLURM job id;
-        ``None`` on a local machine, when no run is queued, or when the
-        scheduler call fails (a failed call is logged as a warning).
+        The expected start and pending reason of every queued run, keyed by its
+        SLURM job id; ``None`` on a local machine, when no run is queued, or when
+        the scheduler call fails (a failed call is logged as a warning).
     """
     # why: the launcher door imports Context, so this import must wait until calls
     from tslab.study.launchers import backend_for  # noqa: PLC0415

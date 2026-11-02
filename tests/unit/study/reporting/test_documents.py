@@ -20,7 +20,7 @@ from tslab.cli import main
 from tslab.core.status import InstanceState, RunState, utc_now_iso
 from tslab.core.text import TextTable
 from tslab.study.definition import expand_runs, load_study
-from tslab.study.launchers import JobPhase
+from tslab.study.launchers import JobPhase, QueuedJob
 from tslab.study.records import append_job, JobRecord
 from tslab.study.reporting.documents import run_entry, show_document, status_document
 from tslab.study.reporting.state import StudyState
@@ -61,6 +61,29 @@ def test_run_entry_contains_absolute_directory_and_run_values(
         == (ctx.study_directory / ctx.reports[0].run.run_path).resolve().as_posix()
     )
     assert entry['values'] == dict(ctx.reports[0].run.values)
+
+
+def test_status_document_has_the_pending_fields(project: Path, fake_backend: FakeBackend) -> None:
+    submit_study(project=project)
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    starts = {'job-0_0': QueuedJob(start='2026-11-03T10:00:00', reason='Priority', stuck=False)}
+    document = status_document(context=ctx, exit_code=0, starts=starts)
+    # why: status_document types the value as object; the runs list is a list of dicts
+    runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
+    assert runs['g/small/1']['expected_start'] == '2026-11-03T10:00:00'
+    assert runs['g/small/1']['pending_reason'] == 'Priority'
+    assert runs['g/small/1']['pending_stuck'] is False
+    assert runs['g/small/2']['expected_start'] is None
+    assert runs['g/small/2']['pending_reason'] is None
+    assert runs['g/small/2']['pending_stuck'] is False
 
 
 def test_run_entry_names_submission_in_progress(project: Path, fake_backend: FakeBackend) -> None:

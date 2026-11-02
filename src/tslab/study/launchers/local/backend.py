@@ -20,6 +20,7 @@ from tslab.study.launchers import (
     launch,
     LaunchReport,
     OnTaskState,
+    QueuedJob,
     Resources,
 )
 from tslab.study.launchers.local.foreground import foreground_script
@@ -119,7 +120,7 @@ class LocalBackend:
         self,
         *,
         context: Context,  # noqa: ARG002 # why: the Backend signature
-    ) -> dict[str, str | None] | None:
+    ) -> dict[str, QueuedJob] | None:
         """There is no scheduler to ask; always ``None``."""
         return None
 

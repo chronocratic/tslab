@@ -10,6 +10,7 @@ from tslab.jobs.slurm.commands import (
     slurm_available,
     SlurmError,
     SlurmJobUsage,
+    SlurmQueueEntry,
     submission_environment,
 )
 from tslab.jobs.slurm.environment import task_count
@@ -27,8 +28,10 @@ from tslab.jobs.slurm.states import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
     job_ended,
+    pending_reason_stuck,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
+    STUCK_PENDING_REASONS,
 )
 from tslab.jobs.slurm.timing import (
     format_slurm_duration,
@@ -43,8 +46,10 @@ __all__ = [
     'QOS_LIMIT_MARKERS',
     'QUEUED_JOB_STATES',
     'RUNNING_JOB_STATES',
+    'STUCK_PENDING_REASONS',
     'SlurmError',
     'SlurmJobUsage',
+    'SlurmQueueEntry',
     'array_spec',
     'check_script_text',
     'export_lines',
@@ -55,6 +60,7 @@ __all__ = [
     'parse_sacct_duration',
     'parse_slurm_duration',
     'parse_slurm_memory',
+    'pending_reason_stuck',
     'query_expected_starts',
     'query_job_states',
     'query_job_usage',

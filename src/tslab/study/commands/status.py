@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 
 from tslab.study.context import Context
+from tslab.study.launchers import QueuedJob
 from tslab.study.reporting.report import log_status
 from tslab.study.reporting.state import StudyState
 
@@ -38,7 +39,7 @@ def status(
     *,
     context: Context,
     states: tuple[StudyState, ...] = (),
-    starts: Mapping[str, str | None] | None = None,
+    starts: Mapping[str, QueuedJob] | None = None,
 ) -> int:
     """Print the state table of the study and one line per run not done.
 
@@ -46,7 +47,7 @@ def status(
         context: The context to report on.
         states: When given, the listed lines are limited to these states.
         starts: When given, the lines of queued runs end with their expected
-            start time.
+            start time and pending reason.
 
     Returns:
         ``0``; the command only reads (spec §7).

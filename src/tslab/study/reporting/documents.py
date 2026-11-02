@@ -7,7 +7,7 @@ from types import MappingProxyType
 from tslab.core.text import format_index_ranges
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers import LaunchReport
+from tslab.study.launchers import LaunchReport, QueuedJob
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.outcome import counts_live
@@ -33,15 +33,15 @@ _LIVE_REASONS: Mapping[StudyState, Callable[..., str]] = MappingProxyType(
 
 
 def run_entry(
-    *, report: RunReport, context: Context, starts: Mapping[str, str | None] | None = None
+    *, report: RunReport, context: Context, starts: Mapping[str, QueuedJob] | None = None
 ) -> dict[str, object]:
     """The JSON fields for one selected run.
 
     Args:
         report: The state report for the run.
         context: The study context containing its folder and live-work state.
-        starts: When given, the entry gains an ``expected_start`` field with the
-            expected start of the job of the run, or ``None``.
+        starts: When given, the entry gains ``expected_start``, ``pending_reason``
+            and ``pending_stuck`` fields for the job of the run.
 
     Returns:
         The run entry with absolute paths.
@@ -62,20 +62,23 @@ def run_entry(
         'directory': (context.study_directory / report.run.run_path).resolve().as_posix(),
     }
     if starts is not None:
-        entry['expected_start'] = starts.get(report.job_id) if report.job_id is not None else None
+        job = starts.get(report.job_id) if report.job_id is not None else None
+        entry['expected_start'] = None if job is None else job.start
+        entry['pending_reason'] = None if job is None else job.reason
+        entry['pending_stuck'] = False if job is None else job.stuck
     return entry
 
 
 def status_document(
-    *, context: Context, exit_code: int, starts: Mapping[str, str | None] | None = None
+    *, context: Context, exit_code: int, starts: Mapping[str, QueuedJob] | None = None
 ) -> dict[str, object]:
     """The JSON document for the status of selected study runs.
 
     Args:
         context: The study context containing selected runs and machine details.
         exit_code: The status code to report, regardless of CLI opt-in.
-        starts: When given, every run entry gains an ``expected_start`` field
-            with the expected start of its job, or ``null``.
+        starts: When given, every run entry gains ``expected_start``,
+            ``pending_reason`` and ``pending_stuck`` fields for its job.
 
     Returns:
         The versioned status document.

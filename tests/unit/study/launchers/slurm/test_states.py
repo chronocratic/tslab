@@ -8,6 +8,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, submit_study
 from tslab.core.status import utc_now_iso
+from tslab.study.launchers import QueuedJob
 from tslab.study.launchers.slurm import states
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
 
@@ -99,6 +100,42 @@ def test_query_states_returns_new_cache_without_mutating_input(
     assert new_cache == {'1000_0': 'COMPLETED', '1000_2': 'COMPLETED'}
     assert ended == {'1000_0': 'COMPLETED'}
     assert queried == [['1000_1', '1000_2']]
+
+
+def test_expected_starts_maps_queued_runs_to_entries(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'squeue',
+        [
+            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
+            {'exit': 0, 'stdout': '1000_0|2026-11-01T10:00:00|Priority\n'},
+        ],
+    )
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    starts = states.expected_starts(context=ctx)
+    assert starts == {
+        '1000_0': QueuedJob(start='2026-11-01T10:00:00', reason='Priority', stuck=False)
+    }
+
+
+def test_expected_starts_flags_a_stuck_reason(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'squeue',
+        [
+            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
+            {'exit': 0, 'stdout': '1000_0|N/A|(PartitionTimeLimit)\n'},
+        ],
+    )
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    starts = states.expected_starts(context=ctx)
+    assert starts == {'1000_0': QueuedJob(start=None, reason='(PartitionTimeLimit)', stuck=True)}
 
 
 def test_expected_starts_asks_nothing_without_queued_runs(project: Path, fake: FakeSlurm) -> None:

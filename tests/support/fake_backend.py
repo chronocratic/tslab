@@ -30,6 +30,7 @@ from tslab.study.launchers import (
     launch,
     Launcher,
     LaunchReport,
+    QueuedJob,
     RecordJob,
     Resources,
 )
@@ -132,7 +133,7 @@ class FakeBackend:
     def __init__(self) -> None:
         self.job_states_answer: JobStates = _EMPTY_STATES
         self.resources_answer: Resources = FakeResources()
-        self.expected_starts_answer: dict[str, str | None] | None = None
+        self.expected_starts_answer: dict[str, QueuedJob] | None = None
         self.after_submit_code: int = 0
         self.cancel_answer: tuple[int, list[str]] = (0, [])
         self.cancellable_answer: list[str] = []
@@ -210,7 +211,7 @@ class FakeBackend:
         self._record(method='job_states', machine=machine, study=study, jobs=jobs, cache=cache)
         return self.job_states_answer, cache
 
-    def expected_starts(self, *, context: Context) -> dict[str, str | None] | None:
+    def expected_starts(self, *, context: Context) -> dict[str, QueuedJob] | None:
         """The starts the test set, as a copy; ``None`` when it set none."""
         self._record(method='expected_starts', context=context)
         if self.expected_starts_answer is None:

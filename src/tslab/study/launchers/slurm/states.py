@@ -3,8 +3,15 @@
 from collections.abc import Mapping, Sequence
 import logging
 
-from tslab.jobs.slurm import job_ended, query_expected_starts, query_job_states, SlurmError
+from tslab.jobs.slurm import (
+    job_ended,
+    pending_reason_stuck,
+    query_expected_starts,
+    query_job_states,
+    SlurmError,
+)
 from tslab.study.context import Context
+from tslab.study.launchers import QueuedJob
 from tslab.study.records import JobRecord, latest_tasks
 from tslab.study.reporting.state import StudyState
 
@@ -43,8 +50,8 @@ def _query_states(
     return {**ended_states, **queried}, new_cache
 
 
-def expected_starts(*, context: Context) -> dict[str, str | None] | None:
-    """The start time of each queued run, or ``None`` when none are queued."""
+def expected_starts(*, context: Context) -> dict[str, QueuedJob] | None:
+    """The start time and pending reason of each queued run, or ``None`` when none are queued."""
     queued = [
         report.job_id
         for report in context.reports
@@ -53,7 +60,13 @@ def expected_starts(*, context: Context) -> dict[str, str | None] | None:
     if not queued:
         return None
     try:
-        return query_expected_starts(job_ids=queued)
+        entries = query_expected_starts(job_ids=queued)
     except SlurmError as error:
         _LOGGER.warning('%s', error)
         return None
+    return {
+        task_id: QueuedJob(
+            start=entry.start, reason=entry.reason, stuck=pending_reason_stuck(reason=entry.reason)
+        )
+        for task_id, entry in entries.items()
+    }

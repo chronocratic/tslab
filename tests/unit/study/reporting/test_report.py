@@ -1,12 +1,53 @@
 """What the study commands print: tables, resources, problems, launch results."""
 
+from types import MappingProxyType
+
 import pytest
 
 from tslab.core.text import format_table
-from tslab.study.launchers import LaunchReport
+from tslab.study.definition import StudyRun
+from tslab.study.launchers import JobPhase, LaunchReport, QueuedJob
 from tslab.study.launchers.local.backend import LocalResources
 from tslab.study.machine import SlurmSettings
-from tslab.study.reporting.report import log_launch, log_problems, resources_of
+from tslab.study.reporting.report import _log_run_lines, log_launch, log_problems, resources_of
+from tslab.study.reporting.state import FolderFacts, RunReport, StudyState
+
+
+def _queued_report(*, job_id: str) -> RunReport:
+    run = StudyRun(
+        grid='g', values={'small': '1'}, run_path='g/small/1', settings=MappingProxyType({})
+    )
+    return RunReport(
+        run=run,
+        state=StudyState.QUEUED,
+        reason=None,
+        job_id=job_id,
+        job_state='PENDING',
+        job_phase=JobPhase.QUEUED,
+        attempt=1,
+        task=None,
+        folder=FolderFacts(snapshot=None, read_error=None, lock_live=False),
+    )
+
+
+def _logged_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
+    return [record.getMessage() for record in caplog.records]
+
+
+def test_status_line_shows_the_pending_reason(caplog: pytest.LogCaptureFixture) -> None:
+    starts = {'1000_0': QueuedJob(start='2026-11-03T10:00:00', reason='Priority', stuck=False)}
+    with caplog.at_level('INFO'):
+        _log_run_lines(reports=[_queued_report(job_id='1000_0')], starts=starts)
+    lines = _logged_lines(caplog)
+    assert lines[0].endswith('starts 2026-11-03T10:00:00, waiting: Priority')
+
+
+def test_status_line_flags_a_stuck_reason(caplog: pytest.LogCaptureFixture) -> None:
+    starts = {'1000_0': QueuedJob(start=None, reason='PartitionTimeLimit', stuck=True)}
+    with caplog.at_level('INFO'):
+        _log_run_lines(reports=[_queued_report(job_id='1000_0')], starts=starts)
+    lines = _logged_lines(caplog)
+    assert lines[0].endswith('will not start: PartitionTimeLimit')
 
 
 def test_format_table_gives_every_row_the_same_widths() -> None:
