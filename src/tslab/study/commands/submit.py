@@ -136,6 +136,11 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     if not context.job_states.known and not dry_run:
         _LOGGER.error('the job states could not be read; not submitting, to avoid duplicates')
         return 1, []
+    backend = backend_for(machine=machine)
+    blocker = backend.launch_blocker(context=context) if before_launch is None else None
+    if blocker is not None:
+        _LOGGER.error('%s', blocker)
+        return 1, []
     runs = [report.run for report in reports]
     folder = study_folder(machine=machine, study=context.study)
     with submission_lock(study_folder=folder):
@@ -159,7 +164,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         before_code = _before_launch_code(before_launch=before_launch, dry_run=dry_run)
         if before_code != 0:
             return before_code, []
-        report = backend_for(machine=machine).launch(
+        report = backend.launch(
             context=context,
             groups=groups,
             folder=folder,

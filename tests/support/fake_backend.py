@@ -217,6 +217,10 @@ class FakeBackend:
             return None
         return dict(self.expected_starts_answer)
 
+    def launch_blocker(self, *, context: Context) -> str | None:
+        """A fake launch has no local pid file to block it."""
+        return None
+
     def resources(
         self,
         *,

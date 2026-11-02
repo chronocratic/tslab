@@ -8,6 +8,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
+from tslab.core.meta import hostname
 from tslab.jobs.local import start_keep_awake, stop_keep_awake
 from tslab.study.context import Context
 from tslab.study.definition import Study
@@ -22,7 +23,7 @@ from tslab.study.launchers import (
     Resources,
 )
 from tslab.study.launchers.local.foreground import foreground_script
-from tslab.study.launchers.local.pid_file import hold_launch, LocalLaunchError
+from tslab.study.launchers.local.pid_file import _check_free, hold_launch, LocalLaunchError
 from tslab.study.launchers.local.run import (
     local_job_id,
     LocalLauncher,
@@ -120,6 +121,17 @@ class LocalBackend:
         context: Context,  # noqa: ARG002 # why: the Backend signature
     ) -> dict[str, str | None] | None:
         """There is no scheduler to ask; always ``None``."""
+        return None
+
+    def launch_blocker(self, *, context: Context) -> str | None:
+        """Why a new local launch of this study cannot start now, or ``None``."""
+        try:
+            _check_free(
+                study_folder=study_folder(machine=context.machine, study=context.study),
+                host=hostname(),
+            )
+        except LocalLaunchError as error:
+            return str(error)
         return None
 
     def resources(

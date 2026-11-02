@@ -1,10 +1,13 @@
 """The behavior of the local study backend."""
 
 from dataclasses import replace
+import fcntl
 from io import StringIO
 import os
 from pathlib import Path
+import subprocess
 import sys
+import threading
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -13,12 +16,15 @@ from tests.unit.study.helpers import (
     context,
     finished_pid,
     jobs_of,
+    no_sleep,
     record_local_job,
     study_directory,
     write_launch,
 )
 from tslab.core.meta import hostname
 from tslab.study.code_snapshot import CodeSnapshot
+from tslab.study.commands import submit
+from tslab.study.commands.submit import submit_runs
 from tslab.study.definition import StudyRun
 from tslab.study.launchers import JobPhase, LaunchError, LaunchReport
 import tslab.study.launchers.local.backend as local_backend
@@ -138,6 +144,63 @@ def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     assert resources.max_tasks_per_job is None
     assert resources.describe() == 'local'
     assert resources.signal_problem() is None
+
+
+def test_submit_while_a_local_launch_runs_fails_at_once(
+    *, project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+    ctx = context(project=project, machine_file='local.toml')
+    folder = ctx.study_directory / '.study'
+    write_launch(folder=folder, pid=child.pid, host=hostname(), tasks={})
+    lock = (folder / 'submit.lock').open('a')
+    fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+    codes: list[int] = []
+    thread = threading.Thread(
+        target=lambda: codes.append(
+            submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+        )
+    )
+    try:
+        with caplog.at_level('ERROR'):
+            thread.start()
+            thread.join(timeout=10)
+        assert not thread.is_alive()
+        assert codes == [1]
+        assert 'a local launch is running' in caplog.text
+    finally:
+        lock.close()
+        if thread.is_alive():
+            thread.join(timeout=10)
+        if child.poll() is None:
+            child.kill()
+        child.wait()
+
+
+def test_resubmit_with_cancel_skips_the_launch_check(
+    *, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(project=project, machine_file='local.toml')
+    monkeypatch.setattr(
+        LocalBackend, 'launch_blocker', lambda *_args, **_kwargs: 'a local launch is running'
+    )
+    before_launch_calls: list[bool] = []
+
+    def before_launch() -> int:
+        before_launch_calls.append(True)
+        return 7
+
+    code, submitted = submit_runs(
+        context=ctx,
+        reports=ctx.reports,
+        dry_run=False,
+        extra_args={},
+        sleep=no_sleep,
+        before_launch=before_launch,
+    )
+    assert code == 7
+    assert submitted == []
+    assert before_launch_calls == [True]
 
 
 def test_cancellable_job_ids_is_empty() -> None:
