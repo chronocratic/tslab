@@ -1,5 +1,6 @@
 """Code snapshots: the copy of ``src/`` that submitted jobs run from."""
 
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -208,3 +209,25 @@ def test_code_snapshot_variables() -> None:
         'TSLAB_CODE_SNAPSHOT_DIRTY': 'true',
         'TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED': 'true',
     }
+
+
+@pytest.mark.slow
+def test_uv_run_imports_the_code_snapshot(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[3]
+    taken = take_code_snapshot(
+        project_root=repo_root,
+        output_root=tmp_path / 'out',
+        include_untracked=True,
+        check_untracked=True,
+        dry_run=False,
+    )
+    result = subprocess.run(  # why: fixed command of this repository
+        ['uv', 'run', 'python', '-c', 'import tslab; print(tslab.__file__)'],  # noqa: S607
+        cwd=repo_root,
+        env={**os.environ, **taken.variables(), 'PYTHONPATH': taken.pythonpath(current=None)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip().startswith(taken.folder.as_posix())

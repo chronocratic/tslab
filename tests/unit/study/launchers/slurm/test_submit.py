@@ -155,6 +155,29 @@ def test_launcher_submit_raises_launch_error_when_sbatch_fails(
         )
 
 
+def test_slurm_submit_drops_code_snapshot_variables(
+    machine: MachineProfile, study: Study, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('TSLAB_CODE_SNAPSHOT', '/s')
+    monkeypatch.setenv('PYTHONPATH', '/s/src')
+    seen: dict[str, object] = {}
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, stdout='77;c\n', stderr='')
+
+    monkeypatch.setattr(subprocess, 'run', fake_run)
+    group = groups_of(study, machine)[0]
+    job_id = SlurmLauncher(sleep=lambda _seconds: None).submit(
+        group=group, study_folder=tmp_path, record=lambda **_kwargs: None
+    )
+    assert job_id == '77'
+    env = seen['env']
+    assert isinstance(env, dict)
+    assert 'TSLAB_CODE_SNAPSHOT' not in env
+    assert 'PYTHONPATH' not in env
+
+
 def run_toy(*, project: Path, model: str, seed: int) -> None:
     """Run one toy run for real, so its status.json is a real one."""
     subprocess.run(  # noqa: S603 # why: the toy script of the project, not external input

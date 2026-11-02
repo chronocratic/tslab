@@ -77,12 +77,19 @@ def _run(
         raise SlurmError(message) from error
 
 
-def sbatch(*, script: Path, sleep: Callable[[float], None] = time.sleep) -> str:
+def sbatch(
+    *,
+    script: Path,
+    sleep: Callable[[float], None] = time.sleep,
+    environ: Mapping[str, str] | None = None,
+) -> str:
     """Submit one job script; QoS limits are waited out, other errors raise.
 
     Args:
         script: The ``.sbatch`` file to submit.
         sleep: The wait between retries; injected for the tests.
+        environ: The environment to clean and submit with; ``os.environ``
+            when omitted.
 
     Returns:
         The job id SLURM printed before the first ``;``.
@@ -94,7 +101,7 @@ def sbatch(*, script: Path, sleep: Callable[[float], None] = time.sleep) -> str:
     while True:
         completed = _run(
             command=['sbatch', '--parsable', str(script)],
-            env=submission_environment(environ=os.environ),
+            env=submission_environment(environ=environ if environ is not None else os.environ),
         )
         if completed.returncode == 0:
             return completed.stdout.split(';', 1)[0].strip()

@@ -249,3 +249,28 @@ def test_sbatch_passes_the_clean_env_and_leaves_os_environ(
     assert isinstance(seen['env'], dict)
     assert 'SLURM_JOB_ID' not in seen['env']
     assert os.environ['SLURM_JOB_ID'] == '1'
+
+
+def test_sbatch_cleans_the_given_environ(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('TSLAB_MARKER', '1')
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    sbatch_script = bin_dir / 'sbatch'
+    sbatch_script.write_text('#!/bin/sh\nenv | sort > "$ENV_OUT"\necho "42;cluster"\n')
+    sbatch_script.chmod(0o755)
+    monkeypatch.setenv('PATH', f'{bin_dir}:{os.environ["PATH"]}')
+    job_id = sbatch(
+        script=tmp_path / 'x.sbatch',
+        environ={
+            'PATH': os.environ['PATH'],
+            'SLURM_JOB_ID': '1',
+            'KEEP': 'x',
+            'ENV_OUT': str(tmp_path / 'env.txt'),
+        },
+        sleep=lambda _seconds: None,
+    )
+    assert job_id == '42'
+    lines = (tmp_path / 'env.txt').read_text().splitlines()
+    assert 'KEEP=x' in lines
+    assert not any(line.startswith('SLURM_JOB_ID=') for line in lines)
+    assert 'TSLAB_MARKER=1' not in lines
