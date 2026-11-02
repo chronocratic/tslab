@@ -31,7 +31,8 @@ __all__ = [
 ]
 
 LAUNCH_FILE = 'local-launch.json'
-LAUNCH_LOG = 'local-launch.log'
+LAUNCH_LOGS = 'local_logs'
+DETACHED_VARIABLE = 'TSLAB_DETACHED'
 _JOB_STATES = frozenset(('pending', 'running', 'ended'))
 _LOGGER = logging.getLogger(__name__)
 
