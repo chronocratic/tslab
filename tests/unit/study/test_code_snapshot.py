@@ -191,6 +191,18 @@ def test_no_commit_is_an_error(tmp_path: Path) -> None:
     assert '--no-code-snapshot' in str(raised.value)
 
 
+def test_src_with_no_tracked_file_is_an_error(tmp_path: Path) -> None:
+    root = tmp_path / 'project'
+    (root / 'src').mkdir(parents=True)
+    _git(cwd=root, arguments=('init', '-q'))
+    _git(cwd=root, arguments=('commit', '-q', '--allow-empty', '-m', 'init'))
+    with pytest.raises(CodeSnapshotError) as raised:
+        _take(project_root=root, output_root=tmp_path / 'out')
+    assert 'no file under src/' in str(raised.value)
+    assert '--no-code-snapshot' in str(raised.value)
+    assert not (tmp_path / 'out').exists()
+
+
 def test_no_src_folder_is_an_error_naming_src_layout(tmp_path: Path) -> None:
     _git(cwd=tmp_path, arguments=('init', '-q'))
     _git(cwd=tmp_path, arguments=('commit', '-q', '--allow-empty', '-m', 'init'))
