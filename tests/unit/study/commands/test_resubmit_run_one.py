@@ -1,28 +1,20 @@
 """``tslab study run``: one run in the foreground, nothing recorded."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 import dataclasses
 import os
 from pathlib import Path
 import shlex
+from typing import cast
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import submit_study
 from tslab.cli import main
 from tslab.study.commands import run_one
 from tslab.study.context import Context, load_context, Selection
-
-GPUTWO_MACHINE = """\
-launcher = "slurm"
-output_root = "{output_root}"
-
-[slurm]
-partition = "CHANGE_ME"
-time = "00:10:00"
-gpus = 2
-"""
+from tslab.study.launchers import JobPhase
 
 
 def _one_run_context(*, project: Path, machine_file: str, only: tuple[str, ...]) -> Context:
@@ -46,12 +38,7 @@ def _process(*, code: int = 3) -> tuple[list[list[str]], Callable[[list[str]], i
     return calls, run_process
 
 
-def _write_gpu_machine(*, project: Path) -> None:
-    text = GPUTWO_MACHINE.format(output_root=(project / 'runs').as_posix())
-    (project / 'gpus.toml').write_text(text)
-
-
-def test_run_one_runs_the_command_of_one_run(project: Path, fake: FakeSlurm) -> None:
+def test_run_one_runs_the_command_of_one_run(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     ctx = _one_run_context(
         project=project, machine_file='cluster.toml', only=('model=small', 'seed=1')
@@ -64,10 +51,13 @@ def test_run_one_runs_the_command_of_one_run(project: Path, fake: FakeSlurm) -> 
     last = args[2].strip().splitlines()[-1]
     assert last.startswith('exec ')
     assert 'toy_script.py' in last
+    assert 'toy_script.py' in shlex.join(
+        cast('Sequence[str]', fake_backend.calls('foreground_script')[0]['command'])
+    )
 
 
 def test_run_one_reuses_extra_args_of_latest_submission(
-    project: Path, fake: FakeSlurm, tmp_path: Path
+    project: Path, fake_backend: FakeBackend, tmp_path: Path
 ) -> None:
     track = tmp_path / 'track.log'
     submit_study(project=project, extra_args=('--tracking-log', str(track)))
@@ -80,7 +70,7 @@ def test_run_one_reuses_extra_args_of_latest_submission(
 
 
 def test_run_one_args_after_dashes_replace_them(
-    project: Path, fake: FakeSlurm, tmp_path: Path
+    project: Path, fake_backend: FakeBackend, tmp_path: Path
 ) -> None:
     track = tmp_path / 'track.log'
     submit_study(project=project, extra_args=('--tracking-log', str(track)))
@@ -95,10 +85,10 @@ def test_run_one_args_after_dashes_replace_them(
 
 
 def test_run_one_refuses_live_run(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n'}])
+    fake_backend.set_states(phases={'job-0_0': JobPhase.RUNNING})
     ctx = _one_run_context(
         project=project, machine_file='cluster.toml', only=('model=small', 'seed=1')
     )
@@ -106,10 +96,10 @@ def test_run_one_refuses_live_run(
     with caplog.at_level('ERROR', logger='tslab.study.commands'):
         assert run_one(context=ctx, extra_args=None, run_process=process) == 1
     assert calls == []
-    assert 'g/small/1 is running (job 1000_0); wait for it or cancel it first' in caplog.text
+    assert 'g/small/1 is running (job job-0_0); wait for it or cancel it first' in caplog.text
 
 
-def test_run_one_without_a_selection_raises(project: Path, fake: FakeSlurm) -> None:
+def test_run_one_without_a_selection_raises(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     ctx = _one_run_context(project=project, machine_file='cluster.toml', only=('model=small',))
     empty = dataclasses.replace(ctx, reports=())
@@ -118,7 +108,7 @@ def test_run_one_without_a_selection_raises(project: Path, fake: FakeSlurm) -> N
 
 
 def test_run_one_cli_lists_more_than_one_run(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
     with caplog.at_level('ERROR', logger='tslab.cli'), pytest.raises(SystemExit) as raised:
@@ -131,23 +121,7 @@ def test_run_one_cli_lists_more_than_one_run(
     assert 'narrow with --only' in text
 
 
-def test_run_one_says_one_process_for_multi_gpu_jobs(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
-) -> None:
-    _write_gpu_machine(project=project)
-    submit_study(project=project, machine_file='gpus.toml')
-    ctx = _one_run_context(
-        project=project, machine_file='gpus.toml', only=('model=small', 'seed=1')
-    )
-    calls, process = _process()
-    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm'):
-        run_one(context=ctx, extra_args=None, run_process=process)
-    assert 'study run starts one process; the job would start 2' in caplog.text
-    assert len(calls) == 1
-    assert calls[0][:2] == ['bash', '-c']
-
-
-def test_run_one_records_nothing(project: Path, fake: FakeSlurm) -> None:
+def test_run_one_records_nothing(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     study = project / 'runs' / 's' / '.study'
     before = (study / 'submissions.jsonl').read_text()

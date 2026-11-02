@@ -11,10 +11,11 @@ import time
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
+from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection
+from tslab.study.launchers import JobPhase
 from tslab.study.reporting.state import StudyState
 
 # why: the small model has no ``depth`` field, so a study that sets
@@ -145,7 +146,7 @@ def run_toy(*, project: Path, model: str, seed: int) -> None:
     )
 
 
-def test_submit_on_slurm_writes_arrays_and_records(project: Path, fake: FakeSlurm) -> None:
+def test_submit_launches_and_records(project: Path, fake_backend: FakeBackend) -> None:
     code = submit(
         context=context(project=project, machine_file='cluster.toml'),
         include_done=False,
@@ -154,7 +155,7 @@ def test_submit_on_slurm_writes_arrays_and_records(project: Path, fake: FakeSlur
         sleep=no_sleep,
     )
     assert code == 0
-    assert len(fake.calls('sbatch')) == 1
+    assert len(fake_backend.calls('launch')) == 1
     jobs = jobs_of(project=project)
     assert len(jobs) == 1
     assert [(t.run_path, t.index) for t in jobs[0].tasks] == [
@@ -166,7 +167,7 @@ def test_submit_on_slurm_writes_arrays_and_records(project: Path, fake: FakeSlur
     assert all(t.attempt == 1 for t in jobs[0].tasks)
 
 
-def test_submit_skips_done_and_live_runs(project: Path, fake: FakeSlurm) -> None:
+def test_submit_skips_done_and_live_runs(project: Path, fake_backend: FakeBackend) -> None:
     first = submit(
         context=context(project=project, machine_file='cluster.toml'),
         include_done=False,
@@ -175,8 +176,14 @@ def test_submit_skips_done_and_live_runs(project: Path, fake: FakeSlurm) -> None
         sleep=no_sleep,
     )
     assert first == 0
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|PENDING\n1000_1|RUNNING\n'}])
-    fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|TIMEOUT\n'}])
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.QUEUED,
+            'job-0_1': JobPhase.RUNNING,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.INTERRUPTED,
+        }
+    )
     run_toy(project=project, model='large', seed=1)
     code = submit(
         context=context(project=project, machine_file='cluster.toml'),
@@ -192,13 +199,9 @@ def test_submit_skips_done_and_live_runs(project: Path, fake: FakeSlurm) -> None
     assert task.attempt == 2
     # why: the run keeps the array index of its first submission
     assert task.index == 3
-    script = (project / 'runs' / 's' / '.study' / 'jobs' / f'{jobs[1].job_file}.sbatch').read_text()
-    assert '#SBATCH --array=3%100' in script
-    assert '#SBATCH --job-name=g1' in script
-    assert 'logs/g1_%a.out' in script
 
 
-def test_include_done_resubmits_done_runs(project: Path, fake: FakeSlurm) -> None:
+def test_include_done_resubmits_done_runs(project: Path, fake_backend: FakeBackend) -> None:
     assert (
         submit(
             context=context(project=project, machine_file='cluster.toml'),
@@ -209,17 +212,13 @@ def test_include_done_resubmits_done_runs(project: Path, fake: FakeSlurm) -> Non
         )
         == 0
     )
-    fake.set_answers('squeue', [{'exit': 0, 'stdout': ''}])
-    fake.set_answers(
-        'sacct',
-        [
-            {
-                'exit': 0,
-                'stdout': (
-                    '1000_0|COMPLETED\n1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'
-                ),
-            }
-        ],
+    fake_backend.set_states(
+        phases={
+            'job-0_0': JobPhase.COMPLETED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-0_2': JobPhase.COMPLETED,
+            'job-0_3': JobPhase.COMPLETED,
+        }
     )
     run_toy(project=project, model='large', seed=1)
     code = submit(
@@ -248,11 +247,11 @@ def test_include_done_resubmits_done_runs(project: Path, fake: FakeSlurm) -> Non
         'g/large/1',
         'g/large/2',
     ]
-    assert len(fake.calls('sbatch')) == 3
+    assert len(fake_backend.calls('launch')) == 3
 
 
 def test_submit_stops_before_writing_when_a_run_does_not_parse(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     (project / 'bad_load.py').write_text(LOAD_BAD_STUDIES.lstrip('\n'))
     with pytest.raises(ValueError, match='not fields'):
@@ -281,13 +280,13 @@ def test_submit_stops_before_writing_when_a_run_does_not_parse(
             sleep=no_sleep,
         )
     assert code == 1
-    assert fake.calls('sbatch') == []
+    assert fake_backend.calls('launch') == []
     assert not (project / 'runs' / 's' / '.study' / 'jobs').exists()
     assert 'g/small/1' in caplog.text
 
 
 def test_dry_run_prints_plan_and_records_nothing(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     with caplog.at_level('INFO'):
         code = submit(
@@ -298,11 +297,10 @@ def test_dry_run_prints_plan_and_records_nothing(
             sleep=no_sleep,
         )
     assert code == 0
-    assert fake.calls('sbatch') == []
+    assert [call['dry_run'] for call in fake_backend.calls('launch')] == [True]
     assert not (project / 'runs' / 's' / '.study' / 'submissions.jsonl').exists()
-    assert (project / 'runs' / 's' / '.study' / 'jobs' / '1.sbatch').is_file()
     text = ' '.join(caplog.text.split())
-    assert 'g1 4 partition=' in text
+    assert 'g1 4 fake resources' in text
     assert 'toy_script.py model:small --seed 1' in text
 
 

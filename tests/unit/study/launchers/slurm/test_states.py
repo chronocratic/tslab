@@ -1,9 +1,12 @@
 """SLURM state queries and cache updates."""
 
+from pathlib import Path
 from typing import Literal
 
 import pytest
 
+from tests.support.fake_slurm import FakeSlurm
+from tests.unit.study.helpers import context, submit_study
 from tslab.core.status import utc_now_iso
 from tslab.study.launchers.slurm import states
 from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
@@ -96,3 +99,36 @@ def test_query_states_returns_new_cache_without_mutating_input(
     assert new_cache == {'1000_0': 'COMPLETED', '1000_2': 'COMPLETED'}
     assert ended == {'1000_0': 'COMPLETED'}
     assert queried == [['1000_1', '1000_2']]
+
+
+def test_expected_starts_asks_nothing_without_queued_runs(project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n'}])
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    starts = states.expected_starts(context=ctx)
+    assert starts is None
+    assert len(fake.calls('squeue')) == 1
+
+
+def test_expected_starts_logs_and_gives_none_when_squeue_fails(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    submit_study(project=project)
+    fake.set_answers(
+        'squeue',
+        [
+            {'exit': 0, 'stdout': '1000_0|PENDING\n'},
+            {'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'},
+        ],
+    )
+    fake.set_answers(
+        'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    with caplog.at_level('WARNING', logger='tslab.study.launchers.slurm.states'):
+        starts = states.expected_starts(context=ctx)
+    assert starts is None
+    assert 'squeue' in caplog.text
