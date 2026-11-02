@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from tslab.jobs.local import process_alive, run_process, stop_on_signals
+from tslab.jobs.local import boot_id, process_alive, run_process, stop_on_signals
 
 
 def test_run_process_returns_exit_code_and_lines(*, tmp_path: Path) -> None:
@@ -146,6 +146,10 @@ def test_stop_on_signals_records_signal() -> None:
         assert request.event.is_set()
         assert request.signal_number == signal.SIGUSR1
     assert signal.getsignal(signal.SIGUSR1) is previous
+
+
+def test_boot_id_is_stable_within_a_boot() -> None:
+    assert boot_id() == boot_id()  # str on Linux and macOS CI, never raises
 
 
 def test_process_alive_for_this_process() -> None:
