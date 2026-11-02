@@ -7,6 +7,7 @@ import pytest
 
 from tests.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.jobs.slurm import (
+    commands,
     query_expected_starts,
     query_job_states,
     query_job_usage,
@@ -16,7 +17,7 @@ from tslab.jobs.slurm import (
     SlurmJobUsage,
     submission_environment,
 )
-from tslab.jobs.slurm.commands import _expand_array_key
+from tslab.jobs.slurm.commands import _expand_array_key, _run
 
 
 @pytest.fixture
@@ -50,6 +51,22 @@ def test_sbatch_other_errors_raise(fake: FakeSlurm, tmp_path: Path) -> None:
     fake.set_answers('sbatch', [{'exit': 1, 'stderr': 'error: invalid partition'}])
     with pytest.raises(SlurmError, match='invalid partition'):
         sbatch(script=tmp_path / 'x.sbatch', sleep=lambda _: None)
+
+
+def test_sbatch_timeout_raises_without_retry(
+    fake: FakeSlurm, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # why: the fake is a Python script; its startup must fit inside the timeout
+    monkeypatch.setattr(commands, 'SUBMIT_TIMEOUT_SECONDS', 2.0)
+    fake.set_answers('sbatch', [{'exit': 0, 'stdout': '1;c', 'sleep': 5}])
+    with pytest.raises(SlurmError, match='did not answer'):
+        sbatch(script=tmp_path / 'x.sbatch', sleep=lambda _: None)
+    assert len(fake.calls('sbatch')) == 1
+
+
+def test_run_raises_on_timeout() -> None:
+    with pytest.raises(SlurmError, match=r'did not answer within 0.2 seconds'):
+        _run(command=['sleep', '5'], timeout=0.2)
 
 
 def test_scancel_with_signal_passes_signal_flag(fake: FakeSlurm) -> None:
@@ -96,7 +113,10 @@ def test_query_expected_starts_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
     assert fake.calls('squeue') == []
 
 
-def test_query_expected_starts_raises_on_failure(fake: FakeSlurm) -> None:
+def test_query_expected_starts_raises_on_failure(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(commands, '_sleep', lambda _: None)
     fake.set_answers('squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'}])
     with pytest.raises(SlurmError, match='Socket timed out'):
         query_expected_starts(job_ids=['1000_0'])
@@ -155,7 +175,10 @@ def test_query_job_usage_empty_ids_calls_nothing(fake: FakeSlurm) -> None:
     assert fake.calls('sacct') == []
 
 
-def test_query_job_usage_raises_on_failure(fake: FakeSlurm) -> None:
+def test_query_job_usage_raises_on_failure(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(commands, '_sleep', lambda _: None)
     fake.set_answers('sacct', [{'exit': 1, 'stderr': 'sacct: error: Problem talking to slurmdbd'}])
     with pytest.raises(SlurmError, match='slurmdbd'):
         query_job_usage(job_ids=['1000_2'])
@@ -175,17 +198,47 @@ def test_query_job_states(fake: FakeSlurm) -> None:
     assert fake.calls('squeue')[0][:2] == ['--array', '--jobs']
 
 
-def test_query_job_states_raises_when_squeue_fails(fake: FakeSlurm) -> None:
+def test_query_job_states_raises_when_squeue_fails(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(commands, '_sleep', lambda _: None)
     fake.set_answers('squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Socket timed out'}])
     with pytest.raises(SlurmError, match='Socket timed out'):
         query_job_states(job_ids=['7'])
 
 
-def test_query_job_states_raises_when_sacct_fails(fake: FakeSlurm) -> None:
+def test_query_job_states_raises_when_sacct_fails(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(commands, '_sleep', lambda _: None)
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '7_0|RUNNING\n'}])
     fake.set_answers('sacct', [{'exit': 1, 'stderr': 'sacct: error: Problem talking to slurmdbd'}])
     with pytest.raises(SlurmError, match='slurmdbd'):
         query_job_states(job_ids=['7'])
+
+
+def test_query_job_states_retries_a_failed_query(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(commands, '_sleep', lambda _: None)
+    fake.set_answers(
+        'squeue',
+        [{'exit': 1, 'stderr': 'Socket timed out'}, {'exit': 0, 'stdout': '1000_0|RUNNING\n'}],
+    )
+    assert query_job_states(job_ids=['1000_0']) == {'1000_0': 'RUNNING'}
+    assert len(fake.calls('squeue')) == 2
+
+
+def test_query_job_states_raises_after_three_failures(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    delays: list[float] = []
+    monkeypatch.setattr(commands, '_sleep', delays.append)
+    fake.set_answers('squeue', [{'exit': 1, 'stderr': 'Socket timed out'}])
+    with pytest.raises(SlurmError, match='Socket timed out'):
+        query_job_states(job_ids=['1000_0'])
+    assert len(fake.calls('squeue')) == 3
+    assert delays == [5.0, 15.0]
 
 
 def test_query_job_states_accepts_squeue_not_knowing_a_job(fake: FakeSlurm) -> None:

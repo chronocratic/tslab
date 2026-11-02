@@ -32,6 +32,16 @@ QOS_LIMIT_MARKERS = ('QOSMaxSubmitJobPerUserLimit', 'Job violates accounting/QOS
 #: What squeue prints for job ids it no longer knows; the accounting database answers then.
 _UNKNOWN_JOB = 'Invalid job id specified'
 
+#: How long a read-only scheduler query may run before the next try.
+QUERY_TIMEOUT_SECONDS = 180.0
+
+#: How long a submit or cancel may run before it gives up.
+SUBMIT_TIMEOUT_SECONDS = 180.0
+
+#: The waits between the tries of a read-only query.
+_QUERY_RETRY_DELAYS = (5.0, 15.0)
+_sleep = time.sleep
+
 _JOB_PREFIXES = ('SLURM_', 'SLURMD_', 'SRUN_', 'SBATCH_', 'SALLOC_')
 _JOB_NAMES = frozenset(
     {'MASTER_ADDR', 'MASTER_PORT', 'RANK', 'WORLD_SIZE', 'LOCAL_RANK', 'LOCAL_WORLD_SIZE'}
@@ -65,16 +75,42 @@ def submission_environment(*, environ: Mapping[str, str]) -> dict[str, str]:
 
 
 def _run(
-    *, command: list[str], env: Mapping[str, str] | None = None
+    *, command: list[str], env: Mapping[str, str] | None = None, timeout: float
 ) -> subprocess.CompletedProcess[str]:
     try:
         # why: fixed scheduler command on PATH; the exit code is checked by the caller
         return subprocess.run(  # noqa: S603
-            command, check=False, capture_output=True, text=True, env=env
+            command, check=False, capture_output=True, text=True, env=env, timeout=timeout
         )
     except FileNotFoundError as error:
         message = f'{command[0]} is not on PATH; is this a machine with SLURM?'
         raise SlurmError(message) from error
+    except subprocess.TimeoutExpired as error:
+        message = f'{command[0]} did not answer within {timeout:g} seconds'
+        raise SlurmError(message) from error
+
+
+def _query_once(*, command: list[str]) -> subprocess.CompletedProcess[str] | None:
+    """Run one read query; ``None`` when the call timed out, other errors raise."""
+    try:
+        return _run(command=command, timeout=QUERY_TIMEOUT_SECONDS)
+    except SlurmError as error:
+        # why: a missing command would not answer on a later try either
+        if isinstance(error.__cause__, subprocess.TimeoutExpired):
+            return None
+        raise
+
+
+def _query(
+    *, command: list[str], accept: Callable[[subprocess.CompletedProcess[str]], bool]
+) -> subprocess.CompletedProcess[str]:
+    for delay in _QUERY_RETRY_DELAYS:
+        last = _query_once(command=command)
+        if last is not None and accept(last):
+            return last
+        _sleep(delay)
+    # why: the last try keeps the timeout error, so a hung query still raises
+    return _run(command=command, timeout=QUERY_TIMEOUT_SECONDS)
 
 
 def sbatch(
@@ -102,6 +138,7 @@ def sbatch(
         completed = _run(
             command=['sbatch', '--parsable', str(script)],
             env=submission_environment(environ=environ if environ is not None else os.environ),
+            timeout=SUBMIT_TIMEOUT_SECONDS,
         )
         if completed.returncode == 0:
             return completed.stdout.split(';', 1)[0].strip()
@@ -133,7 +170,7 @@ def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
     if signal is not None:
         command.append(f'--signal={signal}')
     command += list(job_ids)
-    completed = _run(command=command)
+    completed = _run(command=command, timeout=SUBMIT_TIMEOUT_SECONDS)
     if completed.returncode != 0:
         name = f'scancel --signal={signal}' if signal is not None else 'scancel'
         message = f'{name} failed for {list(job_ids)}:\n{completed.stdout}{completed.stderr}'
@@ -172,6 +209,18 @@ def _pipe_lines(*, stdout: str) -> dict[str, str]:
     return states
 
 
+def _squeue_accepts(process: subprocess.CompletedProcess[str]) -> bool:
+    """Whether the squeue call answered, or only failed over job ids it no longer knows."""
+    if process.returncode == 0:
+        return True
+    return _UNKNOWN_JOB in process.stderr
+
+
+def _sacct_accepts(process: subprocess.CompletedProcess[str]) -> bool:
+    """Whether the sacct call exited zero."""
+    return process.returncode == 0
+
+
 def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
     """Return the estimated start time of each job, as ``squeue --start`` prints it.
 
@@ -190,10 +239,11 @@ def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, str | None]:
     if not job_ids:
         return {}
     ids = ','.join(job_ids)
-    squeue = _run(
-        command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S']
+    squeue = _query(
+        command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S'],
+        accept=_squeue_accepts,
     )
-    if squeue.returncode != 0 and _UNKNOWN_JOB not in squeue.stderr:
+    if not _squeue_accepts(squeue):
         message = f'squeue --start failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
         raise SlurmError(message)
     return _pipe_start_lines(stdout=squeue.stdout)
@@ -230,12 +280,15 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     if not job_ids:
         return {}
     ids = ','.join(job_ids)
-    squeue = _run(command=['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%T'])
-    if squeue.returncode != 0 and _UNKNOWN_JOB not in squeue.stderr:
+    squeue = _query(
+        command=['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%T'],
+        accept=_squeue_accepts,
+    )
+    if not _squeue_accepts(squeue):
         message = f'squeue failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
         raise SlurmError(message)
     states = _pipe_lines(stdout=squeue.stdout)
-    sacct = _run(
+    sacct = _query(
         command=[
             'sacct',
             '--jobs',
@@ -244,7 +297,8 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
             '--parsable2',
             '--allocations',
             '--format=JobID,State',
-        ]
+        ],
+        accept=_sacct_accepts,
     )
     if sacct.returncode != 0:
         message = f'sacct failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'
@@ -294,7 +348,7 @@ def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
     if not job_ids:
         return {}
     ids = ','.join(job_ids)
-    sacct = _run(
+    sacct = _query(
         command=[
             'sacct',
             '--jobs',
@@ -302,7 +356,8 @@ def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
             '--noheader',
             '--parsable2',
             '--format=JobID,State,Elapsed,Timelimit,TotalCPU,MaxRSS,AllocCPUS,AllocTRES',
-        ]
+        ],
+        accept=_sacct_accepts,
     )
     if sacct.returncode != 0:
         message = f'sacct failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'

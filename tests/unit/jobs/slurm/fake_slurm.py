@@ -2,7 +2,8 @@
 
 Each fake command records ``{"command", "args", "stdin"}`` to ``calls.jsonl``
 and answers from ``answers.json``: per command, a list of
-``{"exit", "stdout", "stderr"}`` consumed in order, the last one repeating.
+``{"exit", "stdout", "stderr"}`` consumed in order, the last one repeating;
+an answer may hold ``"sleep"`` to wait that many seconds before answering.
 With no answers, ``sbatch`` answers job ids ``1000``, ``1001``, and the rest
 exit 0 without output.
 """
@@ -27,6 +28,7 @@ _SCRIPT = """\
 import json
 import pathlib
 import sys
+import time
 
 NAME = '%s'
 HERE = pathlib.Path(__file__).resolve().parent
@@ -41,6 +43,7 @@ prior = sum(
 answers = json.loads((HERE / 'answers.json').read_text()).get(NAME, [])
 if answers:
     answer = answers[min(prior, len(answers) - 1)]
+    time.sleep(float(answer.get('sleep', 0)))
     sys.stdout.write(answer.get('stdout', ''))
     sys.stderr.write(answer.get('stderr', ''))
     sys.exit(int(answer.get('exit', 0)))
