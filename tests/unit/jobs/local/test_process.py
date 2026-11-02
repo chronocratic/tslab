@@ -157,3 +157,41 @@ def test_process_alive_for_a_reaped_child() -> None:
         child.wait()
         pid = child.pid
     assert not process_alive(pid=pid)
+
+
+def test_run_process_kills_leftovers_that_hold_the_pipe(*, tmp_path: Path) -> None:
+    events: list[str] = []
+    start = time.monotonic()
+    result = run_process(
+        command=['sh', '-c', 'sleep 60 & echo started'],
+        cwd=tmp_path,
+        environment=os.environ,
+        on_line=lambda _line: None,
+        on_event=events.append,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+    )
+    assert result.exit_code == 0
+    assert time.monotonic() - start < 15
+    assert any('killed the leftover processes' in event for event in events)
+
+
+def test_run_process_returns_when_a_leftover_left_the_group(*, tmp_path: Path) -> None:
+    script = (
+        'import os, subprocess, sys; '
+        'subprocess.Popen(["sleep", "30"], start_new_session=True); print("x")'
+    )
+    start = time.monotonic()
+    result = run_process(
+        command=[sys.executable, '-c', script],
+        cwd=tmp_path,
+        environment=os.environ,
+        on_line=lambda _line: None,
+        on_event=lambda _text: None,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+    )
+    assert result.exit_code == 0
+    assert time.monotonic() - start < 20
