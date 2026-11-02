@@ -153,6 +153,20 @@ def test_local_bad_timeout_fails(tmp_path: Path) -> None:
         load_machine(path=write(tmp_path, text))
 
 
+def test_local_timeout_not_above_signal_seconds_fails(tmp_path: Path) -> None:
+    path = write(tmp_path, LOCAL + '[local]\ntimeout = "2"\n')
+    with pytest.raises(
+        MachineProfileError,
+        match=r'local\.signal_seconds \(120\) must be smaller than local\.timeout \(2\)',
+    ):
+        load_machine(path=path)
+
+
+@pytest.mark.parametrize('table', ['timeout = "2"\nsignal_seconds = 0\n', 'timeout = "3"\n'])
+def test_local_timeout_with_room_for_the_signal_loads(tmp_path: Path, table: str) -> None:
+    load_machine(path=write(tmp_path, LOCAL + '[local]\n' + table))
+
+
 @pytest.mark.parametrize('gpus', ['["0"]', '["cuda"]', '"all"'])
 def test_local_gpus_not_ints_fails(tmp_path: Path, gpus: str) -> None:
     text = LOCAL + f'[local]\ngpus = {gpus}\n'

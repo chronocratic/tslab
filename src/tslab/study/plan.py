@@ -459,22 +459,39 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
 
 
 def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[str, str]]:
-    """The runs whose arguments do not parse, as (run path, message).
+    """The run paths and messages of task argument and group resource problems.
 
     Args:
         study: The study the groups came from.
         groups: The planned groups.
 
     Returns:
-        One pair per problem, in group and task order; a task whose
-        arguments could not even be built reports its building error.
+        One pair per task or group problem, in group and task order. A task
+        whose arguments could not even be built reports its building error.
     """
-    problems = (
-        _task_problem(study=study, group=group, task=task)
-        for group in groups
+    return [problem for group in groups for problem in _group_problems(study=study, group=group)]
+
+
+def _group_problems(*, study: Study, group: JobGroup) -> list[tuple[str, str]]:
+    """The task and resource problems of one group, in task order."""
+    problems = [
+        problem
         for task in group.tasks
-    )
-    return [problem for problem in problems if problem is not None]
+        if (problem := _task_problem(study=study, group=group, task=task)) is not None
+    ]
+    group_problem = _group_signal_problem(group=group)
+    if group_problem is not None:
+        problems.append(group_problem)
+    return problems
+
+
+def _group_signal_problem(*, group: JobGroup) -> tuple[str, str] | None:
+    """The time-limit signal problem for one job group, or ``None`` when valid."""
+    problem = group.resources.signal_problem()
+    if problem is None:
+        return None
+    run_path = group.tasks[0].resolved.run.run_path
+    return run_path, f'job file {group.job_file}: {problem}'
 
 
 def _task_problem(*, study: Study, group: JobGroup, task: PlannedTask) -> tuple[str, str] | None:

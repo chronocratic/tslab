@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
@@ -139,6 +140,10 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
     assert 'max_array_size' in messages[runs[1].run_path]
 
 
+def test_fake_resources_have_no_signal_problem() -> None:
+    assert FakeResources().signal_problem() is None
+
+
 def _epochs_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
     return {
         task.resolved.run.values['recipe']: task.command[
@@ -191,6 +196,44 @@ def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -
     cost = next(run for run in resolved if run.run.values['recipe'] == 'cost-paper')
     assert isinstance(cost.resources, SlurmSettings)
     assert cost.resources.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
+
+
+@pytest.mark.parametrize(
+    ('slurm_override', 'expected_problem'),
+    [
+        (
+            {'time': '0:01:00'},
+            (
+                'slurm.signal_seconds (120) must be smaller than slurm.time (0:01:00); '
+                'lower signal_seconds or set it to 0'
+            ),
+        ),
+        ({'time': '0:01:00', 'signal_seconds': 0}, None),
+    ],
+)
+def test_validate_jobs_checks_slurm_signal_seconds_against_override_time(
+    study: Study, tmp_path: Path, slurm_override: dict[str, object], expected_problem: str | None
+) -> None:
+    machine = _local(
+        tmp_path,
+        launcher='slurm',
+        slurm=SlurmSettings(partition='p'),
+        overrides=(MachineOverride(match={'grid': ('g',)}, slurm=slurm_override),),
+    )
+    groups = _plan(study, machine)
+    problems = validate_jobs(study=study, groups=groups)
+    signal_problems = [
+        (path, message) for path, message in problems if 'slurm.signal_seconds' in message
+    ]
+    if expected_problem is None:
+        assert signal_problems == []
+        return
+    assert signal_problems == [
+        (
+            groups[0].tasks[0].resolved.run.run_path,
+            f'job file {groups[0].job_file}: {expected_problem}',
+        )
+    ]
 
 
 def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(

@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from typing import cast, Literal, TYPE_CHECKING
 
-from tslab.jobs.slurm import parse_slurm_memory
+from tslab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
 from tslab.study.definition import matching_in_order
 from tslab.study.machine.tables import (
     check_keys,
@@ -86,6 +86,22 @@ class SlurmSettings:
     def requested_memory(self) -> int | None:
         """The total memory in bytes one task requests, or ``None`` when unbounded."""
         return _requested_memory(settings=self)
+
+    def signal_problem(self) -> str | None:
+        """The signal timing problem when the signal leaves no training time.
+
+        Returns:
+            The problem message, or ``None`` when the timing is valid.
+        """
+        if self.signal_seconds <= 0:
+            return None
+        time_seconds = parse_slurm_duration(text=self.time).total_seconds()
+        if self.signal_seconds < time_seconds:
+            return None
+        return (
+            f'slurm.signal_seconds ({self.signal_seconds}) must be smaller than '
+            f'slurm.time ({self.time}); lower signal_seconds or set it to 0'
+        )
 
     def as_record(self) -> dict[str, object]:
         """The resource fields of the group, for the submission record."""

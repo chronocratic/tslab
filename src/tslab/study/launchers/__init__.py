@@ -196,6 +196,14 @@ class Resources(Protocol):
         """The resource fields of the group, for the submission record."""
         ...
 
+    def signal_problem(self) -> str | None:
+        """The time-limit signal problem for one group.
+
+        Returns:
+            The problem message, or ``None`` when the timing is valid.
+        """
+        ...
+
 
 # why: the types above must exist first: this import reaches
 # the local pid-file module, which imports OnTaskState from this door
