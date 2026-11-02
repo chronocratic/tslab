@@ -43,11 +43,30 @@ def test_unknown_key_suggests_a_close_one(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    'text', ['studies = 3', 'runs = ""', '[machine_by_host]\n"*" = 1', 'studies = "x']
+    'text',
+    [
+        'studies = 3',
+        'runs = ""',
+        '[machine_by_host]\n"*" = 1',
+        '[machine_by_host]\n"*" = ""',
+        'studies = "x',
+    ],
 )
 def test_wrong_types_name_the_file(tmp_path: Path, text: str) -> None:
     (tmp_path / 'tslab.toml').write_text(text + '\n', encoding='utf-8')
     with pytest.raises(ValueError, match=r'tslab\.toml') as raised:
+        load_project_settings(start=tmp_path)
+    assert str(tmp_path / 'tslab.toml') in str(raised.value)
+
+
+def test_unreadable_file_is_a_value_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / 'tslab.toml').write_text('runs = "runs"\n', encoding='utf-8')
+
+    def _unreadable(self: Path, encoding: str | None = None, errors: str | None = None) -> str:
+        raise PermissionError(13, 'Permission denied', str(self))
+
+    monkeypatch.setattr(Path, 'read_text', _unreadable)
+    with pytest.raises(ValueError, match='cannot read the file') as raised:
         load_project_settings(start=tmp_path)
     assert str(tmp_path / 'tslab.toml') in str(raised.value)
 

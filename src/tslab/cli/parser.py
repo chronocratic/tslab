@@ -57,7 +57,8 @@ def _parse(*, argv: Sequence[str]) -> Command:
             args=argv[1:],
             description=(
                 'Launch and follow the runs of a study. STUDY is module:attribute, for example '
-                'my_paper.studies:example; --machine is a name from tslab machine list, '
+                'my_paper.studies:example; a short name expands against the studies module of '
+                'the nearest tslab.toml; --machine is a name from tslab machine list, '
                 'machines/<name>.toml above the working folder, or a profile path.'
             ),
         )
@@ -93,7 +94,8 @@ def _parse(*, argv: Sequence[str]) -> Command:
             '  tslab study resubmit STUDY --machine local                    '
             'retry interrupted runs\n'
             '  tslab study results STUDY --machine local --out results.csv   collect metrics\n\n'
-            'STUDY is module:attribute, for example my_paper.studies:example.'
+            'STUDY is module:attribute, for example my_paper.studies:example; a short name '
+            'expands against the studies module of tslab.toml.'
         ),
     )
 

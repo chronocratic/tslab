@@ -8,6 +8,7 @@ import pytest
 
 from tslab.cli import main
 from tslab.core.meta import hostname
+from tslab.study.project import PROJECT_FILE
 
 
 def _write_profile(*, tmp_path: Path) -> Path:
@@ -68,6 +69,30 @@ def test_doctor_reports_file_values_and_sources(
     assert values['studies'] == {'value': 'my_paper.studies', 'source': 'file'}
     assert values['machine_by_host'] == {'value': str(profile), 'source': 'flag'}
     assert values['runs'] == {'value': (tmp_path / 'runs').as_posix(), 'source': 'file'}
+
+
+def test_doctor_reads_the_settings_file_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    profile = _write_profile(tmp_path=tmp_path)
+    (tmp_path / 'tslab.toml').write_text('runs = "runs"\n', encoding='utf-8')
+    monkeypatch.chdir(tmp_path)
+    reads = 0
+    original_read_text = Path.read_text
+
+    def _counting_read_text(
+        self: Path, encoding: str | None = None, errors: str | None = None
+    ) -> str:
+        nonlocal reads
+        if self.name == PROJECT_FILE:
+            reads += 1
+        return original_read_text(self, encoding=encoding, errors=errors)
+
+    monkeypatch.setattr(Path, 'read_text', _counting_read_text)
+    with pytest.raises(SystemExit) as raised:
+        main(args=['doctor', '--machine', str(profile), '--json'])
+    assert raised.value.code == 0
+    assert reads == 1
 
 
 def test_doctor_picks_the_machine_by_host(

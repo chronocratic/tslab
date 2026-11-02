@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
-import tomllib
 from typing import Annotated, cast
 
 import tyro
@@ -84,14 +83,6 @@ class Doctor:
         return code
 
 
-def _file_keys(*, settings: ProjectSettings) -> frozenset[str]:
-    """The keys of the raw file, so an empty table still counts as present."""
-    if settings.path is None:
-        return frozenset[str]()
-    table = tomllib.loads(settings.path.read_text(encoding='utf-8'))
-    return frozenset(table)
-
-
 def _source_of(*, keys: frozenset[str], key: str) -> str:
     """The source of one key: file when the key is in the file, else default."""
     if key in keys:
@@ -121,7 +112,7 @@ def _machine_row(
 
 def _log_project_settings(*, settings: ProjectSettings, machine: str | None) -> None:
     """The project settings as one log line and a key, value, source table."""
-    keys = _file_keys(settings=settings)
+    keys = settings.file_keys
     path = settings.path
     _LOGGER.info('project settings: %s', path.as_posix() if path is not None else 'none')
     studies = settings.studies
@@ -150,7 +141,7 @@ def _project_settings_document(
     *, settings: ProjectSettings, machine: str | None
 ) -> dict[str, object]:
     """The project_settings entry of the doctor JSON document."""
-    keys = _file_keys(settings=settings)
+    keys = settings.file_keys
     host_value, host_source = _machine_entry(settings=settings, keys=keys, machine=machine)
     runs = settings.runs
     studies = settings.studies
