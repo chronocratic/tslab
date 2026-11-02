@@ -18,6 +18,7 @@ from tests.unit.study.helpers import (
     record_local_job,
     study_directory,
     submit_study,
+    write_launch,
     write_run_status,
 )
 from tslab.core.meta import hostname
@@ -121,6 +122,31 @@ def test_cancel_live_cancels_then_resubmits_later(project: Path, fake_backend: F
     jobs = jobs_of(project=project)
     assert [t.run_path for t in jobs[1].tasks] == ['g/small/1']
     assert fake_backend.calls('launch')[-1]['start_delay_seconds'] == 660
+
+
+def test_resubmit_checks_local_launch_before_submission_lock(
+    project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = context(project=project, machine_file='local.toml')
+    assert any(report.state is StudyState.MISSING for report in ctx.reports)
+    write_launch(
+        folder=study_directory(project=project) / '.study',
+        pid=os.getpid(),
+        host=hostname(),
+        tasks={},
+    )
+    submit_module = importlib.import_module('tslab.study.commands.submit')
+    monkeypatch.setattr(
+        submit_module,
+        'submission_lock',
+        lambda **_kwargs: pytest.fail('resubmit reached submission_lock'),
+    )
+
+    with caplog.at_level('ERROR'):
+        code = resubmit(context=ctx, sleep=no_sleep)
+
+    assert code == 1
+    assert 'a local launch is running' in caplog.text
 
 
 def test_ended_job_lock_is_removed_before_resubmitting(

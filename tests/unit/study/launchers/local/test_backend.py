@@ -177,7 +177,7 @@ def test_submit_while_a_local_launch_runs_fails_at_once(
         child.wait()
 
 
-def test_resubmit_with_cancel_skips_the_launch_check(
+def test_before_launch_does_not_skip_the_launch_check(
     *, project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
@@ -198,9 +198,9 @@ def test_resubmit_with_cancel_skips_the_launch_check(
         sleep=no_sleep,
         before_launch=before_launch,
     )
-    assert code == 7
+    assert code == 1
     assert submitted == []
-    assert before_launch_calls == [True]
+    assert before_launch_calls == []
 
 
 def test_cancellable_job_ids_is_empty() -> None:

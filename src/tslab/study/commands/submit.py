@@ -137,7 +137,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         _LOGGER.error('the job states could not be read; not submitting, to avoid duplicates')
         return 1, []
     backend = backend_for(machine=machine)
-    blocker = backend.launch_blocker(context=context) if before_launch is None else None
+    blocker = backend.launch_blocker(context=context)
     if blocker is not None:
         _LOGGER.error('%s', blocker)
         return 1, []
