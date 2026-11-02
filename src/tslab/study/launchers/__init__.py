@@ -339,6 +339,8 @@ class Backend(Protocol):
     name: str
     #: Whether the jobs have a time limit; a missing one shows as ``-``, else as ``no limit``.
     has_time_limit: bool
+    #: Whether an ended job state also covers jobs that ran on other hosts.
+    knows_other_hosts: bool
 
     def job_states(
         self,

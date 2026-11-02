@@ -248,7 +248,11 @@ def _before_resubmit(
         code = backend.cancel(context=context, dry_run=False, signal=None)[0] if cancellable else 0
         if code != 0:
             return code
-        _remove_ended_locks(reports=selected, study_directory=context.study_directory)
+        _remove_ended_locks(
+            reports=selected,
+            study_directory=context.study_directory,
+            knows_other_hosts=backend.knows_other_hosts,
+        )
         return 0
 
     delay = _RESTART_DELAY_SECONDS if cancellable else None
@@ -401,7 +405,9 @@ def _made_progress(*, report: RunReport, context: Context) -> bool:
     )
 
 
-def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) -> None:
+def _remove_ended_locks(
+    *, reports: Sequence[RunReport], study_directory: Path, knows_other_hosts: bool
+) -> None:
     for report in reports:
         job_state = report.job_state
         if report.job_phase in (JobPhase.QUEUED, JobPhase.RUNNING, JobPhase.UNKNOWN):
@@ -410,9 +416,15 @@ def _remove_ended_locks(*, reports: Sequence[RunReport], study_directory: Path) 
             continue
         lock = study_directory / report.run.run_path / LOCK_FILE
         owner = read_lock_owner(path=lock)
-        # why: on this host a live lock means a live process, so only a lock left on
-        # another host, whose job the scheduler says ended, is safe to remove
-        if owner is None or owner.host == hostname():
+        if owner is None:
+            continue
+        if owner.host == hostname():
+            continue
+        # why: local job state cannot see live processes on other hosts
+        if not knows_other_hosts:
+            _LOGGER.info(
+                'kept the lock of %s: it is live on host %s', report.run.run_path, owner.host
+            )
             continue
         lock.unlink(missing_ok=True)
         _LOGGER.info(

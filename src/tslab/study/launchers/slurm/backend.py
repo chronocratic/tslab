@@ -102,6 +102,7 @@ class SlurmBackend:
 
     #: Whether the jobs of this backend have a time limit.
     has_time_limit = True
+    knows_other_hosts = True
 
     def job_states(
         self,
