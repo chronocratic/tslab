@@ -17,6 +17,7 @@ configs-and-presets
 :caption: Run and track experiments
 
 studies
+project-settings
 hpc
 tracking
 ```

@@ -179,6 +179,10 @@ uv run tslab machine remove cluster
 profile. `list` marks files that are missing. Follow-up jobs on a SLURM cluster
 get the absolute path of the profile, so the compute nodes need no register.
 
+A project can skip `--machine` altogether: the `[machine_by_host]` table of
+[tslab.toml](project-settings.md) picks the profile by host, and the same file
+expands short study names.
+
 | Key | Default | Meaning |
 |---|---|---|
 | `launcher` | required | `"local"` or `"slurm"` |
