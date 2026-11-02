@@ -40,7 +40,8 @@ def test_help_is_plain_and_free_of_flag_pairs(
     output = _help(command=command, capsys=capsys)
 
     assert '``' not in output
-    assert '--no-' not in output
+    # why: --no-code-snapshot is a deliberate stand-alone flag, not a bool pair
+    assert '--no-' not in output.replace('--no-code-snapshot', '')
     assert '{None}' not in output
     assert '(default: None)' not in output
     assert re.search(r'\b(STR|PATH)$', output.splitlines()[0].strip()) is None

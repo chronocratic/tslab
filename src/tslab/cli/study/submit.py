@@ -9,7 +9,7 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, resolve_request
+from tslab.cli.common import print_json, resolve_request, UsageError
 from tslab.cli.study import (
     _context_of,
     _detach,
@@ -17,6 +17,7 @@ from tslab.cli.study import (
     _selection_args,
     _selection_options,
     _warn_no_runs,
+    take_requested_code_snapshot,
 )
 from tslab.core.meta import hostname
 from tslab.study.commands import submit
@@ -27,6 +28,20 @@ from tslab.study.reporting.documents import launch_document
 __all__ = ['Submit']
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _check_snapshot_flags(
+    *, code_snapshot: bool, no_code_snapshot: bool, include_untracked: bool, wanted: bool
+) -> None:
+    if code_snapshot and no_code_snapshot:
+        message = '--code-snapshot and --no-code-snapshot are mutually exclusive'
+        raise UsageError(message)
+    if include_untracked and not wanted:
+        message = (
+            '--code-snapshot-include-untracked needs a code snapshot: pass --code-snapshot, '
+            'or set code_snapshot = true in tslab.toml'
+        )
+        raise UsageError(message)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -50,6 +65,12 @@ class Submit:
         dry_run: Write the job files and print the plan, submit nothing.
         detach: Local machines only: start the launch in the background and return once
             it runs; follow it with tslab study wait.
+        code_snapshot: Copy src/ into a content-addressed folder and run the jobs
+            from that copy; code_snapshot = true in tslab.toml does the same.
+        no_code_snapshot: Run the live code, even when tslab.toml turns the code
+            snapshot on.
+        code_snapshot_include_untracked: With a code snapshot, copy untracked
+            files under src/ instead of stopping.
         extra_args: The arguments after --, appended to every run.
         json: Print one study-launch JSON document.
     """
@@ -63,6 +84,9 @@ class Submit:
     include_done: bool = False
     dry_run: bool = False
     detach: bool = False
+    code_snapshot: bool = False
+    no_code_snapshot: bool = False
+    code_snapshot_include_untracked: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
     json: bool = False
 
@@ -74,6 +98,22 @@ class Submit:
         study = cast('str', request.study)
         machine = cast('str', request.machine)
         context = _context_of(study=study, machine=machine, grid=self.grid, only=self.only)
+        wanted = self.code_snapshot or (
+            request.settings.code_snapshot and not self.no_code_snapshot
+        )
+        _check_snapshot_flags(
+            code_snapshot=self.code_snapshot,
+            no_code_snapshot=self.no_code_snapshot,
+            include_untracked=self.code_snapshot_include_untracked,
+            wanted=wanted,
+        )
+        code_snapshot = take_requested_code_snapshot(
+            request=request,
+            context=context,
+            wanted=wanted,
+            include_untracked=self.code_snapshot_include_untracked,
+            dry_run=self.dry_run,
+        )
         if self.detach:
             flags = [
                 flag
@@ -81,6 +121,9 @@ class Submit:
                     ('--include-done', self.include_done),
                     ('--dry-run', self.dry_run),
                     ('--json', self.json),
+                    ('--code-snapshot', self.code_snapshot),
+                    ('--no-code-snapshot', self.no_code_snapshot),
+                    ('--code-snapshot-include-untracked', self.code_snapshot_include_untracked),
                 )
                 if on
             ]
@@ -105,6 +148,7 @@ class Submit:
             include_done=self.include_done,
             dry_run=self.dry_run,
             extra_args=self.extra_args,
+            code_snapshot=code_snapshot,
             on_launch=remember_launch if self.json else None,
             task_stream=sys.stderr if self.json else None,
         )

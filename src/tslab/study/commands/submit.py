@@ -29,6 +29,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
     include_done: bool,
     dry_run: bool,
     extra_args: tuple[str, ...],
+    code_snapshot: CodeSnapshot | None = None,
     sleep: Callable[[float], None] = time.sleep,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
@@ -44,6 +45,8 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         include_done: Submit the done runs as well.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The pass-through arguments, appended to every run.
+        code_snapshot: The code snapshot every submitted run runs from;
+            ``None`` runs the live code.
         sleep: What waits out the submission pause of the cluster.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
@@ -66,6 +69,11 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         reports=to_submit,
         dry_run=dry_run,
         extra_args={report.run.run_path: extra_args for report in to_submit},
+        code_snapshots=(
+            {report.run.run_path: code_snapshot for report in to_submit}
+            if code_snapshot is not None
+            else None
+        ),
         sleep=sleep,
         on_launch=on_launch,
         task_stream=task_stream,
