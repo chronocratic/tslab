@@ -3,12 +3,13 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 import logging
+from pathlib import Path
 import sys
-from typing import Annotated
+from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, UsageError
+from tslab.cli.common import print_json, resolve_request, UsageError
 from tslab.cli.study import (
     _context_of,
     _detach,
@@ -18,6 +19,7 @@ from tslab.cli.study import (
     _states_of,
     _warn_no_runs,
 )
+from tslab.core.meta import hostname
 from tslab.study.commands import resubmit, run_one
 from tslab.study.launchers import backend_for, LaunchReport
 from tslab.study.plan import JobGroup
@@ -42,8 +44,10 @@ class RunOne:
         tslab study run my_paper.studies:example --machine cluster --only model=small,seed=1
 
     Attributes:
-        study: The study reference, module:attribute.
-        machine: A machine name or profile path.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
+        machine: A machine name or profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
         extra_args: The arguments after --; taken from the last
@@ -51,7 +55,7 @@ class RunOne:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -60,9 +64,12 @@ class RunOne:
 
     def run(self) -> int:
         """Run the one selected run and return its exit code."""
-        context = _context_of(
-            study=self.study, machine=self.machine, grid=self.grid, only=self.only
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
         )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
+        context = _context_of(study=study, machine=machine, grid=self.grid, only=self.only)
         try:
             return run_one(context=context, extra_args=self.extra_args or None)
         except ValueError as error:
@@ -78,9 +85,11 @@ class Resubmit:
         tslab study resubmit my_paper.studies:example --machine local --dry-run
 
     Attributes:
-        study: The study reference, module:attribute.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
-            registered with tslab machine add) or a profile path.
+            registered with tslab machine add) or a profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only the runs that match axis=value; comma separated for
             several values of one axis.
@@ -100,7 +109,7 @@ class Resubmit:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -117,10 +126,13 @@ class Resubmit:
 
     def run(self) -> int:
         """Resubmit and return the exit code."""
-        states = _states_of(values=self.states)
-        context = _context_of(
-            study=self.study, machine=self.machine, grid=self.grid, only=self.only
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
         )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
+        states = _states_of(values=self.states)
+        context = _context_of(study=study, machine=machine, grid=self.grid, only=self.only)
         if self.detach:
             flags = [
                 flag
@@ -142,7 +154,7 @@ class Resubmit:
                 options=options,
                 flags=flags,
                 extra_args=self.extra_args,
-                request=(self.study, self.machine),
+                request=(study, machine),
             )
         _warn_no_runs(context=context)
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
@@ -170,7 +182,7 @@ class Resubmit:
             _log_next_step(
                 dry_run=self.dry_run,
                 selection=_selection_args(
-                    study=self.study, machine=self.machine, grid=self.grid, only=self.only
+                    study=study, machine=machine, grid=self.grid, only=self.only
                 ),
             )
         if self.json and (code == 0 or launches):

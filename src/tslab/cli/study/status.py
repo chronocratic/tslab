@@ -1,12 +1,14 @@
 """The ``tslab study status``, ``show`` and ``wait`` commands."""
 
 from dataclasses import dataclass
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, UsageError, watch
+from tslab.cli.common import print_json, resolve_request, UsageError, watch
 from tslab.cli.study import _context_of, _states_of, _status_hints, _usage_errors
+from tslab.core.meta import hostname
 from tslab.study.commands import status
 from tslab.study.context import Context, expected_starts
 from tslab.study.definition import load_study
@@ -29,9 +31,11 @@ class Status:
         tslab study status my_paper.studies:example --machine local --watch 60
 
     Attributes:
-        study: The study reference, module:attribute.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
-            registered with tslab machine add) or a profile path.
+            registered with tslab machine add) or a profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only the runs that match axis=value; comma separated for
             several values of one axis.
@@ -42,7 +46,7 @@ class Status:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -56,6 +60,11 @@ class Status:
 
     def run(self) -> int:
         """Print the table and return the exit code."""
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
+        )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
         if self.watch is not None and self.json:
             message = '--watch does not combine with --json; use tslab study wait'
             raise UsageError(message)
@@ -63,11 +72,7 @@ class Status:
 
         def show() -> int:
             context = _context_of(
-                study=self.study,
-                machine=self.machine,
-                grid=self.grid,
-                only=self.only,
-                read_only=True,
+                study=study, machine=machine, grid=self.grid, only=self.only, read_only=True
             )
             if self.exit_code and not context.reports:
                 message = 'no runs match the selection; drop --grid/--only or check values'
@@ -75,11 +80,7 @@ class Status:
             starts = expected_starts(context=context)
             status(context=context, states=states, starts=starts)
             _status_hints(
-                context=context,
-                study=self.study,
-                machine=self.machine,
-                grid=self.grid,
-                only=self.only,
+                context=context, study=study, machine=machine, grid=self.grid, only=self.only
             )
             code = study_exit_code(context=context)
             if self.json:
@@ -97,7 +98,8 @@ class Show:
         tslab study show my_paper.studies:example
 
     Attributes:
-        study: The study reference, module:attribute.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
         json: Print one study-show JSON document.
     """
 
@@ -106,8 +108,12 @@ class Show:
 
     def run(self) -> int:
         """Show a study without loading a machine profile."""
-        with _usage_errors(study=self.study):
-            study = load_study(reference=self.study)
+        request = resolve_request(
+            study=self.study, machine=None, start=Path.cwd(), host=hostname(), needs_machine=False
+        )
+        typed = cast('str', request.study)
+        with _usage_errors(study=typed):
+            study = load_study(reference=typed)
         if self.json:
             print_json(document=show_document(study=study))
         else:
@@ -123,8 +129,10 @@ class Wait:
         tslab study wait my_paper.studies:example --machine local
 
     Attributes:
-        study: The study reference, module:attribute.
-        machine: A machine name or profile path.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
+        machine: A machine name or profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
         interval: Longest gap between checks in seconds (at least 10); checks start
@@ -135,7 +143,7 @@ class Wait:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -147,6 +155,11 @@ class Wait:
 
     def run(self) -> int:
         """Wait for the study and return its final state code."""
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
+        )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
         if self.interval < _MIN_WAIT_INTERVAL_SECONDS:
             message = '--interval takes at least 10 seconds'
             raise UsageError(message)
@@ -155,8 +168,8 @@ class Wait:
 
         def load() -> Context:
             context = _context_of(
-                study=self.study,
-                machine=self.machine,
+                study=study,
+                machine=machine,
                 grid=self.grid,
                 only=self.only,
                 read_only=True,
@@ -179,10 +192,6 @@ class Wait:
         else:
             status(context=context)
             _status_hints(
-                context=context,
-                study=self.study,
-                machine=self.machine,
-                grid=self.grid,
-                only=self.only,
+                context=context, study=study, machine=machine, grid=self.grid, only=self.only
             )
         return code
