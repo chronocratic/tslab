@@ -1,0 +1,15 @@
+# The project settings of this TSLab project. Committed with the project; the
+# study commands read it from the working folder or a folder above it.
+
+# The module that holds the studies. A short name like `example` expands to
+# `<module>:example`.
+studies = "{{package_name}}.studies"
+
+# The default runs folder of `tslab status` without a FOLDER argument.
+runs = "runs"
+
+# Pick the machine by host, so the study commands need no --machine. Commented
+# out on purpose: a new project should never pick a machine on its own.
+# [machine_by_host]
+# "login*.cluster.example" = "cluster"
+# "*" = "local"

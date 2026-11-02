@@ -4,6 +4,7 @@ import pytest
 
 from tslab.cli import main
 from tslab.cli.new import create_project
+from tslab.study.project import load_project_settings
 
 
 def files_below(*, directory: Path) -> set[str]:
@@ -20,6 +21,19 @@ def test_project_is_copied_with_names_filled_in(tmp_path: Path) -> None:
     for name in names:
         assert '{{' not in (project / name).read_text(encoding='utf-8'), name
     assert 'name = "my-paper"' in (project / 'pyproject.toml').read_text(encoding='utf-8')
+
+
+def test_template_tslab_toml_loads_and_picks_no_machine(tmp_path: Path) -> None:
+    project = tmp_path / 'my-paper'
+    assert create_project(path=project) == 'my_paper'
+    toml = project / 'tslab.toml'
+    assert '{{' not in toml.read_text(encoding='utf-8')
+    settings = load_project_settings(start=project)
+    assert settings.studies == 'my_paper.studies'
+    assert settings.runs == project / 'runs'
+    assert settings.machine_by_host == ()
+    for name in ('README.md', 'AGENTS.md'):
+        assert 'tslab study submit example' in (project / name).read_text(encoding='utf-8')
 
 
 def test_template_study_status_examples_are_one_shot(tmp_path: Path) -> None:

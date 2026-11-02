@@ -229,18 +229,23 @@ A study runs one script command over the product of its axes. See
 `studies.py` for the example.
 
 ```bash
-uv run tslab study show {{package_name}}.studies:example
-uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
-uv run tslab study submit {{package_name}}.studies:example --machine local --detach  # background launch; never submit in the foreground
-uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
-uv run tslab study wait {{package_name}}.studies:example --machine local
-uv run tslab study failures {{package_name}}.studies:example --machine local
-uv run tslab study run {{package_name}}.studies:example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
-uv run tslab study usage {{package_name}}.studies:example --machine local  # per-run and per-group accounting
-uv run tslab study resubmit {{package_name}}.studies:example --machine local
-uv run tslab study cancel {{package_name}}.studies:example --machine local  # stops the live local launch
-uv run tslab study results {{package_name}}.studies:example --machine local --out results.csv
+uv run tslab study show example
+uv run tslab study submit example --machine local --dry-run
+uv run tslab study submit example --machine local --detach  # background launch; never submit in the foreground
+uv run tslab study status example --machine local  # add --watch 60 to refresh
+uv run tslab study wait example --machine local
+uv run tslab study failures example --machine local
+uv run tslab study run example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
+uv run tslab study usage example --machine local  # per-run and per-group accounting
+uv run tslab study resubmit example --machine local
+uv run tslab study cancel example --machine local  # stops the live local launch
+uv run tslab study results example --machine local --out results.csv
 ```
+
+`tslab.toml` at the project root names the studies module, so `example` stands
+for `{{package_name}}.studies:example`. Its `[machine_by_host]` table, commented
+out by default, picks the machine by host: uncomment it and drop `--machine`
+from every command.
 
 `--grid NAME` and `--only axis=value` select a slice; arguments after `--` go
 to every run (`-- --trainer.max-epochs 1`). Always `--dry-run` first.

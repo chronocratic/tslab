@@ -45,18 +45,23 @@ A study runs one command of a script over a product of axes (see
 `machines/`:
 
 ```bash
-uv run tslab study show {{package_name}}.studies:example
-uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run
-uv run tslab study submit {{package_name}}.studies:example --machine local
-uv run tslab study status {{package_name}}.studies:example --machine local  # add --watch 60 to refresh
-uv run tslab study wait {{package_name}}.studies:example --machine local
-uv run tslab study failures {{package_name}}.studies:example --machine local
-uv run tslab study run {{package_name}}.studies:example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
-uv run tslab study usage {{package_name}}.studies:example --machine local  # per-run and per-group accounting
-uv run tslab study resubmit {{package_name}}.studies:example --machine local
-uv run tslab study results {{package_name}}.studies:example \
+uv run tslab study show example
+uv run tslab study submit example --machine local --dry-run
+uv run tslab study submit example --machine local
+uv run tslab study status example --machine local  # add --watch 60 to refresh
+uv run tslab study wait example --machine local
+uv run tslab study failures example --machine local
+uv run tslab study run example --machine local --grid classification --only seed=0  # one run in the terminal, nothing recorded
+uv run tslab study usage example --machine local  # per-run and per-group accounting
+uv run tslab study resubmit example --machine local
+uv run tslab study results example \
     --machine local --out results.csv
 ```
+
+`tslab.toml` at the project root names the studies module, so `example` stands
+for `{{package_name}}.studies:example`. Its `[machine_by_host]` table, commented
+out by default, picks the machine by host: uncomment it and drop `--machine`
+from every command.
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
 after `--` go to every run. Slurm: copy `machines/slurm.example.toml` to

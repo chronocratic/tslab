@@ -8,12 +8,16 @@ description: Run, follow, debug and collect TSLab studies of this project from t
 Any coding agent with shell access can use this workflow to run or inspect a study. The
 commands return versioned JSON so you can make decisions from fields, not tables.
 
+The study argument is the short name `example`; `tslab.toml` at the project
+root expands it against the studies module. Its `[machine_by_host]` table can
+pick the machine by host, so `--machine` can be dropped from every command.
+
 ## Before submitting
 
 For a new machine, run its readiness checks before the first submit:
 
 ```bash
-uv run tslab doctor --machine local {{package_name}}.studies:example --json
+uv run tslab doctor --machine local example --json
 ```
 
 Stop on failed checks. Resolve warnings with the researcher when they affect the
@@ -23,8 +27,8 @@ full study; `doctor` checks setup, not whether a real cluster job succeeds.
 Learn valid grid and axis names, then inspect the plan before launching:
 
 ```bash
-uv run tslab study show {{package_name}}.studies:example --json
-uv run tslab study submit {{package_name}}.studies:example --machine local --dry-run --json
+uv run tslab study show example --json
+uv run tslab study submit example --machine local --dry-run --json
 ```
 
 Check each document's `schema` before using its fields. Use `grids[].name` for
@@ -32,7 +36,7 @@ Check each document's `schema` before using its fields. Use `grids[].name` for
 resources, then submit only the selection the researcher requested:
 
 ```bash
-uv run tslab study submit {{package_name}}.studies:example --machine local --detach
+uv run tslab study submit example --machine local --detach
 ```
 
 ## Wait and respond to the result
@@ -42,7 +46,7 @@ Keep its process exit code and JSON output; do not poll by launching repeated
 wait commands.
 
 ```bash
-uv run tslab study wait {{package_name}}.studies:example --machine local --json
+uv run tslab study wait example --machine local --json
 ```
 
 Always pass `--json` to supported commands and check the `schema` field. The
@@ -67,8 +71,8 @@ value to raise, or a resubmit — and nothing else. After fixing the cause,
 retry only failed runs:
 
 ```bash
-uv run tslab study failures {{package_name}}.studies:example --machine local --json
-uv run tslab study resubmit {{package_name}}.studies:example --machine local --states failed --json
+uv run tslab study failures example --machine local --json
+uv run tslab study resubmit example --machine local --states failed --json
 ```
 
 To reproduce one run in the terminal, select exactly one run. `study run`
@@ -76,7 +80,7 @@ runs the command of the run, prints to the terminal, and records nothing; it
 refuses a queued or running run and does not call SLURM:
 
 ```bash
-uv run tslab study run {{package_name}}.studies:example --machine local --only <axis>=<value>
+uv run tslab study run example --machine local --only <axis>=<value>
 ```
 
 `--include-done` belongs to `study submit`, not `study resubmit`. It submits
@@ -87,7 +91,7 @@ selection against the request; ask before submitting any unwanted states.
 For code 5, the default resubmit selection is interrupted and missing runs:
 
 ```bash
-uv run tslab study resubmit {{package_name}}.studies:example --machine local --json
+uv run tslab study resubmit example --machine local --json
 ```
 
 When a group needs more time or memory, size the change before editing the
@@ -96,7 +100,7 @@ field suggests a `time` and a `mem_per_cpu` per resource group. It is SLURM
 only and exits 1 on a local machine.
 
 ```bash
-uv run tslab study usage {{package_name}}.studies:example --machine local --json
+uv run tslab study usage example --machine local --json
 ```
 
 To test the timeout path without waiting for the time limit, `study cancel
@@ -105,7 +109,7 @@ checkpoint and end on their own as `interrupted`, and queued jobs are skipped.
 It never cancels.
 
 ```bash
-uv run tslab study cancel {{package_name}}.studies:example --machine local --signal --json
+uv run tslab study cancel example --machine local --signal --json
 ```
 
 After either resubmit, start another background wait and handle its exit code
@@ -115,7 +119,7 @@ SLURM status and authorizes the next action.
 For code 0, collect the results as JSON on standard output:
 
 ```bash
-uv run tslab study results {{package_name}}.studies:example --machine local --out - --json
+uv run tslab study results example --machine local --out - --json
 ```
 
 ## Safety
