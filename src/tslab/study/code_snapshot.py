@@ -204,7 +204,7 @@ def take_code_snapshot(
         # complete snapshot; recopy the code instead of reusing it
         _LOGGER.warning('code snapshot folder %s lost its src folder; recopying', folder)
         shutil.rmtree(folder)
-    _copy_atomically(project_root=project_root, copies=copies, folder=folder)
+    _copy_atomically(project_root=project_root, copies=copies, folder=folder, digest=digest)
     return snapshot
 
 
@@ -323,20 +323,42 @@ def _hash_of_files(*, project_root: Path, relative_paths: list[str]) -> str:
     return digest.hexdigest()[:16]
 
 
-def _copy_atomically(*, project_root: Path, copies: list[str], folder: Path) -> None:
+def _copy_atomically(*, project_root: Path, copies: list[str], folder: Path, digest: str) -> None:
     """Copy into a temporary sibling folder, then rename to ``folder``.
 
     A crash or a folder that appears meanwhile must never leave a partial
-    copy at ``folder``.
+    copy at ``folder``, and the published bytes must be the bytes the
+    ``digest`` was computed from.
     """
     folder.parent.mkdir(parents=True, exist_ok=True)
     temporary = Path(tempfile.mkdtemp(dir=folder.parent, prefix=f'.{folder.name}-'))
     try:
         _copy_files(project_root=project_root, copies=copies, destination=temporary)
+        _check_copy_digest(temporary=temporary, copies=copies, digest=digest)
         _publish_copy(temporary=temporary, folder=folder)
+    except CodeSnapshotError:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
     except (OSError, shutil.Error):
         shutil.rmtree(temporary, ignore_errors=True)
         raise
+
+
+def _check_copy_digest(*, temporary: Path, copies: list[str], digest: str) -> None:
+    """The copied files match the recorded hash, or the error that names the way out.
+
+    The hash was computed from the project before the copy; an edit in
+    between would publish different bytes under the recorded hash and break
+    the content addressing.
+    """
+    copied = _hash_of_files(project_root=temporary, relative_paths=copies)
+    if copied == digest:
+        return
+    message = (
+        'the code changed while the code snapshot was being copied; '
+        'rerun the command to take a new snapshot'
+    )
+    raise CodeSnapshotError(message)
 
 
 def _copy_files(*, project_root: Path, copies: list[str], destination: Path) -> None:
