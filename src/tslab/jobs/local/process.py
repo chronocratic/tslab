@@ -12,7 +12,14 @@ import threading
 import time
 from types import FrameType
 
-__all__ = ['ProcessResult', 'StopRequest', 'process_alive', 'run_process', 'stop_on_signals']
+__all__ = [
+    'ProcessResult',
+    'StopRequest',
+    'boot_id',
+    'process_alive',
+    'run_process',
+    'stop_on_signals',
+]
 
 _LEFTOVER_WAIT_SECONDS = 5.0
 
@@ -275,6 +282,54 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
     if not reader.is_alive() and process.stdout is not None:
         process.stdout.close()
     return result
+
+
+def _boot_id_from_proc() -> str | None:
+    """The boot id of a Linux host, read from ``/proc``."""
+    try:
+        return Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    except OSError:
+        return None
+
+
+def _boot_id_from_sysctl() -> str | None:
+    """The boot time of a macOS host, read with ``sysctl``."""
+    try:
+        result = subprocess.run(
+            args=('sysctl', '-n', 'kern.boottime'),  # noqa: S607 # why: a fixed system command from the path
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip()
+
+
+_BOOT_ID_BY_PLATFORM: Mapping[str, Callable[[], str | None]] = {
+    'linux': _boot_id_from_proc,
+    'darwin': _boot_id_from_sysctl,
+}
+
+
+def boot_id() -> str | None:
+    """The identity of the current boot, or ``None`` when it cannot be read.
+
+    On Linux the value comes from ``/proc/sys/kernel/random/boot_id``; on
+    macOS from ``sysctl -n kern.boottime``, waiting at most 5 seconds. Any
+    other platform, a read error, a timeout or a non-zero exit gives
+    ``None``, so a check that compares boots falls back to the pid alone.
+
+    Returns:
+        The boot identity, or ``None`` when it cannot be read.
+    """
+    reader = _BOOT_ID_BY_PLATFORM.get(sys.platform)
+    if reader is None:
+        return None
+    return reader()
 
 
 def process_alive(*, pid: int) -> bool:

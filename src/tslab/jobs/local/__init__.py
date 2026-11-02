@@ -13,6 +13,7 @@ from tslab.jobs.local.gpus import (
 from tslab.jobs.local.output import tail_lines, TaskInfo, TaskOutput
 from tslab.jobs.local.pool import OnEnd, OnEvent, OnLine, OnStart, OnWait, PoolCommand, run_commands
 from tslab.jobs.local.process import (
+    boot_id,
     process_alive,
     ProcessResult,
     run_process,
@@ -33,6 +34,7 @@ __all__ = [
     'StopRequest',
     'TaskInfo',
     'TaskOutput',
+    'boot_id',
     'busy_gpus',
     'export_lines',
     'gpu_lock_folder',

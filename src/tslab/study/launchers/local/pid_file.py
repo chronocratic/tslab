@@ -15,7 +15,7 @@ from typing import cast
 
 from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
-from tslab.jobs.local import process_alive, start_detached, tail_lines
+from tslab.jobs.local import boot_id, process_alive, start_detached, tail_lines
 from tslab.study.launchers import OnTaskState
 
 __all__ = [
@@ -51,12 +51,15 @@ class LocalLaunch:
         hostname: The host of that process.
         started: The start time, UTC ISO.
         tasks: Task id and state (``pending``, ``running`` or ``ended``) pairs.
+        boot: The boot identity of the host when the file was written;
+            ``None`` for files written before this field existed.
     """
 
     pid: int
     hostname: str
     started: str
     tasks: tuple[tuple[str, str], ...]
+    boot: str | None = None
 
 
 def read_launch(*, study_folder: Path) -> LocalLaunch | None:
@@ -74,6 +77,7 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
     except FileNotFoundError:
         return None
     try:
+        boot = document.get('boot')
         return LocalLaunch(
             pid=int(str(document['pid'])),
             hostname=str(document['hostname']),
@@ -81,6 +85,7 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
             tasks=tuple(
                 (str(key), str(state)) for key, state in cast('list[list[str]]', document['tasks'])
             ),
+            boot=str(boot) if boot is not None else None,
         )
     except (KeyError, TypeError, ValueError) as error:
         message = f'{path} is not a local launch file ({error}); remove it'
@@ -90,25 +95,33 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
 def launch_is_live(*, launch: LocalLaunch, host: str) -> bool:
     """Whether the process of the launch exists on this host.
 
+    A launch that records a boot is not live when the host booted again
+    since; a file without a boot falls back to the pid alone.
+
     Args:
         launch: The launch to check.
         host: The current host name.
     """
     if launch.hostname != host:
         return False
+    # why: after a reboot the pid may belong to another process
+    current = boot_id()
+    if launch.boot is not None and current is not None and launch.boot != current:
+        return False
     return process_alive(pid=launch.pid)
 
 
 def _write(*, path: Path, launch: LocalLaunch) -> None:
-    atomic_write_json(
-        path=path,
-        document={
-            'pid': launch.pid,
-            'hostname': launch.hostname,
-            'started': launch.started,
-            'tasks': [list(item) for item in launch.tasks],
-        },
-    )
+    document = {
+        'pid': launch.pid,
+        'hostname': launch.hostname,
+        'started': launch.started,
+        'tasks': [list(item) for item in launch.tasks],
+    }
+    if launch.boot is not None:
+        # why: no key when the boot is unknown, so an unknown boot is not read as stale
+        document['boot'] = launch.boot
+    atomic_write_json(path=path, document=document)
 
 
 def _check_free(*, study_folder: Path, host: str) -> None:
@@ -155,13 +168,14 @@ def hold_launch(
     path = study_folder / LAUNCH_FILE
     states = dict.fromkeys(task_ids, 'pending')
     started = now
+    boot = boot_id()
     lock = threading.Lock()
 
     def write() -> None:
         _write(
             path=path,
             launch=LocalLaunch(
-                pid=pid, hostname=host, started=started, tasks=tuple(states.items())
+                pid=pid, hostname=host, started=started, boot=boot, tasks=tuple(states.items())
             ),
         )
 

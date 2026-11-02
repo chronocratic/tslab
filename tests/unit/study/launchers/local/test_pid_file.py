@@ -40,6 +40,7 @@ from tslab.study.launchers.local.pid_file import (
     launch_is_live,
     LAUNCH_LOGS,
     local_job_states,
+    LocalLaunch,
     LocalLaunchError,
     read_launch,
 )
@@ -140,6 +141,34 @@ def test_local_job_states_map_pending_and_running(tmp_path: Path) -> None:
 def test_local_job_states_without_live_launch_is_empty(tmp_path: Path) -> None:
     write_launch(folder=tmp_path, pid=finished_pid(), host=hostname(), tasks={'j_0': 'running'})
     assert local_job_states(study_folder=tmp_path, host=hostname()) == {}
+
+
+def test_launch_from_another_boot_is_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pid_file, 'boot_id', lambda: 'boot-B')
+    launch = LocalLaunch(pid=os.getpid(), hostname='h', started='t', tasks=(), boot='boot-A')
+    assert launch_is_live(launch=launch, host='h') is False
+
+
+def test_launch_from_this_boot_with_a_live_pid_is_live(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pid_file, 'boot_id', lambda: 'boot-A')
+    launch = LocalLaunch(pid=os.getpid(), hostname='h', started='t', tasks=(), boot='boot-A')
+    assert launch_is_live(launch=launch, host='h') is True
+
+
+def test_old_launch_file_without_boot_uses_the_pid(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={})
+    launch = read_launch(study_folder=tmp_path)
+    assert launch is not None
+    assert launch.boot is None
+    assert launch_is_live(launch=launch, host='h') is True
+
+
+def test_hold_launch_writes_the_boot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pid_file, 'boot_id', lambda: 'boot-A')
+    with hold_launch(study_folder=tmp_path, task_ids=['x'], pid=1, host='h', now='t'):
+        launch = read_launch(study_folder=tmp_path)
+        assert launch is not None
+        assert launch.boot == 'boot-A'
 
 
 def test_status_reads_local_launch_states(project: Path) -> None:
