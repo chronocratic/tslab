@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import use_stderr
+from tslab.cli.common import resolve_request, use_stderr
 from tslab.cli.study import _context_of, _warn_no_runs
+from tslab.core.meta import hostname
 from tslab.study.commands import results
 
 __all__ = ['Results']
@@ -21,9 +22,11 @@ class Results:
         tslab study results my_paper.studies:example --machine local --out results.csv
 
     Attributes:
-        study: The study reference, module:attribute.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
-            registered with tslab machine add) or a profile path.
+            registered with tslab machine add) or a profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only the runs that match axis=value; comma separated for
             several values of one axis.
@@ -32,7 +35,7 @@ class Results:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -42,8 +45,13 @@ class Results:
 
     def run(self) -> int:
         """Write the table and return the exit code."""
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
+        )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
         context = _context_of(
-            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
+            study=study, machine=machine, grid=self.grid, only=self.only, read_only=True
         )
         _warn_no_runs(context=context)
         if self.out == Path('-'):

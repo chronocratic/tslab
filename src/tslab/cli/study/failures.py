@@ -2,12 +2,14 @@
 
 from dataclasses import dataclass
 import logging
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json
+from tslab.cli.common import print_json, resolve_request
 from tslab.cli.study import _context_of, _states_of
+from tslab.core.meta import hostname
 from tslab.study.launchers import backend_for, LaunchError
 from tslab.study.reporting.failures import collect_failures, log_failures
 from tslab.study.reporting.usage import log_usage, usage_document
@@ -25,8 +27,10 @@ class Failures:
         tslab study failures my_paper.studies:example --machine local
 
     Attributes:
-        study: The study reference, module:attribute.
-        machine: A machine name or profile path.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
+        machine: A machine name or profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
         states: Show only runs in these states; failed and interrupted by default.
@@ -35,7 +39,7 @@ class Failures:
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -48,8 +52,13 @@ class Failures:
 
     def run(self) -> int:
         """Show failure details and return the process exit code."""
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
+        )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
         context = _context_of(
-            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
+            study=study, machine=machine, grid=self.grid, only=self.only, read_only=True
         )
         failures = collect_failures(
             context=context, states=_states_of(values=self.states), lines=self.lines
@@ -71,15 +80,17 @@ class Usage:
         tslab study usage my_paper.studies:example --machine cluster
 
     Attributes:
-        study: The study reference, module:attribute.
-        machine: A machine name or profile path.
+        study: The study reference, module:attribute. A short name is
+            expanded against the studies module of tslab.toml.
+        machine: A machine name or profile path. Default: from
+            [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
         json: Print one study-usage JSON document.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]
-    machine: Annotated[str, tyro.conf.arg(metavar='MACHINE')]
+    machine: Annotated[str | None, tyro.conf.arg(metavar='MACHINE', help_behavior_hint='')] = None
     grid: Annotated[tuple[str, ...], tyro.conf.arg(metavar='GRID'), tyro.conf.UseAppendAction] = ()
     only: Annotated[
         tuple[str, ...], tyro.conf.arg(metavar='AXIS=VALUES'), tyro.conf.UseAppendAction
@@ -88,8 +99,13 @@ class Usage:
 
     def run(self) -> int:
         """Show the usage of the selected runs and return the process exit code."""
+        request = resolve_request(
+            study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
+        )
+        study = cast('str', request.study)
+        machine = cast('str', request.machine)
         context = _context_of(
-            study=self.study, machine=self.machine, grid=self.grid, only=self.only, read_only=True
+            study=study, machine=machine, grid=self.grid, only=self.only, read_only=True
         )
         try:
             document = usage_document(context=context)

@@ -19,10 +19,12 @@ from tslab.cli.common.output import (
     print_json,
     reset_document_state,
 )
+from tslab.cli.common.project import Request, resolve_request
 
 __all__ = [
     'CONSOLE',
     'ConsoleHandler',
+    'Request',
     'UsageError',
     'configure_logging',
     'error_document',
@@ -30,6 +32,7 @@ __all__ = [
     'make_console',
     'print_json',
     'reset_document_state',
+    'resolve_request',
     'use_stderr',
     'watch',
 ]
