@@ -30,7 +30,8 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.study.commands import resubmit, submit
+from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
+from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
 from tslab.study.context import Context, load_context, refresh_context, Selection
 from tslab.study.launchers import JobPhase, LaunchError
@@ -376,3 +377,261 @@ def test_a_live_lock_of_another_host_with_an_ended_job_is_removed(project: Path)
     report, lock = _ended_run_with_lock(project=project, host='other-host')
     _remove_ended_locks(reports=[report], study_directory=study_directory(project=project))
     assert not lock.exists()
+
+
+def _snapshot(*, folder: Path, digest: str, with_src: bool = True) -> CodeSnapshot:
+    """One recorded code snapshot under ``folder``; ``src/`` exists unless told not to."""
+    if with_src:
+        (folder / 'src').mkdir(parents=True)
+        (folder / 'src' / 'mod.py').write_text('X = 1\n', encoding='utf-8')
+    return CodeSnapshot(
+        folder=folder, hash=digest, commit='c' * 40, dirty=False, untracked_copied=False
+    )
+
+
+def _end_all(*, project: Path, fake_backend: FakeBackend, phase: JobPhase) -> None:
+    """Every recorded task ends in ``phase``, so the whole study is resubmittable."""
+    jobs = jobs_of(project=project)
+    phases = {f'{job.job_id}_{task.index}': phase for job in jobs for task in job.tasks}
+    fake_backend.set_states(phases=phases)
+
+
+def test_resubmit_reuses_recorded_code_snapshot(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    snapshot = _snapshot(folder=tmp_path / 'snap', digest='a' * 16)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=snapshot,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.INTERRUPTED)
+    code = resubmit(context=context(project=project, machine_file='cluster.toml'), sleep=no_sleep)
+    assert code == 0
+    latest = jobs_of(project=project)[-1].code_snapshot
+    assert latest is not None
+    assert latest.folder == snapshot.folder
+    assert latest.hash == snapshot.hash
+
+
+def test_resubmit_mixed_runs_keep_their_own(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    first = _snapshot(folder=tmp_path / 'snap-a', digest='a' * 16)
+    second = _snapshot(folder=tmp_path / 'snap-b', digest='b' * 16)
+    ctx = context(project=project, machine_file='cluster.toml')
+    code, _ = submit_runs(
+        context=ctx,
+        reports=ctx.reports,
+        dry_run=False,
+        extra_args={report.run.run_path: () for report in ctx.reports},
+        code_snapshots={
+            'g/small/1': first,
+            'g/small/2': second,
+            'g/large/1': first,
+            'g/large/2': None,
+        },
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.INTERRUPTED)
+    code = resubmit(context=context(project=project, machine_file='cluster.toml'), sleep=no_sleep)
+    assert code == 0
+    new = jobs_of(project=project)[3:]
+    assert len(new) == 3
+    by_path = {
+        task.run_path: job.code_snapshot.folder if job.code_snapshot is not None else None
+        for job in new
+        for task in job.tasks
+    }
+    assert by_path == {
+        'g/small/1': first.folder,
+        'g/small/2': second.folder,
+        'g/large/1': first.folder,
+        'g/large/2': None,
+    }
+
+
+def test_resubmit_new_code_snapshot_replaces(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    recorded = _snapshot(folder=tmp_path / 'snap-old', digest='o' * 16)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=recorded,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.INTERRUPTED)
+    fresh = _snapshot(folder=tmp_path / 'snap-new', digest='n' * 16)
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        new_code_snapshot=fresh,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    latest = jobs_of(project=project)[-1].code_snapshot
+    assert latest is not None
+    assert latest.folder == fresh.folder
+
+
+def test_resubmit_drop_code_snapshot_runs_live(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    recorded = _snapshot(folder=tmp_path / 'snap', digest='a' * 16)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=recorded,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.INTERRUPTED)
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'),
+        drop_code_snapshot=True,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    assert jobs_of(project=project)[-1].code_snapshot is None
+
+
+def test_resubmit_missing_recorded_folder_is_an_error(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    gone = _snapshot(folder=tmp_path / 'snap-gone', digest='e' * 16, with_src=False)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=gone,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.INTERRUPTED)
+    with pytest.raises(CodeSnapshotError) as raised:
+        resubmit(context=context(project=project, machine_file='cluster.toml'), sleep=no_sleep)
+    message = str(raised.value)
+    assert str(gone.folder) in message
+    assert '--new-code-snapshot' in message
+    assert len(jobs_of(project=project)) == 1
+
+
+def test_resubmit_failed_warns_on_reuse(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    first = _snapshot(folder=tmp_path / 'snap-a', digest='a' * 16)
+    second = _snapshot(folder=tmp_path / 'snap-b', digest='b' * 16)
+    ctx = context(project=project, machine_file='cluster.toml')
+    code, _ = submit_runs(
+        context=ctx,
+        reports=ctx.reports,
+        dry_run=False,
+        extra_args={report.run.run_path: () for report in ctx.reports},
+        code_snapshots={
+            'g/small/1': first,
+            'g/small/2': first,
+            'g/large/1': second,
+            'g/large/2': second,
+        },
+        sleep=no_sleep,
+    )
+    assert code == 0
+    original = jobs_of(project=project)
+    first_time = next(
+        job.time
+        for job in original
+        if job.code_snapshot is not None and job.code_snapshot.hash == first.hash
+    )
+    second_time = next(
+        job.time
+        for job in original
+        if job.code_snapshot is not None and job.code_snapshot.hash == second.hash
+    )
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.FAILED)
+    with caplog.at_level('WARNING'):
+        code = resubmit(
+            context=context(project=project, machine_file='cluster.toml'),
+            states=(StudyState.FAILED,),
+            sleep=no_sleep,
+        )
+    assert code == 0
+    assert (
+        f'reusing the code snapshot from {first_time}; '
+        'pass --new-code-snapshot if you fixed the code'
+    ) in caplog.text
+    assert (
+        f'reusing the code snapshot from {second_time}; '
+        'pass --new-code-snapshot if you fixed the code'
+    ) in caplog.text
+    assert caplog.text.count('reusing the code snapshot from') == 2
+
+
+def test_resubmit_failed_with_new_code_snapshot_no_warning(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    recorded = _snapshot(folder=tmp_path / 'snap', digest='a' * 16)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=recorded,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    _end_all(project=project, fake_backend=fake_backend, phase=JobPhase.FAILED)
+    fresh = _snapshot(folder=tmp_path / 'snap-new', digest='n' * 16)
+    with caplog.at_level('WARNING'):
+        code = resubmit(
+            context=context(project=project, machine_file='cluster.toml'),
+            states=(StudyState.FAILED,),
+            new_code_snapshot=fresh,
+            sleep=no_sleep,
+        )
+    assert code == 0
+    assert 'reusing the code snapshot from' not in caplog.text
+
+
+def test_auto_resubmit_reuses_recorded_code_snapshot(
+    project: Path, tmp_path: Path, fake_backend: FakeBackend
+) -> None:
+    snapshot = _snapshot(folder=tmp_path / 'snap', digest='a' * 16)
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        code_snapshot=snapshot,
+        sleep=no_sleep,
+    )
+    assert code == 0
+    # g/small/1 paused by job_time_share; it saved a checkpoint before the pause
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FAILED,
+        instance=InstanceState.FAILED,
+        error='TrainingPaused: job time share reached',
+    )
+    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
+    code = resubmit(
+        context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
+    )
+    assert code == 0
+    latest = jobs_of(project=project)[-1]
+    assert [task.run_path for task in latest.tasks] == ['g/small/1']
+    assert latest.code_snapshot is not None
+    assert latest.code_snapshot.folder == snapshot.folder

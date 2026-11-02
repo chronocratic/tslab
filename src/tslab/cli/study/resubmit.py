@@ -18,8 +18,10 @@ from tslab.cli.study import (
     _selection_options,
     _states_of,
     _warn_no_runs,
+    take_requested_code_snapshot,
 )
 from tslab.core.meta import hostname
+from tslab.study.code_snapshot import CodeSnapshotError
 from tslab.study.commands import resubmit, run_one
 from tslab.study.launchers import backend_for, LaunchReport
 from tslab.study.plan import JobGroup
@@ -28,6 +30,15 @@ from tslab.study.reporting.documents import launch_document
 __all__ = ['Resubmit', 'RunOne']
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _check_resubmit_snapshot_flags(*, new: bool, drop: bool, include_untracked: bool) -> None:
+    if new and drop:
+        message = '--new-code-snapshot and --no-code-snapshot are mutually exclusive'
+        raise UsageError(message)
+    if include_untracked and not new:
+        message = '--code-snapshot-include-untracked needs --new-code-snapshot'
+        raise UsageError(message)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -103,6 +114,12 @@ class Resubmit:
             The follow-up jobs pass this.
         detach: Local machines only: start the launch in the background and return once
             it runs; follow it with tslab study wait.
+        new_code_snapshot: Copy src/ into a fresh content-addressed folder and
+            run the resubmitted jobs from it, replacing the recorded snapshot.
+        no_code_snapshot: Run the live code, even when the runs recorded a code
+            snapshot.
+        code_snapshot_include_untracked: With --new-code-snapshot, copy
+            untracked files under src/ instead of stopping.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
         json: Print one study-launch JSON document.
@@ -121,6 +138,9 @@ class Resubmit:
     dry_run: bool = False
     auto: bool = False
     detach: bool = False
+    new_code_snapshot: bool = False
+    no_code_snapshot: bool = False
+    code_snapshot_include_untracked: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
     json: bool = False
 
@@ -133,6 +153,20 @@ class Resubmit:
         machine = cast('str', request.machine)
         states = _states_of(values=self.states)
         context = _context_of(study=study, machine=machine, grid=self.grid, only=self.only)
+        # why: the code snapshot of tslab.toml does not apply to a resubmit; the runs
+        # keep the snapshot of their latest job unless the flags say otherwise
+        _check_resubmit_snapshot_flags(
+            new=self.new_code_snapshot,
+            drop=self.no_code_snapshot,
+            include_untracked=self.code_snapshot_include_untracked,
+        )
+        code_snapshot = take_requested_code_snapshot(
+            request=request,
+            context=context,
+            wanted=self.new_code_snapshot,
+            include_untracked=self.code_snapshot_include_untracked,
+            dry_run=self.dry_run,
+        )
         if self.detach:
             flags = [
                 flag
@@ -141,6 +175,9 @@ class Resubmit:
                     ('--dry-run', self.dry_run),
                     ('--auto', self.auto),
                     ('--json', self.json),
+                    ('--new-code-snapshot', self.new_code_snapshot),
+                    ('--no-code-snapshot', self.no_code_snapshot),
+                    ('--code-snapshot-include-untracked', self.code_snapshot_include_untracked),
                 )
                 if on
             ]
@@ -168,16 +205,21 @@ class Resubmit:
             if self.cancel_live and not self.auto
             else []
         )
-        code = resubmit(
-            context=context,
-            states=states,
-            cancel_live=self.cancel_live,
-            dry_run=self.dry_run,
-            extra_args=self.extra_args or None,
-            auto=self.auto,
-            on_launch=remember_launch if self.json else None,
-            task_stream=sys.stderr if self.json else None,
-        )
+        try:
+            code = resubmit(
+                context=context,
+                states=states,
+                cancel_live=self.cancel_live,
+                dry_run=self.dry_run,
+                extra_args=self.extra_args or None,
+                auto=self.auto,
+                new_code_snapshot=code_snapshot,
+                drop_code_snapshot=self.no_code_snapshot,
+                on_launch=remember_launch if self.json else None,
+                task_stream=sys.stderr if self.json else None,
+            )
+        except CodeSnapshotError as error:
+            raise UsageError(str(error)) from error
         if code == 0:
             _log_next_step(
                 dry_run=self.dry_run,

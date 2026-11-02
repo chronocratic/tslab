@@ -1,6 +1,6 @@
 """The resubmit and run-one commands: retry interrupted runs, run one in the foreground."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import logging
 import os
 from pathlib import Path
@@ -11,6 +11,7 @@ from typing import TextIO, TYPE_CHECKING
 from tslab.core.lock import read_lock_owner
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
+from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
@@ -22,6 +23,7 @@ from tslab.study.reporting.state import RunReport, StudyState
 
 if TYPE_CHECKING:
     from tslab.study.launchers import Backend
+    from tslab.study.records import JobRecord, TaskRecord
 
 __all__ = ['resubmit', 'run_one']
 
@@ -46,6 +48,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     dry_run: bool = False,
     extra_args: tuple[str, ...] | None = None,
     auto: bool = False,
+    new_code_snapshot: CodeSnapshot | None = None,
+    drop_code_snapshot: bool = False,
     sleep: Callable[[float], None] = time.sleep,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
@@ -58,6 +62,12 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     fresh machine. The cancelling happens after the plan is validated, and
     never on a dry run.
 
+    Every run resubmits from the code snapshot of its latest job; a run
+    without one runs the live code. ``new_code_snapshot`` switches every
+    selected run to one fresh snapshot, and ``drop_code_snapshot`` to the
+    live code. A reused snapshot folder without a ``src/`` copy is an error
+    before anything is planned.
+
     Args:
         context: The context to resubmit from.
         states: The states to resubmit; interrupted and missing by default.
@@ -69,6 +79,10 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
             progress since their last attempt, up to
             ``followup.max_attempts`` of the machine; the rest are logged and left alone,
             and ``cancel_live`` is ignored.
+        new_code_snapshot: The snapshot every selected run switches to,
+            replacing the recorded one; ``None`` keeps the recorded one.
+        drop_code_snapshot: Run the live code, even when the runs recorded a
+            code snapshot.
         sleep: What waits out the submission pause of the cluster.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
@@ -77,6 +91,10 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         ``0`` when everything submitted, or nothing needed submitting;
         ``1`` when a run does not parse or a submission failed;
         ``128 + N`` when the local launch was stopped by signal N.
+
+    Raises:
+        CodeSnapshotError: When a reused snapshot folder has no ``src/``
+            left; the message names the folder and the way out.
     """
     if auto:
         # why: auto is the path of the follow-up job: it retries interrupted runs
@@ -98,6 +116,9 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         _LOGGER.info('nothing to resubmit')
         return 0
     reuse = latest_tasks(jobs=context.jobs)
+    code_snapshots = _code_snapshots_of(
+        reports=selected, reuse=reuse, new=new_code_snapshot, drop=drop_code_snapshot, states=states
+    )
     args: dict[str, tuple[str, ...]] = {}
     for report in selected:
         path = report.run.run_path
@@ -118,6 +139,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         reports=selected,
         dry_run=dry_run,
         extra_args=args,
+        code_snapshots=code_snapshots,
         sleep=sleep,
         start_delay_seconds=start_delay_seconds,
         before_launch=before_launch,
@@ -127,6 +149,79 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     return _finish_launch(
         code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
     )
+
+
+def _code_snapshots_of(
+    *,
+    reports: Sequence[RunReport],
+    reuse: Mapping[str, tuple['JobRecord', 'TaskRecord']],
+    new: CodeSnapshot | None,
+    drop: bool,
+    states: tuple[StudyState, ...],
+) -> dict[str, CodeSnapshot | None]:
+    """The code snapshot each selected run resubmits from.
+
+    Args:
+        reports: The selected run reports.
+        reuse: The latest job and task per run path.
+        new: The snapshot every run switches to; ``None`` keeps the
+            recorded one of each run.
+        drop: Run the live code, even when the runs recorded a snapshot.
+        states: The states of the selection; failed runs warn on reuse.
+
+    Returns:
+        The run path to code snapshot; ``None`` runs the live code.
+
+    Raises:
+        CodeSnapshotError: When a reused snapshot folder has no ``src/``
+            left.
+    """
+    if new is not None:
+        return {report.run.run_path: new for report in reports}
+    if drop:
+        return {report.run.run_path: None for report in reports}
+    snapshots: dict[str, CodeSnapshot | None] = {}
+    for report in reports:
+        latest = reuse.get(report.run.run_path)
+        snapshots[report.run.run_path] = latest[0].code_snapshot if latest is not None else None
+    _check_reused_folders(snapshots=snapshots)
+    _warn_reused_snapshots(reuse=reuse, snapshots=snapshots, states=states)
+    return snapshots
+
+
+def _check_reused_folders(*, snapshots: Mapping[str, CodeSnapshot | None]) -> None:
+    """Every reused snapshot folder must still hold a ``src/`` copy."""
+    for snapshot in dict.fromkeys(snapshots.values()):
+        if snapshot is None or (snapshot.folder / 'src').is_dir():
+            continue
+        message = (
+            f'the code snapshot folder {snapshot.folder} has no src/ left; the runs '
+            'cannot resubmit from it; pass --new-code-snapshot to copy the code again'
+        )
+        raise CodeSnapshotError(message)
+
+
+def _warn_reused_snapshots(
+    *,
+    reuse: Mapping[str, tuple['JobRecord', 'TaskRecord']],
+    snapshots: Mapping[str, CodeSnapshot | None],
+    states: tuple[StudyState, ...],
+) -> None:
+    """One warning per reused snapshot, when failed runs are resubmitted."""
+    if StudyState.FAILED not in states:
+        return
+    warned: set[CodeSnapshot] = set()
+    for path, snapshot in snapshots.items():
+        if snapshot is None or snapshot in warned:
+            continue
+        warned.add(snapshot)
+        latest = reuse.get(path)
+        if latest is None:
+            continue
+        _LOGGER.warning(
+            'reusing the code snapshot from %s; pass --new-code-snapshot if you fixed the code',
+            latest[0].time,
+        )
 
 
 def _live_reports(*, reports: Sequence[RunReport], cancel_live: bool) -> list[RunReport]:
