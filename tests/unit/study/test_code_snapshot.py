@@ -7,6 +7,7 @@ import subprocess
 
 import pytest
 
+import tslab.study.code_snapshot as code_snapshot_module
 from tslab.study.code_snapshot import (
     CODE_SNAPSHOTS_FOLDER,
     CodeSnapshot,
@@ -143,6 +144,22 @@ def test_dry_run_writes_nothing(project: Path, tmp_path: Path) -> None:
     real = _take(project_root=project, output_root=out)
     assert real.hash == dry.hash
     assert (real.folder / 'src' / 'pkg' / '__init__.py').is_file()
+
+
+def test_code_changed_while_copying_stops_without_folder(
+    project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / 'out'
+    real_copy = code_snapshot_module._copy_files  # noqa: SLF001 # why: test the copy hook
+
+    def _copy_and_tamper(*, project_root: Path, copies: list[str], destination: Path) -> None:
+        real_copy(project_root=project_root, copies=copies, destination=destination)
+        (destination / copies[0]).write_text('tampered\n', encoding='utf-8')
+
+    monkeypatch.setattr(code_snapshot_module, '_copy_files', _copy_and_tamper)
+    with pytest.raises(CodeSnapshotError, match='changed while the code snapshot was being copied'):
+        _take(project_root=project, output_root=out)
+    assert list((out / CODE_SNAPSHOTS_FOLDER).iterdir()) == []
 
 
 def test_not_a_git_repository_is_an_error_naming_no_code_snapshot(tmp_path: Path) -> None:
