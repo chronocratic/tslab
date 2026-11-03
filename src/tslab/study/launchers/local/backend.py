@@ -12,7 +12,7 @@ from typing import TextIO
 
 from tslab.core.meta import hostname
 from tslab.enums import JobPhase, LauncherKind, LocalTaskState
-from tslab.jobs.local import start_keep_awake, stop_keep_awake, visible_gpus
+from tslab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
@@ -166,7 +166,7 @@ class LocalBackend:
         local = machine.local or LocalSettings()
         # ponytail: skip_busy_gpus is not applied here: fewer slots at launch only means each
         # run got a smaller share than it could have (safe direction)
-        if local.gpus == 'auto':
+        if local.gpus is GpuDiscovery.AUTO:
             slots = _auto_gpu_count() * local.tasks_per_gpu or local.max_parallel
         elif local.gpus:
             slots = len(local.gpus) * local.tasks_per_gpu

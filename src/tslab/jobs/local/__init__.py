@@ -5,7 +5,9 @@ from tslab.jobs.local.environment import without_scheduler_variables
 from tslab.jobs.local.gpus import (
     busy_gpus,
     gpu_lock_folder,
+    GpuDiscovery,
     GpuLease,
+    MPS_GPU,
     select_gpus,
     try_lease_gpu,
     visible_gpus,
@@ -33,6 +35,8 @@ from tslab.jobs.local.shell import export_lines
 from tslab.jobs.local.watchdog import Watchdog
 
 __all__ = [
+    'MPS_GPU',
+    'GpuDiscovery',
     'GpuLease',
     'OnEnd',
     'OnEvent',

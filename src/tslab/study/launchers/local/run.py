@@ -15,6 +15,7 @@ from tslab.enums import LocalTaskState
 from tslab.jobs.local import (
     busy_gpus,
     gpu_lock_folder,
+    GpuDiscovery,
     PoolCommand,
     run_commands,
     select_gpus,
@@ -70,7 +71,7 @@ def local_job_id(*, job_file: int, pid: int) -> str:
 
 
 def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) -> tuple[str, ...]:
-    """The GPU ids of a local launch, with ``"auto"`` resolved and the busy ones left out.
+    """The GPU ids of a local launch, with discovery resolved and the busy ones left out.
 
     Args:
         local: The ``[local]`` table: the ``gpus`` list, ``skip_busy_gpus`` and
@@ -83,7 +84,7 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
     Raises:
         ValueError: As ``select_gpus``.
     """
-    gpus = 'auto' if local.gpus == 'auto' else tuple(str(gpu) for gpu in local.gpus)
+    gpus = local.gpus if local.gpus is GpuDiscovery.AUTO else tuple(str(gpu) for gpu in local.gpus)
     gpu_ids = select_gpus(
         gpus=gpus,
         skip_busy=local.skip_busy_gpus,

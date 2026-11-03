@@ -1,0 +1,1 @@
+`tslab.jobs.local` exports `GpuDiscovery` (`GpuDiscovery.AUTO`) and `MPS_GPU`; `select_gpus` takes `GpuDiscovery.AUTO` instead of the text `"auto"`. Machine profiles still say `gpus = "auto"` and `gpus = ["mps"]`.

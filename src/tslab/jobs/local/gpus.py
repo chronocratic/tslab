@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 import fcntl
 import logging
 import os
@@ -10,9 +11,10 @@ import platform
 import shutil
 import subprocess
 import tempfile
-from typing import Literal
 
 __all__ = [
+    'MPS_GPU',
+    'GpuDiscovery',
     'GpuLease',
     'busy_gpus',
     'gpu_lock_folder',
@@ -22,6 +24,19 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
+
+# The id of the Apple GPU; it stands alone in a list of GPU ids.
+MPS_GPU = 'mps'
+
+
+class GpuDiscovery(StrEnum):
+    """Ask for GPUs to be found instead of listing their ids.
+
+    Attributes:
+        AUTO: Find the GPUs of the machine at launch.
+    """
+
+    AUTO = 'auto'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -190,7 +205,7 @@ def visible_gpus(*, environment: Mapping[str, str]) -> tuple[str, ...]:
     means no GPU); else nvidia-smi lists the index of every GPU (a missing
     nvidia-smi logs one debug line and means no GPU; a failing or timed-out
     nvidia-smi logs one warning and means no GPU); else, on Darwin arm64, the
-    Apple GPU ``'mps'``; else no GPU.
+    Apple GPU ``MPS_GPU``; else no GPU.
 
     Args:
         environment: The environment to read ``CUDA_VISIBLE_DEVICES`` from.
@@ -206,7 +221,7 @@ def visible_gpus(*, environment: Mapping[str, str]) -> tuple[str, ...]:
         return _cuda_visible_devices(value=value)
     if shutil.which('nvidia-smi') is None:
         _LOGGER.debug('nvidia-smi is missing; assuming no NVIDIA GPUs')
-        return ('mps',) if platform.system() == 'Darwin' and platform.machine() == 'arm64' else ()
+        return (MPS_GPU,) if platform.system() == 'Darwin' and platform.machine() == 'arm64' else ()
     output = _nvidia_smi(arguments=['--query-gpu=index', '--format=csv,noheader'])
     if output is None:
         return ()
@@ -289,15 +304,15 @@ def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozen
 
 def select_gpus(
     *,
-    gpus: Sequence[str] | Literal['auto'],
+    gpus: Sequence[str] | GpuDiscovery,
     skip_busy: bool,
     environment: Mapping[str, str],
     memory_fraction: float = 1.0,
 ) -> tuple[str, ...]:
-    """The GPU ids a launch may lease, with ``"auto"`` resolved and the busy ones left out.
+    """The GPU ids a launch may lease, with discovery resolved and the busy ones left out.
 
     Args:
-        gpus: The GPU ids to use, or ``"auto"`` to discover them from
+        gpus: The GPU ids to use, or ``GpuDiscovery.AUTO`` to discover them from
             ``environment``.
         skip_busy: Whether to leave out GPUs with running compute processes.
         environment: The environment to discover the GPUs from.
@@ -310,10 +325,10 @@ def select_gpus(
         ValueError: If ``skip_busy`` applies to no NVIDIA GPU, or every
             GPU it would use is busy.
     """
-    gpu_ids = visible_gpus(environment=environment) if gpus == 'auto' else tuple(gpus)
+    gpu_ids = visible_gpus(environment=environment) if gpus is GpuDiscovery.AUTO else tuple(gpus)
     if not skip_busy:
         return gpu_ids
-    if not gpu_ids or gpu_ids == ('mps',):
+    if not gpu_ids or gpu_ids == (MPS_GPU,):
         message = 'skip_busy_gpus needs NVIDIA GPUs'
         raise ValueError(message)
     busy = busy_gpus(gpu_ids=gpu_ids, memory_fraction=memory_fraction)

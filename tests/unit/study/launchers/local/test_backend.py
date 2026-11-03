@@ -23,6 +23,7 @@ from tests.unit.study.helpers import (
 )
 from tslab.core.meta import hostname
 from tslab.enums import JobPhase, LocalTaskState
+from tslab.jobs.local import GpuDiscovery
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit
 from tslab.study.commands.submit import submit_runs
@@ -193,7 +194,9 @@ def test_cpus_per_run_auto_without_nvidia_smi_uses_max_parallel(
         # why: no nvidia-smi and no Apple GPU, so the auto profile sees no GPU
         monkeypatch.setattr('tslab.jobs.local.gpus.platform.system', lambda: 'Linux')
         resources = _local_resources(
-            project=project, local=LocalSettings(gpus='auto', max_parallel=2), local_cpus=8
+            project=project,
+            local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=2),
+            local_cpus=8,
         )
     finally:
         _auto_gpu_count.cache_clear()
@@ -366,7 +369,7 @@ def test_launch_delegates_to_shared_launch(
 def test_launch_resolves_gpus_from_given_environment(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
     run = ctx.runs[0]
-    machine = replace(ctx.machine, local=LocalSettings(gpus='auto'))
+    machine = replace(ctx.machine, local=LocalSettings(gpus=GpuDiscovery.AUTO))
     ctx = replace(ctx, machine=machine)
     groups = plan_jobs(
         study=ctx.study,

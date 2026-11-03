@@ -11,6 +11,7 @@ from tests.unit.study.machine.helpers import (
     SLURM_TABLE,
     write,
 )
+from tslab.jobs.local import GpuDiscovery
 from tslab.study.machine import (
     FollowupSettings,
     LocalSettings,
@@ -29,7 +30,7 @@ def test_local_settings_from_loads_its_profile_table(tmp_path: Path) -> None:
         local_machine.TABLE,
         local_machine.FOLLOWUP_KEYS,
     )
-    assert local == LocalSettings(timeout='00:05:00', gpus='auto')
+    assert local == LocalSettings(timeout='00:05:00', gpus=GpuDiscovery.AUTO)
 
 
 def test_local_profile_needs_little(tmp_path: Path) -> None:
@@ -93,7 +94,7 @@ def test_local_table_reads_every_key(tmp_path: Path) -> None:
 def test_local_gpus_auto(tmp_path: Path) -> None:
     profile = load_machine(path=write(tmp_path, LOCAL + '[local]\ngpus = "auto"\n'))
     assert profile.local is not None
-    assert profile.local.gpus == 'auto'
+    assert profile.local.gpus is GpuDiscovery.AUTO
 
 
 def test_local_gpus_mps(tmp_path: Path) -> None:
@@ -107,6 +108,12 @@ def test_local_gpus_mps(tmp_path: Path) -> None:
     )
     assert profile.local is not None
     assert profile.local.tasks_per_gpu == 2
+
+
+def test_local_gpus_other_text_fails(tmp_path: Path) -> None:
+    text = LOCAL + '[local]\ngpus = "maybe"\n'
+    with pytest.raises(MachineProfileError, match=r'must be "auto", a list of non-negative'):
+        load_machine(path=write(tmp_path, text))
 
 
 def test_local_gpus_mps_with_ids_fails(tmp_path: Path) -> None:

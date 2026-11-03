@@ -10,7 +10,7 @@ import time
 from types import MappingProxyType
 from typing import cast, Protocol
 
-from tslab.jobs.local.gpus import GpuLease, try_lease_gpu
+from tslab.jobs.local.gpus import GpuLease, MPS_GPU, try_lease_gpu
 from tslab.jobs.local.process import ProcessResult, run_process
 
 __all__ = [
@@ -124,7 +124,7 @@ def _release_lease(*, lease: GpuLease | None) -> None:
 def _environment_of(*, command: PoolCommand, slot: str | None) -> dict[str, str]:
     """The environment of one command, with the visible GPU id of its slot."""
     environment = {**command.environment}
-    if slot is not None and slot != 'mps':
+    if slot is not None and slot != MPS_GPU:
         environment['CUDA_VISIBLE_DEVICES'] = slot
         # why: nvidia-smi ids follow the PCI bus; CUDA numbers the fastest GPU first
         # unless told otherwise
@@ -262,7 +262,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     and a busy GPU waits like a held one. A
     leased command runs with ``CUDA_VISIBLE_DEVICES`` set to the id of the
     lease; a numeric slot also gets ``CUDA_DEVICE_ORDER`` set to
-    ``PCI_BUS_ID`` unless the environment already sets it. The ``'mps'``
+    ``PCI_BUS_ID`` unless the environment already sets it. The ``MPS_GPU``
     slot leaves the environment untouched. The command keeps the lock
     while it runs.
 
