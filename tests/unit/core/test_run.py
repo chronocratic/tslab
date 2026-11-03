@@ -14,6 +14,9 @@ from typing import override
 import pytest
 
 import tslab
+from tslab.core.codec import decode_dataclass
+from tslab.core.config import ConfigFileError
+from tslab.core.enums import LogLevel
 from tslab.core.lock import RunLockedError
 from tslab.core.meta import hostname
 from tslab.core.run import Run, RunOptions
@@ -359,7 +362,9 @@ def test_logger_levels_are_restored(tmp_path: Path) -> None:
     tslab_logger = logging.getLogger('tslab')
     before = tslab_logger.level
     with Run(
-        config=Config(run=RunOptions(log_level='DEBUG')), root=tmp_path, relative_path=Path('a')
+        config=Config(run=RunOptions(log_level=LogLevel.DEBUG)),
+        root=tmp_path,
+        relative_path=Path('a'),
     ):
         assert tslab_logger.level == logging.DEBUG
     assert tslab_logger.level == before
@@ -403,3 +408,13 @@ def test_name_conflict_with_an_earlier_execution_names_the_remedy(tmp_path: Path
         pytest.raises(ValueError, match='delete its folder and its entry in'),
     ):
         run.claim_instance(stage_name='attack', name_parts=('a', 'b'))
+
+
+def test_run_options_decode_the_log_level_by_name() -> None:
+    options = decode_dataclass(data={'log_level': 'DEBUG'}, cls=RunOptions, location='run')
+    assert options.log_level is LogLevel.DEBUG
+
+
+def test_run_options_reject_an_unknown_log_level() -> None:
+    with pytest.raises(ConfigFileError, match=r"run\.log_level: expected one of \['DEBUG'"):
+        decode_dataclass(data={'log_level': 'LOUD'}, cls=RunOptions, location='run')

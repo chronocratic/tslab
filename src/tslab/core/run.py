@@ -21,6 +21,7 @@ from typing import Literal, Self
 
 from tslab.core.codec import config_to_data
 from tslab.core.config import config_to_yaml, save_config
+from tslab.core.enums import LogLevel
 from tslab.core.files import atomic_write_json
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.lock import acquire_lock, Heartbeat, release_lock
@@ -86,7 +87,7 @@ class RunOptions:
     rerun: tuple[str, ...] = ()
     fail_fast: bool = False
     dry_run: bool = False
-    log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR'] = 'INFO'
+    log_level: LogLevel = LogLevel.INFO
 
     def fingerprint_settings(self) -> None:
         """Run options never change results, so they never enter a fingerprint.
