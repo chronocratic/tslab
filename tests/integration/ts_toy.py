@@ -8,7 +8,7 @@ from lightning import LightningModule
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.interfaces import Batch
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 

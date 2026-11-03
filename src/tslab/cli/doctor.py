@@ -9,9 +9,9 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.core.enums import CheckStatus
 from tslab.core.meta import hostname
 from tslab.core.text import log_table
+from tslab.enums import CheckStatus
 from tslab.study.doctor import run_checks
 from tslab.study.machine import resolve_machine
 from tslab.study.project import ProjectSettings

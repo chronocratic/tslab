@@ -10,7 +10,7 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.cli.study.helpers import git_project
 from tests.unit.study.helpers import jobs_of
 from tslab.cli import main
-from tslab.study.launchers import JobPhase
+from tslab.enums import JobPhase
 
 
 def run_main(*args: str) -> int:

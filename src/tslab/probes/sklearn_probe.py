@@ -10,7 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 import torch
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.interfaces import Probe
 
 __all__ = [

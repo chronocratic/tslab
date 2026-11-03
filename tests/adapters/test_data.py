@@ -19,8 +19,8 @@ from tslab.adapters.chronocratic.datasets import (
     data_settings,
     DATAMODULES,
 )
-from tslab.core.enums import Split
 from tslab.core.fingerprint import canonicalize
+from tslab.enums import Split
 from tslab.interfaces import SPLITS
 
 pytestmark = pytest.mark.chronocratic

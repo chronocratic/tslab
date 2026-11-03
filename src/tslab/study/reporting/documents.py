@@ -5,6 +5,7 @@ import shlex
 from types import MappingProxyType
 
 from tslab.core.text import format_index_ranges
+from tslab.enums import StudyState
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers import LaunchReport, QueuedJob
@@ -12,7 +13,7 @@ from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.outcome import counts_live
 from tslab.study.reporting.report import resources_of
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
 

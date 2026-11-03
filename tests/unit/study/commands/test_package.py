@@ -10,9 +10,8 @@ import pytest
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import finish_run, submit_study, write_run_status
 from tslab.cli import main
-from tslab.core.status import InstanceState, RunState
 from tslab.core.text import TextTable
-from tslab.study.launchers import JobPhase
+from tslab.enums import InstanceState, JobPhase, RunState
 
 
 def run_main(*args: str) -> int:

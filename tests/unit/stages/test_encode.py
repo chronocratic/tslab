@@ -6,7 +6,7 @@ import torch
 from tests.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
 from tests.unit.stages.helpers import encoded
 import tslab
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.stages import check_representations
 
 

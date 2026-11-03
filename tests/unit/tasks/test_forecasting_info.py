@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import pytest
 import torch
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.tasks import checked_split_slices, TSForecastingDataInfo
 
 

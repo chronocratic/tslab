@@ -15,7 +15,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tslab.cli import main
-from tslab.core.enums import CheckStatus, LauncherKind
+from tslab.enums import CheckStatus, JobFlag, JobPhase, LauncherKind
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -26,7 +26,7 @@ from tslab.study.commands import cancel, resubmit, run_one
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobFlag, JobPhase, JobUsage, LaunchError, LaunchReport
+from tslab.study.launchers import JobUsage, LaunchError, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.launchers.slurm.states import slurm_task_ids

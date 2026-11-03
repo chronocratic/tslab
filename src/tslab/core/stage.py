@@ -43,14 +43,9 @@ from tslab.core.meta.instance import (
 from tslab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
 from tslab.core.ranks import is_writer_process, RankAgreement
 from tslab.core.run import JobTimeLimitSignal, Run
-from tslab.core.status import (
-    format_instance_id,
-    InstanceRecord,
-    InstanceState,
-    StatusFileError,
-    utc_now_iso,
-)
+from tslab.core.status import format_instance_id, InstanceRecord, StatusFileError, utc_now_iso
 from tslab.core.text import describe_error
+from tslab.enums import InstanceState
 from tslab.jobs.slurm import task_count
 
 __all__ = ['FunctionStage', 'Stage', 'stage']

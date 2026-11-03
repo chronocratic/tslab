@@ -4,13 +4,13 @@ from collections.abc import Mapping, Sequence
 import logging
 
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
-from tslab.core.status import InstanceState
+from tslab.enums import InstanceState, StudyState
 from tslab.jobs.local import tail_lines
 from tslab.study.context import Context
 from tslab.study.launchers import Backend, backend_for, JobUsage, Resources
 from tslab.study.paths import instance_directory, study_folder
 from tslab.study.reporting.documents import run_entry
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['collect_failures', 'failure_hint', 'log_failures']
 

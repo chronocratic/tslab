@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import torch
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.probes.metrics import classification_metrics
 from tslab.probes.sklearn_probe import (
     cap_samples,

@@ -9,8 +9,8 @@ from typing import cast, override
 import torch
 
 from tslab.core.artifact import Checkpoint
-from tslab.core.enums import Split
 from tslab.core.run import Run, RunOptions
+from tslab.enums import Split
 from tslab.interfaces import Batch, Trainer
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 

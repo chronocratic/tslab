@@ -24,18 +24,16 @@ from tslab.cli.common import print_json, UsageError, watch
 from tslab.core.paths import STATUS_FILE
 from tslab.core.status import (
     InstanceRecord,
-    InstanceState,
     read_status,
-    RunState,
     RunStatusSnapshot,
     shown_run_state,
     StatusFileError,
 )
 from tslab.core.text import log_table
-from tslab.study.launchers import JobPhase
+from tslab.enums import InstanceState, JobPhase, RunState, StudyState
 from tslab.study.project import load_project_settings
 from tslab.study.reporting.outcome import states_exit_code
-from tslab.study.reporting.state import read_folder, study_state, StudyState
+from tslab.study.reporting.state import read_folder, study_state
 
 __all__ = ['Status']
 

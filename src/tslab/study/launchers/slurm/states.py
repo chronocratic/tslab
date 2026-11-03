@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 import logging
 
+from tslab.enums import StudyState
 from tslab.jobs.slurm import (
     job_ended,
     pending_reason_stuck,
@@ -13,7 +14,6 @@ from tslab.jobs.slurm import (
 from tslab.study.context import Context
 from tslab.study.launchers import QueuedJob
 from tslab.study.records import JobKind, JobRecord, latest_tasks
-from tslab.study.reporting.state import StudyState
 
 __all__ = ['expected_starts', 'followup_job_ids', 'slurm_task_ids']
 

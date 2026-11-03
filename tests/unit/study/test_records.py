@@ -10,15 +10,8 @@ from typing import Any
 
 import pytest
 
-from tslab.core.enums import LauncherKind
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, LauncherKind, RunState
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.records import (
     append_job,

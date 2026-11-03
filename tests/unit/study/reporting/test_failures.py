@@ -18,20 +18,14 @@ from tests.unit.study.helpers import (
 )
 from tslab.cli import main
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, RunState, StudyState
 from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage
 from tslab.study.paths import instance_directory
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 
 def _failed_context(project: Path) -> Context:

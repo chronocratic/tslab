@@ -5,7 +5,7 @@ from typing import Protocol
 
 import torch
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 
 __all__ = ['SPLITS', 'Batch', 'DataSource', 'LabeledSplits']
 

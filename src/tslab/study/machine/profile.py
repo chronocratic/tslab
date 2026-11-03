@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.study.definition import SettingValue
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.slurm import SlurmSettings

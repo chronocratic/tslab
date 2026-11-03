@@ -17,15 +17,13 @@ from typing import TextIO
 
 import pytest
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import JobFlag, JobPhase, LauncherKind
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 import tslab.study.launchers
 from tslab.study.launchers import (
     Backend,
-    JobFlag,
-    JobPhase,
     JobStates,
     JobUsage,
     launch,

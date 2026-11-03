@@ -16,12 +16,12 @@ import pytest
 import tslab
 from tslab.core.codec import decode_dataclass
 from tslab.core.config import ConfigFileError
-from tslab.core.enums import LogLevel
 from tslab.core.lock import RunLockedError
 from tslab.core.meta import hostname
 from tslab.core.run import Run, RunOptions
-from tslab.core.status import InstanceRecord, InstanceState
+from tslab.core.status import InstanceRecord
 from tslab.core.tracker import LocalTracker, RunStatus, Tracker
+from tslab.enums import InstanceState, LogLevel
 
 
 @dataclass(frozen=True, kw_only=True)

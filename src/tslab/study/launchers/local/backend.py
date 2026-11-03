@@ -10,14 +10,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
-from tslab.core.enums import LauncherKind
 from tslab.core.meta import hostname
+from tslab.enums import JobPhase, LauncherKind
 from tslab.jobs.local import start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import (
-    JobPhase,
     JobStates,
     JobUsage,
     launch,

@@ -9,14 +9,13 @@ import each other.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from enum import StrEnum
 import os
 from pathlib import Path
 import sys
 from typing import Protocol, TextIO
 from uuid import uuid4
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import JobFlag, JobPhase, LauncherKind
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile
@@ -29,8 +28,6 @@ __all__ = [
     'BACKENDS',
     'SIGNAL_EXIT_BASE',
     'Backend',
-    'JobFlag',
-    'JobPhase',
     'JobStates',
     'JobUsage',
     'LaunchError',
@@ -101,30 +98,6 @@ class OnLaunch(Protocol):
     def __call__(self, *, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
         """Called with the launch report and the groups the launch covered."""
         ...
-
-
-class JobPhase(StrEnum):
-    """The phase of a job state; the scheduler's words stay in ``JobStates.states``.
-
-    ``ENDED`` is over with the cause unknown; ``UNKNOWN`` was not queried.
-    """
-
-    QUEUED = 'queued'
-    RUNNING = 'running'
-    INTERRUPTED = 'interrupted'
-    FAILED = 'failed'
-    COMPLETED = 'completed'
-    ENDED = 'ended'
-    UNKNOWN = 'unknown'
-
-
-class JobFlag(StrEnum):
-    """What a backend says a job state means for the state logic."""
-
-    #: The job stopped at its time limit.
-    TIME_LIMIT = 'time_limit'
-    #: The machine, not the run, ended the job; the attempt does not count toward the cap.
-    NOT_COUNTED = 'not_counted'
 
 
 @dataclass(frozen=True, kw_only=True)

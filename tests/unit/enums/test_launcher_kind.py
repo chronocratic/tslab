@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 
 
 def test_launcher_kind_parses_the_profile_text() -> None:

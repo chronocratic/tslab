@@ -9,15 +9,8 @@ import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
-from tslab.core.enums import LauncherKind
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, LauncherKind, RunState
 from tslab.study.commands import resubmit, submit
 from tslab.study.launchers.slurm.followups import queue_followups
 from tslab.study.machine import resolve_machine, write_register

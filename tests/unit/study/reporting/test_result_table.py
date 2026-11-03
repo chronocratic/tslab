@@ -8,14 +8,8 @@ import pytest
 
 from tests.unit.study.helpers import make_job_states, no_sleep
 import tslab
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, RunState
 from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 from tslab.study.commands import submit
 from tslab.study.context import load_context, Selection

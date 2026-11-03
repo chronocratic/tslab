@@ -19,7 +19,7 @@ import yaml
 
 from tslab.core.files import atomic_write_text
 from tslab.core.paths import TRACKERS_DIRECTORY
-from tslab.core.status import RunState
+from tslab.enums import RunState
 
 __all__ = ['LocalTracker', 'RunStatus', 'Tracker']
 

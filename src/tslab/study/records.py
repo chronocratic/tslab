@@ -11,9 +11,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from tslab.core.enums import LauncherKind
 from tslab.core.paths import require_path, STATUS_FILE
-from tslab.core.status import InstanceState, read_status
+from tslab.core.status import read_status
+from tslab.enums import InstanceState, LauncherKind
 from tslab.study.code_snapshot import CodeSnapshot
 
 __all__ = [

@@ -24,14 +24,8 @@ from tslab.cli import main
 from tslab.core.files import atomic_write_json
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, RunState, StudyState
 from tslab.jobs.local import process_alive
 from tslab.study.launchers.local import pid_file
 from tslab.study.launchers.local.pid_file import (
@@ -46,7 +40,6 @@ from tslab.study.launchers.local.pid_file import (
     LocalLaunchError,
     read_launch,
 )
-from tslab.study.reporting.state import StudyState
 
 
 def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:

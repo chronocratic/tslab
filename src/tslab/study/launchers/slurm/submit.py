@@ -8,8 +8,8 @@ import time
 from typing import cast
 from uuid import uuid4
 
-from tslab.core.enums import LauncherKind
 from tslab.core.files import atomic_write_text
+from tslab.enums import LauncherKind
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
 from tslab.study.launchers import LaunchError, RecordJob
