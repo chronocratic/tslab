@@ -25,17 +25,21 @@ if TYPE_CHECKING:
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
     'JOB_NAME_PLACEHOLDER_AXES',
+    'RETRY_JOB',
+    'WANDB_SYNC_JOB',
     'RESERVED_AXIS_NAMES',
     'Grid',
     'Match',
     'Override',
     'Study',
+    'followup_job_name',
     'match_problems',
     'merge_settings',
     'normalize_match',
     'run_matches',
     'select_runs',
     'setting_axis',
+    'study_job_names',
 ]
 
 type Match = Mapping[str, str | Sequence[str]]
@@ -43,6 +47,10 @@ type Match = Mapping[str, str | Sequence[str]]
 _SHORT_NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]+')
 _JOB_NAME_PLACEHOLDER = re.compile(r'\{([A-Za-z_][A-Za-z0-9_]*)\}')
 _JOB_NAME_LITERAL = re.compile(r'[A-Za-z0-9._-]*')
+
+#: The kinds of follow-up job; their SLURM names are ``<study>_<kind>``.
+RETRY_JOB = 'retry'
+WANDB_SYNC_JOB = 'wbsync'
 
 #: Names a job name template can use besides the axes; no axis may take one.
 JOB_NAME_PLACEHOLDER_AXES = frozenset({'short_name', *PLACEHOLDERS})
@@ -313,6 +321,26 @@ class Study:
             if next(_grid_runs(grid_name=grid_name, grid=grid), None) is None:
                 message = f'grid {grid_name!r} has no runs; every run is excluded'
                 raise ValueError(message)
+        self._check_job_names()
+
+    def _check_job_names(self) -> None:
+        """Raise when two grids give one job name, or a grid gives a follow-up name."""
+        followups = {followup_job_name(study=self.name, kind=kind) for kind in FOLLOWUP_KINDS}
+        owners: dict[str, str] = {}
+        for grid_name, names in study_job_names(study=self).items():
+            for name in sorted(names):
+                if name in followups:
+                    message = (
+                        f'grid {grid_name!r} gives job name {name!r}, '
+                        f'the follow-up job name {name!r}'
+                    )
+                    raise ValueError(message)
+                if owners.setdefault(name, grid_name) != grid_name:
+                    message = (
+                        f'grid {grid_name!r} gives job name {name!r}, '
+                        f'which grid {owners[name]!r} gives too'
+                    )
+                    raise ValueError(message)
 
     def results(self, *, machine: Path, environment: Mapping[str, str]) -> 'list[ResultRow]':
         """The rows of the results table of every run of the study.
@@ -329,6 +357,25 @@ class Study:
         from tslab.study.reporting.result_table import study_results  # noqa: PLC0415
 
         return study_results(study=self, machine=machine, environment=environment)
+
+
+FOLLOWUP_KINDS = (RETRY_JOB, WANDB_SYNC_JOB)
+
+
+def followup_job_name(*, study: str, kind: str) -> str:
+    """The SLURM job name of a follow-up job of the study."""
+    return f'{study}_{kind}'
+
+
+def study_job_names(*, study: Study) -> dict[str, frozenset[str]]:
+    """Per grid name, the job names its runs get; excluded runs are left out."""
+    return {
+        grid_name: frozenset(
+            grid.job_name_for(study=study.name, values=values)
+            for values in _grid_runs(grid_name=grid_name, grid=grid)
+        )
+        for grid_name, grid in study.grids.items()
+    }
 
 
 def _grid_match_problems(*, grid_name: str, grid: Grid, matches: Sequence[Match]) -> list[str]:
