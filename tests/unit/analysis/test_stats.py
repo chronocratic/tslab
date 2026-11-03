@@ -5,9 +5,15 @@ import scipy.stats
 
 from tslab.analysis.stats import (
     annotate_tests,
+    average_ranks,
+    bootstrap_median,
+    correlations,
     Direction,
+    friedman,
     holm_adjust,
     pairwise_wilcoxon,
+    per_unit_ranks,
+    rank_agreement,
     rank_biserial,
     stars,
     wilcoxon_paired,
@@ -101,3 +107,58 @@ def test_pairwise_wilcoxon_rows() -> None:
         'significance',
     ]
     assert (table['method_a'].iloc[0], table['method_b'].iloc[0]) == ('w', 'x')
+
+
+def test_friedman_uses_complete_rows() -> None:
+    matrix = pd.DataFrame(
+        {'a': [1, 2, 3, 4, np.nan], 'b': [2, 3, 4, 5, 1], 'c': [3, 4, 5, 6, 1]}, dtype=float
+    )
+    result = friedman(matrix=matrix)
+    assert (result.datasets, result.methods) == (4, 3)
+    assert result.p_value < 0.05
+
+
+def test_friedman_nan_when_too_small() -> None:
+    assert np.isnan(friedman(matrix=pd.DataFrame({'a': [1.0, 2.0], 'b': [2.0, 3.0]})).p_value)
+    assert np.isnan(friedman(matrix=pd.DataFrame({'a': [1.0], 'b': [2.0], 'c': [3.0]})).p_value)
+
+
+def test_bootstrap_median_repeats_and_handles_empty() -> None:
+    values = np.arange(20.0)
+    first = bootstrap_median(values=values, rng=np.random.default_rng(3))
+    assert first == bootstrap_median(values=values, rng=np.random.default_rng(3))
+    assert first[1] <= first[0] <= first[2]
+    assert first[0] == 9.5
+    empty = bootstrap_median(values=np.array([np.nan]), rng=np.random.default_rng(0))
+    assert all(np.isnan(empty))
+
+
+def test_average_ranks_with_ties() -> None:
+    matrix = pd.DataFrame({'a': [0.9, 0.8], 'b': [0.9, 0.7], 'c': [0.1, 0.1]})
+    higher = average_ranks(matrix=matrix, direction=Direction.HIGHER_IS_BETTER)
+    assert higher.to_dict() == {'a': 1.25, 'b': 1.75, 'c': 3.0}
+    assert list(higher.index) == ['a', 'b', 'c']
+    lower = average_ranks(matrix=matrix, direction=Direction.LOWER_IS_BETTER)
+    assert lower.index[0] == 'c'
+
+
+def test_per_unit_ranks_skip_incomplete_rows() -> None:
+    matrix = pd.DataFrame({'a': [1.0, np.nan], 'b': [2.0, 1.0]}, index=['d1', 'd2'])
+    ranks = per_unit_ranks(matrix=matrix, direction=Direction.HIGHER_IS_BETTER)
+    assert list(ranks.index) == ['d1']
+    assert ranks.loc['d1'].to_dict() == {'a': 2.0, 'b': 1.0}
+
+
+def test_rank_agreement_identical_and_reversed() -> None:
+    left = pd.DataFrame({'a': [1.0, 1.0], 'b': [2.0, 2.0], 'c': [3.0, 3.0]}, index=['d1', 'd2'])
+    assert rank_agreement(left=left, right=left).tolist() == [1.0, 1.0]
+    assert rank_agreement(left=left, right=-left).tolist() == [-1.0, -1.0]
+
+
+def test_correlations_columns_and_holm() -> None:
+    rng = np.random.default_rng(0)
+    frame = pd.DataFrame({'x': np.arange(10.0), 'y': rng.normal(size=10), 't': np.arange(10.0)})
+    table = correlations(frame=frame, columns=['x', 'y'], target='t')
+    assert table['column'].tolist() == ['x', 'y']
+    assert table.loc[0, 'rho'] == pytest.approx(1.0)
+    assert (table['p_holm'] >= table['p_value']).all()
