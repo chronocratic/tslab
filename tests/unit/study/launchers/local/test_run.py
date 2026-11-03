@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping, Sequence
 import contextlib
+import functools
 from io import StringIO
 import json
 import logging
@@ -432,6 +433,57 @@ def test_launcher_logs_a_busy_gpu_once(
     assert busy_lines == ['GPU 0 is busy; waiting for it']
 
 
+def test_busy_gpu_log_is_not_repeated_after_the_recheck_window(
+    machine: MachineProfile,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    local_machine = _local_machine(machine)
+    script = tmp_path / 'busy.py'
+    script.write_text('import time\ntime.sleep(60)\n')
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(script)),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            )
+        },
+    )
+
+    def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozenset[str]:
+        return frozenset(gpu_ids)
+
+    # why: a short recheck window forces the pool to recheck the same busy GPU
+    monkeypatch.setattr(
+        _local_run,
+        'run_commands',
+        functools.partial(_local_run.run_commands, busy_recheck_seconds=0.2, gpu_poll_seconds=0.1),
+    )
+    monkeypatch.setattr(_local_run, 'busy_gpus', busy_gpus)
+    monkeypatch.setenv('XDG_RUNTIME_DIR', str(tmp_path / 'xdg'))
+    local = LocalSettings(gpus=(0,), skip_busy_gpus=True)
+    timer = threading.Timer(1.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    with caplog.at_level(logging.INFO):
+        report = launch(
+            launcher=LocalLauncher(project_root=tmp_path, env={}, local=local, gpu_ids=('0',)),
+            machine=local_machine,
+            study=study,
+            groups=_local_groups(study, local_machine),
+            project_root=tmp_path,
+            dry_run=False,
+        )
+    timer.cancel()
+    assert report.stopped_signal == signal.SIGTERM
+    busy_lines = [
+        record.getMessage() for record in caplog.records if 'GPU 0 is busy' in record.getMessage()
+    ]
+    assert busy_lines == ['GPU 0 is busy; waiting for it']
+
+
 def _omp_machine(machine: MachineProfile) -> MachineProfile:
     return MachineProfile(
         path=machine.path,
@@ -824,9 +876,9 @@ def _wait_for_run_pid(*, launcher: subprocess.Popen[bytes], launch_file: Path) -
             message = f'the launcher exited with {launcher.returncode} before a run started'
             raise AssertionError(message)
         document = json.loads(launch_file.read_text()) if launch_file.exists() else {}
-        pids = document.get('run_pids') or []
+        pids = document.get('run_pids') or {}
         if pids:
-            return int(pids[0][1])
+            return int(next(iter(pids.values())))
         time.sleep(0.2)
     message = 'no run pid in the launch file after 30 seconds'
     raise AssertionError(message)

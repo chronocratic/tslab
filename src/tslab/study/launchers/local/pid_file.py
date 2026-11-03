@@ -1,6 +1,6 @@
 """The pid file of a local launch: which tasks of the study run, wait or ended."""
 
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Mapping, Sequence
 import contextlib
 from dataclasses import dataclass
 import logging
@@ -65,6 +65,23 @@ class LocalLaunch:
     run_pids: tuple[tuple[str, int], ...] = ()
 
 
+def _run_pids_of(*, document: Mapping[str, object]) -> tuple[tuple[str, int], ...]:
+    """The task id and pid pairs of one launch document.
+
+    Newer files hold ``{task_id: pid}``; files written before that hold a
+    list of ``[task_id, pid]`` pairs.
+    """
+    value = document.get('run_pids')
+    if value is None:
+        return ()
+    if isinstance(value, list):
+        # why: old launch files of this branch hold a list of pairs
+        return tuple((str(key), int(str(pid))) for key, pid in cast('list[list[object]]', value))
+    return tuple(
+        (str(key), int(str(pid))) for key, pid in cast('Mapping[str, object]', value).items()
+    )
+
+
 def read_launch(*, study_folder: Path) -> LocalLaunch | None:
     """The launch in the study folder, or ``None`` when there is no file.
 
@@ -88,10 +105,7 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
             tasks=tuple(
                 (str(key), str(state)) for key, state in cast('list[list[str]]', document['tasks'])
             ),
-            run_pids=tuple(
-                (str(key), int(str(pid)))
-                for key, pid in cast('list[list[object]]', document.get('run_pids', []))
-            ),
+            run_pids=_run_pids_of(document=document),
             boot=str(boot) if boot is not None else None,
         )
     except (KeyError, TypeError, ValueError) as error:
@@ -130,7 +144,7 @@ def _write(*, path: Path, launch: LocalLaunch) -> None:
         document['boot'] = launch.boot
     if launch.run_pids:
         # why: no key when nothing runs, so old readers ignore the file
-        document['run_pids'] = [list(item) for item in launch.run_pids]
+        document['run_pids'] = dict(launch.run_pids)
     atomic_write_json(path=path, document=document)
 
 

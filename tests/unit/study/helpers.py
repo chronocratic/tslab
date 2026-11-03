@@ -149,7 +149,7 @@ def write_launch(  # noqa: PLR0913 # why: one field per launch file key, all key
         'tasks': [[key, state] for key, state in tasks.items()],
     }
     if run_pids:
-        document['run_pids'] = [list(item) for item in run_pids]
+        document['run_pids'] = dict(run_pids)
     if boot is not None:
         document['boot'] = boot
     atomic_write_json(path=folder / LAUNCH_FILE, document=document)

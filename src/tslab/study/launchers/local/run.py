@@ -262,15 +262,24 @@ class LocalLauncher:
             on_task_state=states.on_task_state,
         )
 
+        # why: the recheck after an expired answer window would log the same busy GPU again
+        reported_busy: set[str] = set()
+        reported_busy_lock = threading.Lock()
+
         def gpu_free(gpu_id: str) -> bool:
             """Whether the GPU is free of processes outside this launch."""
             busy = busy_gpus(
                 gpu_ids=(gpu_id,), memory_fraction=self._local.busy_gpu_memory_fraction
             )
-            if gpu_id in busy:
+            if gpu_id not in busy:
+                return True
+            with reported_busy_lock:
+                # why: the message is logged once per GPU, not on every recheck
+                first = gpu_id not in reported_busy
+                reported_busy.add(gpu_id)
+            if first:
                 _LOGGER.info('GPU %s is busy; waiting for it', gpu_id)
-                return False
-            return True
+            return False
 
         def task_environment() -> dict[str, str]:
             # why: a nested launch must not run from the snapshot of the launch that started it
