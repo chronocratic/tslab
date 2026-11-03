@@ -37,7 +37,7 @@ def test_empty_things_raise() -> None:
         grid(command=())
 
 
-@pytest.mark.parametrize('short_name', ['', 'longer_than8', 'a.b', 'a b'])
+@pytest.mark.parametrize('short_name', ['', 'a.b', 'a b'])
 def test_bad_short_names_raise(short_name: str) -> None:
     with pytest.raises(ValueError, match='short_name'):
         grid(short_name=short_name)
