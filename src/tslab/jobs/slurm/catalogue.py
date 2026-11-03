@@ -1,7 +1,7 @@
 """A catalogue of read-only SLURM commands, scoped to the jobs of one study.
 
 Each entry is data: a tool, its arguments with placeholders, and which job ids it
-takes. The same catalogue is rendered to ``slurm.sh`` and run by ``tslab study slurm``.
+takes. Callers render it to a shell file or run it directly.
 """
 
 from collections.abc import Sequence
@@ -62,7 +62,7 @@ class SlurmCommand:
     per_job: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CommandValues:
     """What fills the placeholders: all recorded job ids, name width, sacct start date."""
 
@@ -71,7 +71,7 @@ class CommandValues:
     start: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CommandOutput:
     """What a command printed and how it exited."""
 

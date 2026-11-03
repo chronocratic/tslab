@@ -10,16 +10,9 @@ uv run tslab study submit example
 
 ## Time limits
 
-`LightningTrainer` uses separate limits to end training or pause it.
-
-### Ends training
-
-- `--trainer.max-training-time 23:30:00` caps training (any sbatch `--time`
-  format: `M`, `M:S`, `H:M:S`, `D-H`, `D-H:M`, `D-H:M:S`). It ends training
-  normally when the total training time reaches the limit. It counts across all
-  resumed jobs.
-- `max_training_time` changes trained weights and is fingerprinted. Changing it
-  trains again.
+`LightningTrainer` ends training at `max_training_time` on any machine; see
+[Training stop rules](studies.md#training-stop-rules). The limits below apply
+under SLURM and pause training until the next job.
 
 ### Pauses until the next job
 
@@ -112,23 +105,6 @@ every recorded id.
 
 The `squeue-*` commands are for people at a terminal; agents use
 `tslab study status` and the `sacct-*` commands.
-
-## Many runs
-
-A [study](studies.md) is the supported way to run many runs: one saved
-definition, one SLURM array per grid, fixed run names, status and resubmit.
-
-For one-off batches without a study, give each run its own folder
-(`--run-path ts2vec/Coffee/seed_0`) and submit one job per run. Check the
-folders afterwards:
-
-```bash
-uv run tslab status runs/            # one line per run: state and instance counts
-uv run tslab status runs/ --stage attack
-```
-
-Add `--watch SECONDS` to refresh run status until Ctrl-C. Run-level hints point to failed-instance
-error files and explain interrupted runs; folder hints suggest opening one run.
 
 ## Distributed training
 
