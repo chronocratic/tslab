@@ -197,6 +197,11 @@ class Resources(Protocol):
         ...
 
     @property
+    def cpus_per_run(self) -> int:
+        """The CPUs of one run when several run at once."""
+        ...
+
+    @property
     def max_tasks_per_job(self) -> int | None:
         """The maximum number of tasks in one job, when the launcher has one."""
         ...

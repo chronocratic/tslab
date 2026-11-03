@@ -10,7 +10,7 @@ from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
 from tslab.study import Study
 from tslab.study.definition import expand_runs
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     _override_warnings,
     check_machine,
@@ -241,3 +241,12 @@ def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
 ) -> None:
     machine = _local(tmp_path, settings={'trainer.max_epochs': '{cpus}'})
     assert set(_epochs_by_recipe(_plan(study, machine, local_cpus=3)).values()) == {'3'}
+
+
+def test_cpus_per_run_placeholder_expands(study: Study, tmp_path: Path) -> None:
+    machine = _local(
+        tmp_path,
+        local=LocalSettings(max_parallel=2),
+        settings={'trainer.max_epochs': '{cpus_per_run}'},
+    )
+    assert set(_epochs_by_recipe(_plan(study, machine, local_cpus=4)).values()) == {'2'}

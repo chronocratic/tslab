@@ -11,6 +11,7 @@ tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
 # "tracking.wandb_mode" = "offline"
 # "tracking.shell_log_path" = "{log_file}"
 # "data.num_workers" = "{cpus}" # the cpus_per_task of each run, overrides included
+# "data.num_workers" = "{cpus_per_run}" # the CPUs of one run when several run at once
 
 [env] # exported in every job; ${VAR} in other strings resolves against these
 SCRATCH = "/scratch/CHANGE_ME"

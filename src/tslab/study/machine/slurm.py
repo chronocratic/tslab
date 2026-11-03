@@ -79,6 +79,11 @@ class SlurmSettings:
         return self.cpus_per_task
 
     @property
+    def cpus_per_run(self) -> int:
+        """The CPUs of one run; a SLURM task is one run."""
+        return self.cpus_per_task
+
+    @property
     def max_tasks_per_job(self) -> int | None:
         """The maximum number of tasks in one array."""
         return self.max_array_size

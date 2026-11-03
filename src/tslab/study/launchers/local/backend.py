@@ -3,13 +3,15 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+import functools
 import logging
+import os
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
 from tslab.core.meta import hostname
-from tslab.jobs.local import start_keep_awake, stop_keep_awake
+from tslab.jobs.local import start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
@@ -45,9 +47,16 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(frozen=True, kw_only=True)
 class LocalResources:
-    """The resources of a local launch: the CPUs this process may run on."""
+    """The resources of a local launch: the CPUs this process may run on.
+
+    Attributes:
+        cpus: The CPUs this process may run on.
+        cpus_per_run: The CPUs of one run when several run at once.
+        max_tasks_per_job: A local launch holds no array limit.
+    """
 
     cpus: int
+    cpus_per_run: int
     max_tasks_per_job: int | None = None
 
     @property
@@ -70,6 +79,12 @@ class LocalResources:
             Always ``None``.
         """
         return None
+
+
+@functools.cache
+def _auto_gpu_count() -> int:
+    """The number of visible GPUs, looked up once per process."""
+    return len(visible_gpus(environment=os.environ))
 
 
 def _phase_of(*, job_state: str | None) -> JobPhase:
@@ -138,14 +153,23 @@ class LocalBackend:
     def resources(
         self,
         *,
-        machine: MachineProfile,  # noqa: ARG002 # why: the Backend signature
+        machine: MachineProfile,
         overrides: Sequence[MachineOverride],  # noqa: ARG002 # why: the Backend signature
         grid_name: str,  # noqa: ARG002 # why: the Backend signature
         values: Mapping[str, str],  # noqa: ARG002 # why: the Backend signature
         local_cpus: int,
     ) -> Resources:
         """The CPUs of the machine; a local launch holds no array limit."""
-        return LocalResources(cpus=local_cpus)
+        local = machine.local or LocalSettings()
+        # ponytail: skip_busy_gpus is not applied here: fewer slots at launch only means each
+        # run got a smaller share than it could have (safe direction)
+        if local.gpus == 'auto':
+            slots = _auto_gpu_count() * local.tasks_per_gpu or local.max_parallel
+        elif local.gpus:
+            slots = len(local.gpus) * local.tasks_per_gpu
+        else:
+            slots = local.max_parallel
+        return LocalResources(cpus=local_cpus, cpus_per_run=max(local_cpus // slots, 1))
 
     def failure_hint(
         self,

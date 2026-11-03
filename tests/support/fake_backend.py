@@ -57,11 +57,13 @@ class FakeResources:
 
     Attributes:
         cpus: The CPUs one task of the launch gets.
+        cpus_per_run: The CPUs of one run when several run at once.
         max_tasks_per_job: The maximum number of tasks in one job, when set.
         requested_memory: The total memory in bytes one task requests, when set.
     """
 
     cpus: int = 1
+    cpus_per_run: int = 1
     max_tasks_per_job: int | None = None
     requested_memory: int | None = None
 

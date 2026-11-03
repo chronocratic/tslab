@@ -267,9 +267,9 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
     assert logs.count('could not start') == sum(len(group.tasks) for group in groups)
 
 
-def _local_groups(study: Study, machine: MachineProfile) -> list[JobGroup]:
+def _local_groups(study: Study, machine: MachineProfile, *, local_cpus: int = 1) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=local_cpus)
     return plan_jobs(
         study=study,
         machine=machine,
@@ -386,6 +386,61 @@ def test_local_gpu_ids_reach_tasks(
     assert all('| gpus 0,1' in header for header in headers)
 
 
+def _omp_machine(machine: MachineProfile) -> MachineProfile:
+    return MachineProfile(
+        path=machine.path,
+        launcher='local',
+        output_root=machine.output_root,
+        local=LocalSettings(max_parallel=2),
+    )
+
+
+def _omp_study(tmp_path: Path) -> Study:
+    script = tmp_path / 'omp.py'
+    script.write_text("import os; print(os.environ['OMP_NUM_THREADS'])\n")
+    return Study(
+        name='s', grids={'g': grid(short_name='g1', command=(sys.executable, str(script)))}
+    )
+
+
+def test_omp_num_threads_is_set_for_local_runs(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv('OMP_NUM_THREADS', raising=False)
+    local_machine = _omp_machine(machine)
+    study = _omp_study(tmp_path)
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings(max_parallel=2)),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine, local_cpus=4),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=local_machine, study=study)
+    assert '2' in (folder / 'logs' / 'g1_0.out').read_text().splitlines()
+
+
+def test_preset_omp_num_threads_is_kept(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv('OMP_NUM_THREADS', raising=False)
+    local_machine = _omp_machine(machine)
+    study = _omp_study(tmp_path)
+    launch(
+        launcher=LocalLauncher(
+            project_root=tmp_path, env={'OMP_NUM_THREADS': '1'}, local=LocalSettings(max_parallel=2)
+        ),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine, local_cpus=4),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    folder = study_folder(machine=local_machine, study=study)
+    assert '1' in (folder / 'logs' / 'g1_0.out').read_text().splitlines()
+
+
 def test_local_two_launchers_never_share_a_gpu(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -409,7 +464,7 @@ def test_local_two_launchers_never_share_a_gpu(
         '    resolved=ResolvedRun(\n'
         '        run=StudyRun(grid="g", values={}, run_path="p", settings={}),\n'
         '        settings={},\n'
-        '        resources=LocalResources(cpus=1),\n'
+        '        resources=LocalResources(cpus=1, cpus_per_run=1),\n'
         '    ),\n'
         '    index=1,\n'
         '    log_file=root / ("task" + index + ".log"),\n'
@@ -418,7 +473,7 @@ def test_local_two_launchers_never_share_a_gpu(
         '    attempt=1,\n'
         ')\n'
         'group = JobGroup(\n'
-        '    grid="g", job_name="g", resources=LocalResources(cpus=1),\n'
+        '    grid="g", job_name="g", resources=LocalResources(cpus=1, cpus_per_run=1),\n'
         '    job_file=1, tasks=(task,)\n'
         ')\n'
         'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",), '

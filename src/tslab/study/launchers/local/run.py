@@ -259,6 +259,7 @@ class LocalLauncher:
             # why: a nested launch must not run from the snapshot of the launch that started it
             env = without_code_snapshot(environ=without_scheduler_variables(environ=os.environ))
             env.update(self._env)
+            env.setdefault('OMP_NUM_THREADS', str(group.resources.cpus_per_run))
             if snapshot is not None:
                 env.update(snapshot.variables())
                 env['PYTHONPATH'] = snapshot.pythonpath(current=env.get('PYTHONPATH'))
