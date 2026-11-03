@@ -3972,8 +3972,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "chronocratic-datasets", marker = "extra == 'chronocratic-datasets'", specifier = ">=0.1.0rc1,<0.2" },
-    { name = "chronocratic-models", marker = "extra == 'chronocratic-models'", specifier = ">=0.1.0rc1,<0.2" },
+    { name = "chronocratic-datasets", marker = "extra == 'chronocratic-datasets'", specifier = "==0.1.0rc1" },
+    { name = "chronocratic-models", marker = "extra == 'chronocratic-models'", specifier = "==0.1.0rc1" },
     { name = "lightning", specifier = ">=2.5,<3" },
     { name = "matplotlib", marker = "extra == 'analysis'", specifier = ">=3.11,<4" },
     { name = "mlflow", marker = "extra == 'mlflow'", specifier = ">=3.0,<4" },
