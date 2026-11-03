@@ -293,8 +293,7 @@ class JobGroup:
 
     Args:
         grid: The grid name the runs of the group came from.
-        job_name: The SLURM job name, the grid ``job_name`` template filled in.
-        short_name: The ``short_name`` of the grid; it names the log files.
+        job_name: The name of the job, the grid ``job_name`` template filled in.
         resources: The resources of the job, as declared by its backend.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
@@ -305,7 +304,6 @@ class JobGroup:
 
     grid: str
     job_name: str
-    short_name: str
     resources: 'Resources'
     job_file: int
     tasks: tuple[PlannedTask, ...]
@@ -408,7 +406,6 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                 JobGroup(
                     grid=run.run.grid,
                     job_name=job_name,
-                    short_name=grid.short_name,
                     resources=run.resources,
                     job_file=next_file,
                     tasks=(),

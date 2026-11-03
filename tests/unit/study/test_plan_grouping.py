@@ -289,6 +289,5 @@ def test_job_name_template_splits_groups(machine: MachineProfile) -> None:
     study = Study(name='s', grids={'g': grid(short_name='g1', job_name='{recipe}_{short_name}')})
     groups = _plan(study=study, machine=machine)
     assert sorted(g.job_name for g in groups) == ['cost-paper_g1', 'ts2vec-paper_g1']
-    assert all(g.short_name == 'g1' for g in groups)
     assert sorted(t.index for g in groups for t in g.tasks) == list(range(4))
     assert all(t.log_file.name == f'g1_{t.index}.out' for g in groups for t in g.tasks)

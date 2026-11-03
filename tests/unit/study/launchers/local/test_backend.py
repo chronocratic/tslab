@@ -430,7 +430,6 @@ def _code_snapshot_group(*, snapshot: CodeSnapshot, log_file: Path) -> JobGroup:
     return JobGroup(
         grid='g',
         job_name='g',
-        short_name='g',
         resources=LocalResources(cpus=1, cpus_per_run=1),
         job_file=1,
         tasks=(task,),
