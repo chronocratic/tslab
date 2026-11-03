@@ -19,6 +19,8 @@ __all__ = [
     'DEFAULT_BOOTSTRAP_SAMPLES',
     'DEFAULT_CONFIDENCE',
     'DEFAULT_MIN_PAIRS',
+    'MIN_FRIEDMAN_DATASETS',
+    'MIN_FRIEDMAN_METHODS',
     'Direction',
     'FriedmanTest',
     'PairedTest',
