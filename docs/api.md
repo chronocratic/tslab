@@ -17,13 +17,13 @@ are defined in `core` and documented here.
 ## Enums
 
 The fixed sets of choices that more than one package uses. `InstanceState`,
-`LogLevel` and `RunState` are also importable from `tslab` and documented under Core.
+`LogLevel`, `RunState` and `WandbMode` are also importable from `tslab` and documented under Core.
 
 ```{eval-rst}
 .. automodule:: tslab.enums
    :members:
    :imported-members:
-   :exclude-members: InstanceState, LogLevel, RunState
+   :exclude-members: InstanceState, LogLevel, RunState, WandbMode
 ```
 
 ## Interfaces
