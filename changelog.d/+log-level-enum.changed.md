@@ -1,0 +1,1 @@
+`RunOptions.log_level` is now a `tslab.LogLevel` member (`LogLevel.DEBUG`, `INFO`, `WARNING`, `ERROR`) instead of a string. The command line flag `--run.log-level` and `config.yaml` keep the same text.

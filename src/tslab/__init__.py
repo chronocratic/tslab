@@ -15,6 +15,7 @@ from tslab.core.artifact import (
     UnavailableReason,
 )
 from tslab.core.config import ConfigFileError, load_config, parse_config, REQUIRED, save_config
+from tslab.core.enums import LogLevel
 from tslab.core.fingerprint import Fingerprintable, NotFingerprinted
 from tslab.core.lock import RunLockedError
 from tslab.core.paths import InstanceName
@@ -39,6 +40,7 @@ __all__ = [
     'InstanceState',
     'JobTimeLimitSignal',
     'Json',
+    'LogLevel',
     'Metrics',
     'ModelAsEncoder',
     'NotFingerprinted',
