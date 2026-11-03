@@ -83,6 +83,36 @@ A queued job runs the code of the project folder when it starts; a
 [code snapshot](studies.md#code-snapshots) copies the code at submit time and
 makes the jobs import that copy.
 
+## SLURM commands
+
+After every submit on a SLURM machine, tslab writes `.study/slurm.sh` in the
+study folder. `source` it and call a command by name; each one is a read-only
+SLURM command for the jobs of that study, with the full job name shown. The
+same commands run without sourcing as `tslab study slurm STUDY NAME` (no name
+lists them) and in a notebook as `tslab.study.slurm_output`.
+
+Commands for queued and running jobs take the ids from `sacct`, so a job that
+has ended is not asked of `squeue`; on a cluster without accounting they use
+every recorded id.
+
+| Name | What it shows |
+|---|---|
+| `squeue-full-name` | Queued and running jobs with the full job name. |
+| `squeue-long` | Queued and running jobs in the long format with the full job name. |
+| `squeue-start` | Expected start times of the queued jobs. |
+| `squeue-running` | Running tasks only, with the full job name. |
+| `squeue-stock` | Queued and running jobs in the stock squeue format. |
+| `sacct-full-name` | Every job of the study from the accounting database, full job name. |
+| `sacct-failed` | Jobs that failed, timed out, ran out of memory or lost their node. |
+| `sacct-usage` | Time, CPU and memory use of every job of the study. |
+| `seff-all` | Efficiency summary of every job of the study. |
+| `sstat-live` | Live CPU and memory use of the running tasks. |
+| `sprio-jobs` | Scheduling priority of the queued jobs. |
+| `scontrol-show` | Full controller record of each job still held by the controller. |
+
+The `squeue-*` commands are for people at a terminal; agents use
+`tslab study status` and the `sacct-*` commands.
+
 ## Many runs
 
 A [study](studies.md) is the supported way to run many runs: one saved
