@@ -327,20 +327,23 @@ class Study:
         """Raise when two grids give one job name, or a grid gives a follow-up name."""
         followups = {followup_job_name(study=self.name, kind=kind) for kind in FOLLOWUP_KINDS}
         owners: dict[str, str] = {}
-        for grid_name, names in study_job_names(study=self).items():
-            for name in sorted(names):
-                if name in followups:
-                    message = (
-                        f'grid {grid_name!r} gives job name {name!r}, '
-                        f'the follow-up job name {name!r}'
-                    )
-                    raise ValueError(message)
-                if owners.setdefault(name, grid_name) != grid_name:
-                    message = (
-                        f'grid {grid_name!r} gives job name {name!r}, '
-                        f'which grid {owners[name]!r} gives too'
-                    )
-                    raise ValueError(message)
+        pairs = [
+            (grid_name, name)
+            for grid_name, names in study_job_names(study=self).items()
+            for name in sorted(names)
+        ]
+        for grid_name, name in pairs:
+            if name in followups:
+                message = (
+                    f'grid {grid_name!r} gives job name {name!r}, the follow-up job name {name!r}'
+                )
+                raise ValueError(message)
+            if owners.setdefault(name, grid_name) != grid_name:
+                message = (
+                    f'grid {grid_name!r} gives job name {name!r}, '
+                    f'which grid {owners[name]!r} gives too'
+                )
+                raise ValueError(message)
 
     def results(self, *, machine: Path, environment: Mapping[str, str]) -> 'list[ResultRow]':
         """The rows of the results table of every run of the study.

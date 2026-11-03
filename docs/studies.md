@@ -309,6 +309,11 @@ checkpoints with the rule that stopped it (`stop_reason`), the epochs and the
 steps. A run stopped by `max_training_time` logs a warning.
 
 - `max_epochs` is reproducible from the seed.
+- `--trainer.max-training-time 23:30:00` caps training (any sbatch `--time`
+  format: `M`, `M:S`, `H:M:S`, `D-H`, `D-H:M`, `D-H:M:S`). It ends training
+  normally when the total training time reaches the limit, counted across all
+  resumed jobs. It changes trained weights and is fingerprinted, so changing it
+  trains again.
 - `max_training_time` keeps a run in a time budget, but the number of epochs
   depends on the speed of the hardware, so the result is not reproducible from
   the seed. Use `max_epochs` for results that must be.

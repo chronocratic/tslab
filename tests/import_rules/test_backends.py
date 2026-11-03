@@ -337,6 +337,7 @@ NEUTRAL_EXEMPT = (
     SOURCE / 'study' / 'machine' / 'profile.py',
     SOURCE / 'study' / 'machine' / 'load.py',
     SOURCE / 'study' / 'machine' / 'slurm.py',
+    SOURCE / 'study' / 'slurm.py',
 )
 SLURM_TYPES = frozenset(('SlurmSettings', 'SlurmError', 'SlurmJobUsage'))
 SLURM_MODULES = ('tslab.jobs.slurm', 'tslab.study.launchers.slurm')

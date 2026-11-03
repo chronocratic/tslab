@@ -59,3 +59,21 @@ receiving its heartbeat, so after ten minutes:
 
 Add `--watch SECONDS` to `tslab status runs/` to refresh until Ctrl-C. Its hints
 explain resuming interrupted runs and point to error files for failed instances.
+
+## Many runs without a study
+
+A [study](studies.md) is the supported way to run many runs: one saved
+definition, one SLURM array per grid, fixed run names, status and resubmit.
+
+For one-off batches without a study, give each run its own folder
+(`--run-path ts2vec/Coffee/seed_0`) and submit one job per run. Check the
+folders afterwards:
+
+```bash
+uv run tslab status runs/            # one line per run: state and instance counts
+uv run tslab status runs/ --stage transform
+```
+
+Add `--watch SECONDS` to refresh run status until Ctrl-C. Run-level hints point
+to failed-instance error files and explain interrupted runs; folder hints
+suggest opening one run.
