@@ -213,37 +213,79 @@ def visible_gpus(*, environment: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(line.strip() for line in output.splitlines() if line.strip())
 
 
-def busy_gpus(*, gpu_ids: Sequence[str]) -> frozenset[str]:
-    """The ids of the given GPUs that run a compute application.
+_GPU_ROW_FIELDS = 4
+
+
+def _gpu_row(line: str) -> tuple[str, str, str, str]:
+    """The index, uuid, used memory and total memory of one gpu row.
+
+    A row without the two memory fields gets empty strings for them.
+    """
+    fields = [field.strip() for field in line.split(',')]
+    fields += [''] * (_GPU_ROW_FIELDS - len(fields))
+    return fields[0], fields[1], fields[2], fields[3]
+
+
+def _memory_fraction(*, used: str, total: str) -> float | None:
+    """The used memory of one GPU over its total, or ``None`` when either is not a number."""
+    try:
+        return float(used) / float(total)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozenset[str]:
+    """The ids of the given GPUs with a compute application, or with most of their memory in use.
 
     Args:
         gpu_ids: The ids of the GPUs to check.
+        memory_fraction: A GPU is also busy when more of its memory than this
+            fraction is in use; 1.0 disables the memory rule. A row without
+            the two memory columns, or with non-numeric ones, counts for the
+            compute rule only.
 
     Returns:
-        The subset of ``gpu_ids`` with a compute application on it. A failing
+        The subset of ``gpu_ids`` with a compute application on it, or with
+        more than ``memory_fraction`` of its memory in use. A failing
         nvidia-smi logs one warning and counts no GPU as busy.
     """
     apps = _nvidia_smi(arguments=['--query-compute-apps=gpu_uuid', '--format=csv,noheader'])
     if apps is None:
         return frozenset[str]()
-    gpus = _nvidia_smi(arguments=['--query-gpu=index,uuid', '--format=csv,noheader'])
+    gpus = _nvidia_smi(
+        arguments=[
+            '--query-gpu=index,uuid,memory.used,memory.total',
+            '--format=csv,noheader,nounits',
+        ]
+    )
     if gpus is None:
         return frozenset[str]()
     index_by_uuid: dict[str, str] = {}
-    for line in gpus.splitlines():
-        index, _, uuid = line.partition(',')
-        if uuid:
-            index_by_uuid[uuid.strip()] = index.strip()
-    busy = {
+    busy: set[str] = set()
+    for index, uuid, used, total in (_gpu_row(line) for line in gpus.splitlines()):
+        if not uuid:
+            continue
+        index_by_uuid[uuid] = index
+        if index not in gpu_ids:
+            continue
+        # why: in-use memory also counts as busy; it catches processes nvidia-smi does not list
+        fraction = _memory_fraction(used=used, total=total)
+        if fraction is not None and fraction > memory_fraction:
+            busy.add(index)
+    busy.update(
         index
         for line in apps.splitlines()
         if (index := index_by_uuid.get(line.strip())) is not None and index in gpu_ids
-    }
+    )
     return frozenset(busy)
 
 
 def select_gpus(
-    *, gpus: Sequence[str] | Literal['auto'], skip_busy: bool, environment: Mapping[str, str]
+    *,
+    gpus: Sequence[str] | Literal['auto'],
+    skip_busy: bool,
+    environment: Mapping[str, str],
+    memory_fraction: float = 1.0,
 ) -> tuple[str, ...]:
     """The GPU ids a launch may lease, with ``"auto"`` resolved and the busy ones left out.
 
@@ -252,6 +294,7 @@ def select_gpus(
             ``environment``.
         skip_busy: Whether to leave out GPUs with running compute processes.
         environment: The environment to discover the GPUs from.
+        memory_fraction: The memory rule of ``busy_gpus``; 1.0 disables it.
 
     Returns:
         The ids the launch may lease, in order; empty for CPU-only slots.
@@ -266,7 +309,7 @@ def select_gpus(
     if not gpu_ids or gpu_ids == ('mps',):
         message = 'skip_busy_gpus needs NVIDIA GPUs'
         raise ValueError(message)
-    busy = busy_gpus(gpu_ids=gpu_ids)
+    busy = busy_gpus(gpu_ids=gpu_ids, memory_fraction=memory_fraction)
     if busy:
         gpu_ids = tuple(gpu for gpu in gpu_ids if gpu not in busy)
     if not gpu_ids:

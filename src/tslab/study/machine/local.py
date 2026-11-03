@@ -33,6 +33,9 @@ class LocalSettings:
         gpus: The GPU ids the machine may use (NVIDIA ids, or the Apple GPU
             ``"mps"`` standing alone), or ``"auto"`` to find them at launch.
         skip_busy_gpus: Whether to leave out GPUs with running compute processes.
+        busy_gpu_memory_fraction: The fraction of a GPU memory in use that
+            also counts it as busy; with the default 0.1, a GPU needs 90% of
+            its memory free.
         max_parallel: Tasks at once when the resolved GPU list is empty.
         tasks_per_gpu: Tasks that share one GPU id at once.
         keep_awake: Whether to keep the machine awake while a launch runs.
@@ -42,6 +45,7 @@ class LocalSettings:
     signal_seconds: int = 120
     gpus: tuple[int | Literal['mps'], ...] | Literal['auto'] = ()
     skip_busy_gpus: bool = False
+    busy_gpu_memory_fraction: float = 0.1
     max_parallel: int = 1
     tasks_per_gpu: int = 1
     keep_awake: bool = True
@@ -140,6 +144,9 @@ def check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path
             f'{path}: local.skip_busy_gpus reads nvidia-smi and needs NVIDIA gpus; '
             'remove skip_busy_gpus or set gpus'
         )
+        raise MachineProfileError(message)
+    if not 0 < local.busy_gpu_memory_fraction <= 1:
+        message = f'{path}: local.busy_gpu_memory_fraction must be above 0 and at most 1'
         raise MachineProfileError(message)
 
 
