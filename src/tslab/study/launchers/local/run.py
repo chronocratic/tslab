@@ -12,6 +12,7 @@ from typing import TextIO
 
 from tslab.core.files import atomic_write_text
 from tslab.jobs.local import (
+    busy_gpus,
     gpu_lock_folder,
     PoolCommand,
     run_commands,
@@ -261,6 +262,16 @@ class LocalLauncher:
             on_task_state=states.on_task_state,
         )
 
+        def gpu_free(gpu_id: str) -> bool:
+            """Whether the GPU is free of processes outside this launch."""
+            busy = busy_gpus(
+                gpu_ids=(gpu_id,), memory_fraction=self._local.busy_gpu_memory_fraction
+            )
+            if gpu_id in busy:
+                _LOGGER.info('GPU %s is busy; waiting for it', gpu_id)
+                return False
+            return True
+
         def task_environment() -> dict[str, str]:
             # why: a nested launch must not run from the snapshot of the launch that started it
             env = without_code_snapshot(environ=without_scheduler_variables(environ=os.environ))
@@ -301,6 +312,7 @@ class LocalLauncher:
                     on_end=output.on_end,
                     grace_seconds=self._grace_seconds,
                     on_spawn=states.on_spawn,
+                    gpu_free=(gpu_free if self._local.skip_busy_gpus else None),
                 )
             if request.signal_number is not None:
                 raise LaunchStopped(signal_number=request.signal_number)

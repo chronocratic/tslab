@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import queue
 import threading
+import time
 from types import MappingProxyType
 from typing import cast, Protocol
 
@@ -155,6 +156,74 @@ def _spawn_callback(*, on_spawn: OnSpawn | None, key: str) -> Callable[[int], No
     return lambda pid: on_spawn(key=key, pid=pid)
 
 
+class _GpuLeaseGate:
+    """The lease of a GPU slot, gated by the pool's own leases and a free recheck.
+
+    A slot the pool holds a lease for is leased without a recheck. Otherwise
+    ``gpu_free`` decides, and its answer is kept per GPU for the recheck
+    window, so the poll does not call it again inside the window.
+    """
+
+    def __init__(
+        self,
+        *,
+        lock_folder: Path | None,
+        tasks_per_gpu: int,
+        gpu_free: Callable[[str], bool] | None,
+        busy_recheck_seconds: float,
+    ) -> None:
+        self._lock_folder = lock_folder
+        self._tasks_per_gpu = tasks_per_gpu
+        self._gpu_free = gpu_free
+        self._busy_recheck_seconds = busy_recheck_seconds
+        self._counts: dict[str, int] = {}
+        self._answers: dict[str, tuple[float, bool]] = {}
+        self._lock = threading.Lock()
+
+    def _holds(self, *, gpu_id: str) -> bool:
+        """Whether the pool holds at least one lease on the GPU."""
+        with self._lock:
+            return self._counts.get(gpu_id, 0) > 0
+
+    def _is_busy(self, *, slot: str) -> bool:
+        """Whether the pool must wait for the GPU of the slot before leasing it."""
+        if self._gpu_free is None:
+            return False
+        now = time.monotonic()
+        with self._lock:
+            # why: the lock stays held during the call, so a second thread on the
+            # same GPU reads the answer instead of calling again
+            answer = self._answers.get(slot)
+            if answer is not None and now - answer[0] < self._busy_recheck_seconds:
+                return not answer[1]
+            free = self._gpu_free(slot)
+            self._answers[slot] = (time.monotonic(), free)
+            return not free
+
+    def try_lease(self, *, slot: str) -> GpuLease | None:
+        """The lease of the slot, or ``None`` while the pool must wait for it."""
+        if not self._holds(gpu_id=slot) and self._is_busy(slot=slot):
+            return None
+        if self._lock_folder is None:
+            # why: the check at the top of run_commands already raised; this narrows the type here
+            message = 'lock_folder is required when gpu_ids is not empty'
+            raise ValueError(message)
+        lease = try_lease_gpu(
+            folder=self._lock_folder, gpu_ids=(slot,), tasks_per_gpu=self._tasks_per_gpu
+        )
+        if lease is not None:
+            with self._lock:
+                self._counts[slot] = self._counts.get(slot, 0) + 1
+        return lease
+
+    def drop(self, *, lease: GpuLease | None, gpu_id: str | None) -> None:
+        """Count one less lease of the pool on the GPU; nothing without a lease."""
+        if lease is None or gpu_id is None:
+            return
+        with self._lock:
+            self._counts[gpu_id] = self._counts.get(gpu_id, 1) - 1
+
+
 def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and limit setting
     *,
     commands: Sequence[PoolCommand],
@@ -173,13 +242,19 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     grace_seconds: float = 30.0,
     gpu_poll_seconds: float = 5.0,
     on_spawn: OnSpawn | None = None,
+    gpu_free: Callable[[str], bool] | None = None,
+    busy_recheck_seconds: float = 60.0,
 ) -> tuple[str, ...]:
     """Run the commands in order, at most ``slots`` of them at once.
 
     Without ``gpu_ids`` a command only needs a free slot. With ``gpu_ids`` it
     also needs a lease from ``try_lease_gpu`` in ``lock_folder`` on the id of
     its slot; while none is free, ``on_wait`` is called once for the command
-    and the pool retries every ``gpu_poll_seconds``, waking on a stop. A
+    and the pool retries every ``gpu_poll_seconds``, waking on a stop. With
+    ``gpu_free``, a slot the pool holds no lease for is leased only while
+    ``gpu_free`` reports its GPU free; the answer is kept per GPU for
+    ``busy_recheck_seconds``, so the poll does not recheck inside the window,
+    and a busy GPU waits like a held one. A
     leased command runs with ``CUDA_VISIBLE_DEVICES`` set to the id of the
     lease; a numeric slot also gets ``CUDA_DEVICE_ORDER`` set to
     ``PCI_BUS_ID`` unless the environment already sets it. The ``'mps'``
@@ -216,6 +291,11 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         gpu_poll_seconds: Seconds between retries for a GPU lease.
         on_spawn: Called with the key and the pid of the process right after
             it starts, or ``None`` for no callback.
+        gpu_free: Called with a GPU id to ask whether it is free, while the
+            pool holds no lease on it; a busy GPU waits like a held one.
+            ``None`` skips the check.
+        busy_recheck_seconds: Seconds to keep the answer of ``gpu_free`` per
+            GPU, so the lease poll does not recheck inside the window.
 
     Returns:
         The keys of the commands that never started because ``stop`` was set.
@@ -228,19 +308,20 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     never_started: set[str] = set()
     never_started_lock = threading.Lock()
 
+    gate = _GpuLeaseGate(
+        lock_folder=lock_folder,
+        tasks_per_gpu=tasks_per_gpu,
+        gpu_free=gpu_free,
+        busy_recheck_seconds=busy_recheck_seconds,
+    )
+
     def take_lease(*, command: PoolCommand) -> tuple[GpuLease | None, str | None]:
         """Take one free slot, and the GPU lock of its id, for the command."""
         slot = slot_queue.get()
         if slot is None:
             return None, slot
-        if lock_folder is None:
-            # why: the check at the top of run_commands already raised; this narrows the type here
-            message = 'lock_folder is required when gpu_ids is not empty'
-            raise ValueError(message)
         waited = False
-        while (
-            lease := try_lease_gpu(folder=lock_folder, gpu_ids=(slot,), tasks_per_gpu=tasks_per_gpu)
-        ) is None and not stop.is_set():
+        while (lease := gate.try_lease(slot=slot)) is None and not stop.is_set():
             if not waited:
                 on_wait(key=command.key)
                 waited = True
@@ -276,6 +357,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         finally:
             # why: the slot and the lock must come back even when the command errors
             _release_lease(lease=lease)
+            gate.drop(lease=lease, gpu_id=slot)
             slot_queue.put(slot)
 
     with ThreadPoolExecutor(max_workers=slots) as executor:

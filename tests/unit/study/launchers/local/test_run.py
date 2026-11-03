@@ -1,9 +1,10 @@
 """Local study launch tests."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import contextlib
 from io import StringIO
 import json
+import logging
 import os
 from pathlib import Path
 import signal
@@ -384,6 +385,51 @@ def test_local_gpu_ids_reach_tasks(
     headers = [path.read_text().splitlines()[0] for path in (folder / 'logs').glob('*.out')]
     assert len(headers) == 4
     assert all('| gpus 0,1' in header for header in headers)
+
+
+def test_launcher_logs_a_busy_gpu_once(
+    machine: MachineProfile,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    local_machine = _local_machine(machine)
+    script = tmp_path / 'busy.py'
+    script.write_text('import time\ntime.sleep(60)\n')
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, str(script)),
+                axes={'seed': setting_axis(path='seed', values=(0,))},
+            )
+        },
+    )
+
+    def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozenset[str]:
+        return frozenset(gpu_ids)
+
+    monkeypatch.setattr(_local_run, 'busy_gpus', busy_gpus)
+    monkeypatch.setenv('XDG_RUNTIME_DIR', str(tmp_path / 'xdg'))
+    local = LocalSettings(gpus=(0,), skip_busy_gpus=True)
+    timer = threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    timer.start()
+    with caplog.at_level(logging.INFO):
+        report = launch(
+            launcher=LocalLauncher(project_root=tmp_path, env={}, local=local, gpu_ids=('0',)),
+            machine=local_machine,
+            study=study,
+            groups=_local_groups(study, local_machine),
+            project_root=tmp_path,
+            dry_run=False,
+        )
+    timer.cancel()
+    assert report.stopped_signal == signal.SIGTERM
+    busy_lines = [
+        record.getMessage() for record in caplog.records if 'GPU 0 is busy' in record.getMessage()
+    ]
+    assert busy_lines == ['GPU 0 is busy; waiting for it']
 
 
 def _omp_machine(machine: MachineProfile) -> MachineProfile:
