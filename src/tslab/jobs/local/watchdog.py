@@ -61,7 +61,7 @@ class Watchdog:
         Args:
             pid: The pid of the group leader to hold.
         """
-        self._send(f'+{pid}\n')
+        self._send(line=f'+{pid}\n')
 
     def forget(self, *, pid: int) -> None:
         """Tell the watchdog to drop the process group of ``pid``.
@@ -69,9 +69,9 @@ class Watchdog:
         Args:
             pid: The pid of the group leader to drop.
         """
-        self._send(f'-{pid}\n')
+        self._send(line=f'-{pid}\n')
 
-    def _send(self, line: str) -> None:
+    def _send(self, *, line: str) -> None:
         stdin = self.process.stdin
         if stdin is None:
             # why: the process is started with a pipe; the check keeps the type narrow
@@ -111,21 +111,22 @@ def main(*, argv: Sequence[str], lines: Iterable[str]) -> int:
     grace_seconds = float(argv[0])
     watched: set[int] = set()
     for line in lines:
-        _apply_line(line=line, watched=watched)
+        watched = _apply_line(line=line, watched=watched)
     _stop_groups(pids=tuple(watched), grace_seconds=grace_seconds)
     return 0
 
 
-def _apply_line(*, line: str, watched: set[int]) -> None:
-    """Add or drop the pid of one ``+pid`` or ``-pid`` line."""
+def _apply_line(*, line: str, watched: set[int]) -> set[int]:
+    """The watched pids after one ``+pid`` or ``-pid`` line."""
     text = line.strip()
     if not text[1:].isdigit() or text[0] not in {'+', '-'}:
-        return
+        return watched
     pid = int(text[1:])
     if text[0] == '+':
-        watched.add(pid)
-    else:
-        watched.discard(pid)
+        updated = set(watched)
+        updated.add(pid)
+        return updated
+    return watched - {pid}
 
 
 def _stop_groups(*, pids: tuple[int, ...], grace_seconds: float) -> None:

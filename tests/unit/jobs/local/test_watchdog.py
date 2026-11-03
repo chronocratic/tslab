@@ -1,7 +1,10 @@
 import subprocess
+import sys
 import time
 
-from tslab.jobs.local.watchdog import main, Watchdog
+import pytest
+
+from tslab.jobs.local.watchdog import _apply_line, main, Watchdog
 
 
 def _group_leader() -> subprocess.Popen[bytes]:
@@ -28,6 +31,24 @@ def test_close_after_forget_kills_nothing() -> None:
     assert run.poll() is None
     run.kill()
     run.wait()
+
+
+def test_apply_line_does_not_mutate_its_set() -> None:
+    watched = {1}
+    added = _apply_line(line='+2\n', watched=watched)
+    dropped = _apply_line(line='-1\n', watched=watched)
+    assert watched == {1}
+    assert added == {1, 2}
+    assert dropped == set()
+
+
+def test_send_requires_keyword_argument() -> None:
+    process = subprocess.Popen([sys.executable, '-c', 'pass'])
+    process.wait()
+    watchdog = Watchdog(process=process, grace_seconds=1.0)
+    with pytest.raises(TypeError):
+        # ty: ignore[missing-argument, too-many-positional-arguments]
+        watchdog._send('+1\n')  # noqa: SLF001 # why: the test checks the keyword-only contract
 
 
 def test_a_group_already_gone_is_ignored() -> None:
