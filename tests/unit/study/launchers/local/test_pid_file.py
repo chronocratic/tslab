@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 import contextlib
+import json
 import logging
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ from tests.unit.study.helpers import (
     write_launch,
 )
 from tslab.cli import main
+from tslab.core.files import atomic_write_json
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.core.status import (
@@ -190,6 +192,26 @@ def test_old_launch_file_has_no_run_pids(tmp_path: Path) -> None:
     launch = read_launch(study_folder=tmp_path)
     assert launch is not None
     assert launch.run_pids == ()
+
+
+def test_run_pids_are_written_as_an_object(tmp_path: Path) -> None:
+    with hold_launch(
+        study_folder=tmp_path, task_ids=['j_0', 'j_1'], pid=1, host='h', now='t'
+    ) as set_state:
+        set_state(task_id='j_0', state='running', pid=4242)
+        document = json.loads((tmp_path / LAUNCH_FILE).read_text())
+    assert document['run_pids'] == {'j_0': 4242}
+
+
+def test_list_of_pairs_run_pids_still_loads(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
+    path = tmp_path / LAUNCH_FILE
+    document = json.loads(path.read_text())
+    document['run_pids'] = [['j_0', 4242]]
+    atomic_write_json(path=path, document=document)
+    launch = read_launch(study_folder=tmp_path)
+    assert launch is not None
+    assert launch.run_pids == (('j_0', 4242),)
 
 
 def test_status_reads_local_launch_states(project: Path) -> None:
