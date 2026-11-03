@@ -2,11 +2,6 @@
 
 Every chronocratic model is offered on the command line with its own settings,
 generated from its parameter class. Augmentations are given as recipes.
-
-Known limitation: chronocratic-models 0.1.0a20 draws part of the training
-randomness of TS2Vec, AutoTCL and CoST (training crops, encoder masks, the
-crop-and-shift views of TS2Vec) from NumPy generators that no seed controls,
-so two trainings with the same seed can differ.
 """
 
 from tslab.adapters.chronocratic.models.build import build_chronocratic_model, FingerprintedModel
