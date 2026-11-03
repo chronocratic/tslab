@@ -156,6 +156,35 @@ def test_cancel_dry_run_lists_runs_of_a_dead_launcher(project: Path) -> None:
         run.wait()
 
 
+def test_local_cancel_dead_partial_selection_is_usage_error(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    run = _run_group()
+    try:
+        ids = _hold_dead_launch(project=project, run_pid=run.pid)
+        ctx = load_context(
+            reference='toy_studies:study',
+            machine_path=project / 'local.toml',
+            selection=Selection(only=('seed=1',)),
+            project_root=Path.cwd(),
+            local_cpus=1,
+            environment=os.environ,
+        )
+        selected = {report.job_id for report in ctx.reports}
+        missed = [key for key in ids if key not in selected]
+        assert missed
+        with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
+            assert cancel(context=ctx, dry_run=False) == (2, [])
+        assert 'as one unit' in caplog.text
+        assert all(key in caplog.text for key in missed)
+        assert run.poll() is None
+    finally:
+        if run.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                run.kill()
+        run.wait()
+
+
 def test_local_cancel_signal_flag_is_usage_error(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

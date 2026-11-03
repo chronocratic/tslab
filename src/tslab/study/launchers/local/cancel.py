@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tuple[int, list[str]]:
-    """Stop the live local launch when selection covers every live task."""
+    """Stop the local launch, live or dead, when the selection covers every live task."""
     if signal is not None:
         _LOGGER.error('cancel --signal is SLURM only')
         return 2, []
@@ -24,8 +24,6 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
     if launch is None:
         _LOGGER.info('nothing to cancel')
         return 0, []
-    if not launch_is_live(launch=launch, host=hostname()):
-        return _cancel_dead(launch=launch, dry_run=dry_run)
     selected = {report.job_id for report in context.reports}
     # why: the tasks of a group that has not started have no job record, so no selection names them
     recorded = {f'{job.job_id}_{task.index}' for job in context.jobs for task in job.tasks}
@@ -40,6 +38,8 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
             ', '.join(missed),
         )
         return 2, []
+    if not launch_is_live(launch=launch, host=hostname()):
+        return _cancel_dead(launch=launch, dry_run=dry_run)
     if dry_run:
         _LOGGER.info('would stop local launch %s', launch.pid)
         return 0, [str(launch.pid)]
