@@ -139,9 +139,10 @@ def _unmet_limits(
     """The fail lines of the partition check, and a warn line when memory is unproven.
 
     The fail lines are empty when one node group holds the time and the resources of
-    one job. The warn line is set then, when the memory requirement is set but the
-    cluster answer cannot prove it: the tracking policy is unknown, or no node group
-    is reported with enough memory.
+    one job. The memory verdict is scoped to the groups that already hold the time,
+    CPUs and GPUs of one job: the job fails when every one of them is reported with
+    a memory size below the requirement, and the warn line is set when some of them
+    is not reported with a memory size.
     """
     fragments: list[str] = []
     job_time = parse_slurm_duration(text=settings.time)
@@ -174,15 +175,15 @@ def _unmet_limits(
     )
     if fragments:
         return fragments, None
-    base_fits = _group_fits_all(
-        groups=groups,
-        time=job_time,
-        cpus=cpus,
-        memory=None,
-        gpus=settings.gpus,
-        gpu_type=settings.gpu_type,
-    )
-    if not base_fits or _memory_proven(needed=checked_memory, groups=groups):
+    # why: a candidate holds the time, CPUs and GPUs of one job; only memory can fail it
+    candidates = [
+        group
+        for group in groups
+        if (group.time_limit is None or job_time <= group.time_limit)
+        and group.cpus >= cpus
+        and gres_gpus(gres=group.gres, gpu_type=settings.gpu_type) >= settings.gpus
+    ]
+    if not candidates or all(group.memory_bytes is not None for group in candidates):
         # why: every single resource can fit, yet no one group holds the whole job
         fragments.append(_split_limit(settings=settings, cpus=cpus, memory=checked_memory))
         return fragments, None
@@ -252,16 +253,6 @@ def _unmet_resource_limits(
         )
         if fragment is not None
     ]
-
-
-def _memory_proven(*, needed: int | None, groups: Sequence[SlurmNodeGroup]) -> bool:
-    """Whether some node group is reported with at least the needed memory.
-
-    ``None`` counts as proven: there is no memory requirement to check.
-    """
-    if needed is None:
-        return True
-    return any(group.memory_bytes is not None and group.memory_bytes >= needed for group in groups)
 
 
 def _policy_warning(
