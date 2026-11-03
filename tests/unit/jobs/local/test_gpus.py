@@ -10,7 +10,14 @@ import types
 
 import pytest
 
-from tslab.jobs.local import busy_gpus, gpu_lock_folder, select_gpus, try_lease_gpu, visible_gpus
+from tslab.jobs.local import (
+    busy_gpus,
+    gpu_lock_folder,
+    GpuDiscovery,
+    select_gpus,
+    try_lease_gpu,
+    visible_gpus,
+)
 
 _LOCK_CHILD = (
     'import fcntl, os, sys, time\n'
@@ -263,7 +270,10 @@ def test_all_query_failures_count_no_gpu_as_busy(
 
 def test_select_gpus_auto_uses_visible_gpus() -> None:
     environment = {'CUDA_VISIBLE_DEVICES': '1,3'}
-    assert select_gpus(gpus='auto', skip_busy=False, environment=environment) == ('1', '3')
+    assert select_gpus(gpus=GpuDiscovery.AUTO, skip_busy=False, environment=environment) == (
+        '1',
+        '3',
+    )
 
 
 def test_select_gpus_keeps_the_given_ids_in_order() -> None:
@@ -309,6 +319,8 @@ def test_select_gpus_skip_busy_without_nvidia_gpus_fails(
     monkeypatch.setattr(platform, 'system', lambda: 'Linux')
     monkeypatch.setattr(platform, 'machine', lambda: 'x86_64')
     with pytest.raises(ValueError, match='needs NVIDIA GPUs'):
-        select_gpus(gpus='auto', skip_busy=True, environment={'CUDA_VISIBLE_DEVICES': ''})
+        select_gpus(
+            gpus=GpuDiscovery.AUTO, skip_busy=True, environment={'CUDA_VISIBLE_DEVICES': ''}
+        )
     with pytest.raises(ValueError, match='needs NVIDIA GPUs'):
         select_gpus(gpus=('mps',), skip_busy=True, environment={})

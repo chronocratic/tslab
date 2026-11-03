@@ -1,12 +1,13 @@
 """The ``[local]`` table of a machine profile."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from pathlib import Path
-from typing import cast, Literal
+from typing import cast
 
 from tslab.enums import LauncherKind
+from tslab.jobs.local import GpuDiscovery, MPS_GPU
 from tslab.study.machine.tables import from_table, MachineProfileError
 
 __all__ = [
@@ -32,7 +33,8 @@ class LocalSettings:
         timeout: The per-task time limit, in sbatch duration format, when set.
         signal_seconds: Seconds before the limit to send ``SIGUSR2``; zero disables it.
         gpus: The GPU ids the machine may use (NVIDIA ids, or the Apple GPU
-            ``"mps"`` standing alone), or ``"auto"`` to find them at launch.
+            ``"mps"`` standing alone), or ``GpuDiscovery.AUTO`` (``"auto"`` in the
+            file) to find them at launch.
         skip_busy_gpus: Whether to leave out GPUs with running compute processes.
         busy_gpu_memory_fraction: The fraction of a GPU memory in use that
             also counts it as busy; with the default 0.1, a GPU needs 90% of
@@ -44,7 +46,7 @@ class LocalSettings:
 
     timeout: str | None = None
     signal_seconds: int = 120
-    gpus: tuple[int | Literal['mps'], ...] | Literal['auto'] = ()
+    gpus: tuple[int | str, ...] | GpuDiscovery = ()
     skip_busy_gpus: bool = False
     busy_gpu_memory_fraction: float = 0.1
     max_parallel: int = 1
@@ -70,15 +72,15 @@ def settings_from(*, table: Mapping[str, object], path: Path) -> LocalSettings:
     """Read and validate this profile's local settings table."""
     local_table = table.get(TABLE)
     decoded_table = local_table
+    gpus: tuple[int | str, ...] | GpuDiscovery = ()
     if isinstance(local_table, dict) and 'gpus' in local_table:
-        decoded_table = {
-            **local_table,
-            'gpus': local_gpus(value=local_table['gpus'], location='local.gpus', path=path),
-        }
+        # why: the config codec reads an enum by member name; the file spells the choice by value
+        gpus = local_gpus(value=local_table['gpus'], location='local.gpus', path=path)
+        decoded_table = {name: item for name, item in local_table.items() if name != 'gpus'}
     local = from_table(
         cls=LocalSettings, table=decoded_table, location=TABLE, path=path, required=False
     )
-    local = local or LocalSettings()
+    local = replace(local or LocalSettings(), gpus=gpus)
     check_local(local=local, table=cast('Mapping[str, object]', local_table or {}), path=path)
     return local
 
@@ -140,7 +142,7 @@ def check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path
     if local.gpus == () and local.tasks_per_gpu > 1:
         message = f'{path}: local.tasks_per_gpu needs local.gpus; remove tasks_per_gpu or set gpus'
         raise MachineProfileError(message)
-    if local.gpus in ((), ('mps',)) and local.skip_busy_gpus:
+    if local.gpus in ((), (MPS_GPU,)) and local.skip_busy_gpus:
         message = (
             f'{path}: local.skip_busy_gpus reads nvidia-smi and needs NVIDIA gpus; '
             'remove skip_busy_gpus or set gpus'
@@ -151,18 +153,18 @@ def check_local(*, local: LocalSettings, table: Mapping[str, object], path: Path
         raise MachineProfileError(message)
 
 
-def local_gpus(*, value: object, location: str, path: Path) -> list[int | str] | Literal['auto']:
+def local_gpus(*, value: object, location: str, path: Path) -> tuple[int | str, ...] | GpuDiscovery:
     """The ``gpus`` field: ``"auto"``, a list of non-negative ids, or exactly ``["mps"]``."""
-    if value == 'auto':
-        return 'auto'
-    if value == ['mps']:
-        return cast('list[int | str]', value)
+    if value == GpuDiscovery.AUTO:
+        return GpuDiscovery.AUTO
+    if value == [MPS_GPU]:
+        return (MPS_GPU,)
     invalid = (
         f'{path}: {location} must be "auto", a list of non-negative integers, or exactly ["mps"]'
     )
     if not isinstance(value, list):
         raise MachineProfileError(invalid)
-    if 'mps' in value:
+    if MPS_GPU in value:
         message = (
             f'{path}: {location} must not hold "mps" next to ids: '
             'MPS is the only GPU on a Mac, so it must stand alone'
@@ -170,4 +172,4 @@ def local_gpus(*, value: object, location: str, path: Path) -> list[int | str] |
         raise MachineProfileError(message)
     if any(not isinstance(item, int) or isinstance(item, bool) or item < 0 for item in value):
         raise MachineProfileError(invalid)
-    return cast('list[int | str]', value)
+    return cast('tuple[int | str, ...]', tuple(value))  # checked above: ids are non-negative ints
