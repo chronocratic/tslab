@@ -56,13 +56,20 @@ def write_job_files(
             slurm=cast('SlurmSettings', group.resources),
             indices=[task.index for task in group.tasks],
             tasks_file=study_folder / 'jobs' / f'{group.job_file}.tasks',
-            log_pattern=study_folder / 'logs' / f'{group.short_name}_%a.out',
+            log_pattern=_log_pattern(group=group),
             project_root=project_root,
             env=machine.env,
             begin=begin,
             code_snapshot=group.code_snapshot,
         )
         atomic_write_text(path=study_folder / 'jobs' / f'{group.job_file}.sbatch', text=script)
+
+
+def _log_pattern(*, group: JobGroup) -> Path:
+    """The ``--output`` pattern of a group: the task log files with the index as ``%a``."""
+    first = group.tasks[0]
+    stem = first.log_file.name.removesuffix(f'_{first.index}.out')
+    return first.log_file.with_name(f'{stem}_%a.out')
 
 
 class SlurmLauncher:

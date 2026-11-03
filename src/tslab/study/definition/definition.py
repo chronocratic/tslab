@@ -144,7 +144,7 @@ class Grid:
         overrides: Settings applied to matching runs.
         run_settings: Settings every run of the grid gets, e.g. the run
             paths. Read-only once built.
-        job_name: The SLURM job name as a template of ``{short_name}``,
+        job_name: The job name as a template of ``{short_name}``,
             ``{study}`` and axis names. Runs with different names go into
             different arrays, so naming an axis splits the grid by it.
     """
