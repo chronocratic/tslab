@@ -8,7 +8,7 @@ import fcntl
 import json
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from tslab.core.paths import require_path, STATUS_FILE
@@ -113,7 +113,7 @@ class TaskRecord:
 
     index: int
     grid: str
-    run_path: str
+    run_path: PurePosixPath
     command: tuple[str, ...]
     extra_args: tuple[str, ...]
     resources: Mapping[str, object]
@@ -127,7 +127,7 @@ class TaskRecord:
         return {
             'index': self.index,
             'grid': self.grid,
-            'run_path': self.run_path,
+            'run_path': self.run_path.as_posix(),
             'command': list(self.command),
             'extra_args': list(self.extra_args),
             'resources': dict(self.resources),
@@ -143,7 +143,7 @@ class TaskRecord:
         return cls(
             index=int(document['index']),
             grid=str(document['grid']),
-            run_path=str(document['run_path']),
+            run_path=PurePosixPath(str(document['run_path'])),
             command=tuple(str(item) for item in document['command']),
             extra_args=tuple(str(item) for item in document['extra_args']),
             resources=dict(document['resources']),
@@ -331,7 +331,7 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
     return records
 
 
-def latest_tasks(*, jobs: Sequence[JobRecord]) -> dict[str, tuple[JobRecord, TaskRecord]]:
+def latest_tasks(*, jobs: Sequence[JobRecord]) -> dict[PurePosixPath, tuple[JobRecord, TaskRecord]]:
     """The last submitted task of every run path.
 
     Follow-up jobs hold no run tasks and never win.
@@ -342,7 +342,7 @@ def latest_tasks(*, jobs: Sequence[JobRecord]) -> dict[str, tuple[JobRecord, Tas
     Returns:
         ``{run path: (job, task)}`` with the latest job per path.
     """
-    latest: dict[str, tuple[JobRecord, TaskRecord]] = {}
+    latest: dict[PurePosixPath, tuple[JobRecord, TaskRecord]] = {}
     for job in jobs:
         if job.kind != JobKind.RUN:
             continue

@@ -98,7 +98,7 @@ def test_run_entry_names_live_auto_retry_job(project: Path, fake_backend: FakeBa
     submit_study(project=project)
     job = jobs_of(project=project)[0]
     task = job.tasks[0]
-    _, model, seed = task.run_path.split('/')
+    _, model, seed = task.run_path.parts
     write_run_status(
         project=project,
         model=model,

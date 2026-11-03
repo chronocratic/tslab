@@ -4,7 +4,7 @@ import fcntl
 import json
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import threading
 from typing import Any
 
@@ -30,7 +30,7 @@ def task(**changes: object) -> TaskRecord:
     values: dict[str, Any] = {
         'index': 0,
         'grid': 'g',
-        'run_path': 'g/a/1',
+        'run_path': PurePosixPath('g/a/1'),
         'command': ('python', 'classify', 'no-preset'),
         'extra_args': (),
         'resources': {},
@@ -55,14 +55,29 @@ def job(**changes: object) -> JobRecord:
     return JobRecord(**values)  # ty: ignore[invalid-argument-type]
 
 
+def test_task_record_run_path_round_trips_as_posix_text() -> None:
+    record = task(run_path=PurePosixPath('g/a/1'))
+    document = json.loads(json.dumps(record.to_json()))
+    assert document['run_path'] == 'g/a/1'
+    again = TaskRecord.from_json(document=document)
+    assert again.run_path == PurePosixPath('g/a/1')
+    assert json.dumps(again.to_json()) == json.dumps(record.to_json())
+
+
 def test_append_and_read_round_trip(tmp_path: Path) -> None:
     path = tmp_path / '.study' / 'submissions.jsonl'
-    append_job(path=path, record=job(job_id='100', tasks=(task(run_path='g/a/1', attempt=1),)))
-    append_job(path=path, record=job(job_id='101', tasks=(task(run_path='g/a/1', attempt=2),)))
+    append_job(
+        path=path,
+        record=job(job_id='100', tasks=(task(run_path=PurePosixPath('g/a/1'), attempt=1),)),
+    )
+    append_job(
+        path=path,
+        record=job(job_id='101', tasks=(task(run_path=PurePosixPath('g/a/1'), attempt=2),)),
+    )
     jobs = read_jobs(path=path)
     assert [record.job_id for record in jobs] == ['100', '101']
     assert json.loads(path.read_text().splitlines()[0])['format_version'] == 1
-    assert latest_tasks(jobs=jobs)['g/a/1'][1].attempt == 2
+    assert latest_tasks(jobs=jobs)[PurePosixPath('g/a/1')][1].attempt == 2
 
 
 def test_partial_last_line_is_skipped(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
@@ -77,10 +92,10 @@ def test_partial_last_line_is_skipped(tmp_path: Path, caplog: pytest.LogCaptureF
 
 def test_followups_are_not_latest_tasks(tmp_path: Path) -> None:
     jobs = [
-        job(job_id='1', tasks=(task(run_path='g/a/1'),)),
+        job(job_id='1', tasks=(task(run_path=PurePosixPath('g/a/1')),)),
         job(job_id='2', kind='followup', tasks=()),
     ]
-    assert latest_tasks(jobs=jobs)['g/a/1'][0].job_id == '1'
+    assert latest_tasks(jobs=jobs)[PurePosixPath('g/a/1')][0].job_id == '1'
 
 
 def test_unknown_format_version_raises(tmp_path: Path) -> None:

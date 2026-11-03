@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 import logging
 import os
+from pathlib import PurePosixPath
 import socket
 import time
 from typing import TextIO
@@ -100,13 +101,13 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     context: Context,
     reports: Sequence[RunReport],
     dry_run: bool,
-    extra_args: Mapping[str, tuple[str, ...]],
+    extra_args: Mapping[PurePosixPath, tuple[str, ...]],
     sleep: Callable[[float], None],
     start_delay_seconds: int | None = None,
     before_launch: Callable[[], int] | None = None,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
-    code_snapshots: Mapping[str, CodeSnapshot | None] | None = None,
+    code_snapshots: Mapping[PurePosixPath, CodeSnapshot | None] | None = None,
 ) -> tuple[int, list[JobRecord]]:
     """Plan, validate and launch the given runs; the shared tail of the commands.
 

@@ -4,7 +4,7 @@ from dataclasses import replace
 import fcntl
 from io import StringIO
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import threading
@@ -410,7 +410,7 @@ def test_cancel_delegates_to_local_cancel(
 def _code_snapshot_group(*, snapshot: CodeSnapshot, log_file: Path) -> JobGroup:
     task = PlannedTask(
         resolved=ResolvedRun(
-            run=StudyRun(grid='g', values={}, run_path='p', settings={}),
+            run=StudyRun(grid='g', values={}, run_path=PurePosixPath('p'), settings={}),
             settings={},
             resources=LocalResources(cpus=1, cpus_per_run=1),
         ),

@@ -116,7 +116,7 @@ def test_interrupted_run_is_live_while_followup_queued(
     submit_study(project=project)
     job = jobs_of(project=project)[0]
     task = job.tasks[0]
-    _, model, seed = task.run_path.split('/')
+    _, model, seed = task.run_path.parts
     write_run_status(
         project=project,
         model=model,
@@ -143,7 +143,7 @@ def test_interrupted_runs_are_live_while_resubmit_holds_lock(
     submit_study(project=project)
     job = jobs_of(project=project)[0]
     for task in job.tasks:
-        _, model, seed = task.run_path.split('/')
+        _, model, seed = task.run_path.parts
         write_run_status(
             project=project,
             model=model,

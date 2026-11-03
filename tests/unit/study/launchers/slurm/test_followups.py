@@ -2,7 +2,7 @@
 
 import dataclasses
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import sys
 
 import pytest
@@ -73,7 +73,7 @@ def bump_attempts(
                 TaskRecord(
                     index=index,
                     grid='g',
-                    run_path=run_path,
+                    run_path=PurePosixPath(run_path),
                     command=(sys.executable, 'toy_script.py'),
                     extra_args=(),
                     resources={},
@@ -176,7 +176,7 @@ def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(
         )
     assert code == 0
     retried = jobs_of(project=project)[-1]
-    assert [t.run_path for t in retried.tasks] == ['g/small/1', 'g/small/2']
+    assert [t.run_path.as_posix() for t in retried.tasks] == ['g/small/1', 'g/small/2']
     assert all(t.attempt == 2 for t in retried.tasks)
     assert 'stuck: g/small/3 (attempt 1, no progress)' in caplog.text
     assert 'gave up: g/large/2 after 3 attempts' in caplog.text

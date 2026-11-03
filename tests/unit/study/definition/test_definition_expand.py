@@ -1,5 +1,7 @@
 """``expand_runs``: a study into its runs, with merged settings."""
 
+from pathlib import PurePosixPath
+
 import pytest
 
 from tests.unit.study.configs import grid
@@ -9,7 +11,7 @@ from tslab.study.definition import expand_runs
 
 def test_run_path_follows_axis_order() -> None:
     runs = expand_runs(study=Study(name='s', grids={'classification': grid()}))
-    assert [run.run_path for run in runs][:2] == [
+    assert [run.run_path.as_posix() for run in runs][:2] == [
         'classification/ts2vec-paper/Coffee/42',
         'classification/ts2vec-paper/Coffee/7',
     ]
@@ -36,8 +38,8 @@ def test_override_precedence() -> None:
         )
     )
     by_path = {run.run_path: run for run in expand_runs(study=Study(name='s', grids={'g': g}))}
-    assert by_path['g/ts2vec-paper/Coffee/42'].settings['data.batch_size'] == 2
-    assert by_path['g/cost-paper/Coffee/42'].settings['data.batch_size'] == 3
+    assert by_path[PurePosixPath('g/ts2vec-paper/Coffee/42')].settings['data.batch_size'] == 2
+    assert by_path[PurePosixPath('g/cost-paper/Coffee/42')].settings['data.batch_size'] == 3
 
 
 def test_exclude_drops_runs() -> None:

@@ -112,7 +112,7 @@ def _row_head(*, report: RunReport, axes: Sequence[str]) -> ResultRow:
     row: ResultRow = {'grid': report.run.grid}
     for axis in axes:
         row[axis] = report.run.values.get(axis)
-    row['run_path'] = report.run.run_path
+    row['run_path'] = report.run.run_path.as_posix()
     row['study_state'] = report.state.value
     return row
 

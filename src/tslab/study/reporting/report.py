@@ -3,6 +3,7 @@
 from collections import Counter
 from collections.abc import Mapping, Sequence
 import logging
+from pathlib import PurePosixPath
 import shlex
 
 from tslab.core.text import format_index_ranges, log_table
@@ -80,7 +81,7 @@ def _log_run_lines(*, reports: Sequence[RunReport], starts: Mapping[str, QueuedJ
         ' '.join(
             part
             for part in (
-                report.run.run_path,
+                report.run.run_path.as_posix(),
                 report.state.value,
                 None if report.job_id is None else f'job {report.job_id}',
                 report.reason,
@@ -146,7 +147,7 @@ def resources_of(*, resources: Resources) -> str:
     return resources.describe()
 
 
-def log_problems(*, problems: Sequence[tuple[str, str]]) -> None:
+def log_problems(*, problems: Sequence[tuple[PurePosixPath, str]]) -> None:
     """Log the planning problems, the first few of them.
 
     Args:

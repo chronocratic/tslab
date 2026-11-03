@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import subprocess
 import time
 from typing import TextIO, TYPE_CHECKING
@@ -120,7 +120,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     code_snapshots = _code_snapshots_of(
         reports=selected, reuse=reuse, new=new_code_snapshot, drop=drop_code_snapshot, states=states
     )
-    args: dict[str, tuple[str, ...]] = {}
+    args: dict[PurePosixPath, tuple[str, ...]] = {}
     for report in selected:
         path = report.run.run_path
         if extra_args is None and (task := reuse.get(path)) is not None:
@@ -155,11 +155,11 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
 def _code_snapshots_of(
     *,
     reports: Sequence[RunReport],
-    reuse: Mapping[str, tuple['JobRecord', 'TaskRecord']],
+    reuse: Mapping[PurePosixPath, tuple['JobRecord', 'TaskRecord']],
     new: CodeSnapshot | None,
     drop: bool,
     states: tuple[StudyState, ...],
-) -> dict[str, CodeSnapshot | None]:
+) -> dict[PurePosixPath, CodeSnapshot | None]:
     """The code snapshot each selected run resubmits from.
 
     Args:
@@ -181,7 +181,7 @@ def _code_snapshots_of(
         return {report.run.run_path: new for report in reports}
     if drop:
         return {report.run.run_path: None for report in reports}
-    snapshots: dict[str, CodeSnapshot | None] = {}
+    snapshots: dict[PurePosixPath, CodeSnapshot | None] = {}
     for report in reports:
         latest = reuse.get(report.run.run_path)
         snapshots[report.run.run_path] = latest[0].code_snapshot if latest is not None else None
@@ -190,7 +190,7 @@ def _code_snapshots_of(
     return snapshots
 
 
-def _check_reused_folders(*, snapshots: Mapping[str, CodeSnapshot | None]) -> None:
+def _check_reused_folders(*, snapshots: Mapping[PurePosixPath, CodeSnapshot | None]) -> None:
     """Every reused snapshot folder must still hold a ``src/`` copy."""
     for snapshot in dict.fromkeys(snapshots.values()):
         if snapshot is None or (snapshot.folder / SRC_FOLDER).is_dir():
@@ -204,8 +204,8 @@ def _check_reused_folders(*, snapshots: Mapping[str, CodeSnapshot | None]) -> No
 
 def _warn_reused_snapshots(
     *,
-    reuse: Mapping[str, tuple['JobRecord', 'TaskRecord']],
-    snapshots: Mapping[str, CodeSnapshot | None],
+    reuse: Mapping[PurePosixPath, tuple['JobRecord', 'TaskRecord']],
+    snapshots: Mapping[PurePosixPath, CodeSnapshot | None],
     states: tuple[StudyState, ...],
 ) -> None:
     """One warning per reused snapshot, when failed runs are resubmitted."""
@@ -306,7 +306,7 @@ def run_one(
         raise ValueError(message)
     if len(reports) > 1:
         paths = [report.run.run_path for report in reports]
-        shown = ', '.join(paths[:_SELECTION_SHOWN])
+        shown = ', '.join(path.as_posix() for path in paths[:_SELECTION_SHOWN])
         more = (
             f', and {len(paths) - _SELECTION_SHOWN} more' if len(paths) > _SELECTION_SHOWN else ''
         )
@@ -347,7 +347,7 @@ def run_one(
     return run_process(['bash', '-c', script])
 
 
-def _reused_args(*, path: str, context: Context) -> tuple[str, ...]:
+def _reused_args(*, path: PurePosixPath, context: Context) -> tuple[str, ...]:
     """The extra args of the latest submission of one run, or none."""
     task = latest_tasks(jobs=context.jobs).get(path)
     return () if task is None else task[1].extra_args

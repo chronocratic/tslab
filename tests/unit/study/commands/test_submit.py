@@ -158,7 +158,7 @@ def test_submit_launches_and_records(project: Path, fake_backend: FakeBackend) -
     assert len(fake_backend.calls('launch')) == 1
     jobs = jobs_of(project=project)
     assert len(jobs) == 1
-    assert [(t.run_path, t.index) for t in jobs[0].tasks] == [
+    assert [(t.run_path.as_posix(), t.index) for t in jobs[0].tasks] == [
         ('g/small/1', 0),
         ('g/small/2', 1),
         ('g/large/1', 2),
@@ -217,7 +217,7 @@ def test_submit_skips_done_and_live_runs(project: Path, fake_backend: FakeBacken
     )
     assert code == 0
     jobs = jobs_of(project=project)
-    assert [t.run_path for t in jobs[1].tasks] == ['g/large/2']
+    assert [t.run_path.as_posix() for t in jobs[1].tasks] == ['g/large/2']
     task = jobs[1].tasks[0]
     assert task.attempt == 2
     # why: the run keeps the array index of its first submission
@@ -254,7 +254,7 @@ def test_include_done_resubmits_done_runs(project: Path, fake_backend: FakeBacke
     assert code == 0
     jobs = jobs_of(project=project)
     # why: the done run is skipped, the runs without a folder are failed, not done
-    assert [t.run_path for t in jobs[1].tasks] == ['g/small/1', 'g/small/2', 'g/large/2']
+    assert [t.run_path.as_posix() for t in jobs[1].tasks] == ['g/small/1', 'g/small/2', 'g/large/2']
     code = submit(
         context=context(project=project, machine_file='cluster.toml'),
         include_done=True,
@@ -264,7 +264,7 @@ def test_include_done_resubmits_done_runs(project: Path, fake_backend: FakeBacke
     )
     assert code == 0
     jobs = jobs_of(project=project)
-    assert [t.run_path for t in jobs[2].tasks] == [
+    assert [t.run_path.as_posix() for t in jobs[2].tasks] == [
         'g/small/1',
         'g/small/2',
         'g/large/1',

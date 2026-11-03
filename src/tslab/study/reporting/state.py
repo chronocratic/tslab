@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import time
 from typing import TYPE_CHECKING
 
@@ -187,8 +187,11 @@ def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
 
 
 def _grace_wait(
-    *, directories: dict[str, Path], completed_phase: 'JobPhase', sleep: Callable[[float], None]
-) -> dict[str, FolderFacts]:
+    *,
+    directories: dict[PurePosixPath, Path],
+    completed_phase: 'JobPhase',
+    sleep: Callable[[float], None],
+) -> dict[PurePosixPath, FolderFacts]:
     """Re-read the listed folders until each settles, at most 15 rounds (30 after a chmod error).
 
     Returns:
@@ -196,7 +199,7 @@ def _grace_wait(
     """
     limit = 15
     pending = dict(directories)
-    settled: dict[str, FolderFacts] = {}
+    settled: dict[PurePosixPath, FolderFacts] = {}
     rounds = 0
     while pending and rounds < limit:
         refreshed = [_refresh_failed(directory=directory) for directory in pending.values()]
@@ -220,7 +223,9 @@ def _refresh_failed(*, directory: Path) -> bool:
     return False
 
 
-def _reread(*, pending: dict[str, Path], completed_phase: 'JobPhase') -> dict[str, FolderFacts]:
+def _reread(
+    *, pending: dict[PurePosixPath, Path], completed_phase: 'JobPhase'
+) -> dict[PurePosixPath, FolderFacts]:
     """Read the pending folders again; the ones that settled leave ``pending``."""
     read = {key: read_folder(run_directory=directory) for key, directory in pending.items()}
     for key, folder in read.items():
@@ -255,8 +260,8 @@ def collect_states(
     """
     latest = latest_tasks(jobs=jobs)
     entries = []
-    folders: dict[str, FolderFacts] = {}
-    waiting: dict[str, Path] = {}
+    folders: dict[PurePosixPath, FolderFacts] = {}
+    waiting: dict[PurePosixPath, Path] = {}
     for run in runs:
         directory = study_directory / run.run_path
         folders[run.run_path] = read_folder(run_directory=directory)
