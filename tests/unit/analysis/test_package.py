@@ -1,0 +1,53 @@
+import tslab.analysis
+
+EXPECTED = {
+    'AnalysisMetric',
+    'AnalysisOutput',
+    'Block',
+    'Caption',
+    'CdDiagram',
+    'DEFAULT_ALPHA',
+    'DEFAULT_BOOTSTRAP_SAMPLES',
+    'DEFAULT_CONFIDENCE',
+    'DEFAULT_MIN_PAIRS',
+    'Direction',
+    'FULL_WIDTH',
+    'FigureFormat',
+    'FriedmanTest',
+    'HALF_WIDTH',
+    'NUMBERS_STEM',
+    'NumberKind',
+    'OutputFolder',
+    'PLOTS_FOLDER',
+    'PairedTest',
+    'against_baseline',
+    'annotate_tests',
+    'average_ranks',
+    'bootstrap_median',
+    'cd_diagram',
+    'correlations',
+    'critical_difference',
+    'format_number',
+    'friedman',
+    'holm_adjust',
+    'is_dark_cell',
+    'load_results',
+    'method_matrix',
+    'missing_runs',
+    'number_key',
+    'numbers_frame',
+    'pairwise_wilcoxon',
+    'paper_style',
+    'per_unit_ranks',
+    'rank_agreement',
+    'rank_biserial',
+    'show',
+    'stars',
+    'wilcoxon_paired',
+    'write_numbers',
+}
+
+
+def test_door_lists_the_public_api() -> None:
+    assert set(tslab.analysis.__all__) == EXPECTED
+    assert all(hasattr(tslab.analysis, name) for name in tslab.analysis.__all__)
