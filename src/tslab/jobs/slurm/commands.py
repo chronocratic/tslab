@@ -149,19 +149,8 @@ def sbatch(
     delay = 10.0
     start = now()
     deadline = start + QOS_WAIT_CAP_SECONDS
+    output = ''
     while True:
-        completed = _run(
-            command=['sbatch', '--parsable', str(script)],
-            env=submission_environment(environ=environ if environ is not None else os.environ),
-            timeout=SUBMIT_TIMEOUT_SECONDS,
-        )
-        if completed.returncode == 0:
-            return completed.stdout.split(';', 1)[0].strip()
-        output = completed.stdout + completed.stderr
-        marker = next((name for name in QOS_LIMIT_MARKERS if name in output), None)
-        if marker is None:
-            message = f'sbatch failed for {script}:\n{output}'
-            raise SlurmError(message)
         # why: the cap bounds the total wait, the calls included, not just the sleeps
         remaining = deadline - now()
         if remaining <= 0:
@@ -171,7 +160,19 @@ def sbatch(
                 f'check the limits with sacctmgr show qos:\n{output}'
             )
             raise SlurmError(message)
-        wait = min(delay, remaining)
+        completed = _run(
+            command=['sbatch', '--parsable', str(script)],
+            env=submission_environment(environ=environ if environ is not None else os.environ),
+            timeout=min(SUBMIT_TIMEOUT_SECONDS, remaining),
+        )
+        if completed.returncode == 0:
+            return completed.stdout.split(';', 1)[0].strip()
+        output = completed.stdout + completed.stderr
+        marker = next((name for name in QOS_LIMIT_MARKERS if name in output), None)
+        if marker is None:
+            message = f'sbatch failed for {script}:\n{output}'
+            raise SlurmError(message)
+        wait = min(delay, deadline - now())
         _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, wait)
         sleep(wait)
         delay = min(delay * 2, 900.0)

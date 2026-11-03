@@ -63,6 +63,28 @@ def test_sbatch_gives_up_after_the_qos_cap(fake: FakeSlurm, tmp_path: Path) -> N
     assert sum(delays) + 900 > QOS_WAIT_CAP_SECONDS
 
 
+def test_sbatch_bounds_the_retry_by_the_qos_deadline(fake: FakeSlurm, tmp_path: Path) -> None:
+    fake.set_answers(
+        'sbatch',
+        [
+            {'exit': 1, 'stderr': 'error: QOSMaxSubmitJobPerUserLimit'},
+            {'exit': 0, 'stdout': '7;c', 'sleep': 10},
+        ],
+    )
+    clock = [0.0]
+    jumped = [False]
+
+    def sleep(seconds: float) -> None:
+        clock[0] += seconds
+        if not jumped[0]:
+            jumped[0] = True
+            clock[0] = QOS_WAIT_CAP_SECONDS - 2.0
+
+    with pytest.raises(SlurmError, match=r'did not answer within 2 seconds'):
+        sbatch(script=tmp_path / 'x.sbatch', sleep=sleep, now=lambda: clock[0])
+    assert len(fake.calls('sbatch')) == 2
+
+
 def test_sbatch_logs_each_qos_wait(
     fake: FakeSlurm, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
