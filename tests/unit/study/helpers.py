@@ -131,18 +131,28 @@ def finish_run(*, project: Path, model: str, seed: int) -> None:
     )
 
 
-def write_launch(*, folder: Path, pid: int, host: str, tasks: dict[str, str]) -> None:
+def write_launch(  # noqa: PLR0913 # why: one field per launch file key, all keyword-only
+    *,
+    folder: Path,
+    pid: int,
+    host: str,
+    tasks: dict[str, str],
+    run_pids: tuple[tuple[str, int], ...] = (),
+    boot: str | None = None,
+) -> None:
     """Write a launch file as ``hold_launch`` would."""
     folder.mkdir(parents=True, exist_ok=True)
-    atomic_write_json(
-        path=folder / LAUNCH_FILE,
-        document={
-            'pid': pid,
-            'hostname': host,
-            'started': '2026-01-01T00:00:00+00:00',
-            'tasks': [[key, state] for key, state in tasks.items()],
-        },
-    )
+    document = {
+        'pid': pid,
+        'hostname': host,
+        'started': '2026-01-01T00:00:00+00:00',
+        'tasks': [[key, state] for key, state in tasks.items()],
+    }
+    if run_pids:
+        document['run_pids'] = [list(item) for item in run_pids]
+    if boot is not None:
+        document['boot'] = boot
+    atomic_write_json(path=folder / LAUNCH_FILE, document=document)
 
 
 def record_local_job(*, project: Path) -> list[str]:

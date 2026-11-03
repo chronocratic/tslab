@@ -171,6 +171,27 @@ def test_hold_launch_writes_the_boot(tmp_path: Path, monkeypatch: pytest.MonkeyP
         assert launch.boot == 'boot-A'
 
 
+def test_hold_launch_records_run_pids(tmp_path: Path) -> None:
+    with hold_launch(
+        study_folder=tmp_path, task_ids=['j_0', 'j_1'], pid=1, host='h', now='t'
+    ) as set_state:
+        set_state(task_id='j_0', state='running', pid=4242)
+        launch = read_launch(study_folder=tmp_path)
+        assert launch is not None
+        assert launch.run_pids == (('j_0', 4242),)
+        set_state(task_id='j_0', state='ended')
+        launch = read_launch(study_folder=tmp_path)
+        assert launch is not None
+        assert launch.run_pids == ()
+
+
+def test_old_launch_file_has_no_run_pids(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
+    launch = read_launch(study_folder=tmp_path)
+    assert launch is not None
+    assert launch.run_pids == ()
+
+
 def test_status_reads_local_launch_states(project: Path) -> None:
     record_local_job(project=project)
     write_launch(

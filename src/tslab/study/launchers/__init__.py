@@ -89,8 +89,8 @@ class LaunchReport:
 class OnTaskState(Protocol):
     """The state changes of the tasks of one local launch."""
 
-    def __call__(self, *, task_id: str, state: str) -> None:
-        """Called with the id of a task and its new state."""
+    def __call__(self, *, task_id: str, state: str, pid: int | None = None) -> None:
+        """Called with the id of a task, its new state, and its pid while running."""
         ...
 
 

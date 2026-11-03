@@ -11,7 +11,16 @@ from tslab.jobs.local.gpus import (
     visible_gpus,
 )
 from tslab.jobs.local.output import tail_lines, TaskInfo, TaskOutput
-from tslab.jobs.local.pool import OnEnd, OnEvent, OnLine, OnStart, OnWait, PoolCommand, run_commands
+from tslab.jobs.local.pool import (
+    OnEnd,
+    OnEvent,
+    OnLine,
+    OnSpawn,
+    OnStart,
+    OnWait,
+    PoolCommand,
+    run_commands,
+)
 from tslab.jobs.local.process import (
     boot_id,
     process_alive,
@@ -28,6 +37,7 @@ __all__ = [
     'OnEnd',
     'OnEvent',
     'OnLine',
+    'OnSpawn',
     'OnStart',
     'OnWait',
     'PoolCommand',

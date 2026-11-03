@@ -19,6 +19,55 @@ _LOCK_CHILD = (
 )
 
 
+def test_pool_calls_on_spawn_with_the_key(*, tmp_path: Path) -> None:
+    spawns: list[tuple[str, int]] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        pass
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        pass
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        pass
+
+    def on_spawn(*, key: str, pid: int) -> None:
+        spawns.append((key, pid))
+
+    run_commands(
+        commands=[
+            PoolCommand(
+                key='a',
+                command=(sys.executable, '-c', 'pass'),
+                cwd=tmp_path,
+                environment=os.environ,
+            )
+        ],
+        slots=1,
+        gpu_ids=(),
+        tasks_per_gpu=1,
+        lock_folder=None,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
+        on_spawn=on_spawn,
+    )
+    assert len(spawns) == 1
+    assert spawns[0][0] == 'a'
+    assert spawns[0][1] > 0
+
+
 def _hold_gpu_zero(*, folder: Path) -> subprocess.Popen[bytes]:
     ready = folder / 'ready'
     process = subprocess.Popen(  # noqa: S603 # why: the child only takes the lock file

@@ -1,5 +1,6 @@
 """Cancelling a live local study launch."""
 
+import contextlib
 import os
 from pathlib import Path
 import subprocess
@@ -11,6 +12,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import (
     context,
+    finished_pid,
     no_sleep,
     record_local_job,
     study_directory,
@@ -18,6 +20,7 @@ from tests.unit.study.helpers import (
 )
 from tslab.cli import main
 from tslab.core.meta import hostname
+from tslab.jobs.local import boot_id
 from tslab.study.commands import cancel, resubmit, submit
 from tslab.study.context import load_context, Selection
 
@@ -101,6 +104,56 @@ def test_local_cancel_ignores_tasks_of_groups_not_started(project: Path) -> None
     finally:
         child.kill()
         child.wait()
+
+
+def _run_group() -> subprocess.Popen[bytes]:
+    return subprocess.Popen(  # why: a fixed test command
+        [sys.executable, '-c', 'import time; time.sleep(30)'], start_new_session=True
+    )
+
+
+def _hold_dead_launch(*, project: Path, run_pid: int) -> list[str]:
+    ids = record_local_job(project=project)
+    write_launch(
+        folder=study_directory(project=project) / '.study',
+        pid=finished_pid(),
+        host=hostname(),
+        tasks=dict.fromkeys(ids, 'pending') | {ids[0]: 'running'},
+        run_pids=((ids[0], run_pid),),
+        boot=boot_id(),
+    )
+    return ids
+
+
+def test_cancel_signals_runs_of_a_dead_launcher(project: Path) -> None:
+    run = _run_group()
+    try:
+        _hold_dead_launch(project=project, run_pid=run.pid)
+        ctx = context(project=project, machine_file='local.toml')
+        assert cancel(context=ctx, dry_run=False) == (0, [str(run.pid)])
+        deadline = time.monotonic() + 5
+        while run.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert run.poll() is not None
+    finally:
+        if run.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                run.kill()
+        run.wait()
+
+
+def test_cancel_dry_run_lists_runs_of_a_dead_launcher(project: Path) -> None:
+    run = _run_group()
+    try:
+        _hold_dead_launch(project=project, run_pid=run.pid)
+        ctx = context(project=project, machine_file='local.toml')
+        assert cancel(context=ctx, dry_run=True) == (0, [str(run.pid)])
+        assert run.poll() is None
+    finally:
+        if run.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                run.kill()
+        run.wait()
 
 
 def test_local_cancel_signal_flag_is_usage_error(

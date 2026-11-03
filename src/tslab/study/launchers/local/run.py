@@ -7,6 +7,7 @@ from pathlib import Path
 import shlex
 import signal
 import sys
+import threading
 from typing import TextIO
 
 from tslab.core.files import atomic_write_text
@@ -18,6 +19,7 @@ from tslab.jobs.local import (
     stop_on_signals,
     TaskInfo,
     TaskOutput,
+    Watchdog,
     without_scheduler_variables,
 )
 from tslab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
@@ -25,7 +27,7 @@ from tslab.study.launchers import LaunchError, LaunchStopped, OnTaskState, Recor
 from tslab.study.launchers.local.pid_file import DETACHED_VARIABLE
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.paths import usage_file
-from tslab.study.plan import JobGroup
+from tslab.study.plan import JobGroup, PlannedTask
 
 __all__ = ['LocalLauncher', 'local_job_id', 'resolve_local_gpus', 'write_job_files']
 
@@ -85,6 +87,50 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
     if not gpu_ids and local.tasks_per_gpu > 1:
         _LOGGER.warning('no local GPUs, so local.tasks_per_gpu is ignored')
     return gpu_ids
+
+
+class _LaunchStates:
+    """The run pids of one launch, kept in step with the watchdog and the pid file.
+
+    ``on_task_state`` is the callback the task output calls; ``on_spawn`` the
+    callback the pool calls with the pid of a task that starts.
+    """
+
+    def __init__(self, *, on_task_state: OnTaskState | None, watchdog: Watchdog) -> None:
+        self._on_task_state = on_task_state
+        self._watchdog = watchdog
+        self._pids: dict[str, int] = {}
+        self._lock = threading.Lock()
+
+    def _report(self, *, key: str, state: str, pid: int | None = None) -> None:
+        if self._on_task_state is not None:
+            self._on_task_state(task_id=key, state=state, pid=pid)
+
+    def on_task_state(self, key: str, state: str) -> None:
+        if state != 'ended':
+            self._report(key=key, state=state)
+            return
+        with self._lock:
+            pid = self._pids.pop(key, None)
+        if pid is not None:
+            self._watchdog.forget(pid=pid)
+        self._report(key=key, state=state)
+
+    def on_spawn(self, *, key: str, pid: int) -> None:
+        with self._lock:
+            self._pids[key] = pid
+        self._watchdog.watch(pid=pid)
+        self._report(key=key, state='running', pid=pid)
+
+
+def _task_header(
+    *, task: PlannedTask, job_id: str, host: str, now: Callable[[], str], gpu_ids: tuple[str, ...]
+) -> str:
+    """The header line of the log file of one task."""
+    header = f'=== tslab attempt {task.attempt} | job {job_id} | {host} | {now()}'
+    if gpu_ids:
+        header += f' | gpus {",".join(gpu_ids)}'
+    return header + ' ===\n'
 
 
 class LocalLauncher:
@@ -177,19 +223,8 @@ class LocalLauncher:
         else:
             slots = self._local.max_parallel
         by_key = {f'{job_id}_{task.index}': task for task in group.tasks}
-
-        def task_header(key: str) -> str:
-            task = by_key[key]
-            header = (
-                f'=== tslab attempt {task.attempt} | job {job_id} | {self._host} | {self._now()}'
-            )
-            if self._gpu_ids:
-                header += f' | gpus {",".join(self._gpu_ids)}'
-            return header + ' ===\n'
-
-        def on_task_state(key: str, state: str) -> None:
-            if self._on_task_state is not None:
-                self._on_task_state(task_id=key, state=state)
+        watchdog = Watchdog.start(grace_seconds=self._grace_seconds)
+        states = _LaunchStates(on_task_state=self._on_task_state, watchdog=watchdog)
 
         output = TaskOutput(
             stream=stream,
@@ -210,8 +245,14 @@ class LocalLauncher:
                 )
                 for key, task in by_key.items()
             },
-            header=task_header,
-            on_task_state=on_task_state,
+            header=lambda key: _task_header(
+                task=by_key[key],
+                job_id=job_id,
+                host=self._host,
+                now=self._now,
+                gpu_ids=self._gpu_ids,
+            ),
+            on_task_state=states.on_task_state,
         )
 
         def task_environment() -> dict[str, str]:
@@ -223,35 +264,40 @@ class LocalLauncher:
                 env['PYTHONPATH'] = snapshot.pythonpath(current=env.get('PYTHONPATH'))
             return env
 
-        with stop_on_signals(signals=_STOP_SIGNALS) as request:
-            run_commands(
-                commands=[
-                    PoolCommand(
-                        key=key,
-                        command=task.command,
-                        cwd=self._project_root,
-                        environment=task_environment(),
-                    )
-                    for key, task in by_key.items()
-                ],
-                slots=slots,
-                gpu_ids=self._gpu_ids,
-                tasks_per_gpu=self._local.tasks_per_gpu,
-                lock_folder=(
-                    gpu_lock_folder(name='tslab-gpus', environment=os.environ)
-                    if self._gpu_ids
-                    else None
-                ),
-                stop=request.event,
-                timeout_seconds=timeout_seconds(local=self._local),
-                signal_seconds=self._local.signal_seconds,
-                on_start=output.on_start,
-                on_line=output.on_line,
-                on_event=output.on_event,
-                on_wait=output.on_wait,
-                on_end=output.on_end,
-                grace_seconds=self._grace_seconds,
-            )
-        if request.signal_number is not None:
-            raise LaunchStopped(signal_number=request.signal_number)
+        try:
+            with stop_on_signals(signals=_STOP_SIGNALS) as request:
+                run_commands(
+                    commands=[
+                        PoolCommand(
+                            key=key,
+                            command=task.command,
+                            cwd=self._project_root,
+                            environment=task_environment(),
+                        )
+                        for key, task in by_key.items()
+                    ],
+                    slots=slots,
+                    gpu_ids=self._gpu_ids,
+                    tasks_per_gpu=self._local.tasks_per_gpu,
+                    lock_folder=(
+                        gpu_lock_folder(name='tslab-gpus', environment=os.environ)
+                        if self._gpu_ids
+                        else None
+                    ),
+                    stop=request.event,
+                    timeout_seconds=timeout_seconds(local=self._local),
+                    signal_seconds=self._local.signal_seconds,
+                    on_start=output.on_start,
+                    on_line=output.on_line,
+                    on_event=output.on_event,
+                    on_wait=output.on_wait,
+                    on_end=output.on_end,
+                    grace_seconds=self._grace_seconds,
+                    on_spawn=states.on_spawn,
+                )
+            if request.signal_number is not None:
+                raise LaunchStopped(signal_number=request.signal_number)
+        finally:
+            # why: a launch that dies must not leave the watchdog holding its runs
+            watchdog.close()
         return job_id

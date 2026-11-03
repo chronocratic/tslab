@@ -12,7 +12,16 @@ from typing import cast, Protocol
 from tslab.jobs.local.gpus import GpuLease, try_lease_gpu
 from tslab.jobs.local.process import ProcessResult, run_process
 
-__all__ = ['OnEnd', 'OnEvent', 'OnLine', 'OnStart', 'OnWait', 'PoolCommand', 'run_commands']
+__all__ = [
+    'OnEnd',
+    'OnEvent',
+    'OnLine',
+    'OnSpawn',
+    'OnStart',
+    'OnWait',
+    'PoolCommand',
+    'run_commands',
+]
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -41,6 +50,14 @@ class OnStart(Protocol):
 
     def __call__(self, *, key: str, gpu_id: str | None) -> None:
         """Called with the key and the GPU id when a command starts."""
+        ...
+
+
+class OnSpawn(Protocol):
+    """A callback of the pool, called when the process of a command starts."""
+
+    def __call__(self, *, key: str, pid: int) -> None:
+        """Called with the key and the pid of the process of a command."""
         ...
 
 
@@ -131,6 +148,13 @@ def _never_started_of(
     return tuple(command.key for command in commands if command.key in never_started)
 
 
+def _spawn_callback(*, on_spawn: OnSpawn | None, key: str) -> Callable[[int], None] | None:
+    """The per-key ``on_spawn`` callback for one command, or ``None`` without one."""
+    if on_spawn is None:
+        return None
+    return lambda pid: on_spawn(key=key, pid=pid)
+
+
 def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and limit setting
     *,
     commands: Sequence[PoolCommand],
@@ -148,6 +172,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     on_end: OnEnd,
     grace_seconds: float = 30.0,
     gpu_poll_seconds: float = 5.0,
+    on_spawn: OnSpawn | None = None,
 ) -> tuple[str, ...]:
     """Run the commands in order, at most ``slots`` of them at once.
 
@@ -189,6 +214,8 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
             the ``OSError`` of a finished command.
         grace_seconds: Seconds to wait after a ``SIGTERM`` before a ``SIGKILL``.
         gpu_poll_seconds: Seconds between retries for a GPU lease.
+        on_spawn: Called with the key and the pid of the process right after
+            it starts, or ``None`` for no callback.
 
     Returns:
         The keys of the commands that never started because ``stop`` was set.
@@ -242,6 +269,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
                     signal_seconds=signal_seconds,
                     grace_seconds=grace_seconds,
                     pass_fds=lease.fds if lease is not None else (),
+                    on_spawn=_spawn_callback(on_spawn=on_spawn, key=command.key),
                 )
             )
             on_end(key=command.key, gpu_id=slot, outcome=outcome)
