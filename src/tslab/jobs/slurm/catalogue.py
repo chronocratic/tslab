@@ -31,6 +31,9 @@ __all__ = [
 ]
 
 
+_FALLBACK_NOTE = 'sacct did not answer; asking every recorded job id\n'
+
+
 class IdScope(StrEnum):
     """Which job ids a command takes."""
 
@@ -263,7 +266,7 @@ def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> Comman
     ids, fell_back = select_ids(scope=command.scope, job_ids=values.job_ids)
     returncode = 0
     stdout: list[str] = []
-    stderr: list[str] = []
+    stderr: list[str] = [_FALLBACK_NOTE] if fell_back else []
     for line in command_lines(command=command, ids=ids, values=values):
         try:
             # why: fixed scheduler tool on PATH from the catalogue
