@@ -3,6 +3,7 @@
 import contextlib
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import time
@@ -183,6 +184,44 @@ def test_local_cancel_dead_partial_selection_is_usage_error(
             with contextlib.suppress(ProcessLookupError):
                 run.kill()
         run.wait()
+
+
+def test_cancel_dead_keeps_signalling_when_a_group_gone(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = _run_group()
+    second = _run_group()
+    try:
+        ids = record_local_job(project=project)
+        write_launch(
+            folder=study_directory(project=project) / '.study',
+            pid=finished_pid(),
+            host=hostname(),
+            tasks=dict.fromkeys(ids, 'pending') | {ids[0]: 'running', ids[1]: 'running'},
+            run_pids=((ids[0], first.pid), (ids[1], second.pid)),
+            boot=boot_id(),
+        )
+        real_killpg = os.killpg
+
+        def killpg(pid: int, sig: int) -> None:
+            # why: the first group dies between the existence check and the signal
+            if pid == first.pid and sig == signal.SIGTERM:
+                raise ProcessLookupError
+            real_killpg(pid, sig)
+
+        monkeypatch.setattr(os, 'killpg', killpg)
+        ctx = context(project=project, machine_file='local.toml')
+        assert cancel(context=ctx, dry_run=False) == (0, [str(first.pid), str(second.pid)])
+        deadline = time.monotonic() + 5
+        while second.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert second.poll() is not None
+    finally:
+        for proc in (first, second):
+            if proc.poll() is None:
+                with contextlib.suppress(ProcessLookupError):
+                    proc.kill()
+            proc.wait()
 
 
 def test_local_cancel_signal_flag_is_usage_error(
