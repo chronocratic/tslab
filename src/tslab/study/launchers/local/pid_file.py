@@ -15,6 +15,7 @@ from typing import cast
 
 from tslab.core.files import atomic_write_json, read_json_object
 from tslab.core.meta import hostname
+from tslab.enums import LocalTaskState
 from tslab.jobs.local import boot_id, process_alive, start_detached, tail_lines
 from tslab.study.launchers import OnTaskState
 
@@ -34,7 +35,6 @@ __all__ = [
 LAUNCH_FILE = 'local-launch.json'
 LAUNCH_LOGS = 'local_logs'
 DETACHED_VARIABLE = 'TSLAB_DETACHED'
-_JOB_STATES = frozenset(('pending', 'running', 'ended'))
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -60,7 +60,7 @@ class LocalLaunch:
     pid: int
     hostname: str
     started: str
-    tasks: tuple[tuple[str, str], ...]
+    tasks: tuple[tuple[str, LocalTaskState], ...]
     boot: str | None = None
     run_pids: tuple[tuple[str, int], ...] = ()
 
@@ -103,7 +103,8 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
             hostname=str(document['hostname']),
             started=str(document['started']),
             tasks=tuple(
-                (str(key), str(state)) for key, state in cast('list[list[str]]', document['tasks'])
+                (str(key), LocalTaskState(state))
+                for key, state in cast('list[list[str]]', document['tasks'])
             ),
             run_pids=_run_pids_of(document=document),
             boot=str(boot) if boot is not None else None,
@@ -190,7 +191,7 @@ def hold_launch(
     """
     _check_free(study_folder=study_folder, host=host)
     path = study_folder / LAUNCH_FILE
-    states = dict.fromkeys(task_ids, 'pending')
+    states = dict.fromkeys(task_ids, LocalTaskState.PENDING)
     pids: dict[str, int] = {}
     started = now
     boot = boot_id()
@@ -209,7 +210,7 @@ def hold_launch(
             ),
         )
 
-    def set_state(*, task_id: str, state: str, pid: int | None = None) -> None:
+    def set_state(*, task_id: str, state: LocalTaskState, pid: int | None = None) -> None:
         with lock:
             states[task_id] = state
             if pid is not None:
@@ -226,7 +227,7 @@ def hold_launch(
         path.unlink(missing_ok=True)
 
 
-def local_job_states(*, study_folder: Path, host: str) -> dict[str, str]:
+def local_job_states(*, study_folder: Path, host: str) -> dict[str, LocalTaskState]:
     """The job state of every task of a live launch; empty without one.
 
     Args:
@@ -236,7 +237,7 @@ def local_job_states(*, study_folder: Path, host: str) -> dict[str, str]:
     launch = read_launch(study_folder=study_folder)
     if launch is None or not launch_is_live(launch=launch, host=host):
         return {}
-    return {key: state for key, state in launch.tasks if state in _JOB_STATES}
+    return dict(launch.tasks)
 
 
 def _log_tail(*, path: Path, lines: int = 20) -> str:

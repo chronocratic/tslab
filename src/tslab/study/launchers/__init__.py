@@ -15,7 +15,7 @@ import sys
 from typing import Protocol, TextIO
 from uuid import uuid4
 
-from tslab.enums import JobFlag, JobPhase, LauncherKind
+from tslab.enums import JobFlag, JobPhase, LauncherKind, LocalTaskState
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile
@@ -87,7 +87,7 @@ class LaunchReport:
 class OnTaskState(Protocol):
     """The state changes of the tasks of one local launch."""
 
-    def __call__(self, *, task_id: str, state: str, pid: int | None = None) -> None:
+    def __call__(self, *, task_id: str, state: LocalTaskState, pid: int | None = None) -> None:
         """Called with the id of a task, its new state, and its pid while running."""
         ...
 

@@ -22,7 +22,7 @@ from tests.unit.study.helpers import (
     write_launch,
 )
 from tslab.core.meta import hostname
-from tslab.enums import JobPhase
+from tslab.enums import JobPhase, LocalTaskState
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit
 from tslab.study.commands.submit import submit_runs
@@ -47,14 +47,13 @@ if TYPE_CHECKING:
 @pytest.mark.parametrize(
     ('job_state', 'phase'),
     [
-        ('pending', JobPhase.QUEUED),
-        ('running', JobPhase.RUNNING),
-        ('ended', JobPhase.ENDED),
-        ('UNRECOGNIZED', JobPhase.ENDED),
+        (LocalTaskState.PENDING, JobPhase.QUEUED),
+        (LocalTaskState.RUNNING, JobPhase.RUNNING),
+        (LocalTaskState.ENDED, JobPhase.ENDED),
         (None, JobPhase.UNKNOWN),
     ],
 )
-def test_phase_of_maps_local_states(*, job_state: str | None, phase: JobPhase) -> None:
+def test_phase_of_maps_local_states(*, job_state: LocalTaskState | None, phase: JobPhase) -> None:
     assert _phase_of(job_state=job_state) is phase
 
 

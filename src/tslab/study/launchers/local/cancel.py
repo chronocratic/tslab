@@ -5,6 +5,7 @@ import os
 import signal as signal_module
 
 from tslab.core.meta import hostname
+from tslab.enums import LocalTaskState
 from tslab.jobs.local import boot_id
 from tslab.study.context import Context
 from tslab.study.launchers.local.pid_file import launch_is_live, LocalLaunch, read_launch
@@ -30,7 +31,7 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
     missed = [
         key
         for key, state in launch.tasks
-        if state != 'ended' and key in recorded and key not in selected
+        if state != LocalTaskState.ENDED and key in recorded and key not in selected
     ]
     if missed:
         _LOGGER.error(
@@ -66,7 +67,7 @@ def _cancel_dead(*, launch: LocalLaunch, dry_run: bool) -> tuple[int, list[str]]
     pids = [
         pid
         for task_id, pid in launch.run_pids
-        if states.get(task_id) != 'ended' and _group_exists(pid=pid)
+        if states.get(task_id) != LocalTaskState.ENDED and _group_exists(pid=pid)
     ]
     if not pids:
         _LOGGER.info('nothing to cancel')

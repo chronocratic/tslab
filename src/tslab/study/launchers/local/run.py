@@ -11,6 +11,7 @@ import threading
 from typing import TextIO
 
 from tslab.core.files import atomic_write_text
+from tslab.enums import LocalTaskState
 from tslab.jobs.local import (
     busy_gpus,
     gpu_lock_folder,
@@ -109,25 +110,27 @@ class _LaunchStates:
         self._pids: dict[str, int] = {}
         self._lock = threading.Lock()
 
-    def _report(self, *, key: str, state: str, pid: int | None = None) -> None:
+    def _report(self, *, key: str, state: LocalTaskState, pid: int | None = None) -> None:
         if self._on_task_state is not None:
             self._on_task_state(task_id=key, state=state, pid=pid)
 
     def on_task_state(self, key: str, state: str) -> None:
-        if state != 'ended':
-            self._report(key=key, state=state)
+        # why: the job helpers report the state as text; it becomes a member here
+        task_state = LocalTaskState(state)
+        if task_state is not LocalTaskState.ENDED:
+            self._report(key=key, state=task_state)
             return
         with self._lock:
             pid = self._pids.pop(key, None)
         if pid is not None:
             self._watchdog.forget(pid=pid)
-        self._report(key=key, state=state)
+        self._report(key=key, state=task_state)
 
     def on_spawn(self, *, key: str, pid: int) -> None:
         with self._lock:
             self._pids[key] = pid
         self._watchdog.watch(pid=pid)
-        self._report(key=key, state='running', pid=pid)
+        self._report(key=key, state=LocalTaskState.RUNNING, pid=pid)
 
 
 def _task_header(
@@ -174,8 +177,8 @@ class LocalLauncher:
             gpu_ids: The resolved GPU ids the tasks lease; the caller
                 resolves ``"auto"``. Empty for CPU-only slots.
             stream: Console output stream; standard output when omitted.
-            on_task_state: Called with the task id and ``'running'`` or
-                ``'ended'``; the task id is the job id and the task index.
+            on_task_state: Called with the task id and a ``LocalTaskState``; the task id
+                is the job id and the task index.
             grace_seconds: Seconds to wait after a stop's ``SIGTERM`` before
                 a ``SIGKILL``.
         """

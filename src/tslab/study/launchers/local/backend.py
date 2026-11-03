@@ -11,7 +11,7 @@ from types import MappingProxyType
 from typing import TextIO
 
 from tslab.core.meta import hostname
-from tslab.enums import JobPhase, LauncherKind
+from tslab.enums import JobPhase, LauncherKind, LocalTaskState
 from tslab.jobs.local import start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.study.context import Context
 from tslab.study.definition import Study
@@ -87,15 +87,18 @@ def _auto_gpu_count() -> int:
     return len(visible_gpus(environment=os.environ))
 
 
-def _phase_of(*, job_state: str | None) -> JobPhase:
+_PHASES: Mapping[LocalTaskState, JobPhase] = {
+    LocalTaskState.PENDING: JobPhase.QUEUED,
+    LocalTaskState.RUNNING: JobPhase.RUNNING,
+    LocalTaskState.ENDED: JobPhase.ENDED,
+}
+
+
+def _phase_of(*, job_state: LocalTaskState | None) -> JobPhase:
     """The phase of one local task state from the pid file."""
     if job_state is None:
         return JobPhase.UNKNOWN
-    if job_state == 'pending':
-        return JobPhase.QUEUED
-    if job_state == 'running':
-        return JobPhase.RUNNING
-    return JobPhase.ENDED
+    return _PHASES[job_state]
 
 
 class LocalBackend:
