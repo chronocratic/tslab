@@ -400,7 +400,8 @@ class SlurmNodeGroup:
     """What ``sinfo`` reports about one node group of a partition.
 
     Attributes:
-        time_limit: The time limit of the group, or ``None`` for ``infinite``.
+        time_limit: The time limit of the group, or ``None`` when it has no
+            limit (an empty or ``infinite`` value).
         cpus: The CPUs of the group.
         memory_bytes: The memory of the group in bytes, or ``None`` when the
             value is not numeric.
@@ -420,12 +421,13 @@ def query_partition(*, partition: str) -> list[SlurmNodeGroup]:
         partition: The SLURM partition to describe.
 
     Returns:
-        One ``SlurmNodeGroup`` per node group; ``infinite`` and unparseable
-        time limits become ``None``, a trailing ``+`` on cpus and memory is
+        One ``SlurmNodeGroup`` per node group; an empty or ``infinite`` time
+        limit becomes ``None``, a trailing ``+`` on cpus and memory is
         dropped, and memory is megabytes times ``1024**2``.
 
     Raises:
-        SlurmError: If ``sinfo`` exits non-zero, times out, or is missing.
+        SlurmError: If ``sinfo`` exits non-zero, times out, or is missing, or
+        prints a time limit or CPU count it cannot parse.
     """
     completed = _run(
         command=['sinfo', '-p', partition, '-h', '-o', '%l|%c|%m|%G'],
@@ -444,7 +446,7 @@ def _node_group(*, line: str) -> SlurmNodeGroup:
     memory_text, _, gres = memory_rest.partition('|')
     return SlurmNodeGroup(
         time_limit=_slurm_time_limit(text=time_text.strip()),
-        cpus=_int_or_zero(text=cpus_text.strip().removesuffix('+')),
+        cpus=_slurm_cpus(text=cpus_text.strip().removesuffix('+')),
         memory_bytes=_memory_bytes(text=memory_text.strip()),
         gres=gres.strip(),
     )
@@ -456,8 +458,19 @@ def _slurm_time_limit(*, text: str) -> timedelta | None:
         return None
     try:
         return parse_slurm_duration(text=text)
-    except ValueError:
-        return None
+    except ValueError as error:
+        # why: a garbage time limit must not read as no limit
+        message = f'sinfo printed an unparseable time limit {text!r}'
+        raise SlurmError(message) from error
+
+
+def _slurm_cpus(*, text: str) -> int:
+    try:
+        return int(text)
+    except ValueError as error:
+        # why: a garbage CPU count must not read as zero
+        message = f'sinfo printed an unparseable CPU count {text!r}'
+        raise SlurmError(message) from error
 
 
 def _memory_bytes(*, text: str) -> int | None:

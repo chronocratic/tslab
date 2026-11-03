@@ -524,3 +524,15 @@ def test_query_partition_raises_on_failure(fake: FakeSlurm) -> None:
     fake.set_answers('sinfo', [{'exit': 1, 'stderr': 'boom'}])
     with pytest.raises(SlurmError, match='boom'):
         query_partition(partition='gpu')
+
+
+def test_query_partition_raises_on_a_garbage_cpu_count(fake: FakeSlurm) -> None:
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': '2-00:00:00|abc|256000|gpu:a100:4\n'}])
+    with pytest.raises(SlurmError, match='CPU count'):
+        query_partition(partition='gpu')
+
+
+def test_query_partition_raises_on_a_garbage_time(fake: FakeSlurm) -> None:
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'abc|64|256000|(null)\n'}])
+    with pytest.raises(SlurmError, match='time limit'):
+        query_partition(partition='gpu')

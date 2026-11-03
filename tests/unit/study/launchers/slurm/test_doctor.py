@@ -128,6 +128,59 @@ def test_memory_too_large_fails_with_memory_tracking(fake: FakeSlurm) -> None:
     assert f'the largest has {1000 * 1024**2}' in check.message
 
 
+def test_memory_is_not_checked_when_scontrol_fails(fake: FakeSlurm) -> None:
+    fake.set_answers('scontrol', [{'exit': 1, 'stderr': 'boom'}])
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'infinite|4|1000|(null)\n'}])
+    settings = SlurmSettings(partition='gpu', cpus_per_task=4, mem_per_cpu='4G')
+    checks = doctor.cluster_checks(slurm=settings)
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'warn'
+    assert (
+        check.message == f'scontrol did not answer; the memory requirement of '
+        f'{settings.requested_memory} bytes is not checked'
+    )
+
+
+def test_time_still_fails_when_scontrol_fails(fake: FakeSlurm) -> None:
+    fake.set_answers('scontrol', [{'exit': 1, 'stderr': 'boom'}])
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': '2-00:00:00|32|128000|(null)\n'}])
+    checks = doctor.cluster_checks(slurm=SlurmSettings(partition='gpu', time='3-00:00:00'))
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'fail'
+    assert 'time 3-00:00:00 is above the limit of partition gpu (2-00:00:00)' in check.message
+
+
+def test_garbage_cpu_count_warns(fake: FakeSlurm) -> None:
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': '2-00:00:00|abc|256000|gpu:a100:4\n'}])
+    checks = doctor.cluster_checks(slurm=SlurmSettings(partition='gpu'))
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'warn'
+    assert 'the node sizes are not checked' in check.message
+
+
+def test_garbage_time_warns(fake: FakeSlurm) -> None:
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'abc|64|256000|(null)\n'}])
+    checks = doctor.cluster_checks(slurm=SlurmSettings(partition='gpu'))
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'warn'
+    assert 'the node sizes are not checked' in check.message
+
+
+def test_memory_is_not_checked_when_sinfo_reports_none(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'scontrol', [{'exit': 0, 'stdout': 'SelectTypeParameters    = CR_Core_Memory\n'}]
+    )
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'infinite|4|(null)|(null)\n'}])
+    settings = SlurmSettings(partition='gpu', cpus_per_task=4, mem_per_cpu='4G')
+    checks = doctor.cluster_checks(slurm=settings)
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'warn'
+    assert (
+        check.message == f'sinfo reports no usable memory for partition gpu; '
+        f'the memory requirement of {settings.requested_memory} bytes is not checked'
+    )
+
+
 def test_missing_sinfo_warns(
     fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
