@@ -261,3 +261,34 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
     problems = validate_jobs(study=study, groups=groups)
     assert [path for path, _ in problems] == [run.run_path for run in runs]
     assert all('--data.dataset-folder-path' in message for _, message in problems)
+
+
+def _plan(*, study: Study, machine: MachineProfile) -> list:
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    return plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolved,
+        indices=assign_indices(runs=runs, jobs=[]),
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+        environment={},
+    )
+
+
+def test_default_job_name_keeps_one_group_per_grid(machine: MachineProfile) -> None:
+    study = Study(name='s', grids={'g': grid(short_name='g1')})
+    groups = _plan(study=study, machine=machine)
+    assert [g.job_name for g in groups] == ['g1', 'g1']  # split by resources only, as today
+    assert all(t.log_file.name == f'g1_{t.index}.out' for g in groups for t in g.tasks)
+
+
+def test_job_name_template_splits_groups(machine: MachineProfile) -> None:
+    study = Study(name='s', grids={'g': grid(short_name='g1', job_name='{recipe}_{short_name}')})
+    groups = _plan(study=study, machine=machine)
+    assert sorted(g.job_name for g in groups) == ['cost-paper_g1', 'ts2vec-paper_g1']
+    assert all(g.short_name == 'g1' for g in groups)
+    assert sorted(t.index for g in groups for t in g.tasks) == list(range(4))
+    assert all(t.log_file.name == f'g1_{t.index}.out' for g in groups for t in g.tasks)

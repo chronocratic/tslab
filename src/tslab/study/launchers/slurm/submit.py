@@ -56,7 +56,7 @@ def write_job_files(
             slurm=cast('SlurmSettings', group.resources),
             indices=[task.index for task in group.tasks],
             tasks_file=study_folder / 'jobs' / f'{group.job_file}.tasks',
-            log_pattern=study_folder / 'logs' / f'{group.job_name}_%a.out',
+            log_pattern=study_folder / 'logs' / f'{group.short_name}_%a.out',
             project_root=project_root,
             env=machine.env,
             begin=begin,

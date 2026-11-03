@@ -120,6 +120,8 @@ def log_show(*, study: Study) -> None:
     log_table(logger=_LOGGER, header=('grid', 'short', 'runs', 'axes'), rows=rows)
     for name, grid in study.grids.items():
         _LOGGER.info('command of %s: %s', name, shlex.join(grid.command))
+        if grid.job_name != '{short_name}':
+            _LOGGER.info('job name of %s: %s', name, grid.job_name)
     _LOGGER.info('select with --grid <grid> or --only <axis>=<value>')
 
 
