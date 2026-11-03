@@ -8,13 +8,17 @@ import pytest
 from tests.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.jobs.slurm import (
     commands,
+    gres_gpus,
+    query_cluster_config,
     query_expected_starts,
     query_job_states,
     query_job_usage,
+    query_partition,
     sbatch,
     scancel,
     SlurmError,
     SlurmJobUsage,
+    SlurmNodeGroup,
     SlurmQueueEntry,
     submission_environment,
 )
@@ -434,3 +438,62 @@ def test_sbatch_cleans_the_given_environ(tmp_path: Path, monkeypatch: pytest.Mon
     assert 'KEEP=x' in lines
     assert not any(line.startswith('SLURM_JOB_ID=') for line in lines)
     assert 'TSLAB_MARKER=1' not in lines
+
+
+def test_query_cluster_config_reads_key_values(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'scontrol',
+        [
+            {
+                'exit': 0,
+                'stdout': 'Configuration data as of x\nMaxArraySize            = 1001\n'
+                'SelectTypeParameters    = CR_Core_Memory\n',
+            }
+        ],
+    )
+    config = query_cluster_config()
+    assert config['MaxArraySize'] == '1001'
+    assert config['SelectTypeParameters'] == 'CR_Core_Memory'
+
+
+def test_query_partition_parses_groups(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'sinfo',
+        [
+            {
+                'exit': 0,
+                'stdout': '2-00:00:00|64+|256000+|gpu:a100:4(S:0-1)\ninfinite|32|128000|(null)\n',
+            }
+        ],
+    )
+    groups = query_partition(partition='gpu')
+    expected = SlurmNodeGroup(
+        time_limit=timedelta(days=2),
+        cpus=64,
+        memory_bytes=256000 * 1024**2,
+        gres='gpu:a100:4(S:0-1)',
+    )
+    assert groups[0] == expected
+    assert groups[1].time_limit is None
+    assert fake.calls('sinfo') == [['-p', 'gpu', '-h', '-o', '%l|%c|%m|%G']]
+
+
+@pytest.mark.parametrize(
+    ('gres', 'gpu_type', 'count'),
+    [
+        ('gpu:a100:4(S:0-1)', None, 4),
+        ('gpu:a100:4(S:0-1)', 'a100', 4),
+        ('gpu:a100:4', 'v100', 0),
+        ('gpu:4,shard:8', None, 4),
+        ('gpu:a100:2,gpu:v100:2', None, 4),
+        ('(null)', None, 0),
+    ],
+)
+def test_gres_gpus(gres: str, gpu_type: str | None, count: int) -> None:
+    assert gres_gpus(gres=gres, gpu_type=gpu_type) == count
+
+
+def test_query_partition_raises_on_failure(fake: FakeSlurm) -> None:
+    fake.set_answers('sinfo', [{'exit': 1, 'stderr': 'boom'}])
+    with pytest.raises(SlurmError, match='boom'):
+        query_partition(partition='gpu')
