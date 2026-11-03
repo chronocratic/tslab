@@ -1,6 +1,7 @@
 """Failure details, hints, and bounded log tails."""
 
 import dataclasses
+from datetime import timedelta
 import json
 from pathlib import Path
 from typing import cast
@@ -27,6 +28,7 @@ from tslab.core.status import (
 )
 from tslab.study import launchers
 from tslab.study.context import Context
+from tslab.study.launchers import JobUsage
 from tslab.study.paths import instance_directory
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
 from tslab.study.reporting.state import RunReport, StudyState
@@ -109,6 +111,44 @@ def test_collect_failures_uses_selected_backend_usage(
     ctx = _failed_context(project=project)
     collect_failures(context=ctx, states=(), lines=30)
     assert fake_backend.calls('failure_usage') == [{'context': ctx, 'reports': [ctx.reports[0]]}]
+
+
+def test_failure_entry_shows_the_exit_code(
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = _failed_context(project=project)
+    report = next(report for report in ctx.reports if report.state is StudyState.FAILED)
+    assert report.job_id is not None
+    fake_backend.failure_usage_answer = {
+        report.job_id: JobUsage(
+            state='FAILED',
+            elapsed=timedelta(minutes=1),
+            time_limit=timedelta(minutes=10),
+            total_cpu=timedelta(seconds=30),
+            max_rss=1024,
+            alloc_cpus=2,
+            gpus=0,
+            exit_code='0:9',
+        )
+    }
+    failures = collect_failures(context=ctx, states=(), lines=30)
+    (failure,) = failures
+    assert failure['exit_code'] == '0:9'
+    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
+        log_failures(failures=failures)
+    assert 'exit 0:9' in caplog.text
+
+
+def test_failures_without_sacct_still_lists_the_run(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    ctx = _failed_context(project=project)
+    # why: an empty answer is what the SLURM backend returns after a failed sacct call
+    fake_backend.failure_usage_answer = {}
+    failures = collect_failures(context=ctx, states=(), lines=30)
+    assert len(failures) == 1
+    assert failures[0]['state'] == StudyState.FAILED.value
+    assert failures[0]['exit_code'] is None
 
 
 def test_failures_json_shape(

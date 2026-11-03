@@ -3,7 +3,13 @@
 from collections.abc import Mapping, Sequence
 import logging
 
-from tslab.jobs.slurm import query_job_usage, SlurmError, SlurmJobUsage
+from tslab.jobs.slurm import (
+    FAILING_JOB_STATES,
+    INTERRUPTING_JOB_STATES,
+    query_job_usage,
+    SlurmError,
+    SlurmJobUsage,
+)
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage
 from tslab.study.reporting.state import RunReport
@@ -23,6 +29,7 @@ def _job_usages(*, usage: Mapping[str, SlurmJobUsage]) -> dict[str, JobUsage]:
             max_rss=item.max_rss,
             alloc_cpus=item.alloc_cpus,
             gpus=item.gpus,
+            exit_code=item.exit_code,
         )
         for job_id, item in usage.items()
     }
@@ -41,11 +48,12 @@ def failure_usage(
     context: Context,  # noqa: ARG001 # why: the Backend method signature
     reports: Sequence[RunReport],
 ) -> Mapping[str, JobUsage]:
-    """The accounting usage of selected out-of-memory runs; no numbers on failure."""
+    """The accounting usage of the failed and interrupted runs; no numbers on failure."""
+    failed_states = FAILING_JOB_STATES | INTERRUPTING_JOB_STATES
     job_ids = [
         report.job_id
         for report in reports
-        if report.job_state == 'OUT_OF_MEMORY' and report.job_id is not None
+        if report.job_state in failed_states and report.job_id is not None
     ]
     if not job_ids:
         return dict[str, JobUsage]()

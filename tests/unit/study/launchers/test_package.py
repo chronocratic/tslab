@@ -65,5 +65,6 @@ def test_job_usage_is_a_frozen_neutral_record() -> None:
         'max_rss',
         'alloc_cpus',
         'gpus',
+        'exit_code',
     ]
     assert usage.__dataclass_params__.frozen

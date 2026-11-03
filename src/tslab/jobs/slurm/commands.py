@@ -58,7 +58,9 @@ _COMPRESSED_ARRAY_KEY = re.compile(r'(?P<job>\d+)_\[(?P<ranges>[\d,-]+)(?:%\d+)?
 
 # why: the number of fields the usage query asks for, so a short or long line is skipped
 _USAGE_FIELDS = 8
-_Allocation = tuple[str, timedelta | None, timedelta | None, timedelta | None, int | None, int]
+_Allocation = tuple[
+    str, timedelta | None, timedelta | None, timedelta | None, int | None, int, str | None
+]
 
 
 class SlurmError(RuntimeError):
@@ -355,6 +357,8 @@ class SlurmJobUsage:
         max_rss: The peak memory in bytes over the steps, or ``None``.
         alloc_cpus: The allocated CPUs, or ``None``.
         gpus: The GPUs from ``gres/gpu`` in the allocation, else ``0``.
+        exit_code: The raw ``ExitCode`` text of the allocation row, or ``None``
+            when the row has no ninth field.
     """
 
     state: str
@@ -364,6 +368,7 @@ class SlurmJobUsage:
     max_rss: int | None
     alloc_cpus: int | None
     gpus: int
+    exit_code: str | None = None
 
 
 def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
@@ -390,7 +395,7 @@ def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
             ids,
             '--noheader',
             '--parsable2',
-            '--format=JobID,State,Elapsed,Timelimit,TotalCPU,MaxRSS,AllocCPUS,AllocTRES',
+            '--format=JobID,State,Elapsed,Timelimit,TotalCPU,MaxRSS,AllocCPUS,AllocTRES,ExitCode',
         ],
         accept=_sacct_accepts,
     )
@@ -421,6 +426,7 @@ def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
             # why: MaxRSS is only on the step rows, never on the allocation row
             _note_peak(peak=peak, task_id=job_id.split('.', 1)[0], max_rss=max_rss)
             continue
+        exit_code = parts[_USAGE_FIELDS].strip() or None if len(parts) > _USAGE_FIELDS else None
         allocations[job_id] = (
             state.split()[0] if state else '',
             parse_sacct_duration(text=elapsed),
@@ -428,6 +434,7 @@ def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
             parse_sacct_duration(text=total_cpu),
             int(alloc_cpus) if alloc_cpus else None,
             _gres_gpus(alloc_tres=alloc_tres),
+            exit_code,
         )
     return {
         task_id: SlurmJobUsage(
@@ -438,8 +445,11 @@ def _parse_usage_rows(*, stdout: str) -> dict[str, SlurmJobUsage]:
             max_rss=peak.get(task_id),
             alloc_cpus=cpus,
             gpus=gpus,
+            exit_code=exit_code,
         )
-        for task_id, (state, elapsed, time_limit, total_cpu, cpus, gpus) in allocations.items()
+        for task_id, (state, elapsed, time_limit, total_cpu, cpus, gpus, exit_code) in (
+            allocations.items()
+        )
     }
 
 
