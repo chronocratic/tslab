@@ -71,7 +71,7 @@ def run_checks(
         # why: the launcher package imports DoctorCheck from this module
         from tslab.study.launchers import backend_for  # noqa: PLC0415
 
-        checks.extend(backend_for(machine=machine).doctor_checks())
+        checks.extend(backend_for(machine=machine).doctor_checks(machine=machine))
         output_check, disk_path = _output_root_check(machine=machine)
         checks.append(output_check)
         checks.append(_disk_check(path=disk_path, free_bytes=free_bytes))

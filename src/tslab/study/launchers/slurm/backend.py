@@ -33,7 +33,7 @@ from tslab.study.launchers import (
     QueuedJob,
     Resources,
 )
-from tslab.study.launchers.slurm.doctor import slurm_check
+from tslab.study.launchers.slurm.doctor import cluster_checks, slurm_check
 from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.launchers.slurm.states import (
@@ -321,9 +321,16 @@ class SlurmBackend:
         except SlurmError as error:
             raise LaunchError(str(error)) from error
 
-    def doctor_checks(self) -> tuple[DoctorCheck, ...]:
-        """The readiness checks of a SLURM machine."""
-        return (slurm_check(),)
+    def doctor_checks(self, *, machine: MachineProfile) -> tuple[DoctorCheck, ...]:
+        """The readiness checks of a SLURM machine, against the cluster when it answers.
+
+        The cluster checks are skipped when the command check fails: there is
+        no scheduler to ask the cluster to.
+        """
+        check = slurm_check()
+        if check.status != 'ok':
+            return (check,)
+        return (check, *cluster_checks(slurm=machine.slurm))
 
 
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:

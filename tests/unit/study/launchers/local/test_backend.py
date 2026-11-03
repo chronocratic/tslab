@@ -335,7 +335,7 @@ def test_failure_usage_and_doctor_checks_are_empty(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
 
     assert LocalBackend().failure_usage(context=ctx, reports=()) == {}
-    assert LocalBackend().doctor_checks() == ()
+    assert LocalBackend().doctor_checks(machine=ctx.machine) == ()
 
 
 def test_launch_delegates_to_shared_launch(

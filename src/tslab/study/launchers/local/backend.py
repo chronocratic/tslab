@@ -332,7 +332,11 @@ class LocalBackend:
 
         return usage(context=context)
 
-    def doctor_checks(self) -> tuple[DoctorCheck, ...]:
+    def doctor_checks(
+        self,
+        *,
+        machine: MachineProfile,  # noqa: ARG002 # why: the Backend signature
+    ) -> tuple[DoctorCheck, ...]:
         """A local machine needs no scheduler checks."""
         return ()
 
