@@ -43,7 +43,7 @@ def failure_usage(
     reports: Sequence[RunReport],
 ) -> Mapping[str, JobUsage]:
     """The accounting usage of the failed and interrupted runs; no numbers on failure."""
-    # why: the run state is the study's verdict, so a scheduler state of COMPLETED
+    # why: the run state is the study verdict, so a scheduler state of COMPLETED
     # or a missing state does not keep the recorded exit code away
     job_ids = [report.job_id for report in reports if report.job_id is not None]
     if not job_ids:
