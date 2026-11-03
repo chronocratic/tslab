@@ -3,7 +3,6 @@
 from pathlib import Path
 import subprocess
 import sys
-from typing import Literal
 
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import (
@@ -14,9 +13,10 @@ from tests.unit.study.helpers import (
     submit_study,
     write_run_status,
 )
+from tslab.core.enums import LauncherKind
 from tslab.core.status import InstanceState, RunState, utc_now_iso
 from tslab.study.launchers import backend_for, JobPhase
-from tslab.study.records import append_job, JobRecord, submission_in_progress
+from tslab.study.records import append_job, JobKind, JobRecord, submission_in_progress
 from tslab.study.reporting.outcome import (
     EXIT_DONE,
     EXIT_LIVE,
@@ -28,9 +28,7 @@ from tslab.study.reporting.outcome import (
 from tslab.study.reporting.state import StudyState
 
 
-def _job_record(
-    *, kind: Literal['run', 'followup'], launcher: Literal['local', 'slurm'], job_id: str
-) -> JobRecord:
+def _job_record(*, kind: JobKind, launcher: LauncherKind, job_id: str) -> JobRecord:
     return JobRecord(
         kind=kind,
         submission_id=job_id,
@@ -127,7 +125,7 @@ def test_interrupted_run_is_live_while_followup_queued(
         run_state=RunState.RUNNING,
         instance=InstanceState.RUNNING,
     )
-    followup = _job_record(kind='followup', launcher='slurm', job_id='job-9')
+    followup = _job_record(kind=JobKind.FOLLOWUP, launcher=LauncherKind.SLURM, job_id='job-9')
     append_job(
         path=study_directory(project=project) / '.study' / 'submissions.jsonl', record=followup
     )

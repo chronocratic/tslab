@@ -7,6 +7,7 @@ import subprocess
 import sys
 from types import MappingProxyType
 
+from tslab.core.enums import LauncherKind
 from tslab.core.files import atomic_write_json
 from tslab.core.status import (
     InstanceRecord,
@@ -20,7 +21,14 @@ from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import JobFlag, JobPhase, JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
-from tslab.study.records import append_job, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
+from tslab.study.records import (
+    append_job,
+    JobKind,
+    JobRecord,
+    ProgressSnapshot,
+    read_jobs,
+    TaskRecord,
+)
 
 __all__ = [
     'context',
@@ -174,10 +182,10 @@ def record_local_job(*, project: Path) -> list[str]:
     append_job(
         path=study_directory(project=project) / '.study' / 'submissions.jsonl',
         record=JobRecord(
-            kind='run',
+            kind=JobKind.RUN,
             submission_id='s1',
             time=utc_now_iso(),
-            launcher='local',
+            launcher=LauncherKind.LOCAL,
             job_id='local-1-1',
             job_file=1,
             tasks=tasks,

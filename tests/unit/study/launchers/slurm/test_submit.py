@@ -9,6 +9,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import context, jobs_of, no_sleep
+from tslab.core.enums import LauncherKind
 from tslab.study import Study
 from tslab.study.commands import submit
 from tslab.study.definition import expand_runs
@@ -29,7 +30,7 @@ def fake(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
 def machine(tmp_path: Path) -> MachineProfile:
     return MachineProfile(
         path=tmp_path / 'machine.toml',
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         output_root=tmp_path / 'out',
         slurm=SlurmSettings(partition='gpu', time='01:00:00'),
         overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'gpus': 1}),),

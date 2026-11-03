@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from tests.unit.study.helpers import make_job_states
+from tslab.core.enums import LauncherKind
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -23,7 +24,7 @@ from tslab.jobs.slurm import (
 from tslab.study import StudyRun
 from tslab.study.launchers import JobFlag, JobPhase
 from tslab.study.launchers.slurm.states import slurm_task_ids
-from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import (
     _grace_wait,
     collect_states,
@@ -79,10 +80,10 @@ def task(index: int, run_path: str, attempt: int) -> TaskRecord:
 
 def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
     return JobRecord(
-        kind='run',
+        kind=JobKind.RUN,
         submission_id='s1',
         time=utc_now_iso(),
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         job_id=job_id,
         job_file=1,
         tasks=tasks,
@@ -255,10 +256,10 @@ def test_slurm_task_ids() -> None:
 def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
     local_task = task(index=0, run_path='g/a/1', attempt=1)
     local_job = JobRecord(
-        kind='run',
+        kind=JobKind.RUN,
         submission_id='s2',
         time=utc_now_iso(),
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         job_id='local-1-0',
         job_file=1,
         tasks=(local_task,),
@@ -413,10 +414,10 @@ def test_grace_wait_returns_new_facts(tmp_path: Path) -> None:
 
 def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:
     record = JobRecord(
-        kind='run',
+        kind=JobKind.RUN,
         submission_id='s1',
         time=utc_now_iso(),
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         job_id='local-1-1',
         job_file=1,
         tasks=(

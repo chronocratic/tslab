@@ -6,8 +6,9 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import re
-from typing import cast, Literal, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
+from tslab.core.enums import LauncherKind
 from tslab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
 from tslab.study.definition import matching_in_order
 from tslab.study.machine.tables import (
@@ -31,7 +32,7 @@ __all__ = [
     'slurm_overrides',
 ]
 
-TABLE: Literal['slurm'] = 'slurm'
+TABLE = LauncherKind.SLURM
 FOLLOWUP_KEYS = frozenset(('auto_retry', 'wandb_sync', 'time'))
 _SBATCH_NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 _UNSUPPORTED_SBATCH = frozenset({'clusters', 'cluster'})

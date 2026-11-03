@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from tslab.core.enums import LauncherKind
 from tslab.study.launchers import backend_for, BACKENDS, JobUsage, LaunchError
 from tslab.study.machine import (
     load_machine,
@@ -20,18 +21,18 @@ from tslab.study.machine import (
 def test_backend_for_picks_by_launcher(*, tmp_path: Path) -> None:
     slurm = MachineProfile(
         path=tmp_path / 'slurm.toml',
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         output_root=tmp_path / 'out',
         slurm=SlurmSettings(partition='gpu', time='01:00:00'),
     )
     local = MachineProfile(
         path=tmp_path / 'local.toml',
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         output_root=tmp_path / 'out',
         local=LocalSettings(),
     )
-    assert backend_for(machine=slurm) is BACKENDS['slurm']
-    assert backend_for(machine=local) is BACKENDS['local']
+    assert backend_for(machine=slurm) is BACKENDS[LauncherKind.SLURM]
+    assert backend_for(machine=local) is BACKENDS[LauncherKind.LOCAL]
 
 
 def test_unknown_launcher_is_rejected_by_the_profile(*, tmp_path: Path) -> None:

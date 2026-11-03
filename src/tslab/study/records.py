@@ -3,19 +3,22 @@
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from enum import StrEnum
 import fcntl
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
+from tslab.core.enums import LauncherKind
 from tslab.core.paths import require_path, STATUS_FILE
 from tslab.core.status import InstanceState, read_status
 from tslab.study.code_snapshot import CodeSnapshot
 
 __all__ = [
     'SUBMISSIONS_FORMAT_VERSION',
+    'JobKind',
     'JobRecord',
     'ProgressSnapshot',
     'TaskRecord',
@@ -151,12 +154,19 @@ class TaskRecord:
         )
 
 
+class JobKind(StrEnum):
+    """What a submitted job is; the text is saved in ``submissions.jsonl``."""
+
+    RUN = 'run'
+    FOLLOWUP = 'followup'
+
+
 @dataclass(frozen=True, kw_only=True)
 class JobRecord:
     """One submitted job: a group of run tasks or a follow-up job.
 
     Args:
-        kind: ``'run'`` or ``'followup'``.
+        kind: Whether the job runs tasks or is a follow-up job.
         submission_id: One id per ``launch`` call.
         time: The submission time, UTC ISO.
         launcher: The launcher that submitted the job.
@@ -167,10 +177,10 @@ class JobRecord:
             the live code, as in records written before this field.
     """
 
-    kind: Literal['run', 'followup']
+    kind: JobKind
     submission_id: str
     time: str
-    launcher: Literal['slurm', 'local']
+    launcher: LauncherKind
     job_id: str
     job_file: int
     tasks: tuple[TaskRecord, ...]
@@ -180,10 +190,10 @@ class JobRecord:
         """The JSON form of the record, with the format version."""
         document: dict[str, object] = {
             'format_version': SUBMISSIONS_FORMAT_VERSION,
-            'kind': self.kind,
+            'kind': self.kind.value,
             'submission_id': self.submission_id,
             'time': self.time,
-            'launcher': self.launcher,
+            'launcher': self.launcher.value,
             'job_id': self.job_id,
             'job_file': self.job_file,
             'tasks': [task.to_json() for task in self.tasks],
@@ -201,10 +211,10 @@ class JobRecord:
             raise ValueError(message)
         code_snapshot = document.get('code_snapshot')
         return cls(
-            kind=document['kind'],
+            kind=JobKind(document['kind']),
             submission_id=str(document['submission_id']),
             time=str(document['time']),
-            launcher=document['launcher'],
+            launcher=LauncherKind(document['launcher']),
             job_id=str(document['job_id']),
             job_file=int(document['job_file']),
             tasks=tuple(TaskRecord.from_json(document=item) for item in document['tasks']),
@@ -334,7 +344,7 @@ def latest_tasks(*, jobs: Sequence[JobRecord]) -> dict[str, tuple[JobRecord, Tas
     """
     latest: dict[str, tuple[JobRecord, TaskRecord]] = {}
     for job in jobs:
-        if job.kind != 'run':
+        if job.kind != JobKind.RUN:
             continue
         for task in job.tasks:
             latest[task.run_path] = (job, task)

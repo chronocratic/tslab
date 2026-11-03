@@ -5,6 +5,7 @@ from datetime import timedelta
 import logging
 import shutil
 
+from tslab.core.enums import CheckStatus
 from tslab.jobs.slurm import (
     format_slurm_duration,
     gres_gpus,
@@ -29,9 +30,11 @@ def slurm_check() -> DoctorCheck:
     missing = [name for name in _SLURM_COMMANDS if shutil.which(name) is None]
     if missing:
         return DoctorCheck(
-            name='slurm', status='fail', message=f'missing SLURM commands: {", ".join(missing)}'
+            name='slurm',
+            status=CheckStatus.FAIL,
+            message=f'missing SLURM commands: {", ".join(missing)}',
         )
-    return DoctorCheck(name='slurm', status='ok', message='SLURM commands found')
+    return DoctorCheck(name='slurm', status=CheckStatus.OK, message='SLURM commands found')
 
 
 def cluster_checks(*, slurm: SlurmSettings | None) -> tuple[DoctorCheck, ...]:
@@ -52,7 +55,7 @@ def cluster_checks(*, slurm: SlurmSettings | None) -> tuple[DoctorCheck, ...]:
         return (
             DoctorCheck(
                 name='slurm-array',
-                status='warn',
+                status=CheckStatus.WARN,
                 message='no [slurm] table in the profile; the cluster checks are skipped',
             ),
         )
@@ -77,11 +80,11 @@ def _array_check(*, settings: SlurmSettings, config: Mapping[str, str] | None) -
     """The slurm-array check: the profile array size against MaxArraySize."""
     if config is None:
         message = 'scontrol did not answer; the array limit is not checked'
-        return DoctorCheck(name='slurm-array', status='warn', message=message)
+        return DoctorCheck(name='slurm-array', status=CheckStatus.WARN, message=message)
     max_size = _int_or_none(text=config.get('MaxArraySize', ''))
     if max_size is None:
         message = 'scontrol reports no MaxArraySize; the array limit is not checked'
-        return DoctorCheck(name='slurm-array', status='warn', message=message)
+        return DoctorCheck(name='slurm-array', status=CheckStatus.WARN, message=message)
     # why: an array runs the indices 0 to MaxArraySize - 1
     allowed = max_size - 1
     if settings.max_array_size > allowed:
@@ -89,12 +92,12 @@ def _array_check(*, settings: SlurmSettings, config: Mapping[str, str] | None) -
             f'max_array_size {settings.max_array_size} is above the cluster limit: '
             f'MaxArraySize {max_size} allows {allowed}'
         )
-        return DoctorCheck(name='slurm-array', status='fail', message=message)
+        return DoctorCheck(name='slurm-array', status=CheckStatus.FAIL, message=message)
     message = (
         f'max_array_size {settings.max_array_size} is within the cluster limit: '
         f'MaxArraySize {max_size} allows {allowed}'
     )
-    return DoctorCheck(name='slurm-array', status='ok', message=message)
+    return DoctorCheck(name='slurm-array', status=CheckStatus.OK, message=message)
 
 
 def _int_or_none(*, text: str) -> int | None:
@@ -118,19 +121,21 @@ def _partition_check(*, settings: SlurmSettings, config: Mapping[str, str] | Non
             f'sinfo did not answer for partition {settings.partition}; '
             'the node sizes are not checked'
         )
-        return DoctorCheck(name='slurm-partition', status='warn', message=message)
+        return DoctorCheck(name='slurm-partition', status=CheckStatus.WARN, message=message)
     if not groups:
         message = (
             f'sinfo lists no node of partition {settings.partition}; the node sizes are not checked'
         )
-        return DoctorCheck(name='slurm-partition', status='warn', message=message)
+        return DoctorCheck(name='slurm-partition', status=CheckStatus.WARN, message=message)
     fragments, warning = _unmet_limits(settings=settings, groups=groups, config=config)
     if fragments:
-        return DoctorCheck(name='slurm-partition', status='fail', message='; '.join(fragments))
+        return DoctorCheck(
+            name='slurm-partition', status=CheckStatus.FAIL, message='; '.join(fragments)
+        )
     if warning is not None:
-        return DoctorCheck(name='slurm-partition', status='warn', message=warning)
+        return DoctorCheck(name='slurm-partition', status=CheckStatus.WARN, message=warning)
     message = f'a node of partition {settings.partition} holds one job'
-    return DoctorCheck(name='slurm-partition', status='ok', message=message)
+    return DoctorCheck(name='slurm-partition', status=CheckStatus.OK, message=message)
 
 
 def _unmet_limits(

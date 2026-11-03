@@ -8,8 +8,8 @@ import netrc
 from pathlib import Path
 import shutil
 import tempfile
-from typing import Literal
 
+from tslab.core.enums import CheckStatus
 from tslab.core.paths import require_path
 from tslab.study.definition import load_study
 from tslab.study.machine import load_machine, MachineProfile, MachineProfileError
@@ -32,7 +32,7 @@ class DoctorCheck:
     """
 
     name: str
-    status: Literal['ok', 'warn', 'fail']
+    status: CheckStatus
     message: str
 
 
@@ -62,10 +62,10 @@ def run_checks(
     try:
         machine = load_machine(path=machine_path, lenient_env=False, environment=environment)
     except MachineProfileError as error:
-        checks.append(DoctorCheck(name='profile', status='fail', message=str(error)))
+        checks.append(DoctorCheck(name='profile', status=CheckStatus.FAIL, message=str(error)))
         machine = None
     else:
-        checks.append(DoctorCheck(name='profile', status='ok', message='profile loaded'))
+        checks.append(DoctorCheck(name='profile', status=CheckStatus.OK, message='profile loaded'))
 
     if machine is not None:
         # why: the launcher package imports DoctorCheck from this module
@@ -93,7 +93,7 @@ def _output_root_check(*, machine: MachineProfile) -> tuple[DoctorCheck, Path]:
         return (
             DoctorCheck(
                 name='output_root',
-                status='fail',
+                status=CheckStatus.FAIL,
                 message=f'no existing directory can contain {output_root.as_posix()}',
             ),
             probe,
@@ -105,7 +105,7 @@ def _output_root_check(*, machine: MachineProfile) -> tuple[DoctorCheck, Path]:
         return (
             DoctorCheck(
                 name='output_root',
-                status='fail',
+                status=CheckStatus.FAIL,
                 message=f'cannot write to {probe.as_posix()}: {error}',
             ),
             probe,
@@ -114,7 +114,7 @@ def _output_root_check(*, machine: MachineProfile) -> tuple[DoctorCheck, Path]:
         message = f'writable: {output_root.as_posix()}'
     else:
         message = f'writable parent: {probe.as_posix()}'
-    return DoctorCheck(name='output_root', status='ok', message=message), probe
+    return DoctorCheck(name='output_root', status=CheckStatus.OK, message=message), probe
 
 
 def _disk_check(*, path: Path, free_bytes: Callable[[Path], int]) -> DoctorCheck:
@@ -122,9 +122,9 @@ def _disk_check(*, path: Path, free_bytes: Callable[[Path], int]) -> DoctorCheck
         free = free_bytes(path)
     except OSError as error:
         return DoctorCheck(
-            name='disk', status='fail', message=f'cannot check free disk space: {error}'
+            name='disk', status=CheckStatus.FAIL, message=f'cannot check free disk space: {error}'
         )
-    status: Literal['ok', 'warn'] = 'warn' if free < _DISK_WARNING_BYTES else 'ok'
+    status = CheckStatus.WARN if free < _DISK_WARNING_BYTES else CheckStatus.OK
     return DoctorCheck(
         name='disk', status=status, message=f'{free / 1024**3:.1f} GB free at {path.as_posix()}'
     )
@@ -143,10 +143,10 @@ def _project_check(*, start: Path) -> DoctorCheck:
     if project is None:
         return DoctorCheck(
             name='project',
-            status='warn',
+            status=CheckStatus.WARN,
             message=f'no pyproject.toml found above {folder.as_posix()}',
         )
-    return DoctorCheck(name='project', status='ok', message=f'found {project.as_posix()}')
+    return DoctorCheck(name='project', status=CheckStatus.OK, message=f'found {project.as_posix()}')
 
 
 def _study_check(*, reference: str, machine: MachineProfile) -> DoctorCheck:
@@ -154,8 +154,8 @@ def _study_check(*, reference: str, machine: MachineProfile) -> DoctorCheck:
         study = load_study(reference=reference)
         check_machine(study=study, machine=machine)
     except (ImportError, FileNotFoundError, TypeError, ValueError) as error:
-        return DoctorCheck(name='study', status='fail', message=str(error))
-    return DoctorCheck(name='study', status='ok', message='study fits machine')
+        return DoctorCheck(name='study', status=CheckStatus.FAIL, message=str(error))
+    return DoctorCheck(name='study', status=CheckStatus.OK, message='study fits machine')
 
 
 def _wandb_check(*, environment: Mapping[str, str]) -> DoctorCheck:
@@ -165,5 +165,7 @@ def _wandb_check(*, environment: Mapping[str, str]) -> DoctorCheck:
     except (OSError, netrc.NetrcParseError):
         has_netrc = False
     if has_key or has_netrc:
-        return DoctorCheck(name='wandb', status='ok', message='W&B credentials found')
-    return DoctorCheck(name='wandb', status='warn', message='wandb is installed but not logged in')
+        return DoctorCheck(name='wandb', status=CheckStatus.OK, message='W&B credentials found')
+    return DoctorCheck(
+        name='wandb', status=CheckStatus.WARN, message='wandb is installed but not logged in'
+    )

@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
 
+from tslab.core.enums import LauncherKind
 from tslab.study.definition import SettingValue
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.slurm import SlurmSettings
@@ -35,7 +35,7 @@ class MachineProfile:
     """A machine profile read from TOML, fully checked."""
 
     path: Path
-    launcher: Literal['slurm', 'local']
+    launcher: LauncherKind
     output_root: Path
     tslab_command: tuple[str, ...] = ('uv', 'run', 'tslab')
     settings: dict[str, SettingValue] = field(default_factory=dict)

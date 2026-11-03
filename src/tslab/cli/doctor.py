@@ -9,6 +9,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request, UsageError
+from tslab.core.enums import CheckStatus
 from tslab.core.meta import hostname
 from tslab.core.text import log_table
 from tslab.study.doctor import run_checks
@@ -56,7 +57,7 @@ class Doctor:
             start=Path.cwd(),
             environment=os.environ,
         )
-        code = int(any(check.status == 'fail' for check in checks))
+        code = int(any(check.status == CheckStatus.FAIL for check in checks))
         if self.json:
             print_json(
                 document={

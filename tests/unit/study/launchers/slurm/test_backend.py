@@ -15,6 +15,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tslab.cli import main
+from tslab.core.enums import CheckStatus, LauncherKind
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -30,7 +31,7 @@ import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.machine import MachineOverride, MachineProfileError
-from tslab.study.records import JobRecord
+from tslab.study.records import JobKind, JobRecord
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -185,10 +186,10 @@ def test_job_states_reports_live_followup_jobs(*, project: Path, fake: FakeSlurm
     ctx = _context(project=project, fake=fake)
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '9000|PENDING\n'}])
     followup = JobRecord(
-        kind='followup',
+        kind=JobKind.FOLLOWUP,
         submission_id='f1',
         time='2026-01-01T00:00:00+00:00',
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         job_id='9000',
         job_file=2,
         tasks=(),
@@ -256,7 +257,9 @@ def test_doctor_checks_reports_scheduler_commands(*, project: Path, fake: FakeSl
     ctx = context(project=project, machine_file='cluster.toml')
     checks = SlurmBackend().doctor_checks(machine=ctx.machine)
 
-    assert checks[0] == DoctorCheck(name='slurm', status='ok', message='SLURM commands found')
+    assert checks[0] == DoctorCheck(
+        name='slurm', status=CheckStatus.OK, message='SLURM commands found'
+    )
     assert [check.name for check in checks[1:]] == ['slurm-array', 'slurm-partition']
     assert fake.calls('sbatch') == []
 

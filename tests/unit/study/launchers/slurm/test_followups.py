@@ -9,6 +9,7 @@ import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
+from tslab.core.enums import LauncherKind
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -20,7 +21,7 @@ from tslab.core.status import (
 from tslab.study.commands import resubmit, submit
 from tslab.study.launchers.slurm.followups import queue_followups
 from tslab.study.machine import resolve_machine, write_register
-from tslab.study.records import append_job, JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.records import append_job, JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six
 STUDIES = '''
@@ -69,10 +70,10 @@ def bump_attempts(
     """More attempts of one run, recorded like real submissions."""
     for attempt in range(2, up_to + 1):
         record = JobRecord(
-            kind='run',
+            kind=JobKind.RUN,
             submission_id=f't{attempt}',
             time=utc_now_iso(),
-            launcher='slurm',
+            launcher=LauncherKind.SLURM,
             job_id=f'200{attempt}',
             job_file=attempt,
             tasks=(

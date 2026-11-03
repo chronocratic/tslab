@@ -12,7 +12,7 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.context import Context
 from tslab.study.launchers import QueuedJob
-from tslab.study.records import JobRecord, latest_tasks
+from tslab.study.records import JobKind, JobRecord, latest_tasks
 from tslab.study.reporting.state import StudyState
 
 __all__ = ['expected_starts', 'followup_job_ids', 'slurm_task_ids']
@@ -32,7 +32,9 @@ def slurm_task_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
 
 def followup_job_ids(*, jobs: Sequence[JobRecord]) -> list[str]:
     """The sorted numeric ids of recorded follow-up jobs."""
-    return sorted({job.job_id for job in jobs if job.kind == 'followup' and job.job_id.isdecimal()})
+    return sorted(
+        {job.job_id for job in jobs if job.kind == JobKind.FOLLOWUP and job.job_id.isdecimal()}
+    )
 
 
 def _query_states(
