@@ -6,8 +6,8 @@ import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, submit_study
-from tslab.core.enums import LauncherKind
 from tslab.core.status import utc_now_iso
+from tslab.enums import LauncherKind
 from tslab.study.launchers import QueuedJob
 from tslab.study.launchers.slurm import states
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord

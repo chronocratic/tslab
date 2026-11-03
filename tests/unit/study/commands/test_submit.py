@@ -13,11 +13,10 @@ import pytest
 
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
+from tslab.enums import JobPhase, StudyState
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit, submit_runs
 from tslab.study.context import load_context, Selection
-from tslab.study.launchers import JobPhase
-from tslab.study.reporting.state import StudyState
 
 # why: the small model has no ``depth`` field, so a study that sets
 # ``model.depth`` for it does not load; the parse-bad study leaves the

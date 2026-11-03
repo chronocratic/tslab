@@ -21,7 +21,6 @@ from typing import Literal, Self
 
 from tslab.core.codec import config_to_data
 from tslab.core.config import config_to_yaml, save_config
-from tslab.core.enums import LogLevel
 from tslab.core.files import atomic_write_json
 from tslab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.core.lock import acquire_lock, Heartbeat, release_lock
@@ -49,14 +48,13 @@ from tslab.core.seeding import seed_everything
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
-    InstanceState,
     read_status,
-    RunState,
     RunStatusSnapshot,
     utc_now_iso,
     write_status,
 )
 from tslab.core.tracker import LocalTracker, RunStatus, Tracker
+from tslab.enums import InstanceState, LogLevel, RunState
 
 __all__ = ['JobTimeLimitSignal', 'Run', 'RunOptions']
 

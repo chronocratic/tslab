@@ -7,19 +7,12 @@ import subprocess
 import sys
 from types import MappingProxyType
 
-from tslab.core.enums import LauncherKind
 from tslab.core.files import atomic_write_json
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers import JobFlag, JobPhase, JobStates
+from tslab.study.launchers import JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.records import (
     append_job,

@@ -17,7 +17,7 @@ from tests.unit.study.helpers import (
     write_run_status,
 )
 from tslab.cli import main
-from tslab.core.status import InstanceState, RunState
+from tslab.enums import InstanceState, RunState
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage, LaunchError
 from tslab.study.reporting.usage import log_usage, usage_document

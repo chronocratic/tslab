@@ -51,7 +51,7 @@ from tslab.adapters.chronocratic.models import (
     FingerprintedModel,
     model_settings,
 )
-from tslab.interfaces import Split
+from tslab.enums import Split
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe
 from tslab.tasks import forecasting_representations

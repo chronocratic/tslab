@@ -10,12 +10,12 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
+from tslab.enums import JobFlag, JobPhase, StudyState
 from tslab.study.commands import parse_states, status
 from tslab.study.context import Context, expected_starts
-from tslab.study.launchers import JobFlag, JobPhase, QueuedJob
+from tslab.study.launchers import QueuedJob
 from tslab.study.reporting.documents import status_document
 from tslab.study.reporting.report import log_status
-from tslab.study.reporting.state import StudyState
 
 
 def normalized(text: str) -> str:

@@ -2,35 +2,24 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from enum import StrEnum
 from pathlib import Path
 import time
 from typing import TYPE_CHECKING
 
 from tslab.core.lock import is_run_active
 from tslab.core.paths import STATUS_FILE
-from tslab.core.status import InstanceState, read_status, RunState, RunStatusSnapshot
+from tslab.core.status import read_status, RunStatusSnapshot
 from tslab.core.text import first_line
+from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import JobFlag, JobPhase, JobStates
+    from tslab.study.launchers import JobStates
 
-__all__ = ['FolderFacts', 'RunReport', 'StudyState', 'collect_states', 'read_folder', 'study_state']
+__all__ = ['FolderFacts', 'RunReport', 'collect_states', 'read_folder', 'study_state']
 
 _INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
-
-
-class StudyState(StrEnum):
-    """The state shown for one run of a study."""
-
-    QUEUED = 'queued'
-    RUNNING = 'running'
-    DONE = 'done'
-    INTERRUPTED = 'interrupted'
-    FAILED = 'failed'
-    MISSING = 'missing'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -132,9 +121,6 @@ def study_state(
     Returns:
         The state and a one-line reason, in the order of spec §7.
     """
-    # why: the launcher door imports this module's RunReport during initialization
-    from tslab.study.launchers import JobPhase  # noqa: PLC0415
-
     snapshot = folder.snapshot
     if job_phase is JobPhase.QUEUED:
         return StudyState.QUEUED, None
@@ -193,9 +179,6 @@ def _sleep(seconds: float) -> None:
 def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
     # why: on shared storage the final ``status.json`` of a completed job can reach this
     # node after the SLURM state does
-    # why: the launcher door imports this module's RunReport during initialization
-    from tslab.study.launchers import JobPhase  # noqa: PLC0415
-
     if job_phase is not JobPhase.COMPLETED:
         return False
     if folder.snapshot is None:
@@ -270,9 +253,6 @@ def collect_states(
     Returns:
         One report per run, in the order of ``runs``.
     """
-    # why: the launcher door imports this module's RunReport during initialization
-    from tslab.study.launchers import JobPhase  # noqa: PLC0415
-
     latest = latest_tasks(jobs=jobs)
     entries = []
     folders: dict[str, FolderFacts] = {}

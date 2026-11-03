@@ -19,7 +19,7 @@ import pytest
 
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import study_directory
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.jobs.local import PoolCommand, process_alive, Watchdog
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs

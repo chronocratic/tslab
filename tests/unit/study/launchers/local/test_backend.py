@@ -22,11 +22,12 @@ from tests.unit.study.helpers import (
     write_launch,
 )
 from tslab.core.meta import hostname
+from tslab.enums import JobPhase
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit
 from tslab.study.commands.submit import submit_runs
 from tslab.study.definition import StudyRun
-from tslab.study.launchers import JobPhase, LaunchError, LaunchReport, Resources
+from tslab.study.launchers import LaunchError, LaunchReport, Resources
 import tslab.study.launchers.local.backend as local_backend
 from tslab.study.launchers.local.backend import (
     _auto_gpu_count,

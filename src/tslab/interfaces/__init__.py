@@ -4,7 +4,6 @@ ABCs are used where TSLab provides shared behaviour users inherit; Protocols
 where existing objects should fit without inheriting.
 """
 
-from tslab.core.enums import Split
 from tslab.interfaces.data import Batch, DataSource, LabeledSplits, SPLITS
 from tslab.interfaces.downstream import DownstreamModel, Probe
 from tslab.interfaces.encoder import Encoder, SequenceEncoder
@@ -21,6 +20,5 @@ __all__ = [
     'Metric',
     'Probe',
     'SequenceEncoder',
-    'Split',
     'Trainer',
 ]

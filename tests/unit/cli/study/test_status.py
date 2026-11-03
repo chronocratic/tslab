@@ -9,7 +9,7 @@ from tests.support.fake_backend import FakeBackend, install_fake_backend
 from tests.unit.cli.study.helpers import toy_project
 from tests.unit.study.helpers import finish_run, submit_study
 from tslab.cli.study import Status
-from tslab.study.launchers import JobPhase
+from tslab.enums import JobPhase
 
 
 def test_status_suggests_a_dry_run_when_nothing_ran(

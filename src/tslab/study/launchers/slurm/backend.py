@@ -7,8 +7,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast, TextIO
 
-from tslab.core.enums import CheckStatus, LauncherKind
 from tslab.core.status import utc_now_iso
+from tslab.enums import CheckStatus, JobFlag, JobPhase, LauncherKind, StudyState
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     format_slurm_duration,
@@ -24,8 +24,6 @@ from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import (
-    JobFlag,
-    JobPhase,
     JobStates,
     JobUsage,
     launch,
@@ -48,7 +46,7 @@ from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileE
 from tslab.study.machine.slurm import slurm_for
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['SlurmBackend']
 

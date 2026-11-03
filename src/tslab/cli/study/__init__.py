@@ -12,12 +12,12 @@ from pathlib import Path
 import shlex
 
 from tslab.cli.common import Request, UsageError
+from tslab.enums import StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
 from tslab.study.commands import parse_states
 from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers import available_cpus, backend_for
 from tslab.study.machine import resolve_machine
-from tslab.study.reporting.state import StudyState
 
 __all__ = [
     'STUDY_COMMANDS',

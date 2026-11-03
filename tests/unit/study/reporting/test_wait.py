@@ -11,10 +11,9 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, submit_study
 from tslab.cli import main
 from tslab.cli.study import Wait
+from tslab.enums import JobPhase, StudyState
 from tslab.study.context import Context
-from tslab.study.launchers import JobPhase
 from tslab.study.reporting.outcome import EXIT_TIMEOUT
-from tslab.study.reporting.state import StudyState
 from tslab.study.reporting.wait import wait_for_study
 
 

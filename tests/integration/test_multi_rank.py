@@ -6,7 +6,8 @@ import sys
 import pytest
 
 from tslab.core.artifact import Json
-from tslab.core.status import InstanceState, read_status
+from tslab.core.status import read_status
+from tslab.enums import InstanceState
 
 SCRIPT = Path(__file__).parent / 'multi_rank_script.py'
 

@@ -5,7 +5,7 @@ from datetime import timedelta
 import logging
 import shutil
 
-from tslab.core.enums import CheckStatus
+from tslab.enums import CheckStatus
 from tslab.jobs.slurm import (
     format_slurm_duration,
     gres_gpus,

@@ -6,8 +6,8 @@ from pathlib import Path
 import tomllib
 from typing import cast, Protocol
 
-from tslab.core.enums import LauncherKind
 from tslab.core.text import unknown_key_message
+from tslab.enums import LauncherKind
 from tslab.study.definition import expand_variables
 import tslab.study.machine.local as machine_local
 from tslab.study.machine.local import LocalSettings

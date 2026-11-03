@@ -35,6 +35,8 @@ fixes most lint and format problems.
 src/tslab/
   __init__.py          the public API (re-exports); __all__ is the contract
   core/                the engine: Run, stage, artifacts, fingerprints, status, config, paths
+  enums/               enums shared by more than one package: states, splits, log levels, kinds
+  enums/               enums shared by more than one package: states, splits, log levels, kinds
   interfaces/          Protocols and ABCs: Trainer, DataSource, Encoder, DownstreamModel, Metric, Tracker
   stages/              the ready stages: train, encode, evaluate
   tasks/               classification and forecasting data shapes and helpers

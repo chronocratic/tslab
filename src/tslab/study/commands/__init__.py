@@ -8,10 +8,11 @@ functions, so the behavior is testable without the command line.
 from collections.abc import Callable, Sequence
 from typing import TextIO
 
+from tslab.enums import JobFlag, StudyState
 from tslab.study.context import Context, refresh_context
-from tslab.study.launchers import backend_for, JobFlag, SIGNAL_EXIT_BASE
+from tslab.study.launchers import backend_for, SIGNAL_EXIT_BASE
 from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 __all__ = [
     'LIVE_STATES',

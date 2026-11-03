@@ -9,7 +9,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import context, jobs_of, no_sleep
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.study import Study
 from tslab.study.commands import submit
 from tslab.study.definition import expand_runs

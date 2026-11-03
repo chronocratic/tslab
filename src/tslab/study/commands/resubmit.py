@@ -11,15 +11,16 @@ from typing import TextIO, TYPE_CHECKING
 from tslab.core.lock import read_lock_owner
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
+from tslab.enums import JobFlag, JobPhase, StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, JobFlag, JobPhase, OnLaunch
+from tslab.study.launchers import backend_for, OnLaunch
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
 from tslab.study.reporting.report import log_problems
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
     from tslab.study.launchers import Backend

@@ -15,10 +15,10 @@ from typing import Protocol
 import torch
 
 from tslab.core.artifact import Checkpoint, Tensors
-from tslab.core.enums import Split
 from tslab.core.paths import InstanceName, normalize_instance_name
 from tslab.core.run import Run
 from tslab.core.stage import stage
+from tslab.enums import Split
 from tslab.interfaces import Encoder, SequenceEncoder, SPLITS, Trainer
 from tslab.stages.encode import check_representations, encode_checked, load_encoder
 from tslab.tasks.data import TSDataInfo

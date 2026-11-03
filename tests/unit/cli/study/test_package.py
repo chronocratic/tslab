@@ -11,7 +11,7 @@ from tests.unit.cli.study.helpers import toy_project
 from tests.unit.study.helpers import submit_study
 from tslab.cli import main
 from tslab.cli.study import Resubmit, Results, Submit
-from tslab.study.launchers import JobPhase
+from tslab.enums import JobPhase
 
 if TYPE_CHECKING:
     from tslab.study.context import Context

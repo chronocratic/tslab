@@ -9,17 +9,15 @@ from collections.abc import Mapping
 import dataclasses
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
-from enum import StrEnum
 from pathlib import Path
 
 from tslab.core.files import atomic_write_json, JsonFileError, read_json_object
 from tslab.core.paths import require_path
+from tslab.enums import InstanceState, RunState
 
 __all__ = [
     'STATUS_FORMAT_VERSION',
     'InstanceRecord',
-    'InstanceState',
-    'RunState',
     'RunStatusSnapshot',
     'StatusFileError',
     'format_instance_id',
@@ -36,28 +34,6 @@ _INTERRUPTED = 'interrupted'
 
 class StatusFileError(JsonFileError):
     """Raised when ``status.json`` is unreadable, malformed or of another format version."""
-
-
-class InstanceState(StrEnum):
-    """Lifecycle of one stage instance."""
-
-    RUNNING = 'running'
-    DONE = 'done'
-    FAILED = 'failed'
-    SKIPPED = 'skipped'
-
-
-class RunState(StrEnum):
-    """Lifecycle of a whole run.
-
-    ``FINISHED`` means the ``with Run`` block ended without an exception. It does
-    not mean every instance is ``done``: failed instances are allowed.
-    """
-
-    RUNNING = 'running'
-    FINISHED = 'finished'
-    FAILED = 'failed'
-    CRASHED = 'crashed'
 
 
 @dataclass(frozen=True, kw_only=True)

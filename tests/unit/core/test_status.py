@@ -8,15 +8,14 @@ from tslab.core.meta import hostname
 from tslab.core.status import (
     format_instance_id,
     InstanceRecord,
-    InstanceState,
     parse_instance_id,
     read_status,
-    RunState,
     RunStatusSnapshot,
     shown_run_state,
     StatusFileError,
     write_status,
 )
+from tslab.enums import InstanceState, RunState
 
 
 def test_round_trip(tmp_path: Path) -> None:

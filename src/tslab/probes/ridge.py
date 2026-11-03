@@ -11,7 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import torch
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.probes.metrics import forecasting_metrics
 from tslab.probes.sklearn_probe import (
     cap_samples,

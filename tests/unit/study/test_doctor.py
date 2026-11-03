@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_backend import FakeBackend
-from tslab.core.enums import CheckStatus
+from tslab.enums import CheckStatus
 import tslab.study.doctor as doctor_module
 from tslab.study.doctor import DoctorCheck, run_checks
 

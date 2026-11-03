@@ -5,12 +5,13 @@ from types import MappingProxyType
 import pytest
 
 from tslab.core.text import format_table
+from tslab.enums import JobPhase, StudyState
 from tslab.study.definition import StudyRun
-from tslab.study.launchers import JobPhase, LaunchReport, QueuedJob
+from tslab.study.launchers import LaunchReport, QueuedJob
 from tslab.study.launchers.local.backend import LocalResources
 from tslab.study.machine import SlurmSettings
 from tslab.study.reporting.report import _log_run_lines, log_launch, log_problems, resources_of
-from tslab.study.reporting.state import FolderFacts, RunReport, StudyState
+from tslab.study.reporting.state import FolderFacts, RunReport
 
 
 def _queued_report(*, job_id: str) -> RunReport:

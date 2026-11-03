@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from tests.unit.study.configs import grid, PRESETS
-from tslab.core.enums import LauncherKind
 from tslab.core.status import utc_now_iso
+from tslab.enums import LauncherKind
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import expand_runs

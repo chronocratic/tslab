@@ -6,15 +6,8 @@ from pathlib import Path
 import pytest
 
 from tests.unit.study.helpers import make_job_states
-from tslab.core.enums import LauncherKind
-from tslab.core.status import (
-    InstanceRecord,
-    InstanceState,
-    RunState,
-    RunStatusSnapshot,
-    utc_now_iso,
-    write_status,
-)
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState, StudyState
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -22,7 +15,6 @@ from tslab.jobs.slurm import (
     RUNNING_JOB_STATES,
 )
 from tslab.study import StudyRun
-from tslab.study.launchers import JobFlag, JobPhase
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import (
@@ -32,7 +24,6 @@ from tslab.study.reporting.state import (
     read_folder,
     RunReport,
     study_state,
-    StudyState,
 )
 
 

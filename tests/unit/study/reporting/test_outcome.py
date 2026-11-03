@@ -13,9 +13,9 @@ from tests.unit.study.helpers import (
     submit_study,
     write_run_status,
 )
-from tslab.core.enums import LauncherKind
-from tslab.core.status import InstanceState, RunState, utc_now_iso
-from tslab.study.launchers import backend_for, JobPhase
+from tslab.core.status import utc_now_iso
+from tslab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
+from tslab.study.launchers import backend_for
 from tslab.study.records import append_job, JobKind, JobRecord, submission_in_progress
 from tslab.study.reporting.outcome import (
     EXIT_DONE,
@@ -25,7 +25,6 @@ from tslab.study.reporting.outcome import (
     states_exit_code,
     study_exit_code,
 )
-from tslab.study.reporting.state import StudyState
 
 
 def _job_record(*, kind: JobKind, launcher: LauncherKind, job_id: str) -> JobRecord:

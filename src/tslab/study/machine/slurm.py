@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from typing import cast, TYPE_CHECKING
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
 from tslab.study.definition import matching_in_order
 from tslab.study.machine.tables import (

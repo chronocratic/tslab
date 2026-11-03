@@ -8,6 +8,7 @@ import time
 from typing import TextIO
 
 from tslab.core.status import utc_now_iso
+from tslab.enums import StudyState
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
@@ -16,7 +17,7 @@ from tslab.study.paths import next_job_file, study_folder
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import JobRecord, read_jobs, submission_lock
 from tslab.study.reporting.report import log_launch, log_problems
-from tslab.study.reporting.state import RunReport, StudyState
+from tslab.study.reporting.state import RunReport
 
 __all__ = ['submit', 'submit_runs']
 

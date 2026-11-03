@@ -13,7 +13,8 @@ from safetensors.torch import load_file
 import torch
 
 import tslab
-from tslab.core.status import read_status, RunState
+from tslab.core.status import read_status
+from tslab.enums import RunState
 from tslab.lightning import LightningTrainer
 from tslab.stages import train as train_stage
 

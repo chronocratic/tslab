@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from tslab.adapters.chronocratic.datasets.settings import datamodule_class_of
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.lightning import LightningDataSource
 from tslab.tasks import check_label_range, TSClassificationDataInfo, TSForecastingDataInfo
 

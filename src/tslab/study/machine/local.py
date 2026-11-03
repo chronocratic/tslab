@@ -6,7 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import cast, Literal
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.study.machine.tables import from_table, MachineProfileError
 
 __all__ = [

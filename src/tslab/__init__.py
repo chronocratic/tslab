@@ -15,14 +15,13 @@ from tslab.core.artifact import (
     UnavailableReason,
 )
 from tslab.core.config import ConfigFileError, load_config, parse_config, REQUIRED, save_config
-from tslab.core.enums import LogLevel
 from tslab.core.fingerprint import Fingerprintable, NotFingerprinted
 from tslab.core.lock import RunLockedError
 from tslab.core.paths import InstanceName
 from tslab.core.run import JobTimeLimitSignal, Run, RunOptions
 from tslab.core.stage import Stage, stage
-from tslab.core.status import InstanceState, RunState
 from tslab.core.tracker import RunStatus, Tracker
+from tslab.enums import InstanceState, LogLevel, RunState
 from tslab.stages.encoders import ModelAsEncoder
 
 try:

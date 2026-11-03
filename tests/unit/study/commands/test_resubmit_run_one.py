@@ -12,9 +12,9 @@ import pytest
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import submit_study
 from tslab.cli import main
+from tslab.enums import JobPhase
 from tslab.study.commands import run_one
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers import JobPhase
 
 
 def _one_run_context(*, project: Path, machine_file: str, only: tuple[str, ...]) -> Context:

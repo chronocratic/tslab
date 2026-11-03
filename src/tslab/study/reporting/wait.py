@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 import logging
 import time
 
+from tslab.enums import StudyState
 from tslab.study.context import Context
 from tslab.study.reporting.outcome import (
     counts_live,
@@ -13,7 +14,6 @@ from tslab.study.reporting.outcome import (
     EXIT_UNKNOWN,
     study_exit_code,
 )
-from tslab.study.reporting.state import StudyState
 
 __all__ = ['wait_for_study']
 

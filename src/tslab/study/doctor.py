@@ -9,8 +9,8 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from tslab.core.enums import CheckStatus
 from tslab.core.paths import require_path
+from tslab.enums import CheckStatus
 from tslab.study.definition import load_study
 from tslab.study.machine import load_machine, MachineProfile, MachineProfileError
 from tslab.study.plan import check_machine

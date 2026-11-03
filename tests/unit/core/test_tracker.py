@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tslab.core.status import RunState
 from tslab.core.tracker import LocalTracker, RunStatus
+from tslab.enums import RunState
 
 
 def rows(*, path: Path) -> list[dict[str, str]]:

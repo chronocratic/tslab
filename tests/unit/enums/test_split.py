@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.core.enums import Split
+from tslab.enums import Split
 from tslab.interfaces import SPLITS
 
 

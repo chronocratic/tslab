@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.core.enums import LauncherKind
+from tslab.enums import LauncherKind
 from tslab.study.launchers import backend_for, BACKENDS, JobUsage, LaunchError
 from tslab.study.machine import (
     load_machine,
