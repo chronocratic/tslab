@@ -89,6 +89,33 @@ def test_sbatch_bounds_the_retry_by_the_qos_deadline(fake: FakeSlurm, tmp_path: 
     assert len(fake.calls('sbatch')) == 2
 
 
+def test_sbatch_gives_up_when_sbatch_eats_the_remaining_time(
+    fake: FakeSlurm, tmp_path: Path
+) -> None:
+    # why: the clock jumps after the call, so the wait computed after it is negative
+    fake.set_answers('sbatch', [{'exit': 1, 'stderr': 'error: QOSMaxSubmitJobPerUserLimit'}])
+    reads = [0]
+    delays: list[float] = []
+
+    def now() -> float:
+        reads[0] += 1
+        if reads[0] >= 3:
+            return QOS_WAIT_CAP_SECONDS + 1.0
+        return 0.0
+
+    def sleep(seconds: float) -> None:
+        # why: the real time.sleep rejects negative intervals
+        if seconds < 0:
+            message = 'time interval must be non-negative'
+            raise ValueError(message)
+        delays.append(seconds)
+
+    with pytest.raises(SlurmError, match='sacctmgr show qos'):
+        sbatch(script=tmp_path / 'x.sbatch', sleep=sleep, now=now)
+    assert delays == []
+    assert len(fake.calls('sbatch')) == 1
+
+
 def test_sbatch_logs_each_qos_wait(
     fake: FakeSlurm, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
