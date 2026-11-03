@@ -7,6 +7,7 @@ from tslab.analysis.stats import (
     annotate_tests,
     average_ranks,
     bootstrap_median,
+    complete_row_count,
     correlations,
     Direction,
     friedman,
@@ -167,3 +168,14 @@ def test_correlations_columns_and_holm() -> None:
 def test_holm_adjust_with_duplicate_index_labels() -> None:
     p_values = pd.Series([0.01, 0.04, 0.03, 0.5], index=[0, 1, 0, 1])
     assert holm_adjust(p_values=p_values).tolist() == pytest.approx([0.04, 0.09, 0.09, 0.5])
+
+
+def test_correlations_rejects_target_in_columns() -> None:
+    frame = pd.DataFrame({'x': [1.0, 2.0, 3.0], 't': [1.0, 2.0, 3.0]})
+    with pytest.raises(ValueError, match="'t'"):
+        correlations(frame=frame, columns=['x', 't'], target='t')
+
+
+def test_complete_row_count() -> None:
+    matrix = pd.DataFrame({'a': [1.0, np.nan, 3.0], 'b': [1.0, 2.0, 3.0]})
+    assert complete_row_count(matrix=matrix) == 2

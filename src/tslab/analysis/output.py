@@ -14,6 +14,7 @@ Names are lowercase slugs, general to specific: ``<what>_<slice>``, for example
 ``cd_clean_classification_univariate`` or ``pairwise_wilcoxon_accuracy``.
 """
 
+from collections.abc import Sequence
 import dataclasses
 from dataclasses import dataclass
 from enum import StrEnum
@@ -66,6 +67,18 @@ class FigureFormat(StrEnum):
 DEFAULT_FORMATS = (FigureFormat.PDF, FigureFormat.PNG)
 
 
+def _checked_formats(*, formats: Sequence[FigureFormat | str]) -> tuple[FigureFormat, ...]:
+    """Turn names into ``FigureFormat`` members; reject none and repeats."""
+    chosen = tuple(FigureFormat(item) for item in formats)
+    if not chosen:
+        message = 'formats must name at least one figure format'
+        raise ValueError(message)
+    if len(set(chosen)) != len(chosen):
+        message = f'formats lists a figure format more than once: {[item.value for item in chosen]}'
+        raise ValueError(message)
+    return chosen
+
+
 def require_slug(*, value: str, parameter: str) -> str:
     """Return ``value`` if it is a lowercase slug, otherwise raise ``ValueError``.
 
@@ -103,11 +116,9 @@ class AnalysisOutput:
     dpi: int = DEFAULT_DPI
 
     def __post_init__(self) -> None:
-        """Check the root and the formats."""
+        """Check the root and the formats; format strings become ``FigureFormat``."""
         require_path(value=self.root, parameter='root')
-        if not self.formats:
-            message = 'formats must name at least one figure format'
-            raise ValueError(message)
+        object.__setattr__(self, 'formats', _checked_formats(formats=self.formats))
 
     def table_path(self, *, folder: OutputFolder, name: str) -> Path:
         """Return the CSV path of a table.
@@ -146,7 +157,7 @@ class AnalysisOutput:
         figure: Figure,
         category: str,
         name: str,
-        formats: tuple[FigureFormat, ...] | None = None,
+        formats: Sequence[FigureFormat | str] | None = None,
         tight: bool = False,
     ) -> tuple[Path, ...]:
         """Write a figure once per format, atomically.
@@ -158,7 +169,8 @@ class AnalysisOutput:
             figure: The figure to save.
             category: The kind of figure (for example ``critical_difference``), a slug.
             name: The figure name, a slug.
-            formats: File types for this figure; the tree default when ``None``.
+            formats: File types for this figure (members or their names); the tree
+                default when ``None``.
             tight: Crop to the content and keep long axis labels.
 
         Returns:
@@ -166,7 +178,7 @@ class AnalysisOutput:
         """
         require_slug(value=category, parameter='category')
         require_slug(value=name, parameter='name')
-        chosen = self.formats if formats is None else formats
+        chosen = self.formats if formats is None else _checked_formats(formats=formats)
         labels = (
             [label for axis in figure.axes for label in (axis.xaxis.label, axis.yaxis.label)]
             if tight

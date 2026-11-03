@@ -86,6 +86,8 @@ def missing_runs(*, results: pd.DataFrame) -> pd.DataFrame:
     Returns:
         The rows without a finished instance, without the seconds and metric columns.
     """
+    if INSTANCE_STATE_COLUMN not in results.columns:
+        return results.copy()
     unfinished = results[results[INSTANCE_STATE_COLUMN] != InstanceState.DONE.value]
     metrics = [column for column in unfinished.columns if column.startswith(METRIC_PREFIX)]
     return unfinished.drop(columns=[SECONDS_COLUMN, *metrics], errors='ignore')
@@ -148,7 +150,8 @@ def method_matrix(
         average_over: Columns averaged away (for example the seed).
 
     Returns:
-        The mean score for each unit and method.
+        The mean score for each unit and method. A method without any score keeps
+        its column, all NaN, so it is counted and not dropped silently.
 
     Raises:
         ValueError: If two rows share the unit, method and ``average_over`` values.
@@ -158,4 +161,4 @@ def method_matrix(
         keys=[unit, method, *average_over],
         hint=f'filter on the {INSTANCE_COLUMN!r} column first, so scores are not mixed',
     )
-    return frame.pivot_table(index=unit, columns=method, values=value, aggfunc='mean')
+    return frame.pivot_table(index=unit, columns=method, values=value, aggfunc='mean', dropna=False)

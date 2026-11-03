@@ -43,6 +43,22 @@ _KEY_REPLACEMENTS = (
     ('.', ''),
 )
 _REPEATED_DASH = re.compile(r'-+')
+_UNSAFE_KEY = re.compile(r'[%\\{}#&~^]')
+# Text mode needs these escaped; the order does not matter because every key is replaced once.
+_TEXT_ESCAPES = str.maketrans(
+    {
+        '\\': r'\textbackslash{}',
+        '&': r'\&',
+        '%': r'\%',
+        '$': r'\$',
+        '#': r'\#',
+        '_': r'\_',
+        '{': r'\{',
+        '}': r'\}',
+        '~': r'\textasciitilde{}',
+        '^': r'\textasciicircum{}',
+    }
+)
 _ZERO_P_VALUE = r'<10^{-300}'
 
 
@@ -61,13 +77,17 @@ type NumberRecord = tuple[str, float | str, NumberKind]
 
 
 def number_key(*, parts: Sequence[str]) -> str:
-    """Join name parts into a key a TeX control sequence name can hold.
+    r"""Join name parts into a key a TeX control sequence name can hold.
 
     Args:
         parts: Pieces of the name, general to specific; empty pieces are skipped.
 
     Returns:
-        The pieces joined with ``-``, with the characters TeX cannot take replaced.
+        The pieces joined with ``-``, with ``$``, ``_``, spaces and ``.`` replaced.
+
+    Raises:
+        ValueError: If the key still has a character TeX cannot take in a macro
+            name (``% \ { } # & ~ ^``); rename the part instead of guessing.
     """
     cleaned = []
     for part in parts:
@@ -75,7 +95,12 @@ def number_key(*, parts: Sequence[str]) -> str:
             part = part.replace(old, new)  # noqa: PLW2901 # why: each replacement builds on the last
         if part:
             cleaned.append(part)
-    return _REPEATED_DASH.sub('-', '-'.join(cleaned))
+    key = _REPEATED_DASH.sub('-', '-'.join(cleaned))
+    unsafe = _UNSAFE_KEY.search(key)
+    if unsafe:
+        message = f'key {key!r} has {unsafe.group()!r}, which TeX cannot take in a macro name'
+        raise ValueError(message)
+    return key
 
 
 def _ensure_math(*, text: str) -> str:
@@ -107,7 +132,7 @@ def _count(value: float | str) -> str:
 
 
 def _text(value: float | str) -> str:
-    return str(value)
+    return str(value).translate(_TEXT_ESCAPES)
 
 
 _FORMATTERS: Mapping[NumberKind, Callable[[float | str], str]] = {
@@ -132,7 +157,7 @@ def format_number(*, value: float | str, kind: NumberKind) -> str:
     r"""Format a value for the text.
 
     Args:
-        value: A number, or a string for ``NumberKind.TEXT``.
+        value: A number, or a string for ``NumberKind.TEXT``, which is escaped for LaTeX.
         kind: How to write it.
 
     Returns:
