@@ -7,7 +7,9 @@ import sys
 import threading
 import time
 
-from tslab.jobs.local import PoolCommand, ProcessResult, run_commands
+import pytest
+
+from tslab.jobs.local import PoolCommand, process_alive, ProcessResult, run_commands
 from tslab.jobs.local.pool import _environment_of, _GpuLeaseGate
 
 _LOCK_CHILD = (
@@ -419,6 +421,39 @@ def test_busy_answer_is_cached(*, tmp_path: Path) -> None:
     assert checks == ['0']
 
 
+def test_free_answer_is_not_trusted_for_a_new_lease(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    checks: list[str] = []
+    answers = iter((True, False))
+
+    def gpu_free(gpu_id: str) -> bool:
+        checks.append(gpu_id)
+        return next(answers)
+
+    stop = threading.Event()
+    timer = threading.Timer(0.5, stop.set)
+    timer.start()
+    never_started, starts, waits, _ends = _run_pool(
+        tmp_path=tmp_path,
+        keys=('k0', 'k1'),
+        slots=1,
+        gpu_ids=('0',),
+        lock_folder=folder,
+        sleep_seconds=0.1,
+        gpu_poll_seconds=0.05,
+        stop=stop,
+        gpu_free=gpu_free,
+        busy_recheck_seconds=60,
+    )
+    timer.cancel()
+    assert never_started == ('k1',)
+    assert starts == [('k0', '0')]
+    assert waits == ['k1']
+    # why: k1 must not lease on the stale free answer of k0; the second call is the fresh check
+    assert checks == ['0', '0']
+
+
 def test_gate_counts_only_acquired_leases(*, tmp_path: Path) -> None:
     checks: list[str] = []
 
@@ -484,6 +519,62 @@ def test_pool_start_error_reaches_on_end(*, tmp_path: Path) -> None:
     assert isinstance(first, OSError)
     assert isinstance(second, ProcessResult)
     assert second.exit_code == 0
+
+
+def test_on_spawn_failure_stops_the_child(*, tmp_path: Path) -> None:
+    pids: list[int] = []
+
+    def on_spawn(*, key: str, pid: int) -> None:
+        pids.append(pid)
+        message = 'the launch file could not be written'
+        raise OSError(message)
+
+    ends: list[tuple[str, str | None, object]] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        pass
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        pass
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        ends.append((key, gpu_id, outcome))
+
+    never_started = run_commands(
+        commands=[
+            # why: a command that starts and would stay alive without the fix
+            PoolCommand(
+                key='a', command=('bash', '-c', 'sleep 30'), cwd=tmp_path, environment=os.environ
+            )
+        ],
+        slots=1,
+        gpu_ids=(),
+        tasks_per_gpu=1,
+        lock_folder=None,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
+        on_spawn=on_spawn,
+    )
+    assert never_started == ()
+    (key, _gpu_id, outcome) = ends[0]
+    assert key == 'a'
+    assert isinstance(outcome, OSError)
+    (pid,) = pids
+    assert process_alive(pid=pid) is False
+    with pytest.raises(ProcessLookupError):
+        os.killpg(pid, 0)
 
 
 def test_numeric_slot_sets_pci_bus_order() -> None:

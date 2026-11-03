@@ -199,6 +199,35 @@ def _wait_and_escalate(  # noqa: PLR0913 # why: one keyword per escalation setti
     )
 
 
+def _report_spawn(
+    *, on_spawn: Callable[[int], None] | None, pid: int, process: subprocess.Popen[str]
+) -> None:
+    """Call ``on_spawn`` with the pid of the child that started.
+
+    When the callback raises, the child is signalled and reaped before the
+    error propagates, so a failure of the callback never leaves a live
+    process without a watcher.
+
+    Args:
+        on_spawn: The callback, or ``None`` for none.
+        pid: The pid of the child.
+        process: The child to stop and reap when the callback raises.
+
+    Raises:
+        Exception: Whatever the callback raised, once the child is gone.
+    """
+    if on_spawn is None:
+        return
+    try:
+        on_spawn(pid)
+    except Exception:  # why: a callback failure must never leave the child running
+        with contextlib.suppress(ProcessLookupError):
+            # why: the group, not the child, so grandchildren do not survive either
+            os.killpg(pid, signal.SIGTERM)
+        process.wait()
+        raise
+
+
 def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     command: Sequence[str],
@@ -255,8 +284,7 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
         # why: Popen sets the pid before it returns; the check keeps the type narrow
         message = 'the child process has no pid'
         raise RuntimeError(message)
-    if on_spawn is not None:
-        on_spawn(pid)
+    _report_spawn(on_spawn=on_spawn, pid=pid, process=process)
 
     def read_lines() -> None:
         stdout = process.stdout
