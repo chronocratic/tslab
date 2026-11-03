@@ -49,7 +49,12 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
 
 
 def _cancel_dead(*, launch: LocalLaunch, dry_run: bool) -> tuple[int, list[str]]:
-    """Stop the runs of a launcher that is gone, when the file is from this boot."""
+    """Stop the runs of a launcher that is gone, when the file is from this boot.
+
+    A group that exits between the existence check and the signal is ignored,
+    and the loop signals the rest; the returned pids are the groups the loop
+    tried to signal.
+    """
     if launch.hostname != hostname():
         _LOGGER.info('nothing to cancel')
         return 0, []
@@ -71,7 +76,11 @@ def _cancel_dead(*, launch: LocalLaunch, dry_run: bool) -> tuple[int, list[str]]
         _LOGGER.info('the launcher of pid %s is gone; its runs: %s', launch.pid, pids_text)
         return 0, [str(pid) for pid in pids]
     for pid in pids:
-        os.killpg(pid, signal_module.SIGTERM)
+        try:
+            os.killpg(pid, signal_module.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            # why: the group may have exited between the existence check and the signal
+            _LOGGER.debug('the group of pid %s is already gone; skipping it', pid)
     _LOGGER.info(
         'the launcher of pid %s is gone; sent SIGTERM to its runs: %s', launch.pid, pids_text
     )
