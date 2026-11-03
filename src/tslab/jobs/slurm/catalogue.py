@@ -267,7 +267,15 @@ def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> Comman
     for line in command_lines(command=command, ids=ids, values=values):
         try:
             # why: fixed scheduler tool on PATH from the catalogue
-            process = subprocess.run(line, capture_output=True, text=True, check=False)  # noqa: S603
+            process = subprocess.run(  # noqa: S603
+                line, capture_output=True, text=True, check=False, timeout=QUERY_TIMEOUT_SECONDS
+            )
+        except subprocess.TimeoutExpired:
+            return CommandOutput(
+                returncode=124,
+                stdout=''.join(stdout),
+                stderr=f'{command.tool} did not answer within {QUERY_TIMEOUT_SECONDS:g} seconds\n',
+            )
         except FileNotFoundError:
             return CommandOutput(
                 returncode=127,
@@ -277,8 +285,8 @@ def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> Comman
         stdout.append(process.stdout)
         stderr.append(process.stderr)
         code = process.returncode
-        # why: without accounting every recorded id is asked; squeue no longer knows purged ones
-        if code != 0 and fell_back and command.tool == 'squeue' and _UNKNOWN_JOB in process.stderr:
+        # why: without accounting every recorded id is asked; the controller forgot purged ones
+        if code != 0 and fell_back and _UNKNOWN_JOB in process.stderr:
             code = 0
         returncode = returncode or code
     return CommandOutput(returncode=returncode, stdout=''.join(stdout), stderr=''.join(stderr))
