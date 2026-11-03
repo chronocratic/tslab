@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import itertools
 import os
 from pathlib import Path
@@ -8,7 +8,7 @@ import threading
 import time
 
 from tslab.jobs.local import PoolCommand, ProcessResult, run_commands
-from tslab.jobs.local.pool import _environment_of
+from tslab.jobs.local.pool import _environment_of, _GpuLeaseGate
 
 _LOCK_CHILD = (
     'import fcntl, os, sys, time\n'
@@ -121,6 +121,8 @@ def _run_pool(  # noqa: PLR0913 # why: one keyword per pool setting the test ove
     sleep_seconds: float = 1.0,
     gpu_poll_seconds: float = 5.0,
     stop: threading.Event | None = None,
+    gpu_free: Callable[[str], bool] | None = None,
+    busy_recheck_seconds: float = 60.0,
 ) -> tuple[
     tuple[str, ...], list[tuple[str, str | None]], list[str], list[tuple[str, str | None, object]]
 ]:
@@ -161,6 +163,8 @@ def _run_pool(  # noqa: PLR0913 # why: one keyword per pool setting the test ove
         on_wait=on_wait,
         on_end=on_end,
         gpu_poll_seconds=gpu_poll_seconds,
+        gpu_free=gpu_free,
+        busy_recheck_seconds=busy_recheck_seconds,
     )
     return never_started, starts, waits, ends
 
@@ -336,6 +340,99 @@ def test_pool_waits_for_gpu_held_elsewhere(*, tmp_path: Path) -> None:
     assert waits == ['k0']
     assert (tmp_path / 'k0.times').exists()
     assert len(ends) == 1
+
+
+def test_busy_gpu_gets_no_new_run(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+
+    def gpu_free(gpu_id: str) -> bool:
+        return gpu_id != '0'
+
+    never_started, starts, waits, _ends = _run_pool(
+        tmp_path=tmp_path,
+        keys=('k0',),
+        slots=2,
+        gpu_ids=('0', '1'),
+        lock_folder=folder,
+        sleep_seconds=0.1,
+        gpu_poll_seconds=0.05,
+        gpu_free=gpu_free,
+    )
+    assert never_started == ()
+    assert starts == [('k0', '1')]
+    assert waits == ['k0']
+
+
+def test_gpu_in_use_by_the_pool_is_not_rechecked(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    checks: list[str] = []
+
+    def gpu_free(gpu_id: str) -> bool:
+        checks.append(gpu_id)
+        return True
+
+    never_started, _starts, _waits, _ends = _run_pool(
+        tmp_path=tmp_path,
+        keys=('k0', 'k1'),
+        slots=2,
+        gpu_ids=('0',),
+        tasks_per_gpu=2,
+        lock_folder=folder,
+        sleep_seconds=1.0,
+        gpu_poll_seconds=0.05,
+        gpu_free=gpu_free,
+    )
+    assert never_started == ()
+    assert checks == ['0']
+
+
+def test_busy_answer_is_cached(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    checks: list[str] = []
+    answers = iter((False, True))
+
+    def gpu_free(gpu_id: str) -> bool:
+        checks.append(gpu_id)
+        return next(answers)
+
+    stop = threading.Event()
+    timer = threading.Timer(0.5, stop.set)
+    timer.start()
+    never_started, starts, _waits, _ends = _run_pool(
+        tmp_path=tmp_path,
+        keys=('k0',),
+        slots=1,
+        gpu_ids=('0',),
+        lock_folder=folder,
+        sleep_seconds=60,
+        gpu_poll_seconds=0.05,
+        stop=stop,
+        gpu_free=gpu_free,
+        busy_recheck_seconds=60,
+    )
+    timer.cancel()
+    assert never_started == ('k0',)
+    assert starts == []
+    assert checks == ['0']
+
+
+def test_gate_counts_only_acquired_leases(*, tmp_path: Path) -> None:
+    checks: list[str] = []
+
+    def gpu_free(gpu_id: str) -> bool:
+        checks.append(gpu_id)
+        return True
+
+    gate = _GpuLeaseGate(
+        lock_folder=tmp_path, tasks_per_gpu=2, gpu_free=gpu_free, busy_recheck_seconds=0
+    )
+    gate.try_lease(slot='0')
+    gate.drop(lease=None, gpu_id='0')
+    gate.try_lease(slot='0')
+    assert checks == ['0']
 
 
 def test_pool_start_error_reaches_on_end(*, tmp_path: Path) -> None:
