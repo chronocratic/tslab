@@ -15,10 +15,11 @@ from typing import Protocol
 import torch
 
 from tslab.core.artifact import Checkpoint, Tensors
+from tslab.core.enums import Split
 from tslab.core.paths import InstanceName, normalize_instance_name
 from tslab.core.run import Run
 from tslab.core.stage import stage
-from tslab.interfaces import Encoder, SequenceEncoder, Split, SPLITS, Trainer
+from tslab.interfaces import Encoder, SequenceEncoder, SPLITS, Trainer
 from tslab.stages.encode import check_representations, encode_checked, load_encoder
 from tslab.tasks.data import TSDataInfo
 
@@ -123,7 +124,7 @@ def checked_split_slices(*, data: ForecastingSeries) -> dict[Split, slice]:
         raise ValueError(message)
     for split, window in slices.items():
         if window.step not in {None, 1}:
-            message = f'the {split!r} slice has step {window.step}; only contiguous splits work'
+            message = f"the '{split}' slice has step {window.step}; only contiguous splits work"
             raise ValueError(message)
     return slices
 

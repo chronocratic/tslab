@@ -9,8 +9,9 @@ from typing import cast, override
 import torch
 
 from tslab.core.artifact import Checkpoint
+from tslab.core.enums import Split
 from tslab.core.run import Run, RunOptions
-from tslab.interfaces import Batch, Split, Trainer
+from tslab.interfaces import Batch, Trainer
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
@@ -113,7 +114,7 @@ class ToySplits:
     def __init__(self) -> None:
         generator = torch.Generator().manual_seed(0)
         self._splits: dict[Split, tuple[torch.Tensor, torch.Tensor]] = {}
-        for split, count in (('train', 40), ('val', 20), ('test', 20)):
+        for split, count in ((Split.TRAIN, 40), (Split.VAL, 20), (Split.TEST, 20)):
             labels = torch.arange(count) % 2
             inputs = 4.0 * labels[:, None, None] + torch.randn(count, 5, 2, generator=generator)
             self._splits[split] = (inputs, labels)
@@ -160,7 +161,7 @@ class ToySeries:
         return self._series
 
     def split_slices(self) -> Mapping[Split, slice]:
-        return {'train': slice(0, 24), 'val': slice(24, 32), 'test': slice(32, 40)}
+        return {Split.TRAIN: slice(0, 24), Split.VAL: slice(24, 32), Split.TEST: slice(32, 40)}
 
     # The fake trainer never reads batches; these make ToySeries a DataSource for train.
     def train_loader(self) -> Iterable[Batch]:

@@ -6,6 +6,7 @@ import torch
 from tests.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
 from tests.unit.stages.helpers import encoded
 import tslab
+from tslab.core.enums import Split
 from tslab.stages import check_representations
 
 
@@ -22,7 +23,7 @@ def test_encode_never_uses_the_training_loaders(tmp_path: Path) -> None:
         'test_targets': (20,),
     }
     assert torch.equal(
-        representations.tensors['test_targets'], ToySplits().labeled_split(split='test')[1]
+        representations.tensors['test_targets'], ToySplits().labeled_split(split=Split.TEST)[1]
     )
 
 

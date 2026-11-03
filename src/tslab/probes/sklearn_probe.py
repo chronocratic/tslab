@@ -10,6 +10,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 import torch
 
+from tslab.core.enums import Split
 from tslab.interfaces import Probe
 
 __all__ = [
@@ -85,7 +86,12 @@ def to_float64() -> FunctionTransformer:
 
 
 def cap_samples(
-    *, features: np.ndarray, labels: np.ndarray, max_samples: int | None, stratify: bool, split: str
+    *,
+    features: np.ndarray,
+    labels: np.ndarray,
+    max_samples: int | None,
+    stratify: bool,
+    split: Split,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Keep a random subset of at most ``max_samples`` rows.
 
@@ -94,7 +100,7 @@ def cap_samples(
         labels: The matching targets.
         max_samples: The cap; ``None`` keeps every row.
         stratify: Keep the class proportions (classification).
-        split: Split name for the log message.
+        split: The split the samples belong to, named in the log message.
 
     Returns:
         The kept features and labels.

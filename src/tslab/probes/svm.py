@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 import torch
 
+from tslab.core.enums import Split
 from tslab.probes.metrics import classification_metrics
 from tslab.probes.sklearn_probe import (
     cap_samples,
@@ -82,7 +83,7 @@ class SVMProbe(SklearnProbe[SVMProbeSettings]):
             labels=to_numpy(tensor=train_targets),
             max_samples=self._settings.max_train_samples,
             stratify=True,
-            split='train',
+            split=Split.TRAIN,
         )
         pipeline = Pipeline(
             steps=[
