@@ -121,6 +121,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         {
             'name': name,
             'short_name': grid.short_name,
+            'job_name': grid.job_name,
             'command': list(grid.command),
             'axes': {axis: list(values) for axis, values in grid.axes.items()},
             'excludes': len(grid.exclude),

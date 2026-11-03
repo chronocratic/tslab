@@ -289,11 +289,12 @@ class PlannedTask:
 
 @dataclass(frozen=True, kw_only=True)
 class JobGroup:
-    """The runs submitted as one job: the runs of one grid with one set of resources.
+    """The runs submitted as one job: runs of one grid with one job name and resources.
 
     Args:
         grid: The grid name the runs of the group came from.
-        job_name: The ``short_name`` of the grid; it names the job and its logs.
+        job_name: The SLURM job name, the grid ``job_name`` template filled in.
+        short_name: The ``short_name`` of the grid; it names the log files.
         resources: The resources of the job, as declared by its backend.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
@@ -304,6 +305,7 @@ class JobGroup:
 
     grid: str
     job_name: str
+    short_name: str
     resources: 'Resources'
     job_file: int
     tasks: tuple[PlannedTask, ...]
@@ -361,7 +363,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
-    Runs group by (grid, resources, code snapshot) in first-appearance order;
+    Runs group by (grid, job name, resources, code snapshot) in first-appearance order;
     a group is never split by count, so a group of tasks past
     ``max_array_size`` is reported by ``validate_jobs`` instead of planned
     around. The code snapshot is part of the key, so a resubmit of a mixed
@@ -388,7 +390,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     """
     folder = study_folder(machine=machine, study=study)
     groups: list[JobGroup] = []
-    lookup: dict[tuple[str, Resources, CodeSnapshot | None], int] = {}
+    lookup: dict[tuple[str, str, Resources, CodeSnapshot | None], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
     env = expansion_env(machine=machine, environment=environment)
@@ -397,14 +399,16 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     for run in resolved:
         grid = study.grids[run.run.grid]
         code_snapshot = snapshots.get(run.run.run_path)
-        key = (run.run.grid, run.resources, code_snapshot)
+        job_name = grid.job_name_for(study=study.name, values=run.run.values)
+        key = (run.run.grid, job_name, run.resources, code_snapshot)
         if key not in lookup:
             lookup[key] = len(groups)
             tasks_of[lookup[key]] = []
             groups.append(
                 JobGroup(
                     grid=run.run.grid,
-                    job_name=grid.short_name,
+                    job_name=job_name,
+                    short_name=grid.short_name,
                     resources=run.resources,
                     job_file=next_file,
                     tasks=(),

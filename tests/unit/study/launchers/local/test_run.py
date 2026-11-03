@@ -573,7 +573,7 @@ def test_local_two_launchers_never_share_a_gpu(
         '    attempt=1,\n'
         ')\n'
         'group = JobGroup(\n'
-        '    grid="g", job_name="g", resources=LocalResources(cpus=1, cpus_per_run=1),\n'
+        '    grid="g", job_name="g", short_name="g", resources=LocalResources(cpus=1, cpus_per_run=1),\n'
         '    job_file=1, tasks=(task,)\n'
         ')\n'
         'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",), '
