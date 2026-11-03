@@ -33,7 +33,8 @@ reads `status.json`:
 
 ```python
 from tslab.core.paths import STATUS_FILE
-from tslab.core.status import InstanceState, read_status
+from tslab.core.status import read_status
+from tslab.enums import InstanceState
 
 snapshot = read_status(path=run_folder / STATUS_FILE)
 failed = [
