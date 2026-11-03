@@ -128,8 +128,14 @@ def test_memory_too_large_fails_with_memory_tracking(fake: FakeSlurm) -> None:
     assert f'the largest has {1000 * 1024**2}' in check.message
 
 
-def test_missing_sinfo_warns(fake: FakeSlurm, tmp_path: Path) -> None:
-    (tmp_path / 'slurm' / 'sinfo').unlink()
+def test_missing_sinfo_warns(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    bin_path = tmp_path / 'no-sinfo'
+    bin_path.mkdir()
+    for name in ('sbatch', 'scancel', 'sacct', 'squeue', 'scontrol'):
+        (bin_path / name).symlink_to(tmp_path / 'slurm' / name)
+    monkeypatch.setenv('PATH', str(bin_path))
     checks = doctor.cluster_checks(slurm=SlurmSettings(partition='gpu'))
     check = _check(checks=checks, name='slurm-partition')
     assert check.status == 'warn'
