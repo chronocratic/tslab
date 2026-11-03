@@ -3,6 +3,7 @@
 Needs the ``analysis`` extra.
 """
 
+from tslab.analysis.cd_diagram import cd_diagram, CdDiagram, critical_difference
 from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
 from tslab.analysis.report import Block, Caption, show
 from tslab.analysis.results import (
@@ -38,6 +39,7 @@ __all__ = [
     'AnalysisOutput',
     'Block',
     'Caption',
+    'CdDiagram',
     'Direction',
     'FigureFormat',
     'FriedmanTest',
@@ -47,7 +49,9 @@ __all__ = [
     'annotate_tests',
     'average_ranks',
     'bootstrap_median',
+    'cd_diagram',
     'correlations',
+    'critical_difference',
     'friedman',
     'holm_adjust',
     'is_dark_cell',
