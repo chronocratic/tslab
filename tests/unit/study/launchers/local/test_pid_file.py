@@ -25,7 +25,7 @@ from tslab.core.files import atomic_write_json
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState, StudyState
+from tslab.enums import InstanceState, LocalTaskState, RunState, StudyState
 from tslab.jobs.local import process_alive
 from tslab.study.launchers.local import pid_file
 from tslab.study.launchers.local.pid_file import (
@@ -54,7 +54,7 @@ def test_hold_launch_writes_and_removes_file(tmp_path: Path) -> None:
         assert launch is not None
         assert launch.pid == os.getpid()
         assert launch.tasks == (('j_0', 'pending'), ('j_1', 'pending'))
-        set_state(task_id='j_0', state='running')
+        set_state(task_id='j_0', state=LocalTaskState.RUNNING)
         written = read_launch(study_folder=tmp_path)
         assert written is not None
         assert written.tasks == (('j_0', 'running'), ('j_1', 'pending'))
@@ -170,11 +170,11 @@ def test_hold_launch_records_run_pids(tmp_path: Path) -> None:
     with hold_launch(
         study_folder=tmp_path, task_ids=['j_0', 'j_1'], pid=1, host='h', now='t'
     ) as set_state:
-        set_state(task_id='j_0', state='running', pid=4242)
+        set_state(task_id='j_0', state=LocalTaskState.RUNNING, pid=4242)
         launch = read_launch(study_folder=tmp_path)
         assert launch is not None
         assert launch.run_pids == (('j_0', 4242),)
-        set_state(task_id='j_0', state='ended')
+        set_state(task_id='j_0', state=LocalTaskState.ENDED)
         launch = read_launch(study_folder=tmp_path)
         assert launch is not None
         assert launch.run_pids == ()
@@ -191,7 +191,7 @@ def test_run_pids_are_written_as_an_object(tmp_path: Path) -> None:
     with hold_launch(
         study_folder=tmp_path, task_ids=['j_0', 'j_1'], pid=1, host='h', now='t'
     ) as set_state:
-        set_state(task_id='j_0', state='running', pid=4242)
+        set_state(task_id='j_0', state=LocalTaskState.RUNNING, pid=4242)
         document = json.loads((tmp_path / LAUNCH_FILE).read_text())
     assert document['run_pids'] == {'j_0': 4242}
 
@@ -444,3 +444,9 @@ def test_cancel_detached_launch_interrupts_run(
         report.state for report in context(project=project, machine_file='local.toml').reports
     }
     assert StudyState.INTERRUPTED in states
+
+
+def test_read_launch_rejects_an_unknown_task_state(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=1, host=hostname(), tasks={'j_0': 'paused'})
+    with pytest.raises(LocalLaunchError, match="'paused' is not a valid LocalTaskState"):
+        read_launch(study_folder=tmp_path)

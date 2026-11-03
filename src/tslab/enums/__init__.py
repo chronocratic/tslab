@@ -5,6 +5,7 @@ from tslab.enums.instance_state import InstanceState
 from tslab.enums.job_flag import JobFlag
 from tslab.enums.job_phase import JobPhase
 from tslab.enums.launcher_kind import LauncherKind
+from tslab.enums.local_task_state import LocalTaskState
 from tslab.enums.log_level import LogLevel
 from tslab.enums.run_state import RunState
 from tslab.enums.split import Split
@@ -16,6 +17,7 @@ __all__ = [
     'JobFlag',
     'JobPhase',
     'LauncherKind',
+    'LocalTaskState',
     'LogLevel',
     'RunState',
     'Split',

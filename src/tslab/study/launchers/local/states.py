@@ -1,6 +1,7 @@
 """Reading local task states from the pid file and job records."""
 
 from tslab.core.meta import hostname
+from tslab.enums import LocalTaskState
 from tslab.study.definition import Study
 from tslab.study.launchers.local.pid_file import local_job_states
 from tslab.study.machine import MachineProfile
@@ -25,13 +26,13 @@ def _is_local_job_id(*, job_id: str) -> bool:
 
 def _local_states(
     *, machine: MachineProfile, study: Study, jobs: list[JobRecord]
-) -> dict[str, str]:
+) -> dict[str, LocalTaskState]:
     live = local_job_states(
         study_folder=study_folder(machine=machine, study=study), host=hostname()
     )
     # why: a local task outside a live launch is over, whatever its folder says
     ended = {
-        f'{job.job_id}_{task.index}': 'ended'
+        f'{job.job_id}_{task.index}': LocalTaskState.ENDED
         for job, task in latest_tasks(jobs=jobs).values()
         if _is_local_job_id(job_id=job.job_id)
     }
