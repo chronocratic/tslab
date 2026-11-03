@@ -16,6 +16,7 @@ from tslab.core.paths import _TEMPORARY_MARKER, require_path
 
 __all__ = [
     'JsonFileError',
+    'atomic_write_bytes',
     'atomic_write_json',
     'atomic_write_text',
     'read_json_object',
@@ -40,13 +41,27 @@ def atomic_write_text(*, path: Path, text: str) -> None:
         path: Destination file.
         text: Content to write (UTF-8).
     """
+    _atomic_write(path=path, data=text.encode('utf-8'))
+
+
+def atomic_write_bytes(*, path: Path, data: bytes) -> None:
+    """Write ``data`` to ``path`` atomically, like :func:`atomic_write_text`.
+
+    Args:
+        path: Destination file.
+        data: Content to write.
+    """
+    _atomic_write(path=path, data=data)
+
+
+def _atomic_write(*, path: Path, data: bytes) -> None:
     require_path(value=path, parameter='path')
     path.parent.mkdir(parents=True, exist_ok=True)
     unique = f'{os.getpid()}-{threading.get_ident()}-{uuid.uuid4().hex[:8]}'
     temporary_path = path.with_name(f'{path.name}{_TEMPORARY_MARKER}{unique}')
     try:
-        with temporary_path.open(mode='w', encoding='utf-8') as file_handle:
-            file_handle.write(text)
+        with temporary_path.open(mode='wb') as file_handle:
+            file_handle.write(data)
             file_handle.flush()
             os.fsync(file_handle.fileno())
         temporary_path.replace(path)

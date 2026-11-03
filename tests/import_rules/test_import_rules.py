@@ -4,11 +4,14 @@ Each case imports one module in a fresh interpreter and inspects sys.modules,
 so modules imported by other tests cannot hide a violation.
 """
 
+import ast
+from pathlib import Path
 import subprocess
 import sys
 
 import pytest
 
+ANALYSIS_LIBRARIES = ('pandas', 'scipy', 'matplotlib')
 CORE_MODULES = (
     'tslab',
     'tslab.core',
@@ -43,6 +46,10 @@ FORBIDDEN_IN_CORE = (
     'tslab.probes',
     'tslab.study',
     'tslab.cli',
+    'pandas',
+    'scipy',
+    'matplotlib',
+    'tslab.analysis',
 )
 FORBIDDEN_IN_LIGHTNING = (
     'sklearn',
@@ -51,6 +58,7 @@ FORBIDDEN_IN_LIGHTNING = (
     'chronocratic',
     'tslab.adapters',
     'tslab.tasks',
+    'tslab.analysis',
 )
 FORBIDDEN_IN_PROBES = (
     'lightning',
@@ -62,6 +70,7 @@ FORBIDDEN_IN_PROBES = (
     'tslab.adapters',
     'tslab.lightning',
     'tslab.tasks',
+    'tslab.analysis',
 )
 FORBIDDEN_IN_TASKS = (
     'lightning',
@@ -73,17 +82,23 @@ FORBIDDEN_IN_TASKS = (
     'chronocratic',
     'tslab.adapters',
     'tslab.lightning',
+    'pandas',
+    'scipy',
+    'matplotlib',
+    'tslab.analysis',
 )
 TRACKER_SDKS = ('wandb', 'mlflow', 'tensorboard')
-FORBIDDEN_IN_TRACKING = ('lightning', 'pytorch_lightning', *TRACKER_SDKS)
+FORBIDDEN_IN_TRACKING = ('lightning', 'pytorch_lightning', 'tslab.analysis', *TRACKER_SDKS)
 FORBIDDEN_IN_MODELS_ADAPTER = (
     'chronocratic.datasets',
     'tslab.adapters.chronocratic.datasets',
+    'tslab.analysis',
     *TRACKER_SDKS,
 )
 FORBIDDEN_IN_DATASETS_ADAPTER = (
     'chronocratic.models',
     'tslab.adapters.chronocratic.models',
+    'tslab.analysis',
     *TRACKER_SDKS,
 )
 FORBIDDEN_IN_STUDY = (
@@ -97,6 +112,10 @@ FORBIDDEN_IN_STUDY = (
     'tslab.lightning',
     'tslab.tracking',
     *TRACKER_SDKS,
+    'pandas',
+    'scipy',
+    'matplotlib',
+    'tslab.analysis',
 )
 
 
@@ -190,3 +209,45 @@ def test_chronocratic_namespace_imports_nothing() -> None:
         )
         == []
     )
+
+
+SOURCE_ROOT = Path(__file__).resolve().parents[2] / 'src' / 'tslab'
+ANALYSIS_ALLOWED = (SOURCE_ROOT / 'analysis', SOURCE_ROOT / 'templates')
+
+
+def _analysis_imports(*, path: Path) -> list[str]:
+    found: list[str] = []
+    for node in ast.walk(ast.parse(path.read_text(encoding='utf-8'))):
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module is not None:
+            names = [node.module]
+        else:
+            continue
+        found.extend(
+            f'{path.relative_to(SOURCE_ROOT).as_posix()}:{node.lineno} {name}'
+            for name in names
+            if name.split('.')[0] in ANALYSIS_LIBRARIES
+        )
+    return found
+
+
+def test_only_analysis_imports_analysis_libraries() -> None:
+    files = [
+        path
+        for path in SOURCE_ROOT.rglob('*.py')
+        if not any(path.is_relative_to(allowed) for allowed in ANALYSIS_ALLOWED)
+    ]
+    assert [line for path in files for line in _analysis_imports(path=path)] == []
+
+
+def test_analysis_package_loads_no_training_code() -> None:
+    forbidden = (
+        'lightning',
+        'pytorch_lightning',
+        'tslab.lightning',
+        'tslab.adapters',
+        'tslab.cli',
+        *TRACKER_SDKS,
+    )
+    assert offending(loaded=loaded_by(module='tslab.analysis'), forbidden=forbidden) == []
