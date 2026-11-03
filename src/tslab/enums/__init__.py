@@ -12,6 +12,7 @@ from tslab.enums.run_state import RunState
 from tslab.enums.shown_run_state import ShownRunState
 from tslab.enums.split import Split
 from tslab.enums.study_state import StudyState
+from tslab.enums.wandb_mode import WandbMode
 
 __all__ = [
     'CheckStatus',
@@ -26,4 +27,5 @@ __all__ = [
     'ShownRunState',
     'Split',
     'StudyState',
+    'WandbMode',
 ]
