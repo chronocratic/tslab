@@ -1,5 +1,6 @@
 """Code snapshots: the copy of ``src/`` that submitted jobs run from."""
 
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -152,7 +153,7 @@ def test_code_changed_while_copying_stops_without_folder(
     out = tmp_path / 'out'
     real_copy = code_snapshot_module._copy_files  # noqa: SLF001 # why: test the copy hook
 
-    def _copy_and_tamper(*, project_root: Path, copies: list[str], destination: Path) -> None:
+    def _copy_and_tamper(*, project_root: Path, copies: list[Path], destination: Path) -> None:
         real_copy(project_root=project_root, copies=copies, destination=destination)
         (destination / copies[0]).write_text('tampered\n', encoding='utf-8')
 
@@ -165,7 +166,7 @@ def test_code_changed_while_copying_stops_without_folder(
 def test_copy_error_is_a_code_snapshot_error(
     project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def _broken_copy(*, project_root: Path, copies: list[str], destination: Path) -> None:
+    def _broken_copy(*, project_root: Path, copies: list[Path], destination: Path) -> None:
         message = 'enospc'
         raise OSError(message)
 
@@ -285,3 +286,16 @@ def test_uv_run_imports_the_code_snapshot(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().startswith(taken.folder.as_posix())
+
+
+def test_hash_of_files_sorts_by_the_posix_text(tmp_path: Path) -> None:
+    (tmp_path / 'src' / 'a').mkdir(parents=True)
+    (tmp_path / 'src' / 'a.py').write_bytes(b'one')
+    (tmp_path / 'src' / 'a' / 'b.py').write_bytes(b'two')
+    expected = hashlib.sha256()
+    for name, data in (('src/a.py', b'one'), ('src/a/b.py', b'two')):
+        expected.update(name.encode('utf-8') + b'\0' + len(data).to_bytes(8, 'big') + data)
+    digest = code_snapshot_module._hash_of_files(  # noqa: SLF001 # why: pin the hash format
+        project_root=tmp_path, relative_paths=[Path('src/a/b.py'), Path('src/a.py')]
+    )
+    assert digest == expected.hexdigest()[:16]

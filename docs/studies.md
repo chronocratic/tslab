@@ -27,6 +27,8 @@ over the presets and toy data of the template:
 
 ```python
 # my_paper/studies.py
+from pathlib import Path
+
 from tslab.adapters.chronocratic.datasets import ucr_datasets
 from tslab.study import from_presets, Grid, Override, setting_axis, Study
 
@@ -45,7 +47,7 @@ example = Study(
                     names=('ts2vec-archive-split',),
                     without=('data', 'run_path'),
                 ),
-                'dataset': ucr_datasets(root='data', names=('ToySpectra',)),
+                'dataset': ucr_datasets(root=Path('data'), names=('ToySpectra',)),
                 'seed': setting_axis(path='seed', values=(0, 1)),
             },
         )
@@ -58,6 +60,8 @@ A larger study: classification over UCR and UEA in one grid, forecasting with
 a `variant` axis, an `exclude`, and an `Override`:
 
 ```python
+from pathlib import Path
+
 from tslab.adapters.chronocratic.datasets import ucr_datasets, uea_datasets
 
 UCR = ('Coffee', 'Wallet', 'EigenWorms')  # user code may compute these
@@ -71,8 +75,8 @@ classification = Grid(
         'recipe': from_presets(
             presets=classify.PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
         ),
-        'dataset': ucr_datasets(root='${UCR_ROOT}', names=UCR)
-        | uea_datasets(root='${UEA_ROOT}', names=UEA),
+        'dataset': ucr_datasets(root=Path('${UCR_ROOT}'), names=UCR)
+        | uea_datasets(root=Path('${UEA_ROOT}'), names=UEA),
         'seed': setting_axis(path='seed', values=(42, 7)),
     },
     exclude=({'recipe': 'cost-paper', 'dataset': 'EigenWorms'},),

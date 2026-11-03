@@ -105,3 +105,15 @@ def test_shown_run_state_shows_running_for_a_live_run(tmp_path: Path) -> None:
 def test_shown_run_state_keeps_the_state_of_a_finished_run(tmp_path: Path) -> None:
     snapshot = RunStatusSnapshot(run_state=RunState.FINISHED, updated_at='t')
     assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'finished'
+
+
+def test_traceback_file_is_saved_as_posix_text_and_read_back_as_a_path() -> None:
+    record = InstanceRecord(state=InstanceState.FAILED, traceback_file=Path('a') / 'error.txt')
+    document = record.to_json()
+    assert document['traceback_file'] == 'a/error.txt'
+    assert InstanceRecord.from_json(document=document).traceback_file == Path('a/error.txt')
+
+
+def test_traceback_file_must_be_a_string_in_the_document() -> None:
+    with pytest.raises(ValueError, match='traceback_file must be a string'):
+        InstanceRecord.from_json(document={'state': 'failed', 'traceback_file': 3})
