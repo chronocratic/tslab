@@ -306,6 +306,20 @@ def test_query_job_states_raises_after_three_failures(
     assert delays == [5.0, 15.0]
 
 
+def test_query_job_states_retries_a_timed_out_query(
+    fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # why: the fake is a Python script; its startup must fit inside the timeout
+    monkeypatch.setattr(commands, 'QUERY_TIMEOUT_SECONDS', 2.0)
+    delays: list[float] = []
+    monkeypatch.setattr(commands, '_sleep', delays.append)
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '', 'sleep': 5}])
+    with pytest.raises(SlurmError, match=r'did not answer within 2 seconds'):
+        query_job_states(job_ids=['1000_0'])
+    assert len(fake.calls('squeue')) == 3
+    assert delays == [5.0, 15.0]
+
+
 def test_query_job_states_accepts_squeue_not_knowing_a_job(fake: FakeSlurm) -> None:
     fake.set_answers(
         'squeue', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id specified'}]
