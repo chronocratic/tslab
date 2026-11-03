@@ -4,7 +4,7 @@ Every function takes keyword arguments and returns a new object. Missing cells a
 never filled: a test uses the pairs both methods have.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from enum import StrEnum
@@ -16,12 +16,21 @@ import scipy.stats
 
 __all__ = [
     'DEFAULT_ALPHA',
+    'DEFAULT_BOOTSTRAP_SAMPLES',
+    'DEFAULT_CONFIDENCE',
     'DEFAULT_MIN_PAIRS',
     'Direction',
+    'FriedmanTest',
     'PairedTest',
     'annotate_tests',
+    'average_ranks',
+    'bootstrap_median',
+    'correlations',
+    'friedman',
     'holm_adjust',
     'pairwise_wilcoxon',
+    'per_unit_ranks',
+    'rank_agreement',
     'rank_biserial',
     'stars',
     'wilcoxon_paired',
@@ -29,6 +38,10 @@ __all__ = [
 
 DEFAULT_ALPHA = 0.05
 DEFAULT_MIN_PAIRS = 3
+DEFAULT_BOOTSTRAP_SAMPLES = 2000
+DEFAULT_CONFIDENCE = 0.95
+MIN_FRIEDMAN_METHODS = 3
+MIN_FRIEDMAN_DATASETS = 2
 NOT_SIGNIFICANT = 'n.s.'
 NOT_AVAILABLE = 'n/a'
 # A p-value strictly below alpha / divisor earns the marker, strongest first.
@@ -199,3 +212,161 @@ def pairwise_wilcoxon(
         for method_a, method_b in itertools.combinations(matrix.columns, 2)
     ]
     return annotate_tests(table=pd.DataFrame(rows, columns=list(_PAIR_COLUMNS)), alpha=alpha)
+
+
+@dataclass(frozen=True, kw_only=True)
+class FriedmanTest:
+    """The outcome of a Friedman test over complete rows.
+
+    Attributes:
+        statistic: The chi-square statistic, NaN when the test was skipped.
+        p_value: The p-value, NaN when the test was skipped.
+        datasets: Number of complete rows used.
+        methods: Number of method columns.
+    """
+
+    statistic: float
+    p_value: float
+    datasets: int
+    methods: int
+
+
+def friedman(*, matrix: pd.DataFrame) -> FriedmanTest:
+    """Run a Friedman test across method columns, using only complete rows.
+
+    Args:
+        matrix: Rows by unit (for example dataset), columns by method.
+
+    Returns:
+        The test. With fewer than 3 methods or fewer than 2 complete rows the
+        statistic and p-value are NaN.
+    """
+    complete = matrix.dropna()
+    methods = matrix.shape[1]
+    if methods < MIN_FRIEDMAN_METHODS or len(complete) < MIN_FRIEDMAN_DATASETS:
+        return FriedmanTest(
+            statistic=float('nan'), p_value=float('nan'), datasets=len(complete), methods=methods
+        )
+    result = scipy.stats.friedmanchisquare(*(complete[column] for column in complete.columns))
+    return FriedmanTest(
+        statistic=float(result.statistic),
+        p_value=float(result.pvalue),
+        datasets=len(complete),
+        methods=methods,
+    )
+
+
+def bootstrap_median(
+    *,
+    values: pd.Series | np.ndarray,
+    rng: np.random.Generator,
+    samples: int = DEFAULT_BOOTSTRAP_SAMPLES,
+    confidence: float = DEFAULT_CONFIDENCE,
+) -> tuple[float, float, float]:
+    """Return the median and a percentile bootstrap confidence interval.
+
+    Args:
+        values: The observations. NaN entries are dropped.
+        rng: Random generator, so a seed makes the result repeatable.
+        samples: Number of resamples.
+        confidence: Coverage of the interval.
+
+    Returns:
+        ``(median, lower, upper)``; all NaN when there are no observations.
+    """
+    data = np.asarray(values, dtype=float)
+    data = data[~np.isnan(data)]
+    if data.size == 0:
+        nan = float('nan')
+        return nan, nan, nan
+    medians = np.median(rng.choice(data, size=(samples, data.size), replace=True), axis=1)
+    tail = (1 - confidence) / 2 * 100
+    lower, upper = np.percentile(medians, [tail, 100 - tail])
+    return float(np.median(data)), float(lower), float(upper)
+
+
+def rank_agreement(*, left: pd.DataFrame, right: pd.DataFrame) -> pd.Series:
+    """Return the Kendall tau between two score tables for each shared row.
+
+    Args:
+        left: Rows by unit, columns by method.
+        right: Same layout; only shared rows and columns are compared.
+
+    Returns:
+        Kendall tau per shared row. Rows with a missing value are dropped.
+    """
+    columns = left.columns.intersection(right.columns)
+    rows = left.index.intersection(right.index)
+    first = left.loc[rows, columns].dropna()
+    second = right.loc[first.index, columns].dropna()
+    first = first.loc[second.index]
+    taus = {
+        row: float(scipy.stats.kendalltau(first.loc[row], second.loc[row]).statistic)
+        for row in first.index
+    }
+    return pd.Series(taus, index=first.index, dtype=float)
+
+
+def correlations(
+    *,
+    frame: pd.DataFrame,
+    columns: Sequence[str],
+    target: str,
+    alpha: float = DEFAULT_ALPHA,
+    min_pairs: int = DEFAULT_MIN_PAIRS,
+) -> pd.DataFrame:
+    """Return the Spearman correlation of each column with a target column.
+
+    Args:
+        frame: The observations.
+        columns: Columns to correlate with ``target``.
+        target: The column they are compared against.
+        alpha: Significance level for the markers.
+        min_pairs: Fewer complete pairs (or a constant column) give NaN.
+
+    Returns:
+        A frame with columns ``column, n, rho, p_value, p_holm, significance``.
+    """
+    rows = []
+    for column in columns:
+        pairs = frame[[column, target]].dropna()
+        usable = len(pairs) >= min_pairs and (pairs.min() < pairs.max()).all()
+        result = scipy.stats.spearmanr(pairs[column], pairs[target]) if usable else None
+        rows.append(
+            {
+                'column': column,
+                'n': len(pairs),
+                'rho': float(result.statistic) if result else float('nan'),
+                'p_value': float(result.pvalue) if result else float('nan'),
+            }
+        )
+    table = pd.DataFrame(rows, columns=['column', 'n', 'rho', 'p_value'])
+    return annotate_tests(table=table, alpha=alpha)
+
+
+def per_unit_ranks(*, matrix: pd.DataFrame, direction: Direction) -> pd.DataFrame:
+    """Rank the methods within each complete row; 1 is best and ties share the average.
+
+    Args:
+        matrix: Rows by unit, columns by method.
+        direction: Which end of the scale is best.
+
+    Returns:
+        Ranks for the complete rows only, same columns.
+    """
+    complete = matrix.dropna()
+    ranks = scipy.stats.rankdata(-direction.sign * complete.to_numpy(dtype=float), axis=1)
+    return pd.DataFrame(ranks, index=complete.index, columns=complete.columns)
+
+
+def average_ranks(*, matrix: pd.DataFrame, direction: Direction) -> pd.Series:
+    """Return the mean rank of each method over complete rows, best first.
+
+    Args:
+        matrix: Rows by unit, columns by method.
+        direction: Which end of the scale is best.
+
+    Returns:
+        Mean ranks sorted ascending (the best method first).
+    """
+    return per_unit_ranks(matrix=matrix, direction=direction).mean().sort_values(kind='stable')
