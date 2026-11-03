@@ -28,6 +28,7 @@ __all__ = [
     'Results',
     'RunOne',
     'Show',
+    'Slurm',
     'Status',
     'Submit',
     'Usage',
@@ -224,6 +225,7 @@ from tslab.cli.study.failures import Failures, Usage  # noqa: E402
 from tslab.cli.study.logs import Logs  # noqa: E402
 from tslab.cli.study.resubmit import Resubmit, RunOne  # noqa: E402
 from tslab.cli.study.results import Results  # noqa: E402
+from tslab.cli.study.slurm import Slurm  # noqa: E402
 from tslab.cli.study.status import Show, Status, Wait  # noqa: E402
 from tslab.cli.study.submit import Submit  # noqa: E402
 
@@ -238,5 +240,6 @@ STUDY_COMMANDS = {
     'logs': Logs,
     'cancel': Cancel,
     'usage': Usage,
+    'slurm': Slurm,
     'run': RunOne,
 }

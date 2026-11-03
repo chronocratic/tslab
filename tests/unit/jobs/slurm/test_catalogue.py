@@ -1,6 +1,7 @@
 """The catalogue of read-only SLURM commands and its live id selection."""
 
 from pathlib import Path
+import re
 
 import pytest
 
@@ -96,3 +97,10 @@ def test_missing_tool_gives_127(monkeypatch: pytest.MonkeyPatch, tmp_path: Path)
 def test_unknown_name_lists_valid_names() -> None:
     with pytest.raises(KeyError, match='squeue-full-name'):
         slurm_command(name='squeue')
+
+
+def test_docs_table_matches_catalogue() -> None:
+    repo = Path(__file__).resolve().parents[4]
+    text = (repo / 'docs' / 'hpc.md').read_text(encoding='utf-8')
+    names = re.findall(r'^\| `([a-z]+-[a-z-]+)` \|', text, re.MULTILINE)
+    assert names == [command.name for command in SLURM_COMMANDS]
