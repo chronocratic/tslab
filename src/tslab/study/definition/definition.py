@@ -16,6 +16,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.core.paths import NAME_PART_PATTERN
+from tslab.study.definition.expansion import PLACEHOLDERS
 from tslab.study.definition.settings import check_paths, Settings, SettingValue
 
 if TYPE_CHECKING:
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
+    'JOB_NAME_PLACEHOLDER_AXES',
     'RESERVED_AXIS_NAMES',
     'Grid',
     'Match',
@@ -38,7 +40,12 @@ __all__ = [
 
 type Match = Mapping[str, str | Sequence[str]]
 
-_SHORT_NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]{1,8}')
+_SHORT_NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]+')
+_JOB_NAME_PLACEHOLDER = re.compile(r'\{([A-Za-z_][A-Za-z0-9_]*)\}')
+_JOB_NAME_LITERAL = re.compile(r'[A-Za-z0-9._-]*')
+
+#: Names a job name template can use besides the axes; no axis may take one.
+JOB_NAME_PLACEHOLDER_AXES = frozenset({'short_name', *PLACEHOLDERS})
 
 #: Axis names that are columns of the results table or the match key of a grid.
 RESERVED_AXIS_NAMES = frozenset(
@@ -120,8 +127,8 @@ class Grid:
     """One script command of a study, run over the product of its axes.
 
     Args:
-        short_name: At most 8 characters, unique in the study; shown where a
-            full grid name does not fit, e.g. on ``squeue``.
+        short_name: Unique in the study; the default job name and the stem of
+            the task log files.
         command: The no-preset command of the script, as a word tuple.
         config: The config class of the script that the settings are typed against.
         axes: Axis name to ``{value name: settings}``, in run-path order.
@@ -129,6 +136,9 @@ class Grid:
         overrides: Settings applied to matching runs.
         run_settings: Settings every run of the grid gets, e.g. the run
             paths. Read-only once built.
+        job_name: The SLURM job name as a template of ``{short_name}``,
+            ``{study}`` and axis names. Runs with different names go into
+            different arrays, so naming an axis splits the grid by it.
     """
 
     short_name: str
@@ -138,13 +148,52 @@ class Grid:
     exclude: tuple[Match, ...] = ()
     overrides: tuple[Override, ...] = ()
     run_settings: Settings = DEFAULT_RUN_SETTINGS
+    job_name: str = '{short_name}'
+
+    @property
+    def job_name_axes(self) -> tuple[str, ...]:
+        """The axes the job name template uses, in template order."""
+        names = _JOB_NAME_PLACEHOLDER.findall(self.job_name)
+        return tuple(dict.fromkeys(name for name in names if name in self.axes))
+
+    def job_name_for(self, *, study: str, values: Mapping[str, str]) -> str:
+        """The job name of one run.
+
+        Args:
+            study: The study name.
+            values: The axis values of the run, as ``StudyRun.values``.
+
+        Returns:
+            The template with its placeholders filled in.
+        """
+        known = {'short_name': self.short_name, 'study': study, **values}
+        return _JOB_NAME_PLACEHOLDER.sub(lambda match: known[match.group(1)], self.job_name)
+
+    def _check_job_name(self) -> None:
+        """Raise unless the template has plain characters and known placeholders."""
+        template = self.job_name
+        for piece in _JOB_NAME_PLACEHOLDER.split(template)[::2]:
+            if _JOB_NAME_LITERAL.fullmatch(piece) is None:
+                message = (
+                    f'grid job_name {template!r}: {piece!r} is not allowed; use letters, '
+                    f'digits, dot, dash or underscore between placeholders'
+                )
+                raise ValueError(message)
+        allowed = {'short_name', 'study', *self.axes}
+        for name in _JOB_NAME_PLACEHOLDER.findall(template):
+            if name not in allowed:
+                message = (
+                    f'grid job_name {template!r}: unknown placeholder {name!r}; '
+                    f'use short_name, study or an axis: {", ".join(sorted(allowed))}'
+                )
+                raise ValueError(message)
 
     def __post_init__(self) -> None:
         """Check the shape: names, command, config, axes."""
         if _SHORT_NAME_PATTERN.fullmatch(self.short_name) is None:
             message = (
                 f'invalid short_name {self.short_name!r}; '
-                f'use at most 8 letters, digits, dashes or underscores (squeue shows 8)'
+                f'use letters, digits, dashes or underscores'
             )
             raise ValueError(message)
         if not self.command:
@@ -159,10 +208,11 @@ class Grid:
             raise ValueError(message)
         for axis_name, values in self.axes.items():
             validate_name(name=axis_name, kind='axis')
-            if axis_name in RESERVED_AXIS_NAMES:
+            if axis_name in RESERVED_AXIS_NAMES | JOB_NAME_PLACEHOLDER_AXES:
+                reserved = RESERVED_AXIS_NAMES | JOB_NAME_PLACEHOLDER_AXES
                 message = (
-                    f'axis name {axis_name!r} is reserved (a results column or the grid key); '
-                    f'reserved: {", ".join(sorted(RESERVED_AXIS_NAMES))}'
+                    f'axis name {axis_name!r} is reserved (a results column, the grid key '
+                    f'or a placeholder); reserved: {", ".join(sorted(reserved))}'
                 )
                 raise ValueError(message)
             if not values:
@@ -170,6 +220,7 @@ class Grid:
                 raise ValueError(message)
             for value_name in values:
                 validate_name(name=value_name, kind=f'axis {axis_name!r} value')
+        self._check_job_name()
 
     def _check_shapes(self) -> None:
         """Type-check the containers; the usual slip is a missing trailing comma."""
