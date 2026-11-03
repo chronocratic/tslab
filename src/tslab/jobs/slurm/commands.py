@@ -56,7 +56,8 @@ _JOB_NAMES = frozenset(
 )
 _COMPRESSED_ARRAY_KEY = re.compile(r'(?P<job>\d+)_\[(?P<ranges>[\d,-]+)(?:%\d+)?\]')
 
-# why: the number of fields the usage query asks for, so a short or long line is skipped
+# why: eight is the minimum field count of a usage row (the exit code is the
+# optional ninth), so a short line is skipped
 _USAGE_FIELDS = 8
 _Allocation = tuple[
     str, timedelta | None, timedelta | None, timedelta | None, int | None, int, str | None
