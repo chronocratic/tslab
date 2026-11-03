@@ -179,10 +179,13 @@ def sbatch(
         if marker is None:
             message = f'sbatch failed for {script}:\n{output}'
             raise SlurmError(message)
+        # why: the call itself can eat the remaining time, so a wait of zero or less
+        # skips the sleep and the loop top raises
         wait = min(delay, deadline - now())
-        _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, wait)
-        sleep(wait)
         delay = min(delay * 2, 900.0)
+        if wait > 0:
+            _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, wait)
+            sleep(wait)
 
 
 def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
