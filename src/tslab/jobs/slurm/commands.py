@@ -262,8 +262,9 @@ def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, SlurmQueueEntr
 
     Returns:
         ``{task id: SlurmQueueEntry}`` with task ids ``<job>_<index>`` or
-        ``<job>``; ``N/A`` and an empty start become ``None``, and an empty
-        reason becomes ``None``; other values are returned as printed.
+        ``<job>``; ``N/A`` and an empty start become ``None``, and an empty or
+        literal ``None`` reason becomes ``None``; other values are returned
+        as printed.
 
     Raises:
         SlurmError: If ``squeue`` exits non-zero (squeue not knowing a purged
@@ -292,7 +293,8 @@ def _pipe_start_lines(*, stdout: str) -> dict[str, SlurmQueueEntry]:
         if not key:
             continue
         start = None if start.strip() in ('', 'N/A') else start.strip()
-        reason = reason.strip() or None
+        # why: squeue prints the literal word None when a job has no reason
+        reason = None if reason.strip() in ('', 'None') else reason.strip()
         for expanded in _expand_array_key(key=key):
             starts[expanded] = SlurmQueueEntry(start=start, reason=reason)
     return starts

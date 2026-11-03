@@ -121,6 +121,13 @@ def test_query_expected_starts_maps_na_to_none(fake: FakeSlurm) -> None:
     ]
 
 
+def test_query_expected_starts_treats_the_literal_none_reason_as_none(fake: FakeSlurm) -> None:
+    fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|N/A|None\n'}])
+    assert query_expected_starts(job_ids=['1000_0']) == {
+        '1000_0': SlurmQueueEntry(start=None, reason=None)
+    }
+
+
 def test_query_expected_starts_empty_value_is_none(fake: FakeSlurm) -> None:
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|\n'}])
     assert query_expected_starts(job_ids=['1000_0']) == {
