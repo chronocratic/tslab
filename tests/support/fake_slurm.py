@@ -19,7 +19,7 @@ import pytest
 
 __all__ = ['FakeSlurm', 'install_fake_slurm']
 
-_COMMANDS = ('sbatch', 'scancel', 'sacct', 'squeue')
+_COMMANDS = ('sbatch', 'scancel', 'sacct', 'squeue', 'scontrol', 'sinfo')
 
 # ponytail: the script counts its prior calls in calls.jsonl instead of a
 # state file; the fakes are never called concurrently.

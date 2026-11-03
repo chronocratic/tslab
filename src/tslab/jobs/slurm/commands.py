@@ -12,17 +12,21 @@ import subprocess
 import time
 
 from tslab.jobs.slurm.memory import parse_slurm_memory
-from tslab.jobs.slurm.timing import parse_sacct_duration
+from tslab.jobs.slurm.timing import parse_sacct_duration, parse_slurm_duration
 
 __all__ = [
     'QOS_LIMIT_MARKERS',
     'QOS_WAIT_CAP_SECONDS',
     'SlurmError',
     'SlurmJobUsage',
+    'SlurmNodeGroup',
     'SlurmQueueEntry',
+    'gres_gpus',
+    'query_cluster_config',
     'query_expected_starts',
     'query_job_states',
     'query_job_usage',
+    'query_partition',
     'sbatch',
     'scancel',
     'slurm_available',
@@ -45,6 +49,9 @@ QUERY_TIMEOUT_SECONDS = 180.0
 
 #: How long a submit or cancel may run before it gives up.
 SUBMIT_TIMEOUT_SECONDS = 180.0
+
+#: How long a cluster config query may run; it is read once, not retried.
+CONFIG_TIMEOUT_SECONDS = 30.0
 
 #: The waits between the tries of a read-only query.
 _QUERY_RETRY_DELAYS = (5.0, 15.0)
@@ -355,6 +362,109 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     return states
 
 
+def query_cluster_config() -> dict[str, str]:
+    """Read the cluster configuration with ``scontrol show config``.
+
+    Returns:
+        Every ``Key = Value`` line of the config, with keys and values
+        stripped; lines without an ``=`` are skipped.
+
+    Raises:
+        SlurmError: If ``scontrol`` exits non-zero, times out, or is missing.
+    """
+    completed = _run(command=['scontrol', 'show', 'config'], timeout=CONFIG_TIMEOUT_SECONDS)
+    if completed.returncode != 0:
+        output = completed.stdout + completed.stderr
+        message = f'scontrol show config failed:\n{output}'
+        raise SlurmError(message)
+    return _config_lines(stdout=completed.stdout)
+
+
+def _config_lines(*, stdout: str) -> dict[str, str]:
+    config: dict[str, str] = {}
+    for line in stdout.splitlines():
+        key, separator, value = line.partition('=')
+        if not separator:
+            continue
+        key = key.strip()
+        if key:
+            config[key] = value.strip()
+    return config
+
+
+@dataclass(frozen=True, kw_only=True)
+class SlurmNodeGroup:
+    """What ``sinfo`` reports about one node group of a partition.
+
+    Attributes:
+        time_limit: The time limit of the group, or ``None`` for ``infinite``.
+        cpus: The CPUs of the group.
+        memory_bytes: The memory of the group in bytes, or ``None`` when the
+            value is not numeric.
+        gres: The GRES text of the group, as printed.
+    """
+
+    time_limit: timedelta | None
+    cpus: int
+    memory_bytes: int | None
+    gres: str
+
+
+def query_partition(*, partition: str) -> list[SlurmNodeGroup]:
+    """Return one node group per line of ``sinfo`` for a partition.
+
+    Args:
+        partition: The SLURM partition to describe.
+
+    Returns:
+        One ``SlurmNodeGroup`` per node group; ``infinite`` and unparseable
+        time limits become ``None``, a trailing ``+`` on cpus and memory is
+        dropped, and memory is megabytes times ``1024**2``.
+
+    Raises:
+        SlurmError: If ``sinfo`` exits non-zero, times out, or is missing.
+    """
+    completed = _run(
+        command=['sinfo', '-p', partition, '-h', '-o', '%l|%c|%m|%G'],
+        timeout=CONFIG_TIMEOUT_SECONDS,
+    )
+    if completed.returncode != 0:
+        output = completed.stdout + completed.stderr
+        message = f'sinfo failed for partition {partition}:\n{output}'
+        raise SlurmError(message)
+    return [_node_group(line=line) for line in completed.stdout.splitlines() if line.strip()]
+
+
+def _node_group(*, line: str) -> SlurmNodeGroup:
+    time_text, _, cpus_rest = line.partition('|')
+    cpus_text, _, memory_rest = cpus_rest.partition('|')
+    memory_text, _, gres = memory_rest.partition('|')
+    return SlurmNodeGroup(
+        time_limit=_slurm_time_limit(text=time_text.strip()),
+        cpus=_int_or_zero(text=cpus_text.strip().removesuffix('+')),
+        memory_bytes=_memory_bytes(text=memory_text.strip()),
+        gres=gres.strip(),
+    )
+
+
+def _slurm_time_limit(*, text: str) -> timedelta | None:
+    # why: sinfo prints infinite when the partition has no time limit
+    if text in ('', 'infinite'):
+        return None
+    try:
+        return parse_slurm_duration(text=text)
+    except ValueError:
+        return None
+
+
+def _memory_bytes(*, text: str) -> int | None:
+    # why: sinfo prints memory in megabytes
+    try:
+        return int(text.removesuffix('+')) * 1024**2
+    except ValueError:
+        return None
+
+
 @dataclass(frozen=True, kw_only=True)
 class SlurmJobUsage:
     """What ``sacct`` reports about the usage of one task of a job.
@@ -475,3 +585,35 @@ def _int_or_zero(*, text: str) -> int:
         return int(text)
     except ValueError:
         return 0
+
+
+def gres_gpus(*, gres: str, gpu_type: str | None) -> int:
+    """Count the GPUs of a GRES string, filtered by GPU type when set.
+
+    Args:
+        gres: The ``%G`` field of ``sinfo``, such as ``gpu:a100:4(S:0-1)``,
+            ``gpu:4,shard:8`` or ``(null)``.
+        gpu_type: Count only entries of this GPU type when set.
+
+    Returns:
+        The sum of the counts of the matching ``gpu`` entries; 0 for
+        ``(null)`` or a string without gpu entries.
+    """
+    if gres == '(null)':
+        return 0
+    return sum(_gres_entry_gpus(entry=entry, gpu_type=gpu_type) for entry in gres.split(','))
+
+
+def _gres_entry_gpus(*, entry: str, gpu_type: str | None) -> int:
+    # why: sinfo adds a state suffix such as ``gpu:a100:4(S:0-1)``
+    parts = entry.split('(', 1)[0].split(':')
+    match parts:
+        case ['gpu', count]:
+            entry_type = None
+        case ['gpu', entry_type, count]:
+            pass
+        case _:
+            return 0
+    if gpu_type is not None and entry_type != gpu_type:
+        return 0
+    return _int_or_zero(text=count)
