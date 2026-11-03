@@ -50,9 +50,15 @@ def test_sbatch_backoff_caps_at_900(fake: FakeSlurm, tmp_path: Path) -> None:
 
 def test_sbatch_gives_up_after_the_qos_cap(fake: FakeSlurm, tmp_path: Path) -> None:
     fake.set_answers('sbatch', [{'exit': 1, 'stderr': 'Job violates accounting/QOS policy'}])
+    clock = [0.0]
     delays: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        delays.append(seconds)
+        clock[0] += seconds
+
     with pytest.raises(SlurmError, match='sacctmgr show qos'):
-        sbatch(script=tmp_path / 'x.sbatch', sleep=delays.append)
+        sbatch(script=tmp_path / 'x.sbatch', sleep=sleep, now=lambda: clock[0])
     assert sum(delays) <= QOS_WAIT_CAP_SECONDS
     assert sum(delays) + 900 > QOS_WAIT_CAP_SECONDS
 

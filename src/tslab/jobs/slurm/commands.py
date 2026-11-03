@@ -128,6 +128,7 @@ def sbatch(
     *,
     script: Path,
     sleep: Callable[[float], None] = time.sleep,
+    now: Callable[[], float] = time.monotonic,
     environ: Mapping[str, str] | None = None,
 ) -> str:
     """Submit one job script; QoS limits are waited out, other errors raise.
@@ -135,6 +136,7 @@ def sbatch(
     Args:
         script: The ``.sbatch`` file to submit.
         sleep: The wait between retries; injected for the tests.
+        now: The monotonic clock in seconds; injected for the tests.
         environ: The environment to clean and submit with; ``os.environ``
             when omitted.
 
@@ -145,7 +147,8 @@ def sbatch(
         SlurmError: If ``sbatch`` fails without a QoS limit marker.
     """
     delay = 10.0
-    waited = 0.0
+    start = now()
+    deadline = start + QOS_WAIT_CAP_SECONDS
     while True:
         completed = _run(
             command=['sbatch', '--parsable', str(script)],
@@ -159,15 +162,18 @@ def sbatch(
         if marker is None:
             message = f'sbatch failed for {script}:\n{output}'
             raise SlurmError(message)
-        if waited + delay > QOS_WAIT_CAP_SECONDS:
+        # why: the cap bounds the total wait, the calls included, not just the sleeps
+        remaining = deadline - now()
+        if remaining <= 0:
             message = (
-                f'sbatch for {script} still hits a QoS limit after {waited:g} seconds; '
+                f'sbatch for {script} still hits a QoS limit after '
+                f'{now() - start:g} seconds; '
                 f'check the limits with sacctmgr show qos:\n{output}'
             )
             raise SlurmError(message)
-        _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, delay)
-        sleep(delay)
-        waited += delay
+        wait = min(delay, remaining)
+        _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, wait)
+        sleep(wait)
         delay = min(delay * 2, 900.0)
 
 
