@@ -124,19 +124,24 @@ def _partition_check(*, settings: SlurmSettings, config: Mapping[str, str] | Non
             f'sinfo lists no node of partition {settings.partition}; the node sizes are not checked'
         )
         return DoctorCheck(name='slurm-partition', status='warn', message=message)
-    fragments = _unmet_limits(settings=settings, groups=groups, config=config)
+    fragments, warning = _unmet_limits(settings=settings, groups=groups, config=config)
     if fragments:
         return DoctorCheck(name='slurm-partition', status='fail', message='; '.join(fragments))
+    if warning is not None:
+        return DoctorCheck(name='slurm-partition', status='warn', message=warning)
     message = f'a node of partition {settings.partition} holds one job'
     return DoctorCheck(name='slurm-partition', status='ok', message=message)
 
 
 def _unmet_limits(
     *, settings: SlurmSettings, groups: Sequence[SlurmNodeGroup], config: Mapping[str, str] | None
-) -> list[str]:
-    """The fail lines of the partition check.
+) -> tuple[list[str], str | None]:
+    """The fail lines of the partition check, and a warn line when memory is unproven.
 
-    Empty when one node group holds the time and the resources of one job.
+    The fail lines are empty when one node group holds the time and the resources of
+    one job. The warn line is set then, when the memory requirement is set but the
+    cluster answer cannot prove it: the tracking policy is unknown, or no node group
+    is reported with enough memory.
     """
     fragments: list[str] = []
     job_time = parse_slurm_duration(text=settings.time)
@@ -150,23 +155,38 @@ def _unmet_limits(
     tasks = max(settings.gpus, 1)
     cpus = settings.cpus_per_task * tasks
     memory = settings.requested_memory
-    if memory is not None and not _tracks_memory(config=config):
-        memory = None
     if memory is not None:
         memory *= tasks
-    fits = _group_fits_all(
+    # why: without a cluster config the tracking policy is unknown, so memory must not fail
+    tracked = config is not None and _tracks_memory(config=config)
+    checked_memory = memory if tracked else None
+    if _group_fits_all(
         groups=groups,
         time=job_time,
         cpus=cpus,
-        memory=memory,
+        memory=checked_memory,
+        gpus=settings.gpus,
+        gpu_type=settings.gpu_type,
+    ):
+        return fragments, _policy_warning(settings=settings, memory=memory, config=config)
+    fragments += _unmet_resource_limits(
+        settings=settings, groups=groups, cpus=cpus, memory=checked_memory
+    )
+    if fragments:
+        return fragments, None
+    base_fits = _group_fits_all(
+        groups=groups,
+        time=job_time,
+        cpus=cpus,
+        memory=None,
         gpus=settings.gpus,
         gpu_type=settings.gpu_type,
     )
-    if not fits:
-        fragments += _unmet_resource_limits(
-            settings=settings, groups=groups, cpus=cpus, memory=memory
-        )
-    return fragments
+    if not base_fits or _memory_proven(needed=checked_memory, groups=groups):
+        # why: every single resource can fit, yet no one group holds the whole job
+        fragments.append(_split_limit(settings=settings, cpus=cpus, memory=checked_memory))
+        return fragments, None
+    return fragments, _memory_warning(settings=settings, needed=checked_memory, config=config)
 
 
 def _largest_time_limit(*, groups: Sequence[SlurmNodeGroup]) -> timedelta | None:
@@ -180,13 +200,13 @@ def _largest_time_limit(*, groups: Sequence[SlurmNodeGroup]) -> timedelta | None
     return largest
 
 
-def _tracks_memory(*, config: Mapping[str, str] | None) -> bool:
+def _tracks_memory(*, config: Mapping[str, str]) -> bool:
     """Whether the cluster tracks memory, from SelectTypeParameters.
 
-    A missing config or key counts as tracked: a node would still refuse a job
+    A missing key counts as tracked: a node would still refuse a job
     that asks for more memory than it has.
     """
-    parameters = (config or {}).get('SelectTypeParameters')
+    parameters = config.get('SelectTypeParameters')
     if parameters is None:
         return True
     return 'MEMORY' in parameters.upper()
@@ -217,7 +237,8 @@ def _group_fits_all(  # noqa: PLR0913 # why: one keyword-only argument per job r
 def _unmet_resource_limits(
     *, settings: SlurmSettings, groups: Sequence[SlurmNodeGroup], cpus: int, memory: int | None
 ) -> list[str]:
-    fragments = [
+    """The fail lines of the single resources: CPUs, memory and GPUs."""
+    return [
         fragment
         for fragment in (
             _cpu_limit(partition=settings.partition, needed=cpus, groups=groups),
@@ -231,10 +252,45 @@ def _unmet_resource_limits(
         )
         if fragment is not None
     ]
-    # why: every single resource can fit, yet no one group holds the whole job
-    if not fragments:
-        fragments.append(_split_limit(settings=settings, cpus=cpus, memory=memory))
-    return fragments
+
+
+def _memory_proven(*, needed: int | None, groups: Sequence[SlurmNodeGroup]) -> bool:
+    """Whether some node group is reported with at least the needed memory.
+
+    ``None`` counts as proven: there is no memory requirement to check.
+    """
+    if needed is None:
+        return True
+    return any(group.memory_bytes is not None and group.memory_bytes >= needed for group in groups)
+
+
+def _policy_warning(
+    *, settings: SlurmSettings, memory: int | None, config: Mapping[str, str] | None
+) -> str | None:
+    """The warn line when the tracking policy is unknown but memory is required.
+
+    ``None`` when the policy is known, or no memory requirement is set.
+    """
+    if config is not None or memory is None:
+        return None
+    return _memory_warning(settings=settings, needed=memory, config=config)
+
+
+def _memory_warning(
+    *, settings: SlurmSettings, needed: int | None, config: Mapping[str, str] | None
+) -> str | None:
+    """The warn line when the memory requirement of one job cannot be checked.
+
+    ``None`` when there is no memory requirement to check.
+    """
+    if needed is None:
+        return None
+    if config is None:
+        return f'scontrol did not answer; the memory requirement of {needed} bytes is not checked'
+    return (
+        f'sinfo reports no usable memory for partition {settings.partition}; '
+        f'the memory requirement of {needed} bytes is not checked'
+    )
 
 
 def _cpu_limit(*, partition: str, needed: int, groups: Sequence[SlurmNodeGroup]) -> str | None:
@@ -247,11 +303,15 @@ def _cpu_limit(*, partition: str, needed: int, groups: Sequence[SlurmNodeGroup])
 def _memory_limit(
     *, partition: str, needed: int | None, groups: Sequence[SlurmNodeGroup]
 ) -> str | None:
-    if needed is None or any(
-        group.memory_bytes is not None and group.memory_bytes >= needed for group in groups
-    ):
+    """The fail line when every node reports memory and none holds the job.
+
+    A node without a reported memory keeps the line out: the requirement is
+    then unproven, not failed.
+    """
+    sizes = [size for size in (group.memory_bytes for group in groups) if size is not None]
+    if needed is None or len(sizes) != len(groups) or any(size >= needed for size in sizes):
         return None
-    largest = max(group.memory_bytes or 0 for group in groups)
+    largest = max(sizes)
     return (
         f'no node of partition {partition} has {needed} bytes of memory; the largest has {largest}'
     )
