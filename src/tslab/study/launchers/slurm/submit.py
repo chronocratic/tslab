@@ -68,7 +68,13 @@ def write_job_files(
 def _log_pattern(*, group: JobGroup) -> Path:
     """The ``--output`` pattern of a group: the task log files with the index as ``%a``."""
     first = group.tasks[0]
-    stem = first.log_file.name.removesuffix(f'_{first.index}.out')
+    suffix = f'_{first.index}.out'
+    if not first.log_file.name.endswith(suffix):
+        message = (
+            f'cannot derive the log pattern from {first.log_file.name!r}; expected ...{suffix}'
+        )
+        raise ValueError(message)
+    stem = first.log_file.name.removesuffix(suffix)
     return first.log_file.with_name(f'{stem}_%a.out')
 
 

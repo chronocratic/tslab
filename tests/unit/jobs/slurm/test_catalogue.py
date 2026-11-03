@@ -125,3 +125,11 @@ def test_a_hung_tool_times_out(fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch)
     output = run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
     assert output.returncode == 124
     assert 'seff did not answer within' in output.stderr
+
+
+def test_fallback_says_that_sacct_did_not_answer(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'exit': 1}])
+    fake.set_answers('squeue', [{'stdout': 'row\n'}])
+    output = run_slurm_command(command=slurm_command(name='squeue-stock'), values=VALUES)
+    assert output.stdout == 'row\n'
+    assert output.stderr == 'sacct did not answer; asking every recorded job id\n'

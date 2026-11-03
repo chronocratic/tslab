@@ -1,5 +1,6 @@
 """SLURM study launch tests."""
 
+import dataclasses
 from pathlib import Path
 import subprocess
 import sys
@@ -14,7 +15,7 @@ from tslab.study import Study
 from tslab.study.commands import submit
 from tslab.study.definition import expand_runs
 from tslab.study.launchers import launch as _launch, LaunchError, LaunchReport
-from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
+from tslab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import study_folder
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
@@ -268,3 +269,13 @@ def test_job_name_and_log_pattern_use_name_and_short_name(
     scripts = [(folder / 'jobs' / f'{group.job_file}.sbatch').read_text() for group in groups]
     assert any('--job-name=cost-paper_g1' in text for text in scripts)
     assert all(f'--output={folder}/logs/g1_%a.out' in text for text in scripts)
+
+
+def test_log_pattern_refuses_a_log_name_it_cannot_read(
+    machine: MachineProfile, study: Study
+) -> None:
+    group = groups_of(study, machine)[0]
+    task = dataclasses.replace(group.tasks[0], log_file=Path('logs') / 'odd-name.log')
+    broken = dataclasses.replace(group, tasks=(task, *group.tasks[1:]))
+    with pytest.raises(ValueError, match=r'odd-name\.log'):
+        _log_pattern(group=broken)

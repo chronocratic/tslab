@@ -184,3 +184,13 @@ def test_slurm_file_per_job_command_works_in_zsh(tmp_path: Path, fake: FakeSlurm
     )
     assert result.returncode == 0
     assert fake.calls('seff') == [['1000'], ['1001']]
+
+
+def test_slurm_file_fallback_says_that_sacct_did_not_answer(
+    tmp_path: Path, fake: FakeSlurm
+) -> None:
+    fake.set_answers('sacct', [{'exit': 1}])
+    path = tmp_path / SLURM_FILE
+    path.write_text(slurm_file_text(study=STUDY, values=VALUES))
+    result = _run_bash(path=path, call='squeue-stock')
+    assert 'sacct did not answer; asking every recorded job id' in result.stderr

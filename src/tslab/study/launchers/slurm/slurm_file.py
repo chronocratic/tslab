@@ -37,7 +37,11 @@ _tslab_pick() {
   [ "$1" = all ] && return 0
   local rows
   rows=$(command sacct --jobs "$_tslab_job_ids" --noheader --parsable2 --allocations \\
-    --starttime 1970-01-01 --format=JobID,State 2>/dev/null) || { _tslab_fell_back=1; return 0; }
+    --starttime 1970-01-01 --format=JobID,State 2>/dev/null) || {
+    _tslab_fell_back=1
+    echo 'sacct did not answer; asking every recorded job id' >&2
+    return 0
+  }
   _tslab_picked=$(printf '%%s\\n' "$rows" | awk -F'|' -v scope="$1" '
     BEGIN {
       n = split("%(live)s", l, " "); for (i = 1; i <= n; i++) live[l[i]] = 1
