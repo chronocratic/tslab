@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from types import FrameType
+from typing import Any
 
 __all__ = [
     'ProcessResult',
@@ -199,14 +200,41 @@ def _wait_and_escalate(  # noqa: PLR0913 # why: one keyword per escalation setti
     )
 
 
+def _stop_group_and_reap(*, pid: int, process: subprocess.Popen[Any]) -> None:
+    """Stop the process group of ``pid`` and reap its leader.
+
+    The group gets a ``SIGTERM``; once the leader has not exited within
+    ``_LEFTOVER_WAIT_SECONDS``, the group gets a ``SIGKILL``, so a leader
+    that survives the ``SIGTERM`` does not keep the cleanup waiting and its
+    descendants do not outlive it.
+
+    Args:
+        pid: The pid of the process; the leader of its group.
+        process: The child to reap; its pipes are not read, so the pipe
+            type does not matter.
+    """
+    with contextlib.suppress(ProcessLookupError):
+        # why: the group, not the child, so grandchildren do not survive either
+        os.killpg(pid, signal.SIGTERM)
+    deadline = time.monotonic() + _LEFTOVER_WAIT_SECONDS
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.1)
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        # why: the leader may obey the TERM and be gone; the KILL still reaches
+        # the descendants that survive it (macOS answers EPERM, not ESRCH, for
+        # a group left with only a zombie)
+        os.killpg(pid, signal.SIGKILL)
+    process.wait()
+
+
 def _report_spawn(
     *, on_spawn: Callable[[int], None] | None, pid: int, process: subprocess.Popen[str]
 ) -> None:
     """Call ``on_spawn`` with the pid of the child that started.
 
-    When the callback raises, the child is signalled and reaped before the
-    error propagates, so a failure of the callback never leaves a live
-    process without a watcher.
+    When the callback raises, the child's process group is stopped and
+    reaped before the error propagates, so a failure of the callback never
+    leaves a live process without a watcher.
 
     Args:
         on_spawn: The callback, or ``None`` for none.
@@ -221,10 +249,7 @@ def _report_spawn(
     try:
         on_spawn(pid)
     except Exception:  # why: a callback failure must never leave the child running
-        with contextlib.suppress(ProcessLookupError):
-            # why: the group, not the child, so grandchildren do not survive either
-            os.killpg(pid, signal.SIGTERM)
-        process.wait()
+        _stop_group_and_reap(pid=pid, process=process)
         raise
 
 

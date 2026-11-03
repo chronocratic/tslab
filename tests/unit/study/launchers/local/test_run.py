@@ -13,12 +13,13 @@ import subprocess
 import sys
 import threading
 import time
-from typing import ClassVar, TextIO
+from typing import cast, ClassVar, TextIO
 
 import pytest
 
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import study_directory
+from tslab.jobs.local import PoolCommand, process_alive, Watchdog
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
 from tslab.study.launchers import launch as _launch, LaunchReport, OnTaskState
@@ -867,6 +868,72 @@ def test_normal_launch_end_leaves_the_runs_alone(
     assert fake.process.poll() is not None
     assert len(fake.watched) == 2
     assert sorted(fake.watched) == sorted(fake.forgotten)
+
+
+def test_on_spawn_failure_stops_and_reaps_the_run(*, tmp_path: Path) -> None:
+    """The launcher state callbacks stop the run when the pid file write fails."""
+    _FakeWatchdog.started.clear()
+    fake = _FakeWatchdog.start(grace_seconds=5.0)
+    seen: dict[str, int] = {}
+
+    def on_task_state(*, task_id: str, state: str, pid: int | None = None) -> None:
+        # why: only the 'running' report carries a pid, like the pid file write
+        if pid is not None:
+            seen[task_id] = pid
+            message = 'the launch file could not be written'
+            raise OSError(message)
+
+    states = _local_run._LaunchStates(  # noqa: SLF001 # why: the test drives the real launcher states
+        on_task_state=on_task_state, watchdog=cast('Watchdog', fake)
+    )
+
+    outcomes: list[object] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        pass
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        pass
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        outcomes.append(outcome)
+        states.on_task_state(key, 'ended')
+
+    never_started = _local_run.run_commands(
+        commands=[
+            # why: a command that stays alive without the stop
+            PoolCommand(
+                key='a', command=('bash', '-c', 'sleep 30'), cwd=tmp_path, environment=os.environ
+            )
+        ],
+        slots=1,
+        gpu_ids=(),
+        tasks_per_gpu=1,
+        lock_folder=None,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+        on_start=on_start,
+        on_line=on_line,
+        on_event=on_event,
+        on_wait=on_wait,
+        on_end=on_end,
+        on_spawn=states.on_spawn,
+    )
+    assert never_started == ()
+    pid = seen['a']
+    assert process_alive(pid=pid) is False
+    with pytest.raises((ProcessLookupError, PermissionError)):
+        os.killpg(pid, 0)
+    assert isinstance(outcomes[0], OSError)
+    assert fake.watched == [pid]
+    assert fake.forgotten == [pid]
 
 
 def _wait_for_run_pid(*, launcher: subprocess.Popen[bytes], launch_file: Path) -> int:
