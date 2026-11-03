@@ -51,6 +51,7 @@ from tslab.adapters.chronocratic.models import (
     FingerprintedModel,
     model_settings,
 )
+from tslab.interfaces import Split
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.probes import RidgeProbe
 from tslab.tasks import forecasting_representations
@@ -160,7 +161,7 @@ def attack(  # noqa: PLR0913 # why: a stage takes its inputs as keyword argument
         message = f'{type(model).__qualname__} has no encode_batch'
         raise TypeError(message)
     series = data.full_series().to(dtype=torch.float32)
-    test = data.split_slices()['test']
+    test = data.split_slices()[Split.TEST]
     clean = series[:, test]
     movable = torch.zeros(series.shape[-1])
     movable[list(data.info.target_channels)] = 1.0

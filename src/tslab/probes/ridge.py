@@ -11,6 +11,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import torch
 
+from tslab.core.enums import Split
 from tslab.probes.metrics import forecasting_metrics
 from tslab.probes.sklearn_probe import (
     cap_samples,
@@ -80,14 +81,14 @@ class RidgeProbe(SklearnProbe[RidgeProbeSettings]):
             labels=to_numpy(tensor=train_targets),
             max_samples=self._settings.max_samples,
             stratify=False,
-            split='train',
+            split=Split.TRAIN,
         )
         val_features, val_labels = cap_samples(
             features=val_features,
             labels=val_labels,
             max_samples=self._settings.max_samples,
             stratify=False,
-            split='val',
+            split=Split.VAL,
         )
         pipeline = Pipeline(
             steps=[

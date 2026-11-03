@@ -19,6 +19,7 @@ from tslab.adapters.chronocratic.datasets import (
     data_settings,
     DATAMODULES,
 )
+from tslab.core.enums import Split
 from tslab.core.fingerprint import canonicalize
 from tslab.interfaces import SPLITS
 
@@ -97,14 +98,14 @@ def test_labeled_splits_cover_every_sample_once() -> None:
     assert samples.shape == (56, 286, 1)
     assert torch.unique(samples.flatten(start_dim=1), dim=0).shape[0] == 56
     assert set(labels.tolist()) == {0, 1}
-    assert splits['test'][0].shape[0] == 28
+    assert splits[Split.TEST][0].shape[0] == 28
 
 
 def test_setup_again_gives_the_same_data() -> None:
     data = classification()
-    before = data.labeled_split(split='train')
+    before = data.labeled_split(split=Split.TRAIN)
     data.datamodule.setup(stage='fit')
-    after = data.labeled_split(split='train')
+    after = data.labeled_split(split=Split.TRAIN)
     torch.testing.assert_close(actual=after, expected=before)
     series = forecasting()
     first = series.full_series()
@@ -124,9 +125,9 @@ def test_forecasting_channels_and_splits() -> None:
     assert data.full_series().shape == (1, 14_400, info.num_channels)
     assert data.full_series().dtype == torch.float32
     slices = data.split_slices()
-    assert slices['train'].stop == 8_640
-    assert (slices['val'].start, slices['val'].stop) == (8_640, 11_520)
-    assert (slices['test'].start, slices['test'].stop) == (11_520, 14_400)
+    assert slices[Split.TRAIN].stop == 8_640
+    assert (slices[Split.VAL].start, slices[Split.VAL].stop) == (8_640, 11_520)
+    assert (slices[Split.TEST].start, slices[Split.TEST].stop) == (11_520, 14_400)
 
 
 def test_foreign_settings_are_rejected() -> None:
@@ -149,7 +150,7 @@ def test_empty_validation_split_encodes_as_empty_tensors() -> None:
     config = parse(Config, *CLASSIFICATION_ARGS, '--data.valid-size', '0').data
     data = build_chronocratic_data_source(config=config)
     assert isinstance(data, ChronocraticClassificationData)
-    samples, labels = data.labeled_split(split='val')
+    samples, labels = data.labeled_split(split=Split.VAL)
     assert samples.shape[0] == 0
     assert labels.shape == (0,)
 
@@ -157,6 +158,6 @@ def test_empty_validation_split_encodes_as_empty_tensors() -> None:
 def test_the_datamodule_is_not_set_up_again_for_a_stage_already_set_up() -> None:
     data = classification()
     with mock.patch.object(data.datamodule, 'setup', wraps=data.datamodule.setup) as setup:
-        data.labeled_split(split='train')
-        data.labeled_split(split='val')
+        data.labeled_split(split=Split.TRAIN)
+        data.labeled_split(split=Split.VAL)
     setup.assert_not_called()

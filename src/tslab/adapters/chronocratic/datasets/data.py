@@ -13,7 +13,7 @@ import numpy as np
 import torch
 
 from tslab.adapters.chronocratic.datasets.settings import datamodule_class_of
-from tslab.interfaces import Split
+from tslab.core.enums import Split
 from tslab.lightning import LightningDataSource
 from tslab.tasks import check_label_range, TSClassificationDataInfo, TSForecastingDataInfo
 
@@ -77,17 +77,17 @@ class ChronocraticClassificationData(LightningDataSource[TSClassificationDataInf
         Raises:
             ValueError: If a label lies outside ``0 .. num_classes - 1``.
         """
-        self._set_up(stage='test' if split == 'test' else 'fit')
+        self._set_up(stage='test' if split == Split.TEST else 'fit')
         loaders = {
-            'train': self._classification.train_dataloader,
-            'val': self._classification.val_dataloader,
-            'test': self._classification.test_dataloader,
+            Split.TRAIN: self._classification.train_dataloader,
+            Split.VAL: self._classification.val_dataloader,
+            Split.TEST: self._classification.test_dataloader,
         }
         # Strict batches repeat tail samples to fill the last batch; collection must be exact.
         loader = loaders[split](
             loader_mode=ClassificationLoaderMode.SAMPLE_LABEL, loader_strict_batch_size=False
         )
-        if loader is None and split == 'val':
+        if loader is None and split == Split.VAL:
             # A validation size of 0 leaves no validation loader: the split is empty.
             samples = torch.empty(0, self.info.length or 0, self.info.num_channels)
             return samples, torch.empty(0, dtype=torch.long)
@@ -140,9 +140,9 @@ class ChronocraticForecastingData(LightningDataSource[TSForecastingDataInfo]):
     def split_slices(self) -> Mapping[Split, slice]:
         """Return the timestep range of each split."""
         return {
-            'train': _known(value=self._forecasting.train_slice, name='train_slice'),
-            'val': _known(value=self._forecasting.valid_slice, name='valid_slice'),
-            'test': _known(value=self._forecasting.test_slice, name='test_slice'),
+            Split.TRAIN: _known(value=self._forecasting.train_slice, name='train_slice'),
+            Split.VAL: _known(value=self._forecasting.valid_slice, name='valid_slice'),
+            Split.TEST: _known(value=self._forecasting.test_slice, name='test_slice'),
         }
 
 

@@ -1,18 +1,19 @@
 """The data interface: what trainers and the ready stages need from a dataset."""
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Literal, Protocol
+from typing import Protocol
 
 import torch
 
-__all__ = ['SPLITS', 'Batch', 'DataSource', 'LabeledSplits', 'Split']
+from tslab.core.enums import Split
+
+__all__ = ['SPLITS', 'Batch', 'DataSource', 'LabeledSplits']
 
 # One batch as a loader yields it: a tensor, a sequence of tensors or named tensors.
 type Batch = Mapping[str, torch.Tensor] | Sequence[torch.Tensor] | torch.Tensor
 
-# The three splits every ready stage works with, in this order.
-type Split = Literal['train', 'val', 'test']
-SPLITS: tuple[Split, ...] = ('train', 'val', 'test')
+# The splits in the order the ready stages work through them.
+SPLITS: tuple[Split, ...] = tuple(Split)
 
 
 class DataSource[I](Protocol):
@@ -54,7 +55,7 @@ class LabeledSplits(Protocol):
         """Return ``(inputs, targets)`` for ``split``.
 
         Args:
-            split: ``'train'``, ``'val'`` or ``'test'``.
+            split: A ``Split`` member.
 
         Returns:
             The inputs (one row per sample) and the matching targets.

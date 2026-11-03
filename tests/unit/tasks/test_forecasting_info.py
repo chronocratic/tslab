@@ -3,7 +3,7 @@ from collections.abc import Mapping
 import pytest
 import torch
 
-from tslab.interfaces import Split
+from tslab.core.enums import Split
 from tslab.tasks import checked_split_slices, TSForecastingDataInfo
 
 
@@ -54,9 +54,15 @@ class Series:
 
 
 def test_split_slices_are_checked() -> None:
-    good: Mapping[Split, slice] = {'train': slice(0, 6), 'val': slice(6, 8), 'test': slice(8, 10)}
+    good: Mapping[Split, slice] = {
+        Split.TRAIN: slice(0, 6),
+        Split.VAL: slice(6, 8),
+        Split.TEST: slice(8, 10),
+    }
     assert checked_split_slices(data=Series(slices=good)) == good
     with pytest.raises(ValueError, match="'val'"):
-        checked_split_slices(data=Series(slices={'train': slice(0, 6), 'test': slice(6, 10)}))
+        checked_split_slices(
+            data=Series(slices={Split.TRAIN: slice(0, 6), Split.TEST: slice(6, 10)})
+        )
     with pytest.raises(ValueError, match='step'):
-        checked_split_slices(data=Series(slices={**good, 'test': slice(8, 10, 2)}))
+        checked_split_slices(data=Series(slices={**good, Split.TEST: slice(8, 10, 2)}))

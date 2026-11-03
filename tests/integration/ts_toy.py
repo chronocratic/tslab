@@ -8,7 +8,8 @@ from lightning import LightningModule
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from tslab.interfaces import Batch, Split
+from tslab.core.enums import Split
+from tslab.interfaces import Batch
 from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
@@ -100,7 +101,7 @@ class SineClassification:
         generator = torch.Generator().manual_seed(0)
         time = torch.arange(32, dtype=torch.float32)
         self._splits: dict[Split, tuple[torch.Tensor, torch.Tensor]] = {}
-        for split, count in (('train', 64), ('val', 32), ('test', 32)):
+        for split, count in ((Split.TRAIN, 64), (Split.VAL, 32), (Split.TEST, 32)):
             labels = torch.arange(count) % 2
             periods = torch.where(labels == 0, 16.0, 4.0)[:, None]
             phases = 2 * math.pi * torch.rand(count, 1, generator=generator)
@@ -119,22 +120,22 @@ class SineClassification:
         return self._splits[split]
 
     def train_loader(self) -> Iterable[Batch]:
-        return _loader(tensors=self._splits['train'], shuffle=True)
+        return _loader(tensors=self._splits[Split.TRAIN], shuffle=True)
 
     def val_loader(self) -> Iterable[Batch] | None:
-        return _loader(tensors=self._splits['val'], shuffle=False)
+        return _loader(tensors=self._splits[Split.VAL], shuffle=False)
 
     def test_loader(self) -> Iterable[Batch]:
-        return _loader(tensors=self._splits['test'], shuffle=False)
+        return _loader(tensors=self._splits[Split.TEST], shuffle=False)
 
 
 class SineForecasting:
     """One series of 400 steps: channel 0 is time (0..1), channel 1 a noisy sine."""
 
     SLICES: Mapping[Split, slice] = {
-        'train': slice(0, 240),
-        'val': slice(240, 320),
-        'test': slice(320, 400),
+        Split.TRAIN: slice(0, 240),
+        Split.VAL: slice(240, 320),
+        Split.TEST: slice(320, 400),
     }
 
     def __init__(self) -> None:
@@ -163,10 +164,10 @@ class SineForecasting:
         return (part.unfold(dimension=0, size=24, step=4).transpose(1, 2),)
 
     def train_loader(self) -> Iterable[Batch]:
-        return _loader(tensors=self._windows(split='train'), shuffle=True)
+        return _loader(tensors=self._windows(split=Split.TRAIN), shuffle=True)
 
     def val_loader(self) -> Iterable[Batch] | None:
-        return _loader(tensors=self._windows(split='val'), shuffle=False)
+        return _loader(tensors=self._windows(split=Split.VAL), shuffle=False)
 
     def test_loader(self) -> Iterable[Batch]:
-        return _loader(tensors=self._windows(split='test'), shuffle=False)
+        return _loader(tensors=self._windows(split=Split.TEST), shuffle=False)
