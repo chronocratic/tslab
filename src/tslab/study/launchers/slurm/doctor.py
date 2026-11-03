@@ -105,7 +105,10 @@ def _int_or_none(*, text: str) -> int | None:
 
 
 def _partition_check(*, settings: SlurmSettings, config: Mapping[str, str] | None) -> DoctorCheck:
-    """The slurm-partition check: one job against the node groups of the partition."""
+    """The slurm-partition check: one job against the node groups of the partition.
+
+    One node group must hold the time and the resources of the job.
+    """
     try:
         groups = query_partition(partition=settings.partition)
     except SlurmError as error:
@@ -131,10 +134,14 @@ def _partition_check(*, settings: SlurmSettings, config: Mapping[str, str] | Non
 def _unmet_limits(
     *, settings: SlurmSettings, groups: Sequence[SlurmNodeGroup], config: Mapping[str, str] | None
 ) -> list[str]:
-    """The fail lines of the partition check, empty when one node group holds one job."""
+    """The fail lines of the partition check.
+
+    Empty when one node group holds the time and the resources of one job.
+    """
     fragments: list[str] = []
+    job_time = parse_slurm_duration(text=settings.time)
     limit = _largest_time_limit(groups=groups)
-    if limit is not None and parse_slurm_duration(text=settings.time) > limit:
+    if limit is not None and job_time > limit:
         fragments.append(
             f'time {settings.time} is above the limit of partition {settings.partition} '
             f'({format_slurm_duration(duration=limit)})'
@@ -148,7 +155,12 @@ def _unmet_limits(
     if memory is not None:
         memory *= tasks
     fits = _group_fits_all(
-        groups=groups, cpus=cpus, memory=memory, gpus=settings.gpus, gpu_type=settings.gpu_type
+        groups=groups,
+        time=job_time,
+        cpus=cpus,
+        memory=memory,
+        gpus=settings.gpus,
+        gpu_type=settings.gpu_type,
     )
     if not fits:
         fragments += _unmet_resource_limits(
@@ -180,17 +192,22 @@ def _tracks_memory(*, config: Mapping[str, str] | None) -> bool:
     return 'MEMORY' in parameters.upper()
 
 
-def _group_fits_all(
+def _group_fits_all(  # noqa: PLR0913 # why: one keyword-only argument per job requirement
     *,
     groups: Sequence[SlurmNodeGroup],
+    time: timedelta,
     cpus: int,
     memory: int | None,
     gpus: int,
     gpu_type: str | None,
 ) -> bool:
-    """Whether one node group holds the CPUs, memory and GPUs of one job."""
+    """Whether one node group holds the time, CPUs, memory and GPUs of one job.
+
+    A ``time_limit`` of ``None`` means the group has no time limit.
+    """
     return any(
-        group.cpus >= cpus
+        (group.time_limit is None or time <= group.time_limit)
+        and group.cpus >= cpus
         and (memory is None or (group.memory_bytes is not None and group.memory_bytes >= memory))
         and gres_gpus(gres=group.gres, gpu_type=gpu_type) >= gpus
         for group in groups
