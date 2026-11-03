@@ -1,5 +1,16 @@
 """SLURM helpers: submitting jobs and reading their states and timing."""
 
+from tslab.jobs.slurm.catalogue import (
+    command_lines,
+    CommandOutput,
+    CommandValues,
+    IdScope,
+    run_slurm_command,
+    select_ids,
+    SLURM_COMMANDS,
+    slurm_command,
+    SlurmCommand,
+)
 from tslab.jobs.slurm.commands import (
     gres_gpus,
     QOS_LIMIT_MARKERS,
@@ -45,6 +56,15 @@ from tslab.jobs.slurm.timing import (
 )
 
 __all__ = [
+    'SLURM_COMMANDS',
+    'CommandOutput',
+    'CommandValues',
+    'IdScope',
+    'SlurmCommand',
+    'command_lines',
+    'run_slurm_command',
+    'select_ids',
+    'slurm_command',
     'FAILING_JOB_STATES',
     'INTERRUPTING_JOB_STATES',
     'QOS_LIMIT_MARKERS',
