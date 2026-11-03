@@ -27,7 +27,6 @@ from tslab.analysis.stats import (
     MIN_FRIEDMAN_DATASETS,
     MIN_FRIEDMAN_METHODS,
 )
-from tslab.analysis.style import FULL_WIDTH
 
 __all__ = ['CdDiagram', 'CdStyle', 'cd_diagram', 'cd_groups', 'critical_difference']
 
@@ -72,6 +71,8 @@ class CdStyle:
 
 
 DEFAULT_CD_STYLE = CdStyle()
+#: Default figure width in inches; pass ``FULL_WIDTH`` to fit the paper text width.
+DEFAULT_CD_WIDTH = 6.0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -144,7 +145,7 @@ def cd_diagram(  # noqa: PLR0913 # why: keyword-only public API; each option is 
     direction: Direction,
     labels: Mapping[str, str] | None = None,
     alpha: float = DEFAULT_ALPHA,
-    width: float = FULL_WIDTH,
+    width: float = DEFAULT_CD_WIDTH,
     reverse: bool = False,
     style: CdStyle = DEFAULT_CD_STYLE,
 ) -> CdDiagram:

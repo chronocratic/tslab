@@ -12,16 +12,13 @@ __all__ = [
     'DARK_LUMINANCE',
     'DEFAULT_FONT_SIZE',
     'FULL_WIDTH',
-    'HALF_WIDTH',
     'PAPER_DPI',
     'is_dark_cell',
     'paper_style',
 ]
 
-#: Default text width in inches (13.1 cm). A caller passes its own ``width`` when its page differs.
+#: Text width of a journal page in inches (13.1 cm), to pass as a figure ``width``.
 FULL_WIDTH = 13.1 / 2.54
-#: Default column width in inches (6.4 cm, a column with a gutter, not half of ``FULL_WIDTH``).
-HALF_WIDTH = 6.4 / 2.54
 DEFAULT_FONT_SIZE = 8
 PAPER_DPI = 150
 #: Perceived luminance below this counts as a dark cell.
