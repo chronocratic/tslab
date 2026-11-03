@@ -21,6 +21,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
+from tslab.study.slurm import slurm_output
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
@@ -34,4 +35,5 @@ __all__ = [
     'from_presets',
     'setting_axis',
     'settings_to_args',
+    'slurm_output',
 ]

@@ -267,8 +267,13 @@ snapshot — and never pick the flag on your own.
 
 Writing a study:
 
-- A `Grid` has a `short_name` (SLURM job name, at most 8 characters), a
+- A `Grid` has a `short_name` (the default SLURM job name), a
   `command` (the script with `no-preset`), the `config` class and `axes`.
+  Optional `job_name='{recipe}_{short_name}'` names jobs from axis values and
+  splits the grid into one array per name.
+- SLURM commands for a study: `tslab study slurm STUDY` lists them,
+  `tslab study slurm STUDY NAME` runs one (also `.study/slurm.sh`). Agents use
+  `tslab study status` and the `sacct-*` commands, not `squeue-*`.
 - Axes are mappings of value name to settings (dotted config paths:
   `'model.depth': 10`, `'data': 'ett'`). Helpers: `from_presets(presets=PRESETS, names=..., without=('data', 'run_path'))`
   for recipes, `ucr_datasets` / `uea_datasets` for datasets,
