@@ -19,7 +19,7 @@ from tslab.core.config import (
 from tslab.core.fingerprint import NotFingerprinted
 
 
-class Mode(Enum):
+class Mode(StrEnum):
     FAST = 'fast'
     SLOW = 'slow'
 
@@ -108,8 +108,8 @@ def test_file_is_plain_yaml() -> None:
         'augmentation': None,
     }
     assert document['config']['run_path'] == 'x/y'
-    assert document['config']['mode'] == 'SLOW'
-    assert document['config']['mask'] == 'CONTINUOUS'
+    assert document['config']['mode'] == 'slow'
+    assert document['config']['mask'] == 'continuous'
 
 
 def test_non_none_unsupported_value_raises_on_save() -> None:
@@ -137,7 +137,8 @@ def edited(**changes: object) -> str:
         ({'seed': 'one'}, r"config\.seed: expected int, got 'one'"),
         ({'seed': True}, r'config\.seed: expected int, got True'),
         ({'scales': ['abc']}, r"config\.scales\[0\]: expected float, got 'abc'"),
-        ({'mode': 'MEDIUM'}, r"config\.mode: expected one of \['FAST', 'SLOW'\]"),
+        ({'mode': 'SLOW'}, r"config\.mode: expected one of \['fast', 'slow'\]"),
+        ({'mode': 'MEDIUM'}, r"config\.mode: expected one of \['fast', 'slow'\]"),
         ({'level': 'mid'}, r"config\.level: expected one of \['low', 'high'\]"),
         ({'model': {'__type__': 'Nope'}}, r"config\.model: __type__ 'Nope' is not one of"),
         ({'model': {'hidden': 1}}, r'config\.model: missing __type__'),
@@ -259,3 +260,32 @@ def test_round_trip_through_a_type_alias_annotation() -> None:
     config = AliasConfig(scales=(0.5, 3.0))
     text = config_to_yaml(config=config)
     assert config_from_yaml(config_class=AliasConfig, text=text) == config
+
+
+def test_cli_flag_takes_the_enum_value() -> None:
+    config = parse_config(config_class=Config, args=['--mask', 'continuous'])
+    assert config.mask is MaskMode.CONTINUOUS
+    with pytest.raises(SystemExit):
+        parse_config(config_class=Config, args=['--mask', 'CONTINUOUS'])
+
+
+def test_decode_lists_the_valid_enum_values() -> None:
+    with pytest.raises(ConfigFileError, match=r"expected one of \['binomial', 'continuous'\]"):
+        config_from_yaml(config_class=Config, text=edited(mask='nope'))
+
+
+def test_decode_rejects_the_member_name() -> None:
+    with pytest.raises(ConfigFileError, match=r'config\.mask: expected one of'):
+        config_from_yaml(config_class=Config, text=edited(mask='BINOMIAL'))
+
+
+def test_plain_enum_in_a_config_raises_on_save() -> None:
+    class Plain(Enum):
+        ONE = 1
+
+    @dataclass(frozen=True, kw_only=True)
+    class Holder:
+        plain: Plain = Plain.ONE
+
+    with pytest.raises(TypeError, match='configs hold choices as StrEnum'):
+        config_to_yaml(config=Holder())

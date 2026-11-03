@@ -95,7 +95,7 @@ def test_value_forms() -> None:
         '0.2',
         '1e-05',
         '--data.splitting-strategy',
-        'MANUAL',
+        'manual',
         '--data.dataset-folder-path',
         'a b',
         '--trainer.max-training-time',

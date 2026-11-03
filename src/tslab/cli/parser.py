@@ -150,7 +150,7 @@ def _cli(
             cast('Any', Union[options]),  # noqa: UP007 # why: `|` cannot unpack a runtime tuple
             prog=prog,
             args=list(args),
-            config=(tyro.conf.FlagCreatePairsOff,),
+            config=(tyro.conf.FlagCreatePairsOff, tyro.conf.EnumChoicesFromValues),
             description=description,
         ),
     )

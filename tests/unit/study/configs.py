@@ -6,7 +6,7 @@ registry of the template, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -16,7 +16,7 @@ import tslab
 from tslab.study import from_presets, Grid, setting_axis
 
 
-class SplitMode(Enum):
+class SplitMode(StrEnum):
     """The splitting strategies of the mock data settings."""
 
     ARCHIVE = 'archive'

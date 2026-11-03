@@ -19,7 +19,7 @@ non-``None`` value of an unsupported type raises ``TypeError`` when saving.
 
 from collections.abc import Mapping, Sequence
 import dataclasses
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 import types
 from typing import (
@@ -182,8 +182,14 @@ def _fail(*, data: object, expected: str, location: str) -> NoReturn:
 
 def _encode(*, value: object, annotation: object, location: str) -> object:
     annotation = strip_annotated(annotation=annotation)
-    if isinstance(value, Enum):  # before scalars: StrEnum and IntEnum members are str and int
-        return value.name
+    if isinstance(value, StrEnum):  # before scalars: a StrEnum member is a str
+        return value.value
+    if isinstance(value, Enum):
+        message = (
+            f'{location}: cannot save {type(value).__qualname__}.{value.name} in a config file; '
+            f'configs hold choices as StrEnum'
+        )
+        raise TypeError(message)
     if value is None or isinstance(value, _SCALARS):
         return value
     if isinstance(value, Path):
@@ -200,7 +206,7 @@ def _encode(*, value: object, annotation: object, location: str) -> object:
         return _encode_mapping(value=value, annotation=annotation, location=location)
     message = (
         f'{location}: cannot save a value of type {type(value).__qualname__} in a config file; '
-        f'configs may hold only dataclasses, scalars, Path, Enum, tuples, lists, dicts and None'
+        f'configs may hold only dataclasses, scalars, Path, StrEnum, tuples, lists, dicts and None'
     )
     raise TypeError(message)
 
@@ -346,9 +352,10 @@ def _decode_null(*, data: object, location: str) -> None:
 
 
 def _decode_enum(*, data: object, cls: type[Enum], location: str) -> object:
-    if isinstance(data, str) and data in cls.__members__:
-        return cls[data]
-    _fail(data=data, expected=f'one of {list(cls.__members__)}', location=location)
+    try:
+        return cls(data)
+    except ValueError:
+        _fail(data=data, expected=f'one of {[member.value for member in cls]}', location=location)
 
 
 def _decode_path(*, data: object, cls: type[Path], location: str) -> object:

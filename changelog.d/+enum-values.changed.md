@@ -1,0 +1,1 @@
+Config files, command line flags and fingerprints now use the value of an enum (`mask_mode: continuous`, `--model.mask-mode continuous`) instead of the member name. A config that holds an enum that is not a `StrEnum` raises an error. Every fingerprint changes once.
