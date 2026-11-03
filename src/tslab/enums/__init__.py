@@ -8,6 +8,7 @@ from tslab.enums.launcher_kind import LauncherKind
 from tslab.enums.local_task_state import LocalTaskState
 from tslab.enums.log_level import LogLevel
 from tslab.enums.run_state import RunState
+from tslab.enums.shown_run_state import ShownRunState
 from tslab.enums.split import Split
 from tslab.enums.study_state import StudyState
 
@@ -20,6 +21,7 @@ __all__ = [
     'LocalTaskState',
     'LogLevel',
     'RunState',
+    'ShownRunState',
     'Split',
     'StudyState',
 ]

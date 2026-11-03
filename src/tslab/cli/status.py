@@ -30,7 +30,7 @@ from tslab.core.status import (
     StatusFileError,
 )
 from tslab.core.text import log_table
-from tslab.enums import InstanceState, JobPhase, RunState, StudyState
+from tslab.enums import InstanceState, JobPhase, ShownRunState, StudyState
 from tslab.study.project import load_project_settings
 from tslab.study.reporting.outcome import states_exit_code
 from tslab.study.reporting.state import read_folder, study_state
@@ -38,7 +38,6 @@ from tslab.study.reporting.state import read_folder, study_state
 __all__ = ['Status']
 
 _LOGGER = logging.getLogger(__name__)
-_INTERRUPTED = 'interrupted'
 _FINGERPRINT_PREFIX = 8
 _MAX_FAILED_INSTANCES = 10
 _SECONDS_PER_MINUTE = 60
@@ -216,9 +215,9 @@ def _selected(
     ]
 
 
-def _instance_state_shown(*, record: InstanceRecord, run_state: str) -> str:
-    if record.state is InstanceState.RUNNING and run_state == _INTERRUPTED:
-        return _INTERRUPTED
+def _instance_state_shown(*, record: InstanceRecord, run_state: ShownRunState) -> str:
+    if record.state is InstanceState.RUNNING and run_state is ShownRunState.INTERRUPTED:
+        return ShownRunState.INTERRUPTED
     return record.state.value
 
 
@@ -268,7 +267,7 @@ def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | Non
 
 
 def _log_run_hints(
-    *, directory: Path, selected: list[tuple[str, InstanceRecord]], run_state: str
+    *, directory: Path, selected: list[tuple[str, InstanceRecord]], run_state: ShownRunState
 ) -> None:
     failed: list[tuple[str, str]] = []
     for instance_id, record in selected:
@@ -279,11 +278,11 @@ def _log_run_hints(
         _LOGGER.warning('%s failed; full error: %s', instance_id, error_file)
     if len(failed) > _MAX_FAILED_INSTANCES:
         _LOGGER.warning('… and %d more failed instances', len(failed) - _MAX_FAILED_INSTANCES)
-    if run_state == _INTERRUPTED:
+    if run_state is ShownRunState.INTERRUPTED:
         _LOGGER.warning('run interrupted; run the same script again to resume it')
     if selected and all(record.state is InstanceState.DONE for _, record in selected):
         _LOGGER.info('all %d instances done', len(selected))
-    if run_state == RunState.RUNNING.value:
+    if run_state is ShownRunState.RUNNING:
         _LOGGER.info(
             'follow active run: %s',
             shlex.join(['tslab', 'status', directory.as_posix(), '--watch', '60']),
@@ -292,7 +291,7 @@ def _log_run_hints(
 
 def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     rows: list[tuple[str, ...]] = []
-    totals: Counter[str] = Counter()
+    totals: Counter[ShownRunState] = Counter()
     has_failed_instances = False
     for directory in runs:
         try:
@@ -318,9 +317,9 @@ def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
     log_table(logger=_LOGGER, header=header, rows=rows)
     summary = ', '.join(f'{count} {state}' for state, count in sorted(totals.items()))
     _LOGGER.info('%d %s: %s', len(rows), 'run' if len(rows) == 1 else 'runs', summary)
-    if totals[RunState.FAILED.value] or totals[_INTERRUPTED] or has_failed_instances:
+    if totals[ShownRunState.FAILED] or totals[ShownRunState.INTERRUPTED] or has_failed_instances:
         _LOGGER.info('details of one run: tslab status <run folder>')
-    if totals[RunState.RUNNING.value]:
+    if totals[ShownRunState.RUNNING]:
         _LOGGER.info(
             'follow active runs: %s',
             shlex.join(['tslab', 'status', root.as_posix(), '--watch', '60']),
