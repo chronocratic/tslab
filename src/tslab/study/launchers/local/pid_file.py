@@ -111,8 +111,7 @@ def launch_is_live(*, launch: LocalLaunch, host: str) -> bool:
     """
     if launch.hostname != host:
         return False
-    # why: after a reboot the pid may belong to another process; the boot time
-    # tells the two apart
+    # why: after a reboot the pid may belong to another process
     current = boot_id()
     if launch.boot is not None and current is not None and launch.boot != current:
         return False
