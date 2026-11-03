@@ -6,10 +6,10 @@ __all__ = ['OutputFormat']
 
 
 class OutputFormat(StrEnum):
-    """How a command writes its output.
+    """How a command prints to the terminal.
 
     Attributes:
-        TEXT: Plain text for people (CSV for the results table).
+        TEXT: Plain text for people.
         JSON: A JSON document, selected by the ``--json`` flag.
     """
 
