@@ -4,6 +4,7 @@ Needs the ``analysis`` extra.
 """
 
 from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
+from tslab.analysis.report import Block, Caption, show
 from tslab.analysis.results import (
     against_baseline,
     AnalysisMetric,
@@ -23,15 +24,20 @@ from tslab.analysis.stats import (
     stars,
     wilcoxon_paired,
 )
+from tslab.analysis.style import FULL_WIDTH, HALF_WIDTH, is_dark_cell, paper_style
 
 __all__ = [
     'DEFAULT_ALPHA',
     'DEFAULT_BOOTSTRAP_SAMPLES',
     'DEFAULT_CONFIDENCE',
     'DEFAULT_MIN_PAIRS',
+    'FULL_WIDTH',
+    'HALF_WIDTH',
     'PLOTS_FOLDER',
     'AnalysisMetric',
     'AnalysisOutput',
+    'Block',
+    'Caption',
     'Direction',
     'FigureFormat',
     'FriedmanTest',
@@ -44,13 +50,16 @@ __all__ = [
     'correlations',
     'friedman',
     'holm_adjust',
+    'is_dark_cell',
     'load_results',
     'method_matrix',
     'missing_runs',
     'pairwise_wilcoxon',
+    'paper_style',
     'per_unit_ranks',
     'rank_agreement',
     'rank_biserial',
+    'show',
     'stars',
     'wilcoxon_paired',
 ]
