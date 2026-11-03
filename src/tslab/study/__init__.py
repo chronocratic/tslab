@@ -3,9 +3,9 @@
 A study turns every run into the flags of the user's own ``no-preset``
 command and hands them to a launcher; TSLab never runs experiment code.
 
-This package exports the authoring surface only: what a study module imports
-to define its grids. The commands, machine profiles and job records live in the
-submodules (``tslab.study.commands``, ``tslab.study.context``, ...).
+This package exports the authoring surface, what a study module imports to
+define its grids, and ``slurm_output`` for notebooks. The commands, machine
+profiles and job records live in the submodules (``tslab.study.commands``, ``tslab.study.context``, ...).
 """
 
 from tslab.study.definition import (

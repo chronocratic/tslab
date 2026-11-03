@@ -53,15 +53,15 @@ _tslab_pick() {
     END { print out }')
 }
 
-# _tslab_run <tool> <args>...: runs the real tool; after the sacct fallback, squeue
-# ids that are purged from the controller are not an error.
+# _tslab_run <tool> <args>...: runs the real tool; after the sacct fallback, ids that
+# are purged from the controller are not an error.
 _tslab_run() {
   local err code
   err=$(mktemp)
   command "$@" 2>"$err"
   code=$?
   cat "$err" >&2
-  if [ "$code" -ne 0 ] && [ "$_tslab_fell_back" = 1 ] && [ "$1" = squeue ] \\
+  if [ "$code" -ne 0 ] && [ "$_tslab_fell_back" = 1 ] \\
     && grep -q '%(unknown)s' "$err"; then
     code=0
   fi
@@ -111,7 +111,11 @@ def _function(*, command: SlurmCommand, values: CommandValues) -> str:
     words = ' '.join(_argument(text=text, values=values) for text in command.arguments)
     call = f'_tslab_run {command.tool} {words}'
     body = (
-        f'  for id in ${{_tslab_picked//,/ }}; do {call}; done' if command.per_job else f'  {call}'
+        f'  local code=0\n'
+        f'  for id in $(printf %s "$_tslab_picked" | tr , " "); do {call} || code=$?; done\n'
+        f'  return "$code"'
+        if command.per_job
+        else f'  {call}'
     )
     return (
         f'# {command.name}: {command.description}\n'

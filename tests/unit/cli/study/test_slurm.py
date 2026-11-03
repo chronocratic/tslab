@@ -108,3 +108,20 @@ def test_slurm_output_rejects_unknown_name_and_unsubmitted_study(
         slurm_output(
             study=study, machine=project / 'cluster.toml', name='sacct-usage', environment={}
         )
+
+
+def test_failing_command_reaches_the_exit_code_and_the_notebook_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake: FakeSlurm
+) -> None:
+    project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    submit_study(project=project)
+    fake.set_answers('sacct', [{'exit': 1, 'stderr': 'boom'}])
+    code = Slurm(study='toy_studies:study', name='sacct-failed', machine='cluster.toml').run()
+    assert code == 1
+    with pytest.raises(RuntimeError, match='boom'):
+        slurm_output(
+            study=load_study(reference='toy_studies:study'),
+            machine=project / 'cluster.toml',
+            name='sacct-failed',
+            environment={},
+        )

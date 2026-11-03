@@ -5,7 +5,10 @@
 import dataclasses
 from pathlib import Path
 import re
+import shutil
 import subprocess
+
+import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.configs import grid
@@ -153,3 +156,31 @@ def test_command_values_skip_local_job_ids(tmp_path: Path) -> None:
     local = _record(job_id='host-123-4', time='2026-11-02T11:00:00+00:00')
     append_job(path=path, record=dataclasses.replace(local, launcher=LauncherKind.LOCAL))
     assert command_values(study=STUDY, study_folder=folder).job_ids == ('1000',)
+
+
+def test_slurm_file_per_job_exit_code_is_the_worst_one(tmp_path: Path, fake: FakeSlurm) -> None:
+    fake.set_answers('seff', [{'exit': 1, 'stderr': 'bad'}, {'exit': 0}])
+    path = tmp_path / SLURM_FILE
+    path.write_text(slurm_file_text(study=STUDY, values=VALUES))
+    assert _run_bash(path=path, call='seff-all').returncode == 1
+
+
+def test_slurm_file_fallback_tolerates_purged_ids_for_every_live_tool(
+    tmp_path: Path, fake: FakeSlurm
+) -> None:
+    fake.set_answers('sacct', [{'exit': 1}])
+    fake.set_answers('scontrol', [{'exit': 1, 'stderr': 'Invalid job id specified'}])
+    path = tmp_path / SLURM_FILE
+    path.write_text(slurm_file_text(study=STUDY, values=VALUES))
+    assert _run_bash(path=path, call='scontrol-show').returncode == 0
+
+
+@pytest.mark.skipif(shutil.which('zsh') is None, reason='needs zsh')
+def test_slurm_file_per_job_command_works_in_zsh(tmp_path: Path, fake: FakeSlurm) -> None:
+    path = tmp_path / SLURM_FILE
+    path.write_text(slurm_file_text(study=STUDY, values=VALUES))
+    result = subprocess.run(
+        ['zsh', '-c', f'source {path} && seff-all'], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 0
+    assert fake.calls('seff') == [['1000'], ['1001']]

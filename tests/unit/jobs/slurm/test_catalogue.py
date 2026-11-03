@@ -104,3 +104,24 @@ def test_docs_table_matches_catalogue() -> None:
     text = (repo / 'docs' / 'hpc.md').read_text(encoding='utf-8')
     names = re.findall(r'^\| `([a-z]+-[a-z-]+)` \|', text, re.MULTILINE)
     assert names == [command.name for command in SLURM_COMMANDS]
+
+
+def test_fallback_tolerates_purged_ids_for_every_live_tool(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'exit': 1}])
+    fake.set_answers(
+        'scontrol',
+        [
+            {'stdout': 'record\n'},
+            {'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id specified'},
+        ],
+    )
+    output = run_slurm_command(command=slurm_command(name='scontrol-show'), values=VALUES)
+    assert (output.returncode, output.stdout) == (0, 'record\n')
+
+
+def test_a_hung_tool_times_out(fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake.set_answers('seff', [{'sleep': 3}])
+    monkeypatch.setattr('tslab.jobs.slurm.catalogue.QUERY_TIMEOUT_SECONDS', 0.3)
+    output = run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
+    assert output.returncode == 124
+    assert 'seff did not answer within' in output.stderr
