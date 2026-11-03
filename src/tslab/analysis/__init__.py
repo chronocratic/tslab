@@ -4,6 +4,14 @@ Needs the ``analysis`` extra.
 """
 
 from tslab.analysis.cd_diagram import cd_diagram, CdDiagram, critical_difference
+from tslab.analysis.numbers import (
+    format_number,
+    number_key,
+    NumberKind,
+    numbers_frame,
+    NUMBERS_STEM,
+    write_numbers,
+)
 from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
 from tslab.analysis.report import Block, Caption, show
 from tslab.analysis.results import (
@@ -34,6 +42,7 @@ __all__ = [
     'DEFAULT_MIN_PAIRS',
     'FULL_WIDTH',
     'HALF_WIDTH',
+    'NUMBERS_STEM',
     'PLOTS_FOLDER',
     'AnalysisMetric',
     'AnalysisOutput',
@@ -43,6 +52,7 @@ __all__ = [
     'Direction',
     'FigureFormat',
     'FriedmanTest',
+    'NumberKind',
     'OutputFolder',
     'PairedTest',
     'against_baseline',
@@ -52,12 +62,15 @@ __all__ = [
     'cd_diagram',
     'correlations',
     'critical_difference',
+    'format_number',
     'friedman',
     'holm_adjust',
     'is_dark_cell',
     'load_results',
     'method_matrix',
     'missing_runs',
+    'number_key',
+    'numbers_frame',
     'pairwise_wilcoxon',
     'paper_style',
     'per_unit_ranks',
@@ -66,4 +79,5 @@ __all__ = [
     'show',
     'stars',
     'wilcoxon_paired',
+    'write_numbers',
 ]
