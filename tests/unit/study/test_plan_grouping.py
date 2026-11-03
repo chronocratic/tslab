@@ -13,7 +13,7 @@ from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
-from tslab.study.plan import assign_indices, plan_jobs, resolve_runs, validate_jobs
+from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, validate_jobs
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 
@@ -263,7 +263,7 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
     assert all('--data.dataset-folder-path' in message for _, message in problems)
 
 
-def _plan(*, study: Study, machine: MachineProfile) -> list:
+def _plan(*, study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
     resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
     return plan_jobs(
