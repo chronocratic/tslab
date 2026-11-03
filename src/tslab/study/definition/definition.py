@@ -25,9 +25,9 @@ if TYPE_CHECKING:
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
     'JOB_NAME_PLACEHOLDER_AXES',
+    'RESERVED_AXIS_NAMES',
     'RETRY_JOB',
     'WANDB_SYNC_JOB',
-    'RESERVED_AXIS_NAMES',
     'Grid',
     'Match',
     'Override',
