@@ -3,6 +3,7 @@
 Needs the ``analysis`` extra.
 """
 
+from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
 from tslab.analysis.results import (
     against_baseline,
     AnalysisMetric,
@@ -28,9 +29,13 @@ __all__ = [
     'DEFAULT_BOOTSTRAP_SAMPLES',
     'DEFAULT_CONFIDENCE',
     'DEFAULT_MIN_PAIRS',
+    'PLOTS_FOLDER',
     'AnalysisMetric',
+    'AnalysisOutput',
     'Direction',
+    'FigureFormat',
     'FriedmanTest',
+    'OutputFolder',
     'PairedTest',
     'against_baseline',
     'annotate_tests',
