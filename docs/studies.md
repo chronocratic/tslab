@@ -68,7 +68,7 @@ UCR = ('Coffee', 'Wallet', 'EigenWorms')  # user code may compute these
 UEA = ('BasicMotions', 'Epilepsy')
 
 classification = Grid(
-    short_name='cls',  # SLURM job name, at most 8 characters
+    short_name='cls',  # the SLURM job name, and the stem of the log files
     command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
     config=classify.ClassifyConfig,
     axes={
@@ -124,8 +124,9 @@ Rules that matter when writing one:
   then `[settings]` of the machine profile, then matching machine overrides.
   After the merge each path appears once.
 - **Names.** Study, grid, axis and value names match `[A-Za-z0-9._-]+` and
-  are not `.` or `..`; `short_name` matches `[A-Za-z0-9_-]{1,8}` and is unique
-  among the grids. Violations raise `ValueError` when the study is built.
+  are not `.` or `..`; `short_name` matches `[A-Za-z0-9_-]+` and is unique
+  among the grids. No axis may be named `short_name`, `study`, `output_root`,
+  `run_path`, `log_file`, `cpus` or `cpus_per_run`. Violations raise `ValueError` when the study is built.
 - **Validation at import:** every settings path must exist on the
   `config` of the grid (a typo fails before anything is submitted). **Validation at
   `submit`, `resubmit` and `--dry-run`:** each selected run is parsed with
@@ -343,14 +344,31 @@ adding, removing or reordering axis values never moves an existing run. The
 index plus `short_name` of the grid names the run everywhere: `<short_name>_<index>`
 in `squeue`, in `scancel <job>_<index>`, and in its log
 `.study/logs/cls_17.out`, which collects every attempt under a header line.
-`short_name` is at most 8 characters because the default name column of
-`squeue` shows 8. An index at or above `max_array_size` stops the submission before
+An index at or above `max_array_size` stops the submission before
 anything is written, naming the grid — raise `max_array_size` (or the
 MaxArraySize of the cluster) for grids beyond about 1000 runs.
 
-Runs of one grid with identical resolved SLURM settings share one array job
-(`--array=3,7,12%max_concurrent`, consecutive indices written as ranges). A
-resubmit is a sparse array of the same indices.
+Runs of one grid with identical resolved SLURM settings and the same job name
+share one array job (`--array=3,7,12%max_concurrent`, consecutive indices
+written as ranges). A resubmit is a sparse array of the same indices. Each
+array has its own `%max_concurrent` cap, because SLURM cannot share one cap
+across arrays.
+
+**Job names.** By default every job of a grid is named `short_name`. A grid can
+name its jobs from axis values with `job_name`, a template of `{short_name}`,
+`{study}` and axis names, written with single braces:
+
+```python
+Grid(short_name='ucr', job_name='{recipe}_{short_name}', ...)  # s11_ucr, b1_ucr, ...
+```
+
+The axes the template names split the grid into one array per value
+combination; the other axes stay tasks inside the array. Between placeholders
+only letters, digits, dot, dash and underscore are allowed, so `${VAR}`, `{{`
+and spaces are rejected. Two grids must not give the same job name, and no
+name may be `<study>_retry` or `<study>_wbsync`, the names of the follow-up
+jobs. Log files keep the name `<short_name>_<index>.out`. Each array is one
+`sbatch` call, so a finer split costs more submit pauses.
 
 ## Status
 
