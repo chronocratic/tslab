@@ -16,12 +16,13 @@ import sys
 from typing import Protocol, TextIO
 from uuid import uuid4
 
+from tslab.core.enums import LauncherKind
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
+from tslab.study.records import append_job, JobKind, JobRecord, take_progress, TaskRecord
 from tslab.study.reporting.state import RunReport
 
 __all__ = [
@@ -331,7 +332,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
             *, job_id: str, group: JobGroup = group, tasks: tuple[TaskRecord, ...] = tasks
         ) -> None:
             record = JobRecord(
-                kind='run',
+                kind=JobKind.RUN,
                 submission_id=submission_id,
                 time=now(),
                 launcher=machine.launcher,
@@ -367,7 +368,7 @@ class Backend(Protocol):
     and calls these methods; it never compares launcher names.
     """
 
-    name: str
+    name: LauncherKind
     #: Whether the jobs have a time limit; a missing one shows as ``-``, else as ``no limit``.
     has_time_limit: bool
     #: Whether an ended job state also covers jobs that ran on other hosts.
@@ -493,7 +494,10 @@ from tslab.study.launchers.slurm import SlurmBackend  # noqa: E402
 
 #: One backend per launcher; the only place beside the machine tables that
 #: names both.
-BACKENDS: Mapping[str, Backend] = {'slurm': SlurmBackend(), 'local': LocalBackend()}
+BACKENDS: Mapping[LauncherKind, Backend] = {
+    LauncherKind.SLURM: SlurmBackend(),
+    LauncherKind.LOCAL: LocalBackend(),
+}
 
 
 def backend_for(*, machine: MachineProfile) -> Backend:

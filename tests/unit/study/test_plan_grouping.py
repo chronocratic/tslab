@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from tests.unit.study.configs import grid, PRESETS
+from tslab.core.enums import LauncherKind
 from tslab.core.status import utc_now_iso
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.code_snapshot import CodeSnapshot
@@ -13,14 +14,14 @@ from tslab.study.definition import expand_runs
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
 from tslab.study.plan import assign_indices, plan_jobs, resolve_runs, validate_jobs
-from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 
 @pytest.fixture
 def machine(tmp_path: Path) -> MachineProfile:
     return MachineProfile(
         path=tmp_path / 'machine.toml',
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         output_root=tmp_path / 'out',
         slurm=SlurmSettings(partition='gpu', time='01:00:00'),
         overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'gpus': 1}),),
@@ -51,10 +52,10 @@ def task_record(index: int, run_path: str) -> TaskRecord:
 
 def job_record(job_id: str, tasks: tuple[tuple[int, str], ...]) -> JobRecord:
     return JobRecord(
-        kind='run',
+        kind=JobKind.RUN,
         submission_id='s1',
         time=utc_now_iso(),
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         job_id=job_id,
         job_file=1,
         tasks=tuple(task_record(index=i, run_path=path) for i, path in tasks),

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_backend import FakeBackend
+from tslab.core.enums import CheckStatus
 import tslab.study.doctor as doctor_module
 from tslab.study.doctor import DoctorCheck, run_checks
 
@@ -21,7 +22,7 @@ def test_doctor_ok_on_local_toy_profile(project: Path) -> None:
 
 
 def test_doctor_checks_come_from_selected_backend(project: Path, fake_backend: FakeBackend) -> None:
-    backend_check = DoctorCheck(name='backend', status='ok', message='backend selected')
+    backend_check = DoctorCheck(name='backend', status=CheckStatus.OK, message='backend selected')
     fake_backend.doctor_answer = (backend_check,)
 
     checks = run_checks(

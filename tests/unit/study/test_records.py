@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from tslab.core.enums import LauncherKind
 from tslab.core.status import (
     InstanceRecord,
     InstanceState,
@@ -21,6 +22,7 @@ from tslab.core.status import (
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.records import (
     append_job,
+    JobKind,
     JobRecord,
     latest_tasks,
     ProgressSnapshot,
@@ -48,10 +50,10 @@ def task(**changes: object) -> TaskRecord:
 
 def job(**changes: object) -> JobRecord:
     values: dict[str, object] = {
-        'kind': 'run',
+        'kind': JobKind.RUN,
         'submission_id': 's1',
         'time': utc_now_iso(),
-        'launcher': 'slurm',
+        'launcher': LauncherKind.SLURM,
         'job_id': '100',
         'job_file': 1,
         'tasks': (),
@@ -197,3 +199,17 @@ def test_task_record_without_counters_reads_as_zero() -> None:
 def test_task_record_counters_round_trip() -> None:
     record = task(uncounted_attempts=2, uncounted_in_row=1)
     assert TaskRecord.from_json(document=record.to_json()) == record
+
+
+def test_from_json_rejects_an_unknown_job_kind() -> None:
+    document = job().to_json()
+    document['kind'] = 'batch'
+    with pytest.raises(ValueError, match="'batch' is not a valid JobKind"):
+        JobRecord.from_json(document=document)
+
+
+def test_from_json_rejects_an_unknown_launcher() -> None:
+    document = job().to_json()
+    document['launcher'] = 'kubernetes'
+    with pytest.raises(ValueError, match="'kubernetes' is not a valid LauncherKind"):
+        JobRecord.from_json(document=document)

@@ -7,6 +7,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast, TextIO
 
+from tslab.core.enums import CheckStatus, LauncherKind
 from tslab.core.status import utc_now_iso
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
@@ -99,7 +100,7 @@ class SlurmBackend:
     """The backend of a SLURM machine: sbatch jobs, sacct states, accounting."""
 
     #: The launcher of the machines this backend serves.
-    name = 'slurm'
+    name = LauncherKind.SLURM
 
     #: Whether the jobs of this backend have a time limit.
     has_time_limit = True
@@ -328,7 +329,7 @@ class SlurmBackend:
         no scheduler to ask the cluster to.
         """
         check = slurm_check()
-        if check.status != 'ok':
+        if check.status != CheckStatus.OK:
             return (check,)
         return (check, *cluster_checks(slurm=machine.slurm))
 

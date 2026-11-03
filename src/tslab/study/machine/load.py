@@ -4,8 +4,9 @@ from collections.abc import Mapping
 import dataclasses
 from pathlib import Path
 import tomllib
-from typing import cast, Literal, Protocol
+from typing import cast, Protocol
 
+from tslab.core.enums import LauncherKind
 from tslab.core.text import unknown_key_message
 from tslab.study.definition import expand_variables
 import tslab.study.machine.local as machine_local
@@ -34,7 +35,7 @@ class ProfileBackend(Protocol):
     """The machine-specific part of one profile table."""
 
     @property
-    def TABLE(self) -> Literal['slurm', 'local']:  # noqa: N802 # why: the profile module exports TABLE
+    def TABLE(self) -> LauncherKind:  # noqa: N802 # why: the profile module exports TABLE
         """The top-level key that selects this table."""
         ...
 
@@ -50,7 +51,7 @@ class ProfileBackend(Protocol):
         ...
 
 
-PROFILE_BACKENDS: dict[str, ProfileBackend] = {
+PROFILE_BACKENDS: dict[LauncherKind, ProfileBackend] = {
     machine_slurm.TABLE: machine_slurm,
     machine_local.TABLE: machine_local,
 }
@@ -101,10 +102,12 @@ def _machine_profile(
         message = f'{path}: {problem}'
         raise MachineProfileError(message)
     launcher = string_field(table=table, name='launcher', path=path)
-    backend = PROFILE_BACKENDS.get(launcher)
-    if backend is None:
+    try:
+        kind = LauncherKind(launcher)
+    except ValueError as error:
         message = f'{path}: launcher must be "slurm" or "local", got {launcher!r}'
-        raise MachineProfileError(message)
+        raise MachineProfileError(message) from error
+    backend = PROFILE_BACKENDS[kind]
     output_root = string_field(table=table, name='output_root', path=path)
     env = expand_env(table=table, path=path, lenient=lenient_env, environment=environment)
     _reject_other_backend_tables(backend=backend, table=table, path=path)

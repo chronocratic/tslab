@@ -2,11 +2,11 @@
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
 
 import pytest
 
 from tests.unit.study.machine.helpers import BASE_SLURM, load_profile as load_machine, LOCAL, write
+from tslab.core.enums import LauncherKind
 from tslab.study.machine import LocalSettings, MachineProfileError, SlurmSettings
 import tslab.study.machine.load as machine_load
 from tslab.study.machine.load import load_machine as _load_machine
@@ -25,14 +25,14 @@ def test_load_machine_uses_selected_backend_settings_loader(
     calls: list[Mapping[str, object]] = []
 
     class LocalProfileBackend:
-        TABLE: Literal['local'] = 'local'
+        TABLE = LauncherKind.LOCAL
         FOLLOWUP_KEYS: frozenset[str] = frozenset({'auto_retry'})
 
         def settings_from(self, *, table: Mapping[str, object], path: Path) -> LocalSettings:
             calls.append(table)
             return LocalSettings(timeout='00:05:00')
 
-    monkeypatch.setitem(machine_load.PROFILE_BACKENDS, 'local', LocalProfileBackend())
+    monkeypatch.setitem(machine_load.PROFILE_BACKENDS, LauncherKind.LOCAL, LocalProfileBackend())
 
     profile = _load_machine(
         path=write(tmp_path, LOCAL), environment={'HOME': str(tmp_path), 'ROOT': 'profile-root'}

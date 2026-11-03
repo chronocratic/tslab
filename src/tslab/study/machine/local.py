@@ -6,6 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import cast, Literal
 
+from tslab.core.enums import LauncherKind
 from tslab.study.machine.tables import from_table, MachineProfileError
 
 __all__ = [
@@ -18,7 +19,7 @@ __all__ = [
     'timeout_seconds',
 ]
 
-TABLE: Literal['local'] = 'local'
+TABLE = LauncherKind.LOCAL
 FOLLOWUP_KEYS = frozenset(('auto_retry',))
 _DURATION_HINT = 'use an sbatch --time format: "M", "M:S", "H:M:S", "D-H", "D-H:M" or "D-H:M:S"'
 

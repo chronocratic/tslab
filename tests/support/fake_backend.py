@@ -17,6 +17,7 @@ from typing import TextIO
 
 import pytest
 
+from tslab.core.enums import LauncherKind
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
@@ -128,7 +129,7 @@ class FakeBackend:
             called, so a test can make one call fail.
     """
 
-    name = 'fake'
+    name = LauncherKind.LOCAL
     has_time_limit = True
     knows_other_hosts = True
 
@@ -376,7 +377,9 @@ def install_fake_backend(*, monkeypatch: pytest.MonkeyPatch) -> FakeBackend:
         The installed fake, to set the answers of before the command runs.
     """
     fake = FakeBackend()
-    monkeypatch.setattr(tslab.study.launchers, 'BACKENDS', {'slurm': fake, 'local': fake})
+    monkeypatch.setattr(
+        tslab.study.launchers, 'BACKENDS', {LauncherKind.SLURM: fake, LauncherKind.LOCAL: fake}
+    )
     return fake
 
 

@@ -19,6 +19,7 @@ import pytest
 
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import study_directory
+from tslab.core.enums import LauncherKind
 from tslab.jobs.local import PoolCommand, process_alive, Watchdog
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
@@ -68,7 +69,7 @@ class LocalLauncher(_LocalLauncher):
 def machine(tmp_path: Path) -> MachineProfile:
     return MachineProfile(
         path=tmp_path / 'machine.toml',
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         output_root=tmp_path / 'out',
         local=LocalSettings(),
     )
@@ -126,7 +127,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
 ) -> None:
     machine = MachineProfile(
         path=machine.path,
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         output_root=machine.output_root,
         local=machine.local or LocalSettings(),
     )
@@ -194,7 +195,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
 
 def test_local_launcher_writes_to_given_stream(machine: MachineProfile, tmp_path: Path) -> None:
     local_machine = MachineProfile(
-        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+        path=machine.path, launcher=LauncherKind.LOCAL, output_root=machine.output_root, slurm=None
     )
     script = tmp_path / 'echo.py'
     script.write_text("print('TASK-OUTPUT')")
@@ -218,7 +219,7 @@ def test_detached_local_launcher_keeps_task_lines_out_of_the_console(
 ) -> None:
     monkeypatch.setenv('TSLAB_DETACHED', '1')
     local_machine = MachineProfile(
-        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+        path=machine.path, launcher=LauncherKind.LOCAL, output_root=machine.output_root, slurm=None
     )
     script = tmp_path / 'echo.py'
     script.write_text("print('TASK-OUTPUT')")
@@ -308,7 +309,7 @@ def _times_script(tmp_path: Path) -> Path:
 
 def _local_machine(machine: MachineProfile) -> MachineProfile:
     return MachineProfile(
-        path=machine.path, launcher='local', output_root=machine.output_root, slurm=None
+        path=machine.path, launcher=LauncherKind.LOCAL, output_root=machine.output_root, slurm=None
     )
 
 
@@ -488,7 +489,7 @@ def test_busy_gpu_log_is_not_repeated_after_the_recheck_window(
 def _omp_machine(machine: MachineProfile) -> MachineProfile:
     return MachineProfile(
         path=machine.path,
-        launcher='local',
+        launcher=LauncherKind.LOCAL,
         output_root=machine.output_root,
         local=LocalSettings(max_parallel=2),
     )

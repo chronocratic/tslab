@@ -1,24 +1,20 @@
 """SLURM state queries and cache updates."""
 
 from pathlib import Path
-from typing import Literal
 
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, submit_study
+from tslab.core.enums import LauncherKind
 from tslab.core.status import utc_now_iso
 from tslab.study.launchers import QueuedJob
 from tslab.study.launchers.slurm import states
-from tslab.study.records import JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 
 def _job_record(
-    *,
-    job_id: str,
-    kind: Literal['run', 'followup'],
-    launcher: Literal['slurm', 'local'],
-    tasks: tuple[TaskRecord, ...] = (),
+    *, job_id: str, kind: JobKind, launcher: LauncherKind, tasks: tuple[TaskRecord, ...] = ()
 ) -> JobRecord:
     return JobRecord(
         kind=kind,
@@ -47,12 +43,15 @@ def _task(*, index: int, run_path: str) -> TaskRecord:
 def test_slurm_task_ids_exclude_local_job_records() -> None:
     jobs = [
         _job_record(
-            job_id='7', kind='run', launcher='slurm', tasks=(_task(index=0, run_path='g/a/1'),)
+            job_id='7',
+            kind=JobKind.RUN,
+            launcher=LauncherKind.SLURM,
+            tasks=(_task(index=0, run_path='g/a/1'),),
         ),
         _job_record(
             job_id='local-123-1',
-            kind='run',
-            launcher='local',
+            kind=JobKind.RUN,
+            launcher=LauncherKind.LOCAL,
             tasks=(_task(index=1, run_path='g/a/2'),),
         ),
     ]
@@ -62,8 +61,8 @@ def test_slurm_task_ids_exclude_local_job_records() -> None:
 
 def test_followup_job_ids_exclude_local_job_records() -> None:
     jobs = [
-        _job_record(job_id='20', kind='followup', launcher='slurm'),
-        _job_record(job_id='local-123-1', kind='followup', launcher='local'),
+        _job_record(job_id='20', kind=JobKind.FOLLOWUP, launcher=LauncherKind.SLURM),
+        _job_record(job_id='local-123-1', kind=JobKind.FOLLOWUP, launcher=LauncherKind.LOCAL),
     ]
 
     assert states.followup_job_ids(jobs=jobs) == ['20']
@@ -71,10 +70,10 @@ def test_followup_job_ids_exclude_local_job_records() -> None:
 
 def test_followup_job_ids_lists_only_sorted_slurm_followups() -> None:
     jobs = [
-        _job_record(job_id='20', kind='followup', launcher='slurm'),
-        _job_record(job_id='10', kind='run', launcher='slurm'),
-        _job_record(job_id='local-123-1', kind='followup', launcher='local'),
-        _job_record(job_id='3', kind='followup', launcher='slurm'),
+        _job_record(job_id='20', kind=JobKind.FOLLOWUP, launcher=LauncherKind.SLURM),
+        _job_record(job_id='10', kind=JobKind.RUN, launcher=LauncherKind.SLURM),
+        _job_record(job_id='local-123-1', kind=JobKind.FOLLOWUP, launcher=LauncherKind.LOCAL),
+        _job_record(job_id='3', kind=JobKind.FOLLOWUP, launcher=LauncherKind.SLURM),
     ]
 
     assert states.followup_job_ids(jobs=jobs) == ['20', '3']

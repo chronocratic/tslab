@@ -8,6 +8,7 @@ import time
 from typing import cast
 from uuid import uuid4
 
+from tslab.core.enums import LauncherKind
 from tslab.core.files import atomic_write_text
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
@@ -16,7 +17,7 @@ from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.machine import MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
 from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobRecord
+from tslab.study.records import append_job, JobKind, JobRecord
 
 __all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']
 
@@ -151,10 +152,10 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
         script=sbatch_file, sleep=sleep, environ=without_code_snapshot(environ=os.environ)
     )
     record = JobRecord(
-        kind='followup',
+        kind=JobKind.FOLLOWUP,
         submission_id=uuid4().hex,
         time=now(),
-        launcher='slurm',
+        launcher=LauncherKind.SLURM,
         job_id=job_id,
         job_file=job_file,
         tasks=(),

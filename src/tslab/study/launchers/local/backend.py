@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
+from tslab.core.enums import LauncherKind
 from tslab.core.meta import hostname
 from tslab.jobs.local import start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.study.context import Context
@@ -102,7 +103,7 @@ class LocalBackend:
     """The backend of a local machine: in-process tasks under the pid file."""
 
     #: The launcher of the machines this backend serves.
-    name = 'local'
+    name = LauncherKind.LOCAL
 
     #: Whether the jobs of this backend have a time limit.
     has_time_limit = False
