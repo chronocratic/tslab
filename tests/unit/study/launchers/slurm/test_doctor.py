@@ -181,6 +181,40 @@ def test_memory_is_not_checked_when_sinfo_reports_none(fake: FakeSlurm) -> None:
     )
 
 
+def test_unreported_memory_of_an_ineligible_group_does_not_warn(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'scontrol', [{'exit': 0, 'stdout': 'SelectTypeParameters    = CR_Core_Memory\n'}]
+    )
+    fake.set_answers(
+        'sinfo', [{'exit': 0, 'stdout': 'infinite|4|1000|(null)\n2-00:00:00|4|(null)|(null)\n'}]
+    )
+    settings = SlurmSettings(partition='gpu', time='3-00:00:00', cpus_per_task=4, mem_per_cpu='4G')
+    checks = doctor.cluster_checks(slurm=settings)
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'fail'
+    assert (
+        check.message == f'no node of partition gpu holds one job of 4 CPUs, '
+        f'{settings.requested_memory} bytes of memory'
+    )
+
+
+def test_known_memory_of_an_ineligible_group_does_not_fail(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'scontrol', [{'exit': 0, 'stdout': 'SelectTypeParameters    = CR_Core_Memory\n'}]
+    )
+    fake.set_answers(
+        'sinfo', [{'exit': 0, 'stdout': 'infinite|4|(null)|(null)\ninfinite|2|8192|(null)\n'}]
+    )
+    settings = SlurmSettings(partition='gpu', cpus_per_task=4, mem_per_cpu='4G')
+    checks = doctor.cluster_checks(slurm=settings)
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'warn'
+    assert (
+        check.message == f'sinfo reports no usable memory for partition gpu; '
+        f'the memory requirement of {settings.requested_memory} bytes is not checked'
+    )
+
+
 def test_missing_sinfo_warns(
     fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
