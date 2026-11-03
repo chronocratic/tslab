@@ -13,7 +13,7 @@ from pathlib import Path
 
 from tslab.core.files import atomic_write_json, JsonFileError, read_json_object
 from tslab.core.paths import require_path
-from tslab.enums import InstanceState, RunState
+from tslab.enums import InstanceState, RunState, ShownRunState
 
 __all__ = [
     'STATUS_FORMAT_VERSION',
@@ -29,7 +29,6 @@ __all__ = [
 ]
 
 STATUS_FORMAT_VERSION = 1
-_INTERRUPTED = 'interrupted'
 
 
 class StatusFileError(JsonFileError):
@@ -245,7 +244,7 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
     atomic_write_json(path=path, document=document)
 
 
-def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> str:
+def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> ShownRunState:
     """Return the run state to display: ``interrupted`` for a dead ``running`` run.
 
     Args:
@@ -257,5 +256,5 @@ def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> str:
     from tslab.core.lock import is_run_active  # noqa: PLC0415
 
     if snapshot.run_state is RunState.RUNNING and not is_run_active(directory=directory):
-        return _INTERRUPTED
-    return snapshot.run_state.value
+        return ShownRunState.INTERRUPTED
+    return ShownRunState(snapshot.run_state.value)
