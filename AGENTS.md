@@ -44,6 +44,7 @@ src/tslab/
   probes/              SVMProbe, RidgeProbe (scikit-learn)
   tracking/            W&B, MLflow, TensorBoard trackers and TrackingOptions
     wandb/             the W&B tracker, the transaction-log reader and the resync logic
+  analysis/            post-hoc analysis: tests, CD diagram, numbers file, output tree (extra 'analysis')
   adapters/chronocratic/
     models/            chronocratic-models as TSLab models and encoders
     datasets/          chronocratic-datasets as TSLab data sources, study helpers
@@ -82,6 +83,7 @@ changelog.d/           towncrier fragments, one per pull request
   submodules, but importing `tslab.tracking` itself loads no Lightning and
   no tracker SDK.
 - Only `tslab.probes` imports scikit-learn.
+- Only `tslab.analysis` imports pandas, SciPy and matplotlib; it may import `core`, `enums` and `study`, and no other TSLab package imports it.
 - Only `tslab.adapters.chronocratic` imports chronocratic; the models adapter
   never imports the datasets adapter and the other way round.
 - `tslab.tasks` imports none of the optional libraries.

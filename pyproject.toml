@@ -44,6 +44,7 @@ chronocratic-models = [
 chronocratic-datasets = [
     "chronocratic-datasets>=0.1.0rc1,<0.2",
 ]
+analysis = ["pandas>=3.1,<4", "scipy>=1.18,<2", "matplotlib>=3.11,<4"]
 
 [project.scripts]
 tslab = "tslab.cli:main"
@@ -53,6 +54,10 @@ Repository = "https://github.com/skafai/tslab"
 
 [dependency-groups]
 dev = [
+    "ipython>=9.18",
+    "matplotlib>=3.11",
+    "pandas>=3.1",
+    "scipy>=1.18",
     "pytest>=8.2",
     "pytest-cov>=5.0",
     "ruff>=0.17",

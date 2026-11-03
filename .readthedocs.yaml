@@ -21,3 +21,4 @@ python:
         - tensorboard
         - chronocratic-models
         - chronocratic-datasets
+        - analysis

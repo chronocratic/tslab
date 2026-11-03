@@ -4,6 +4,7 @@ import threading
 import pytest
 
 from tslab.core.files import (
+    atomic_write_bytes,
     atomic_write_json,
     atomic_write_text,
     JsonFileError,
@@ -105,3 +106,27 @@ def test_replace_directory_restores_the_old_folder_when_the_swap_fails(tmp_path:
         replace_directory(source=tmp_path / 'missing', destination=destination)
     assert (destination / 'old.txt').read_text(encoding='utf-8') == 'old'
     assert [item.name for item in tmp_path.iterdir()] == ['final']
+
+
+def test_atomic_write_bytes_writes_and_creates_parents(tmp_path: Path) -> None:
+    target = tmp_path / 'a' / 'b.png'
+    atomic_write_bytes(path=target, data=b'\x89PNG')
+    assert target.read_bytes() == b'\x89PNG'
+    assert [item.name for item in target.parent.iterdir()] == ['b.png']
+
+
+def test_atomic_write_bytes_keeps_old_file_on_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / 'b.bin'
+    target.write_bytes(b'old')
+
+    def crash(*_args: object, **_kwargs: object) -> None:
+        message = 'simulated crash before rename'
+        raise OSError(message)
+
+    monkeypatch.setattr(Path, 'replace', crash)
+    with pytest.raises(OSError, match='simulated crash'):
+        atomic_write_bytes(path=target, data=b'new')
+    assert target.read_bytes() == b'old'
+    assert [item.name for item in tmp_path.iterdir()] == ['b.bin']
