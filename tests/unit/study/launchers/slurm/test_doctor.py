@@ -81,6 +81,18 @@ def test_fits_on_the_larger_group(fake: FakeSlurm) -> None:
     assert check.status == 'ok'
 
 
+def test_time_and_resources_scattered_across_groups_fails(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'sinfo',
+        [{'exit': 0, 'stdout': '2-00:00:00|32|128000|gpu:v100:4\n3-00:00:00|32|4000|(null)\n'}],
+    )
+    checks = doctor.cluster_checks(
+        slurm=SlurmSettings(partition='gpu', time='3-00:00:00', gpus=4, cpus_per_task=1)
+    )
+    check = _check(checks=checks, name='slurm-partition')
+    assert check.status == 'fail'
+
+
 def test_missing_gpus_of_the_type_fails(fake: FakeSlurm) -> None:
     fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'infinite|16|32000|gpu:v100:4\n'}])
     checks = doctor.cluster_checks(
