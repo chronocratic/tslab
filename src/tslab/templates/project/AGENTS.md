@@ -139,6 +139,12 @@ runs/<run path>/
 
 A run killed by a time limit shows as `interrupted`; the same command resumes it.
 
+`notebooks/analysis.ipynb` analyses a study with `tslab.analysis`: results, missing runs,
+a critical-difference diagram, paired tests and a numbers file. Its comparison runs on
+data marked "SYNTHETIC DATA" until the swap line in the notebook is applied. Output lands
+in `notebooks/analysis/` (`stats/`, `tables/`, `coverage/`, `plots/<category>/<format>/`,
+`results_numbers.tex`); synthetic files go to its `synthetic/` folder.
+
 ### Tracking
 
 CSV metrics are always written. W&B, MLflow and TensorBoard are opt-in with

@@ -74,6 +74,14 @@ finds it from this folder or any folder below. To use the name from any folder, 
 the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
 TSLab docs.
 
+Once runs are done, `notebooks/analysis.ipynb` reads the results, lists the runs that
+are missing and compares methods with a critical-difference diagram, paired tests and a
+numbers file for the paper. Open it with `uv sync --group notebooks` and pick the project
+kernel. Its comparison runs on marked synthetic data until you apply the swap line in the
+notebook; files land in `notebooks/analysis/` (`stats/`, `tables/`, `coverage/`,
+`plots/<category>/<format>/`, `results_numbers.tex`), and synthetic ones in its
+`synthetic/` folder.
+
 ## Rerun and check
 
 ```bash
