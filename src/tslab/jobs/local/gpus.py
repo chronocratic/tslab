@@ -246,8 +246,9 @@ def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozen
 
     Returns:
         The subset of ``gpu_ids`` with a compute application on it, or with
-        more than ``memory_fraction`` of its memory in use. A failing
-        nvidia-smi logs one warning and counts no GPU as busy.
+        more than ``memory_fraction`` of its memory in use. When the memory
+        query fails, a retry without the memory columns keeps the compute
+        rule; when every query fails, no GPU is counted as busy.
     """
     apps = _nvidia_smi(arguments=['--query-compute-apps=gpu_uuid', '--format=csv,noheader'])
     if apps is None:
@@ -258,6 +259,9 @@ def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozen
             '--format=csv,noheader,nounits',
         ]
     )
+    if gpus is None:
+        # why: an older driver may reject the memory fields; the compute rule still applies
+        gpus = _nvidia_smi(arguments=['--query-gpu=index,uuid', '--format=csv,noheader'])
     if gpus is None:
         return frozenset[str]()
     index_by_uuid: dict[str, str] = {}

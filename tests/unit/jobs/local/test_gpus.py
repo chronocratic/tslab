@@ -216,6 +216,25 @@ def test_rows_without_memory_use_compute_only(
     assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.1) == frozenset({'1'})
 
 
+def test_memory_query_failure_keeps_the_compute_rule(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        "  echo 'GPU-BUSY-1'\n"
+        'elif [ "$1" = "--query-gpu=index,uuid,memory.used,memory.total" ]; then\n'
+        '  exit 1\n'
+        'else\n'
+        "  echo '0,GPU-BUSY-0'\n"
+        "  echo '1,GPU-BUSY-1'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.1) == frozenset({'1'})
+
+
 def test_select_gpus_auto_uses_visible_gpus() -> None:
     environment = {'CUDA_VISIBLE_DEVICES': '1,3'}
     assert select_gpus(gpus='auto', skip_busy=False, environment=environment) == ('1', '3')
