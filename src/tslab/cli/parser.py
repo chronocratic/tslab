@@ -8,6 +8,7 @@ pass-through (``--``) argument handling.
 from collections.abc import Mapping, Sequence
 import dataclasses
 import inspect
+from types import MappingProxyType
 from typing import Annotated, Any, cast, Protocol, Union
 
 import tyro
@@ -49,33 +50,53 @@ def _takes_pass_through(*, command: object) -> bool:
     return dataclasses.is_dataclass(command) and hasattr(command, 'extra_args')
 
 
-def _parse(*, argv: Sequence[str]) -> Command:
-    if argv and argv[0] == 'study':
-        return _cli(
+_STUDY = 'study'
+_MACHINE = 'machine'
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Group:
+    """A command group: the commands under one word, its program name and its help."""
+
+    commands: Mapping[str, type]
+    prog: str
+    description: str
+
+
+_GROUPS: Mapping[str, _Group] = MappingProxyType(
+    {
+        _STUDY: _Group(
             commands=STUDY_COMMANDS,
-            prog='tslab study',
-            args=argv[1:],
+            prog=f'tslab {_STUDY}',
             description=(
                 'Launch and follow the runs of a study. STUDY is module:attribute, for example '
                 'my_paper.studies:example; a short name expands against the studies module of '
                 'the nearest tslab.toml; --machine is a name from tslab machine list, '
                 'machines/<name>.toml above the working folder, or a profile path.'
             ),
-        )
-    if argv and argv[0] == 'machine':
-        return _cli(
+        ),
+        _MACHINE: _Group(
             commands=MACHINE_COMMANDS,
-            prog='tslab machine',
-            args=argv[1:],
+            prog=f'tslab {_MACHINE}',
             description='Name machine profiles once, then pass --machine <name> from any folder.',
+        ),
+    }
+)
+
+
+def _parse(*, argv: Sequence[str]) -> Command:
+    group = _GROUPS.get(argv[0]) if argv else None
+    if group is not None:
+        return _cli(
+            commands=group.commands, prog=group.prog, args=argv[1:], description=group.description
         )
     return _cli(
         commands={
-            'machine': _Machine,
+            _MACHINE: _Machine,
             'doctor': Doctor,
             'new': New,
             'status': Status,
-            'study': _Study,
+            _STUDY: _Study,
             'wandb-sync': WandbSync,
         },
         prog='tslab',
