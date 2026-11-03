@@ -56,27 +56,28 @@ def foreground_script(
     return '\n'.join(lines) + '\n'
 
 
-def _task_section(*, array: bool, tasks_file: Path) -> str:
+def _wait_section(*, tasks_file: Path) -> str:
     # why: on shared storage the file written by the launcher can reach the node late
-    wait = f'{wait_for_file_line(path=tasks_file, seconds=60)}\n'
-    if array:
-        return wait + (
-            'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" '
-            + shlex.quote(str(tasks_file))
-            + ')\n'
-            'if [ -z "$TASK_LINE" ]; then\n'
-            '    echo "no task ${SLURM_ARRAY_TASK_ID} in "'
-            + shlex.quote(str(tasks_file))
-            + ' >&2\n'
-            '    exit 1\n'
-            'fi\n'
-            'ATTEMPT=${TASK_LINE%% *}\n'
-            'TASK_LINE=${TASK_LINE#* }\n'
-            'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
-            ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
-            + srun_command(variable='TASK_LINE')
-        )
-    return wait + (
+    return f'{wait_for_file_line(path=tasks_file, seconds=60)}\n'
+
+
+def _array_section(*, tasks_file: Path) -> str:
+    return _wait_section(tasks_file=tasks_file) + (
+        'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" ' + shlex.quote(str(tasks_file)) + ')\n'
+        'if [ -z "$TASK_LINE" ]; then\n'
+        '    echo "no task ${SLURM_ARRAY_TASK_ID} in "' + shlex.quote(str(tasks_file)) + ' >&2\n'
+        '    exit 1\n'
+        'fi\n'
+        'ATTEMPT=${TASK_LINE%% *}\n'
+        'TASK_LINE=${TASK_LINE#* }\n'
+        'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
+        ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
+        + srun_command(variable='TASK_LINE')
+    )
+
+
+def _single_section(*, tasks_file: Path) -> str:
+    return _wait_section(tasks_file=tasks_file) + (
         'TASK_LINE=$(sed -n 1p ' + shlex.quote(str(tasks_file)) + ')\n'
         # why: like the array section, the line starts with the index and the attempt
         'TASK_LINE=${TASK_LINE#* }\n'
@@ -201,7 +202,8 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         )
     if code_snapshot is not None:
         lines += _code_snapshot_lines(code_snapshot=code_snapshot)
-    lines.append(_task_section(array=array, tasks_file=tasks_file))
+    task_section = _single_section if indices is None else _array_section
+    lines.append(task_section(tasks_file=tasks_file))
     return '\n'.join(lines) + '\n'
 
 
