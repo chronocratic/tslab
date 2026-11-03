@@ -230,6 +230,11 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
         return count + 1 - rank if reverse else rank
 
     groups = cd_groups(ranks=values, cd=cd)
+    # why: bars and name lists follow screen order, left to right, as readers scan
+    screen = list(range(count))
+    if reverse:
+        groups.reverse()
+        screen.reverse()
     left_count = math.ceil(count / 2)
     depth = style.elbow_start + style.group_step * len(groups) + style.label_step * left_count
     figure = Figure(figsize=(width, style.top + depth))
@@ -261,10 +266,10 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
         low, high = sorted((x(values[first]), x(values[last])))
         line([low - overhang, high + overhang], [y, y], width=style.group_width)
     first_row = -(style.elbow_start + style.group_step * len(groups))
-    for position, (name, rank) in enumerate(zip(names, values, strict=True)):
-        better_half = position < left_count
-        row = position if better_half else count - 1 - position
-        on_left = better_half != reverse
+    for position, index in enumerate(screen):
+        name, rank = names[index], values[index]
+        on_left = position < left_count
+        row = position if on_left else count - 1 - position
         side = -1 if on_left else 1
         y = first_row - style.label_step * row
         x_end = (1 if on_left else count) + side * style.elbow_overhang / unit

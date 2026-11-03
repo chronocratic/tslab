@@ -166,3 +166,29 @@ def test_cd_diagram_style_sets_the_name_space() -> None:
 
     # more room for names leaves less of the figure for the 1..4 rank scale
     assert x_span(CdStyle(text_space=2.0)) > x_span(CdStyle(text_space=1.0))
+
+
+def test_cd_diagram_reverse_follows_screen_order() -> None:
+    # four methods in two clear pairs: two bars, two names on each side
+    rng = np.random.default_rng(0)
+    base = rng.normal(size=(30, 1))
+    scores = base + np.array([[3.0, 2.9, 0.1, 0.0]]) + rng.normal(scale=0.5, size=(30, 4))
+    matrix = pd.DataFrame(scores, columns=['a', 'b', 'c', 'd'])
+    for reverse in (False, True):
+        result = cd_diagram(matrix=matrix, direction=Direction.HIGHER_IS_BETTER, reverse=reverse)
+        assert result.figure is not None
+        axis = result.figure.axes[0]
+        bars = [
+            np.asarray(line.get_xdata(), dtype=float)
+            for line in axis.lines
+            if line.get_linewidth() == CdStyle().group_width
+        ]
+        bars_y = [
+            float(np.asarray(line.get_ydata(), dtype=float)[0])
+            for line in axis.lines
+            if line.get_linewidth() == CdStyle().group_width
+        ]
+        top_bar = bars[int(np.argmax(bars_y))]
+        assert top_bar.min() == min(bar.min() for bar in bars)
+        left_names = {t.get_text() for t in axis.texts if t.get_horizontalalignment() == 'right'}
+        assert left_names == ({'c', 'd'} if reverse else {'a', 'b'})
