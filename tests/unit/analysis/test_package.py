@@ -15,7 +15,6 @@ EXPECTED = {
     'FULL_WIDTH',
     'FigureFormat',
     'FriedmanTest',
-    'HALF_WIDTH',
     'NUMBERS_STEM',
     'NumberKind',
     'OutputFolder',

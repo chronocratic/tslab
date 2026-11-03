@@ -43,7 +43,7 @@ from tslab.analysis.stats import (
     stars,
     wilcoxon_paired,
 )
-from tslab.analysis.style import FULL_WIDTH, HALF_WIDTH, is_dark_cell, paper_style
+from tslab.analysis.style import FULL_WIDTH, is_dark_cell, paper_style
 
 __all__ = [
     'DEFAULT_ALPHA',
@@ -51,7 +51,6 @@ __all__ = [
     'DEFAULT_CONFIDENCE',
     'DEFAULT_MIN_PAIRS',
     'FULL_WIDTH',
-    'HALF_WIDTH',
     'NUMBERS_STEM',
     'PLOTS_FOLDER',
     'AnalysisMetric',
