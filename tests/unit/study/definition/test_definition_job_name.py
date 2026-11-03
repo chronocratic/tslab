@@ -61,7 +61,7 @@ def test_placeholder_axis_names_are_reserved(axis: str) -> None:
 
 
 def test_job_names_must_differ_across_grids() -> None:
-    with pytest.raises(ValueError, match="grid 'b'.*job name 'cost-paper'.*grid 'a'"):
+    with pytest.raises(ValueError, match=r"grid 'b'.*job name 'cost-paper'.*grid 'a'"):
         Study(
             name='s',
             grids={
