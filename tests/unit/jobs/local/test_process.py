@@ -28,6 +28,24 @@ def test_run_process_returns_exit_code_and_lines(*, tmp_path: Path) -> None:
     assert result.timed_out is False
 
 
+def test_run_process_reports_the_pid(*, tmp_path: Path) -> None:
+    lines: list[str] = []
+    pids: list[int] = []
+    run_process(
+        command=[sys.executable, '-c', 'import os; print(os.getpid())'],
+        cwd=tmp_path,
+        environment=os.environ,
+        on_line=lines.append,
+        on_event=lambda _text: None,
+        stop=threading.Event(),
+        timeout_seconds=None,
+        signal_seconds=0,
+        on_spawn=pids.append,
+    )
+    assert len(pids) == 1
+    assert pids[0] == int(lines[0].strip())
+
+
 def test_run_process_sends_usr2_then_term(*, tmp_path: Path) -> None:
     mark = tmp_path / 'mark'
     code = (

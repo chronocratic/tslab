@@ -53,6 +53,8 @@ class LocalLaunch:
         tasks: Task id and state (``pending``, ``running`` or ``ended``) pairs.
         boot: The boot identity of the host when the file was written;
             ``None`` for files written before this field existed.
+        run_pids: Task id and pid pairs of the tasks that run right now;
+            empty for files written before this field existed.
     """
 
     pid: int
@@ -60,6 +62,7 @@ class LocalLaunch:
     started: str
     tasks: tuple[tuple[str, str], ...]
     boot: str | None = None
+    run_pids: tuple[tuple[str, int], ...] = ()
 
 
 def read_launch(*, study_folder: Path) -> LocalLaunch | None:
@@ -84,6 +87,10 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
             started=str(document['started']),
             tasks=tuple(
                 (str(key), str(state)) for key, state in cast('list[list[str]]', document['tasks'])
+            ),
+            run_pids=tuple(
+                (str(key), int(str(pid)))
+                for key, pid in cast('list[list[object]]', document.get('run_pids', []))
             ),
             boot=str(boot) if boot is not None else None,
         )
@@ -121,6 +128,9 @@ def _write(*, path: Path, launch: LocalLaunch) -> None:
     if launch.boot is not None:
         # why: no key when the boot is unknown, so an unknown boot is not read as stale
         document['boot'] = launch.boot
+    if launch.run_pids:
+        # why: no key when nothing runs, so old readers ignore the file
+        document['run_pids'] = [list(item) for item in launch.run_pids]
     atomic_write_json(path=path, document=document)
 
 
@@ -158,8 +168,8 @@ def hold_launch(
         now: The UTC ISO start time of the launch.
 
     Yields:
-        The setter, called with ``task_id=`` and ``state=``, that rewrites
-        the file; safe across threads.
+        The setter, called with ``task_id=``, ``state=``, and the ``pid=``
+        of a task that starts, that rewrites the file; safe across threads.
 
     Raises:
         LocalLaunchError: If a live launch, or a launch of another host, holds the file.
@@ -167,6 +177,7 @@ def hold_launch(
     _check_free(study_folder=study_folder, host=host)
     path = study_folder / LAUNCH_FILE
     states = dict.fromkeys(task_ids, 'pending')
+    pids: dict[str, int] = {}
     started = now
     boot = boot_id()
     lock = threading.Lock()
@@ -175,13 +186,22 @@ def hold_launch(
         _write(
             path=path,
             launch=LocalLaunch(
-                pid=pid, hostname=host, started=started, boot=boot, tasks=tuple(states.items())
+                pid=pid,
+                hostname=host,
+                started=started,
+                boot=boot,
+                tasks=tuple(states.items()),
+                run_pids=tuple(pids.items()),
             ),
         )
 
-    def set_state(*, task_id: str, state: str) -> None:
+    def set_state(*, task_id: str, state: str, pid: int | None = None) -> None:
         with lock:
             states[task_id] = state
+            if pid is not None:
+                pids[task_id] = pid
+            else:
+                pids.pop(task_id, None)
             write()
 
     study_folder.mkdir(parents=True, exist_ok=True)

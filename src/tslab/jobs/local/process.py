@@ -211,6 +211,7 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
     signal_seconds: float,
     grace_seconds: float = 30.0,
     pass_fds: tuple[int, ...] = (),
+    on_spawn: Callable[[int], None] | None = None,
 ) -> ProcessResult:
     """Run one process in its own session, escalating signals at the time limit.
 
@@ -229,6 +230,8 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
             zero disables the signal.
         grace_seconds: Seconds to wait after a ``SIGTERM`` before a ``SIGKILL``.
         pass_fds: Extra file descriptors to keep open in the process.
+        on_spawn: Called with the pid of the child right after it starts,
+            or ``None`` for no callback.
 
     Returns:
         The exit code and the usage of the finished process.
@@ -252,6 +255,8 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
         # why: Popen sets the pid before it returns; the check keeps the type narrow
         message = 'the child process has no pid'
         raise RuntimeError(message)
+    if on_spawn is not None:
+        on_spawn(pid)
 
     def read_lines() -> None:
         stdout = process.stdout

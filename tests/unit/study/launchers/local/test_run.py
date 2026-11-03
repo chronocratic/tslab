@@ -1,6 +1,7 @@
 """Local study launch tests."""
 
 from collections.abc import Mapping
+import contextlib
 from io import StringIO
 import json
 import os
@@ -10,14 +11,17 @@ import subprocess
 import sys
 import threading
 import time
-from typing import TextIO
+from typing import ClassVar, TextIO
 
 import pytest
 
 from tests.unit.study.configs import grid
+from tests.unit.study.helpers import study_directory
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
 from tslab.study.launchers import launch as _launch, LaunchReport, OnTaskState
+from tslab.study.launchers.local import run as _local_run
+from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.launchers.local.run import (
     local_job_id,
     LocalLauncher as _LocalLauncher,
@@ -647,3 +651,123 @@ def test_local_stop_kills_task_ignoring_sigterm(machine: MachineProfile, tmp_pat
     assert elapsed < 4
     folder = study_folder(machine=local_machine, study=study)
     assert 'exit -9' in (folder / 'logs' / 'g1_0.out').read_text()
+
+
+class _FakeWatchdog:
+    """A stand-in for the launcher's watchdog that records every call."""
+
+    started: ClassVar[list['_FakeWatchdog']] = []
+
+    def __init__(self, *, process: subprocess.Popen[bytes], grace_seconds: float) -> None:
+        self.process = process
+        self.grace_seconds = grace_seconds
+        self.watched: list[int] = []
+        self.forgotten: list[int] = []
+        self.closed = False
+
+    @classmethod
+    def start(cls, *, grace_seconds: float) -> '_FakeWatchdog':
+        process = subprocess.Popen([sys.executable, '-c', 'pass'])  # why: a fixed test command
+        process.wait()
+        fake = cls(process=process, grace_seconds=grace_seconds)
+        cls.started.append(fake)
+        return fake
+
+    def watch(self, *, pid: int) -> None:
+        self.watched.append(pid)
+
+    def forget(self, *, pid: int) -> None:
+        self.forgotten.append(pid)
+
+    def close(self) -> None:
+        self.closed = True
+        self.process.wait()
+
+
+def test_normal_launch_end_leaves_the_runs_alone(
+    machine: MachineProfile, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local_machine = _local_machine(machine)
+    _FakeWatchdog.started.clear()
+    monkeypatch.setattr(_local_run, 'Watchdog', _FakeWatchdog)
+    study = Study(
+        name='s',
+        grids={
+            'g': grid(
+                short_name='g1',
+                command=(sys.executable, '-c', 'pass'),
+                axes={'seed': setting_axis(path='seed', values=(0, 1))},
+            )
+        },
+    )
+    launch(
+        launcher=LocalLauncher(project_root=tmp_path, env={}, local=LocalSettings(max_parallel=2)),
+        machine=local_machine,
+        study=study,
+        groups=_local_groups(study, local_machine),
+        project_root=tmp_path,
+        dry_run=False,
+    )
+    assert len(_FakeWatchdog.started) == 1
+    fake = _FakeWatchdog.started[0]
+    assert fake.closed is True
+    assert fake.process.poll() is not None
+    assert len(fake.watched) == 2
+    assert sorted(fake.watched) == sorted(fake.forgotten)
+
+
+def _wait_for_run_pid(*, launcher: subprocess.Popen[bytes], launch_file: Path) -> int:
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if launcher.poll() is not None:
+            message = f'the launcher exited with {launcher.returncode} before a run started'
+            raise AssertionError(message)
+        document = json.loads(launch_file.read_text()) if launch_file.exists() else {}
+        pids = document.get('run_pids') or []
+        if pids:
+            return int(pids[0][1])
+        time.sleep(0.2)
+    message = 'no run pid in the launch file after 30 seconds'
+    raise AssertionError(message)
+
+
+def _group_exists(*, pid: int) -> bool:
+    try:
+        os.killpg(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+@pytest.mark.slow
+def test_launcher_crash_stops_its_runs(project: Path) -> None:
+    launcher = subprocess.Popen(  # why: the study submit of the toy project
+        [
+            sys.executable,
+            '-m',
+            'tslab',
+            'study',
+            'submit',
+            'toy_studies:study',
+            '--machine',
+            'local.toml',
+        ],
+        cwd=project,
+        env={**os.environ, 'TOY_SLEEP': '600'},
+        start_new_session=True,
+    )
+    launch_file = study_directory(project=project) / '.study' / LAUNCH_FILE
+    try:
+        run_pid = _wait_for_run_pid(launcher=launcher, launch_file=launch_file)
+        os.kill(launcher.pid, signal.SIGKILL)
+        deadline = time.monotonic() + 10
+        while _group_exists(pid=run_pid) and time.monotonic() < deadline:
+            time.sleep(0.2)
+        assert not _group_exists(pid=run_pid), (
+            f'the run {run_pid} survived the crash of its launcher'
+        )
+        assert launcher.wait(timeout=30) is not None
+    finally:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(launcher.pid, signal.SIGKILL)
+        launcher.wait()
