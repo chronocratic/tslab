@@ -1,6 +1,6 @@
 """SLURM state queries and cache updates."""
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -31,7 +31,7 @@ def _task(*, index: int, run_path: str) -> TaskRecord:
     return TaskRecord(
         index=index,
         grid='g',
-        run_path=run_path,
+        run_path=PurePosixPath(run_path),
         command=('python', 'run.py'),
         extra_args=(),
         resources={},

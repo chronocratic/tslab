@@ -10,7 +10,7 @@ from collections.abc import Iterator, Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from itertools import product
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING
@@ -395,7 +395,7 @@ class StudyRun:
 
     grid: str
     values: Mapping[str, str]
-    run_path: str
+    run_path: PurePosixPath
     settings: Mapping[str, SettingValue]
 
 
@@ -532,7 +532,7 @@ def _study_run(*, grid_name: str, grid: Grid, values: Mapping[str, str]) -> Stud
     return StudyRun(
         grid=grid_name,
         values=dict(values),
-        run_path='/'.join([grid_name, *values.values()]),
+        run_path=PurePosixPath(grid_name, *values.values()),
         settings=settings,
     )
 

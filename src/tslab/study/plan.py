@@ -5,7 +5,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, replace
 from io import StringIO
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 import tslab
@@ -310,7 +310,9 @@ class JobGroup:
     code_snapshot: CodeSnapshot | None = None
 
 
-def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> dict[str, int]:
+def assign_indices(
+    *, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]
+) -> dict[PurePosixPath, int]:
     """The array index of every run: recorded ones keep theirs, new ones append.
 
     Args:
@@ -326,7 +328,7 @@ def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> di
     highest: dict[str, int] = {}
     for _, task in latest.values():
         highest[task.grid] = max(highest.get(task.grid, -1), task.index)
-    indices: dict[str, int] = {}
+    indices: dict[PurePosixPath, int] = {}
     for run in runs:
         recorded = latest.get(run.run_path)
         if recorded is not None:
@@ -337,7 +339,7 @@ def assign_indices(*, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]) -> di
     return indices
 
 
-def _task_error(*, grid_name: str, run_path: str, index: int, max_array_size: int) -> str:
+def _task_error(*, grid_name: str, run_path: PurePosixPath, index: int, max_array_size: int) -> str:
     return (
         f'grid {grid_name}: run {run_path} needs array index {index}, '
         f'but max_array_size is {max_array_size} (the MaxArraySize of the cluster)'
@@ -349,13 +351,13 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     study: Study,
     machine: MachineProfile,
     resolved: Sequence[ResolvedRun],
-    indices: Mapping[str, int],
-    extra_args: Mapping[str, tuple[str, ...]],
-    attempts: Mapping[str, int],
+    indices: Mapping[PurePosixPath, int],
+    extra_args: Mapping[PurePosixPath, tuple[str, ...]],
+    attempts: Mapping[PurePosixPath, int],
     first_job_file: int,
     environment: Mapping[str, str],
-    uncounted: Mapping[str, tuple[int, int]] | None = None,
-    code_snapshots: Mapping[str, CodeSnapshot | None] | None = None,
+    uncounted: Mapping[PurePosixPath, tuple[int, int]] | None = None,
+    code_snapshots: Mapping[PurePosixPath, CodeSnapshot | None] | None = None,
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
@@ -421,7 +423,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                 placeholders={
                     'output_root': str(machine.output_root),
                     'study': study.name,
-                    'run_path': run.run.run_path,
+                    'run_path': run.run.run_path.as_posix(),
                     'log_file': str(log_file),
                     'cpus': str(run.resources.cpus),
                     'cpus_per_run': str(run.resources.cpus_per_run),
@@ -459,7 +461,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     ]
 
 
-def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[str, str]]:
+def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[PurePosixPath, str]]:
     """The run paths and messages of task argument and group resource problems.
 
     Args:
@@ -473,7 +475,7 @@ def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[str
     return [problem for group in groups for problem in _group_problems(study=study, group=group)]
 
 
-def _group_problems(*, study: Study, group: JobGroup) -> list[tuple[str, str]]:
+def _group_problems(*, study: Study, group: JobGroup) -> list[tuple[PurePosixPath, str]]:
     """The task and resource problems of one group, in task order."""
     problems = [
         problem
@@ -486,7 +488,7 @@ def _group_problems(*, study: Study, group: JobGroup) -> list[tuple[str, str]]:
     return problems
 
 
-def _group_signal_problem(*, group: JobGroup) -> tuple[str, str] | None:
+def _group_signal_problem(*, group: JobGroup) -> tuple[PurePosixPath, str] | None:
     """The time-limit signal problem for one job group, or ``None`` when valid."""
     problem = group.resources.signal_problem()
     if problem is None:
@@ -495,7 +497,9 @@ def _group_signal_problem(*, group: JobGroup) -> tuple[str, str] | None:
     return run_path, f'job file {group.job_file}: {problem}'
 
 
-def _task_problem(*, study: Study, group: JobGroup, task: PlannedTask) -> tuple[str, str] | None:
+def _task_problem(
+    *, study: Study, group: JobGroup, task: PlannedTask
+) -> tuple[PurePosixPath, str] | None:
     """The (run path, message) of a task whose arguments do not parse, else ``None``."""
     run_path = task.resolved.run.run_path
     if task.error is not None:

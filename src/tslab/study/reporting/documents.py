@@ -52,7 +52,7 @@ def run_entry(
     if live_reason is not None and counts_live(report=report, context=context):
         reason = live_reason(context=context)
     entry: dict[str, object] = {
-        'run_path': report.run.run_path,
+        'run_path': report.run.run_path.as_posix(),
         'grid': report.run.grid,
         'values': dict(report.run.values),
         'state': report.state.value,

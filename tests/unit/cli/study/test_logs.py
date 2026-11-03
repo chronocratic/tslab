@@ -2,7 +2,7 @@
 
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -89,7 +89,12 @@ def test_logs_job_reads_the_scheduler_output(
     project = toy_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
     submit_study(project=project)
     ctx = context(project=project, machine_file='cluster.toml')
-    task = next(task for job in ctx.jobs for task in job.tasks if task.run_path == 'g/small/1')
+    task = next(
+        task
+        for job in ctx.jobs
+        for task in job.tasks
+        if task.run_path == PurePosixPath('g/small/1')
+    )
     logs = study_directory(project=project) / 'logs'
     logs.mkdir(exist_ok=True)
     (logs / f'g1_{task.index}.out').write_text('the job of small/1\n', encoding='utf-8')

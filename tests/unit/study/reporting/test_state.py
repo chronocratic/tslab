@@ -1,7 +1,7 @@
 """Study states: the decision over folders and SLURM job states."""
 
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -53,14 +53,19 @@ def facts(
 
 
 def run(run_path: str) -> StudyRun:
-    return StudyRun(grid='g', values={'a': run_path.split('/')[1]}, run_path=run_path, settings={})
+    return StudyRun(
+        grid='g',
+        values={'a': run_path.split('/')[1]},
+        run_path=PurePosixPath(run_path),
+        settings={},
+    )
 
 
 def task(index: int, run_path: str, attempt: int) -> TaskRecord:
     return TaskRecord(
         index=index,
         grid='g',
-        run_path=run_path,
+        run_path=PurePosixPath(run_path),
         command=('python', 'classify', 'no-preset'),
         extra_args=(),
         resources={},
@@ -396,11 +401,14 @@ def test_grace_wait_returns_new_facts(tmp_path: Path) -> None:
         _write_status(folder, RunState.FINISHED, InstanceState.DONE)
 
     settled = _grace_wait(
-        directories={'g/a/1': folder}, completed_phase=JobPhase.COMPLETED, sleep=sleep
+        directories={PurePosixPath('g/a/1'): folder},
+        completed_phase=JobPhase.COMPLETED,
+        sleep=sleep,
     )
     assert calls == [1]
-    assert settled['g/a/1'].snapshot is not None
-    assert settled['g/a/1'].snapshot.run_state is RunState.FINISHED
+    snapshot = settled[PurePosixPath('g/a/1')].snapshot
+    assert snapshot is not None
+    assert snapshot.run_state is RunState.FINISHED
 
 
 def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:

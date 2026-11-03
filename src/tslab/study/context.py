@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 import dataclasses
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from tslab.study.definition import expand_runs, load_study, select_runs, Study, StudyRun
@@ -65,7 +65,7 @@ class Context:
     machine_path: Path
     project_root: Path
     runs: list[StudyRun]
-    resolved: dict[str, ResolvedRun]
+    resolved: dict[PurePosixPath, ResolvedRun]
     jobs: list[JobRecord]
     reports: list[RunReport]
     job_states: 'JobStates'

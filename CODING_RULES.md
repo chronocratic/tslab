@@ -283,7 +283,9 @@ they have to read.
     `os.path` or string joins. Turn text into a `Path` once, where it enters
     (CLI argument, TOML, YAML, environment variable). Convert to `str` only at
     a third-party or subprocess boundary. Saved files store paths relative to
-    the run folder with `.as_posix()`.
+    the run folder with `.as_posix()`. A path relative to a study or run that code never
+    opens directly is a `pathlib.PurePosixPath`; join it to a root `Path` before
+    touching the disk, and save it with `.as_posix()`.
 19. **Atomic writes:** write a temporary file, `fsync`, then rename. Use the
     helpers in `tslab.core.paths` (`atomic_write_text`, `atomic_write_json`).
     A crash must never leave a half-written file that looks valid.

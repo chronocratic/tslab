@@ -3,7 +3,7 @@
 import dataclasses
 from datetime import timedelta
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 import pytest
@@ -54,7 +54,12 @@ def test_failures_lists_error_and_log_tails(project: Path, fake_backend: FakeBac
     )
     error_file.parent.mkdir(parents=True)
     error_file.write_text('traceback details\n', encoding='utf-8')
-    task = next(task for job in ctx.jobs for task in job.tasks if task.run_path == 'g/small/1')
+    task = next(
+        task
+        for job in ctx.jobs
+        for task in job.tasks
+        if task.run_path == PurePosixPath('g/small/1')
+    )
     grid = ctx.study.grids[task.grid]
     job_log = ctx.study_directory / LOGS_DIRECTORY / f'{grid.short_name}_{task.index}.out'
     job_log.parent.mkdir(parents=True)

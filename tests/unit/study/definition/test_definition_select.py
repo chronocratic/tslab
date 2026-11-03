@@ -20,14 +20,14 @@ def test_only_filters_grids_with_that_axis() -> None:
     )
     runs = expand_runs(study=study)
     selected = select_runs(study=study, runs=runs, only=('dataset=Coffee', 'seed=42'))
-    assert {run.run_path for run in selected} == {
+    assert {run.run_path.as_posix() for run in selected} == {
         'c/ts2vec-paper/Coffee/42',
         'c/cost-paper/Coffee/42',
         'f/ETTh1/42',
     }
-    assert [run.run_path for run in select_runs(study=study, runs=runs, grids=('f',))] == [
-        'f/ETTh1/42'
-    ]
+    assert [
+        run.run_path.as_posix() for run in select_runs(study=study, runs=runs, grids=('f',))
+    ] == ['f/ETTh1/42']
 
 
 @pytest.mark.parametrize('item', ['datset=Coffee', 'dataset=Cofee', 'dataset', 'dataset='])

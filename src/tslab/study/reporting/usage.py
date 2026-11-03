@@ -103,7 +103,7 @@ def _run_entry(
 ) -> dict[str, object]:
     resources = context.resolved[report.run.run_path].resources
     return {
-        'run_path': report.run.run_path,
+        'run_path': report.run.run_path.as_posix(),
         'job_id': report.job_id,
         'state': usage.state if usage is not None else report.job_state,
         'elapsed': _duration_text(duration=usage.elapsed if usage is not None else None),

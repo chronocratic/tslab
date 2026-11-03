@@ -2,7 +2,7 @@
 
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -43,12 +43,12 @@ def test_merge_order_and_slurm_precedence(study: Study, tmp_path: Path) -> None:
             study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
         )
     }
-    cost = resolved['g/cost-paper/Coffee/42']
+    cost = resolved[PurePosixPath('g/cost-paper/Coffee/42')]
     assert isinstance(cost.resources, SlurmSettings)
     assert cost.resources.gpus == 1
     assert cost.resources.time == '1-00:00:00'
     assert cost.settings['trainer.max_epochs'] == 1
-    ts2vec = resolved['g/ts2vec-paper/Coffee/42']
+    ts2vec = resolved[PurePosixPath('g/ts2vec-paper/Coffee/42')]
     assert ts2vec.resources == profile.slurm
     assert ts2vec.settings['trainer.max_epochs'] == 5
 

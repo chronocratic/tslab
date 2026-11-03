@@ -1,5 +1,6 @@
 """What the study commands print: tables, resources, problems, launch results."""
 
+from pathlib import PurePosixPath
 from types import MappingProxyType
 
 import pytest
@@ -16,7 +17,10 @@ from tslab.study.reporting.state import FolderFacts, RunReport
 
 def _queued_report(*, job_id: str) -> RunReport:
     run = StudyRun(
-        grid='g', values={'small': '1'}, run_path='g/small/1', settings=MappingProxyType({})
+        grid='g',
+        values={'small': '1'},
+        run_path=PurePosixPath('g/small/1'),
+        settings=MappingProxyType({}),
     )
     return RunReport(
         run=run,
@@ -72,7 +76,7 @@ def test_resources_of_names_every_set_field() -> None:
 
 
 def test_log_problems_cuts_off_after_twenty(caplog: pytest.LogCaptureFixture) -> None:
-    problems = [(f'g/{index}', 'bad') for index in range(25)]
+    problems = [(PurePosixPath(f'g/{index}'), 'bad') for index in range(25)]
     with caplog.at_level('ERROR'):
         log_problems(problems=problems)
     messages = [record.getMessage() for record in caplog.records]

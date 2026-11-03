@@ -1,7 +1,7 @@
 """Grouping runs into numbered job arrays: indices, groups, job files."""
 
 import dataclasses
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -34,14 +34,14 @@ def study() -> Study:
 
 
 def study_run(grid_name: str, run_path: str) -> StudyRun:
-    return StudyRun(grid=grid_name, values={}, run_path=run_path, settings={})
+    return StudyRun(grid=grid_name, values={}, run_path=PurePosixPath(run_path), settings={})
 
 
 def task_record(index: int, run_path: str) -> TaskRecord:
     return TaskRecord(
         index=index,
         grid=run_path.split('/', maxsplit=1)[0],
-        run_path=run_path,
+        run_path=PurePosixPath(run_path),
         command=(),
         extra_args=(),
         resources={},
@@ -163,11 +163,11 @@ def test_indices_are_stable_when_the_grid_changes() -> None:
         study_run('g', 'g/a0/2'),
     ]
     assert assign_indices(runs=runs, jobs=jobs) == {
-        'g/a0/1': 3,
-        'g/a/1': 0,
-        'g/a/2': 1,
-        'g/b/1': 2,
-        'g/a0/2': 4,
+        PurePosixPath('g/a0/1'): 3,
+        PurePosixPath('g/a/1'): 0,
+        PurePosixPath('g/a/2'): 1,
+        PurePosixPath('g/b/1'): 2,
+        PurePosixPath('g/a0/2'): 4,
     }
 
 

@@ -4,7 +4,7 @@ import dataclasses
 import importlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -70,7 +70,7 @@ def test_default_states_are_interrupted_and_missing(
     assert code == 0
     jobs = jobs_of(project=project)
     assert jobs[1].job_id == 'job-1'
-    assert [t.run_path for t in jobs[1].tasks] == ['g/large/1', 'g/large/2']
+    assert [t.run_path.as_posix() for t in jobs[1].tasks] == ['g/large/1', 'g/large/2']
     assert all(t.attempt == 2 for t in jobs[1].tasks)
 
 
@@ -84,7 +84,7 @@ def test_failed_must_be_asked_for(project: Path, fake_backend: FakeBackend) -> N
     )
     assert code == 0
     jobs = jobs_of(project=project)
-    assert [t.run_path for t in jobs[1].tasks] == ['g/small/2']
+    assert [t.run_path.as_posix() for t in jobs[1].tasks] == ['g/small/2']
 
 
 def test_resubmit_never_touches_live_runs(project: Path, fake_backend: FakeBackend) -> None:
@@ -98,7 +98,7 @@ def test_resubmit_never_touches_live_runs(project: Path, fake_backend: FakeBacke
     )
     assert code == 0
     jobs = jobs_of(project=project)
-    assert all(t.run_path != 'g/small/1' for t in jobs[1].tasks)
+    assert all(t.run_path != PurePosixPath('g/small/1') for t in jobs[1].tasks)
     assert fake_backend.calls('cancel') == []
 
 
@@ -114,7 +114,7 @@ def test_cancel_live_cancels_then_resubmits_later(project: Path, fake_backend: F
         (False, None)
     ]
     jobs = jobs_of(project=project)
-    assert [t.run_path for t in jobs[1].tasks] == ['g/small/1']
+    assert [t.run_path.as_posix() for t in jobs[1].tasks] == ['g/small/1']
     assert fake_backend.calls('launch')[-1]['start_delay_seconds'] == 660
 
 
@@ -158,7 +158,7 @@ def test_ended_job_lock_is_removed_before_resubmitting(
     assert not lock.exists()
     assert 'removed the lock of g/large/2: its job job-0_3 ended (interrupted)' in caplog.text
     jobs = jobs_of(project=project)
-    assert 'g/large/2' in [t.run_path for t in jobs[1].tasks]
+    assert 'g/large/2' in [t.run_path.as_posix() for t in jobs[1].tasks]
 
 
 def test_pass_through_arguments_reach_jobs_and_retries(
@@ -470,10 +470,10 @@ def test_resubmit_mixed_runs_keep_their_own(
         dry_run=False,
         extra_args={report.run.run_path: () for report in ctx.reports},
         code_snapshots={
-            'g/small/1': first,
-            'g/small/2': second,
-            'g/large/1': first,
-            'g/large/2': None,
+            PurePosixPath('g/small/1'): first,
+            PurePosixPath('g/small/2'): second,
+            PurePosixPath('g/large/1'): first,
+            PurePosixPath('g/large/2'): None,
         },
         sleep=no_sleep,
     )
@@ -489,10 +489,10 @@ def test_resubmit_mixed_runs_keep_their_own(
         for task in job.tasks
     }
     assert by_path == {
-        'g/small/1': first.folder,
-        'g/small/2': second.folder,
-        'g/large/1': first.folder,
-        'g/large/2': None,
+        PurePosixPath('g/small/1'): first.folder,
+        PurePosixPath('g/small/2'): second.folder,
+        PurePosixPath('g/large/1'): first.folder,
+        PurePosixPath('g/large/2'): None,
     }
 
 
@@ -579,10 +579,10 @@ def test_resubmit_failed_warns_on_reuse(
         dry_run=False,
         extra_args={report.run.run_path: () for report in ctx.reports},
         code_snapshots={
-            'g/small/1': first,
-            'g/small/2': first,
-            'g/large/1': second,
-            'g/large/2': second,
+            PurePosixPath('g/small/1'): first,
+            PurePosixPath('g/small/2'): first,
+            PurePosixPath('g/large/1'): second,
+            PurePosixPath('g/large/2'): second,
         },
         sleep=no_sleep,
     )
@@ -672,6 +672,6 @@ def test_auto_resubmit_reuses_recorded_code_snapshot(
     )
     assert code == 0
     latest = jobs_of(project=project)[-1]
-    assert [task.run_path for task in latest.tasks] == ['g/small/1']
+    assert [task.run_path.as_posix() for task in latest.tasks] == ['g/small/1']
     assert latest.code_snapshot is not None
     assert latest.code_snapshot.folder == snapshot.folder

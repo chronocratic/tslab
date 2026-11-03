@@ -22,13 +22,13 @@ def test_run_arguments_expand_then_flag() -> None:
         placeholders={
             'output_root': '/x',
             'study': 's',
-            'run_path': run.run_path,
+            'run_path': run.run_path.as_posix(),
             'log_file': '/l',
         },
     )
     assert '/d/Coffee' in args
     assert args[args.index('--output-root') + 1] == '/x/s'
-    assert args[args.index('--run-path') + 1] == run.run_path
+    assert args[args.index('--run-path') + 1] == run.run_path.as_posix()
 
 
 def test_validate_arguments_accepts_a_good_run() -> None:
