@@ -169,7 +169,6 @@ class LocalBackend:
             slots = len(local.gpus) * local.tasks_per_gpu
         else:
             slots = local.max_parallel
-        # why: split the usable CPUs over the parallel slots, one share per run
         return LocalResources(cpus=local_cpus, cpus_per_run=max(local_cpus // slots, 1))
 
     def failure_hint(
