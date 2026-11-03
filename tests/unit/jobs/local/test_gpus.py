@@ -235,6 +235,32 @@ def test_memory_query_failure_keeps_the_compute_rule(
     assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.1) == frozenset({'1'})
 
 
+def test_compute_query_failure_keeps_the_memory_rule(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        '  exit 1\n'
+        'else\n'
+        "  echo '0,GPU-0,30000,40000'\n"
+        "  echo '1,GPU-1,10,40000'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    # why: the default fraction 1.0 disables the memory rule, so the rule needs a lower one
+    assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.5) == frozenset({'0'})
+
+
+def test_all_query_failures_count_no_gpu_as_busy(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body='#!/bin/sh\nexit 1\n')
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert busy_gpus(gpu_ids=('0',)) == frozenset()
+
+
 def test_select_gpus_auto_uses_visible_gpus() -> None:
     environment = {'CUDA_VISIBLE_DEVICES': '1,3'}
     assert select_gpus(gpus='auto', skip_busy=False, environment=environment) == ('1', '3')

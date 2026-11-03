@@ -161,7 +161,9 @@ class _GpuLeaseGate:
 
     A slot the pool holds a lease for is leased without a recheck. Otherwise
     ``gpu_free`` decides, and its answer is kept per GPU for the recheck
-    window, so the poll does not call it again inside the window.
+    window, so the poll does not call it again inside the window. The answer
+    dies with the last lease of the pool on the GPU, so a free answer is
+    never trusted for a new lease.
     """
 
     def __init__(
@@ -222,6 +224,9 @@ class _GpuLeaseGate:
             return
         with self._lock:
             self._counts[gpu_id] = self._counts.get(gpu_id, 1) - 1
+            if self._counts[gpu_id] == 0:
+                # why: a free answer from before the release must not lease the GPU again
+                self._answers.pop(gpu_id, None)
 
 
 def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and limit setting
@@ -252,7 +257,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     its slot; while none is free, ``on_wait`` is called once for the command
     and the pool retries every ``gpu_poll_seconds``, waking on a stop. With
     ``gpu_free``, a slot the pool holds no lease for is leased only while
-    ``gpu_free`` reports its GPU free; the answer is kept per GPU for
+    ``gpu_free`` reports its GPU free; the busy answer is kept per GPU for
     ``busy_recheck_seconds``, so the poll does not recheck inside the window,
     and a busy GPU waits like a held one. A
     leased command runs with ``CUDA_VISIBLE_DEVICES`` set to the id of the
@@ -294,8 +299,8 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         gpu_free: Called with a GPU id to ask whether it is free, while the
             pool holds no lease on it; a busy GPU waits like a held one.
             ``None`` skips the check.
-        busy_recheck_seconds: Seconds to keep the answer of ``gpu_free`` per
-            GPU, so the lease poll does not recheck inside the window.
+        busy_recheck_seconds: Seconds to keep the busy answer of ``gpu_free``
+            per GPU, so the lease poll does not recheck inside the window.
 
     Returns:
         The keys of the commands that never started because ``stop`` was set.
