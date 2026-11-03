@@ -3,13 +3,7 @@
 from collections.abc import Mapping, Sequence
 import logging
 
-from tslab.jobs.slurm import (
-    FAILING_JOB_STATES,
-    INTERRUPTING_JOB_STATES,
-    query_job_usage,
-    SlurmError,
-    SlurmJobUsage,
-)
+from tslab.jobs.slurm import query_job_usage, SlurmError, SlurmJobUsage
 from tslab.study.context import Context
 from tslab.study.launchers import JobUsage
 from tslab.study.reporting.state import RunReport
@@ -49,12 +43,9 @@ def failure_usage(
     reports: Sequence[RunReport],
 ) -> Mapping[str, JobUsage]:
     """The accounting usage of the failed and interrupted runs; no numbers on failure."""
-    failed_states = FAILING_JOB_STATES | INTERRUPTING_JOB_STATES
-    job_ids = [
-        report.job_id
-        for report in reports
-        if report.job_state in failed_states and report.job_id is not None
-    ]
+    # why: the run state is the study's verdict, so a scheduler state of COMPLETED
+    # or a missing state does not keep the recorded exit code away
+    job_ids = [report.job_id for report in reports if report.job_id is not None]
     if not job_ids:
         return dict[str, JobUsage]()
     try:
