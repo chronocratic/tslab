@@ -11,6 +11,7 @@ import sys
 from typing import Any, cast
 
 from tslab.cli.common import configure_logging, output, UsageError, use_stderr
+from tslab.enums import OutputFormat
 
 __all__ = ['main']
 
@@ -53,16 +54,16 @@ def main(args: Sequence[str] | None = None) -> None:
     configure_logging()
     argv = list(sys.argv[1:]) if args is None else list(args)
     head, extra_args = _split_pass_through(argv=argv)
-    json_mode = '--json' in head
+    output_format = OutputFormat.JSON if '--json' in head else OutputFormat.TEXT
     output.reset_document_state()
-    if json_mode:
+    if output_format is OutputFormat.JSON:
         use_stderr()
     try:
         command: Command = _parse(argv=head)
     except SystemExit as error:
         code = _system_exit_code(error=error)
         _print_error_document(
-            json_mode=json_mode,
+            output_format=output_format,
             exit_code=code,
             message=f'command argument parsing failed with exit code {code}',
         )
@@ -70,7 +71,7 @@ def main(args: Sequence[str] | None = None) -> None:
     if extra_args and not _takes_pass_through(command=command):
         _LOGGER.error('this command does not take arguments after --')
         _print_error_document(
-            json_mode=json_mode,
+            output_format=output_format,
             exit_code=2,
             message='this command does not take arguments after --',
         )
@@ -84,7 +85,7 @@ def main(args: Sequence[str] | None = None) -> None:
     except SystemExit as error:
         exit_code = _system_exit_code(error=error)
         _print_error_document(
-            json_mode=json_mode,
+            output_format=output_format,
             exit_code=exit_code,
             message=f'command exited with code {exit_code}',
         )
@@ -92,20 +93,20 @@ def main(args: Sequence[str] | None = None) -> None:
     except UsageError as error:
         failure = error  # logged below, without a traceback: it is a usage error
     except Exception as error:  # why: JSON commands need a document for every failure
-        _print_error_document(json_mode=json_mode, exit_code=1, message=str(error))
+        _print_error_document(output_format=output_format, exit_code=1, message=str(error))
         raise
     else:
         _print_error_document(
-            json_mode=json_mode, exit_code=code, message=f'command exited with code {code}'
+            output_format=output_format, exit_code=code, message=f'command exited with code {code}'
         )
         raise SystemExit(code)
     _LOGGER.error('%s', failure)
-    _print_error_document(json_mode=json_mode, exit_code=2, message=str(failure))
+    _print_error_document(output_format=output_format, exit_code=2, message=str(failure))
     raise SystemExit(2)
 
 
-def _print_error_document(*, json_mode: bool, exit_code: int, message: str) -> None:
-    if json_mode and exit_code != 0 and not output.has_printed_document():
+def _print_error_document(*, output_format: OutputFormat, exit_code: int, message: str) -> None:
+    if output_format is OutputFormat.JSON and exit_code != 0 and not output.has_printed_document():
         output.print_json(document=output.error_document(exit_code=exit_code, message=message))
 
 
