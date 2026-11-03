@@ -24,7 +24,16 @@ from tslab.study.paths import instance_directory
 from tslab.study.reporting.state import RunReport
 
 __all__ = [
+    'ERROR_COLUMN',
+    'GRID_COLUMN',
+    'INSTANCE_COLUMN',
+    'INSTANCE_STATE_COLUMN',
     'METRICS_TYPE',
+    'METRIC_PREFIX',
+    'RUN_PATH_COLUMN',
+    'SECONDS_COLUMN',
+    'STUDY_STATE_COLUMN',
+    'UNREADABLE_STATE',
     'ResultRow',
     'collect_results',
     'format_results_csv',
@@ -34,6 +43,19 @@ __all__ = [
 
 #: The ``meta.json`` value of a metrics instance, ``module.Class`` of ``Metrics``.
 METRICS_TYPE = f'{Metrics.__module__}.{Metrics.__qualname__}'
+
+#: The names of the columns the table writes.
+GRID_COLUMN = 'grid'
+RUN_PATH_COLUMN = 'run_path'
+STUDY_STATE_COLUMN = 'study_state'
+INSTANCE_COLUMN = 'instance'
+INSTANCE_STATE_COLUMN = 'instance_state'
+SECONDS_COLUMN = 'seconds'
+ERROR_COLUMN = 'error'
+#: The prefix of a metric column; the rest is the metric name.
+METRIC_PREFIX = 'metric/'
+#: The ``instance_state`` of an instance whose files cannot be read.
+UNREADABLE_STATE = 'unreadable'
 
 #: One row of the results table: column name to value.
 type ResultRow = dict[str, str | float | None]
@@ -109,20 +131,20 @@ def _axis_names(*, study: Study) -> list[str]:
 
 
 def _row_head(*, report: RunReport, axes: Sequence[str]) -> ResultRow:
-    row: ResultRow = {'grid': report.run.grid}
+    row: ResultRow = {GRID_COLUMN: report.run.grid}
     for axis in axes:
         row[axis] = report.run.values.get(axis)
-    row['run_path'] = report.run.run_path.as_posix()
-    row['study_state'] = report.state.value
+    row[RUN_PATH_COLUMN] = report.run.run_path.as_posix()
+    row[STUDY_STATE_COLUMN] = report.state.value
     return row
 
 
 def _bare_row(*, report: RunReport, axes: Sequence[str]) -> ResultRow:
     row = _row_head(report=report, axes=axes)
-    row['instance'] = None
-    row['instance_state'] = None if report.folder.read_error is None else 'unreadable'
-    row['seconds'] = None
-    row['error'] = report.folder.read_error
+    row[INSTANCE_COLUMN] = None
+    row[INSTANCE_STATE_COLUMN] = None if report.folder.read_error is None else UNREADABLE_STATE
+    row[SECONDS_COLUMN] = None
+    row[ERROR_COLUMN] = report.folder.read_error
     return row
 
 
@@ -135,10 +157,10 @@ def _instance_row(
     run_directory: Path,
 ) -> ResultRow:
     row = _row_head(report=report, axes=axes)
-    row['instance'] = instance_id
-    row['instance_state'] = record.state.value
-    row['seconds'] = record.seconds
-    row['error'] = None if record.error is None else first_line(text=record.error)
+    row[INSTANCE_COLUMN] = instance_id
+    row[INSTANCE_STATE_COLUMN] = record.state.value
+    row[SECONDS_COLUMN] = record.seconds
+    row[ERROR_COLUMN] = None if record.error is None else first_line(text=record.error)
     # why: only a done instance has a meta.json; the others show their own state and error
     if record.state is InstanceState.DONE:
         row.update(
@@ -160,21 +182,27 @@ def _metrics_of(*, instance_directory: Path) -> dict[str, str | float | None]:
     try:
         meta = json.loads((instance_directory / META_FILE).read_text(encoding='utf-8'))
     except (OSError, ValueError, UnicodeDecodeError) as error:
-        return {'instance_state': 'unreadable', 'error': f'{type(error).__name__}: {error}'}
+        return {
+            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
+            ERROR_COLUMN: f'{type(error).__name__}: {error}',
+        }
     if not isinstance(meta, dict) or meta.get('artifact_type') != METRICS_TYPE:
         return {}
     try:
         data = json.loads((instance_directory / Metrics.FILE_NAME).read_text(encoding='utf-8'))
     except (OSError, ValueError, UnicodeDecodeError) as error:
-        return {'instance_state': 'unreadable', 'error': f'{type(error).__name__}: {error}'}
+        return {
+            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
+            ERROR_COLUMN: f'{type(error).__name__}: {error}',
+        }
     if not isinstance(data, dict):
         return {
-            'instance_state': 'unreadable',
-            'error': f'{Metrics.FILE_NAME} is not a JSON object',
+            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
+            ERROR_COLUMN: f'{Metrics.FILE_NAME} is not a JSON object',
         }
     cells: dict[str, str | float | None] = {}
     for name, value in data.items():
-        cells[f'metric/{name}'] = (
+        cells[f'{METRIC_PREFIX}{name}'] = (
             float(value) if not isinstance(value, bool) and isinstance(value, int | float) else None
         )
     return cells
@@ -219,5 +247,5 @@ def format_results_csv(*, rows: Sequence[ResultRow]) -> str:
 
 def _header_of(*, rows: Sequence[ResultRow]) -> list[str]:
     keys = {key: None for row in rows for key in row}
-    header = [key for key in keys if not key.startswith('metric/')]
-    return [*header, *sorted(key for key in keys if key.startswith('metric/'))]
+    header = [key for key in keys if not key.startswith(METRIC_PREFIX)]
+    return [*header, *sorted(key for key in keys if key.startswith(METRIC_PREFIX))]
