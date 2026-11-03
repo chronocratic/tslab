@@ -35,6 +35,7 @@ from tslab.study.launchers import (
 from tslab.study.launchers.slurm.doctor import cluster_checks, slurm_check
 from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.launchers.slurm.job_script import foreground_script
+from tslab.study.launchers.slurm.slurm_file import write_slurm_file
 from tslab.study.launchers.slurm.states import (
     _query_states,
     expected_starts,
@@ -44,6 +45,7 @@ from tslab.study.launchers.slurm.states import (
 from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError, SlurmSettings
 from tslab.study.machine.slurm import slurm_for
+from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport
@@ -225,7 +227,21 @@ class SlurmBackend:
             now=utc_now_iso,
             sleep=sleep,
         )
+        if submitted:
+            self._write_slurm_file(context=context)
         return code
+
+    @staticmethod
+    def _write_slurm_file(*, context: Context) -> None:
+        """Write ``slurm.sh``; a failure only warns, the jobs are already queued."""
+        folder = study_folder(machine=context.machine, study=context.study)
+        try:
+            path = write_slurm_file(study=context.study, study_folder=folder)
+        except OSError as error:
+            # why: the jobs are already queued, so the exit code stays as it is
+            _LOGGER.warning('could not write the SLURM commands file: %s', error)
+            return
+        _LOGGER.info('SLURM commands: source %s && squeue-full-name', path)
 
     def cancel(
         self, *, context: Context, dry_run: bool, signal: str | None

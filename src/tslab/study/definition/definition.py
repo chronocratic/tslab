@@ -161,8 +161,8 @@ class Grid:
     @property
     def job_name_axes(self) -> tuple[str, ...]:
         """The axes the job name template uses, in template order."""
-        names = _JOB_NAME_PLACEHOLDER.findall(self.job_name)
-        return tuple(dict.fromkeys(name for name in names if name in self.axes))
+        names = [str(match[1]) for match in _JOB_NAME_PLACEHOLDER.finditer(self.job_name)]
+        return tuple(name for name in dict.fromkeys(names) if name in self.axes)
 
     def job_name_for(self, *, study: str, values: Mapping[str, str]) -> str:
         """The job name of one run.
