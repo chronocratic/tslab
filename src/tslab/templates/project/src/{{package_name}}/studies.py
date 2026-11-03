@@ -8,6 +8,8 @@ command over the product of its axes; every run lands in
         --machine local --grid classification --only seed=0 --dry-run
 """
 
+from pathlib import Path
+
 from tslab.adapters.chronocratic.datasets import ucr_datasets
 from tslab.study import from_presets, Grid, Override, setting_axis, Study
 
@@ -29,7 +31,7 @@ example = Study(
                     without=('data', 'run_path'),
                 ),
                 # The dataset: a UCR archive under the data/ folder of the project.
-                'dataset': ucr_datasets(root='data', names=('ToySpectra',)),
+                'dataset': ucr_datasets(root=Path('data'), names=('ToySpectra',)),
                 # The seed, one value per run.
                 'seed': setting_axis(path='seed', values=(0, 1)),
             },

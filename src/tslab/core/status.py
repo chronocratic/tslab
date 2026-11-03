@@ -48,7 +48,7 @@ class InstanceRecord:
         finished_at: UTC ISO 8601 time the execution ended.
         seconds: Wall-clock duration of the execution.
         error: ``"ExceptionType: message"`` for failed instances.
-        traceback_file: Path of ``error.txt``, relative to the run folder.
+        traceback_file: The path of ``error.txt``, relative to the run folder.
         reason: Why the instance was skipped.
     """
 
@@ -58,7 +58,7 @@ class InstanceRecord:
     finished_at: str | None = None
     seconds: float | None = None
     error: str | None = None
-    traceback_file: str | None = None
+    traceback_file: Path | None = None
     reason: str | None = None
 
     def to_json(self) -> dict[str, object]:
@@ -67,7 +67,7 @@ class InstanceRecord:
         for record_field in dataclasses.fields(self):
             value = getattr(self, record_field.name)
             if record_field.name != 'state' and value is not None:
-                document[record_field.name] = value
+                document[record_field.name] = value.as_posix() if isinstance(value, Path) else value
         return document
 
     @classmethod
@@ -94,9 +94,14 @@ class InstanceRecord:
             finished_at=_optional_str(document=document, key='finished_at'),
             seconds=None if seconds is None else float(seconds),
             error=_optional_str(document=document, key='error'),
-            traceback_file=_optional_str(document=document, key='traceback_file'),
+            traceback_file=_optional_path(document=document, key='traceback_file'),
             reason=_optional_str(document=document, key='reason'),
         )
+
+
+def _optional_path(*, document: Mapping[str, object], key: str) -> Path | None:
+    text = _optional_str(document=document, key=key)
+    return None if text is None else Path(text)
 
 
 def _optional_str(*, document: Mapping[str, object], key: str) -> str | None:

@@ -427,7 +427,7 @@ class Stage[Out: Artifact](ABC):
 
     def _save_error(
         self, *, run: Run, directory: Path, error: Exception | JobTimeLimitSignal
-    ) -> str | None:
+    ) -> Path | None:
         """Write ``error.txt`` beside the result; return its path in the run, or ``None``."""
         if not self.in_place:
             shutil.rmtree(self._work_directory(directory=directory), ignore_errors=True)
@@ -440,7 +440,7 @@ class Stage[Out: Artifact](ABC):
         except OSError:
             _LOGGER.warning('cannot write %s', error_path.as_posix(), exc_info=True)
             return None
-        return error_path.relative_to(run.directory).as_posix()
+        return error_path.relative_to(run.directory)
 
     def _record_failure(
         self,

@@ -112,7 +112,10 @@ class MachineList:
             print_json(document={'schema': 'tslab.machine-list/1', 'machines': machines})
             _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
             return 0
-        rows = [(name, 'project', os.path.relpath(file), '') for name, file in project.items()]
+        rows = [
+            (name, 'project', file.relative_to(Path.cwd(), walk_up=True).as_posix(), '')
+            for name, file in project.items()
+        ]
         rows += [
             (
                 name,

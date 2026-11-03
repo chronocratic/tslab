@@ -210,11 +210,12 @@ def take_code_snapshot(
     return snapshot
 
 
-def _check_git(*, project_root: Path) -> str:
+def _check_git(*, project_root: Path) -> Path:
     """The git executable, or the error that names the way out."""
-    git = shutil.which('git')
-    if git is None:
+    found = shutil.which('git')
+    if found is None:
         _stop_no_git(project_root=project_root)
+    git = Path(found)
     try:
         _run_git(git=git, project_root=project_root, arguments=('rev-parse', '--show-toplevel'))
     except (OSError, subprocess.SubprocessError):
@@ -230,7 +231,7 @@ def _stop_no_git(*, project_root: Path) -> NoReturn:
     raise CodeSnapshotError(message)
 
 
-def _head_commit(*, git: str, project_root: Path) -> str:
+def _head_commit(*, git: Path, project_root: Path) -> str:
     """The ``HEAD`` of the repository, or the error that names the way out."""
     try:
         return _run_git(git=git, project_root=project_root, arguments=('rev-parse', 'HEAD')).strip()
@@ -252,25 +253,25 @@ def _check_src_layout(*, project_root: Path) -> None:
     raise CodeSnapshotError(message)
 
 
-def _tracked_files(*, git: str, project_root: Path) -> list[str]:
+def _tracked_files(*, git: Path, project_root: Path) -> list[Path]:
     return _list_files(git=git, project_root=project_root, flags=('--cached',))
 
 
-def _untracked_files(*, git: str, project_root: Path) -> list[str]:
+def _untracked_files(*, git: Path, project_root: Path) -> list[Path]:
     return _list_files(git=git, project_root=project_root, flags=('--others', '--exclude-standard'))
 
 
-def _list_files(*, git: str, project_root: Path, flags: tuple[str, ...]) -> list[str]:
+def _list_files(*, git: Path, project_root: Path, flags: tuple[str, ...]) -> list[Path]:
     raw = _run_git(
         git=git,
         project_root=project_root,
         arguments=('ls-files', '-z', *flags, '--', f'{SRC_FOLDER}/'),
     )
-    return [path for path in raw.split('\0') if path]
+    return [Path(path) for path in raw.split('\0') if path]
 
 
 def _stop_on_untracked(
-    *, untracked: list[str], check_untracked: bool, include_untracked: bool
+    *, untracked: list[Path], check_untracked: bool, include_untracked: bool
 ) -> None:
     if not untracked or not check_untracked or include_untracked:
         return
@@ -295,11 +296,11 @@ def _stop_on_untracked(
 def _copied_files(
     *,
     project_root: Path,
-    tracked: list[str],
-    untracked: list[str],
+    tracked: list[Path],
+    untracked: list[Path],
     include_untracked: bool,
     check_untracked: bool,
-) -> tuple[list[str], bool]:
+) -> tuple[list[Path], bool]:
     copies = [path for path in tracked if (project_root / path).is_file()]
     untracked_copied = False
     if untracked and (include_untracked or not check_untracked):
@@ -316,24 +317,27 @@ def _stop_empty_copies() -> NoReturn:
     raise CodeSnapshotError(message)
 
 
-def _dirty_files(*, git: str, project_root: Path) -> list[str]:
+def _dirty_files(*, git: Path, project_root: Path) -> list[Path]:
     raw = _run_git(
         git=git,
         project_root=project_root,
         arguments=('diff', '--name-only', '-z', 'HEAD', '--', f'{SRC_FOLDER}/'),
     )
-    return [path for path in raw.split('\0') if path]
+    return [Path(path) for path in raw.split('\0') if path]
 
 
-def _hash_of_files(*, project_root: Path, relative_paths: list[str]) -> str:
+def _hash_of_files(*, project_root: Path, relative_paths: list[Path]) -> str:
     digest = hashlib.sha256()
-    for relative in sorted(relative_paths):
+    # why: sorting by the posix text keeps the hash of snapshots taken before this typing
+    for relative in sorted(relative_paths, key=Path.as_posix):
         data = (project_root / relative).read_bytes()
-        digest.update(relative.encode('utf-8') + b'\0' + len(data).to_bytes(8, 'big') + data)
+        digest.update(
+            relative.as_posix().encode('utf-8') + b'\0' + len(data).to_bytes(8, 'big') + data
+        )
     return digest.hexdigest()[:16]
 
 
-def _copy_atomically(*, project_root: Path, copies: list[str], folder: Path, digest: str) -> None:
+def _copy_atomically(*, project_root: Path, copies: list[Path], folder: Path, digest: str) -> None:
     """Copy into a temporary sibling folder, then rename to ``folder``.
 
     A crash or a folder that appears meanwhile must never leave a partial
@@ -355,7 +359,7 @@ def _copy_atomically(*, project_root: Path, copies: list[str], folder: Path, dig
         raise CodeSnapshotError(message) from error
 
 
-def _check_copy_digest(*, temporary: Path, copies: list[str], digest: str) -> None:
+def _check_copy_digest(*, temporary: Path, copies: list[Path], digest: str) -> None:
     """The copied files match the recorded hash, or the error that names the way out.
 
     The hash was computed from the project before the copy; an edit in
@@ -372,7 +376,7 @@ def _check_copy_digest(*, temporary: Path, copies: list[str], digest: str) -> No
     raise CodeSnapshotError(message)
 
 
-def _copy_files(*, project_root: Path, copies: list[str], destination: Path) -> None:
+def _copy_files(*, project_root: Path, copies: list[Path], destination: Path) -> None:
     for relative in copies:
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -388,9 +392,9 @@ def _publish_copy(*, temporary: Path, folder: Path) -> None:
         shutil.rmtree(temporary)
 
 
-def _run_git(*, git: str, project_root: Path, arguments: tuple[str, ...]) -> str:
+def _run_git(*, git: Path, project_root: Path, arguments: tuple[str, ...]) -> str:
     return subprocess.run(  # noqa: S603 # why: fixed git arguments, no user input
-        [git, *arguments],
+        [str(git), *arguments],
         cwd=project_root,
         capture_output=True,
         text=True,

@@ -6,7 +6,9 @@ fields, so one axis can hold both, ``ucr_datasets(...) | uea_datasets(...)``.
 """
 
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
+from tslab.core.paths import require_path
 from tslab.study.definition import SettingValue
 
 __all__ = ['ucr_datasets', 'uea_datasets']
@@ -14,7 +16,7 @@ __all__ = ['ucr_datasets', 'uea_datasets']
 
 def ucr_datasets(
     *,
-    root: str,
+    root: Path,
     names: Sequence[str],
     target_column_name: str = 'target',
     settings: Mapping[str, SettingValue] | None = None,
@@ -22,7 +24,7 @@ def ucr_datasets(
     """Axis values that point at the UCR archives under ``root``.
 
     Args:
-        root: The folder that holds the dataset folders, e.g. ``'${UCR_ROOT}'``.
+        root: The folder that holds the dataset folders, e.g. ``Path('${UCR_ROOT}')``.
         names: The UCR dataset names, e.g. ``('Coffee',)``.
         target_column_name: The UCR column name the model trains on.
         settings: Extra settings every dataset gets, e.g. ``{'data.batch_size': 2}``.
@@ -32,6 +34,7 @@ def ucr_datasets(
         entry per name, with the extra settings last.
 
     Raises:
+        TypeError: If ``root`` is a string.
         ValueError: If ``names`` is empty.
     """
     return _datasets(
@@ -45,7 +48,7 @@ def ucr_datasets(
 
 def uea_datasets(
     *,
-    root: str,
+    root: Path,
     names: Sequence[str],
     target_column_name: str = 'target',
     settings: Mapping[str, SettingValue] | None = None,
@@ -53,7 +56,7 @@ def uea_datasets(
     """Axis values that point at the UEA archives under ``root``.
 
     Args:
-        root: The folder that holds the dataset folders, e.g. ``'/d/UEA'``.
+        root: The folder that holds the dataset folders, e.g. ``Path('/d/UEA')``.
         names: The UEA dataset names, e.g. ``('BasicMotions',)``.
         target_column_name: The UEA column name the model trains on.
         settings: Extra settings every dataset gets, e.g. ``{'data.batch_size': 2}``.
@@ -63,6 +66,7 @@ def uea_datasets(
         entry per name, with the extra settings last.
 
     Raises:
+        TypeError: If ``root`` is a string.
         ValueError: If ``names`` is empty.
     """
     return _datasets(
@@ -77,11 +81,12 @@ def uea_datasets(
 def _datasets(
     *,
     archive: str,
-    root: str,
+    root: Path,
     names: Sequence[str],
     target_column_name: str,
     settings: Mapping[str, SettingValue] | None,
 ) -> dict[str, dict[str, SettingValue]]:
+    require_path(value=root, parameter='root')
     if not names:
         message = f'{archive}_datasets needs at least one dataset name'
         raise ValueError(message)
@@ -89,7 +94,7 @@ def _datasets(
     return {
         name: {
             'data': archive,
-            'data.dataset_folder_path': f'{root}/{name}',
+            'data.dataset_folder_path': (root / name).as_posix(),
             'data.target_column_name': target_column_name,
             **extra,
         }
