@@ -9,8 +9,8 @@ import tyro
 from tslab.cli.common import resolve_request, use_stderr
 from tslab.cli.study import _context_of, _warn_no_runs
 from tslab.core.meta import hostname
+from tslab.enums import OutputFormat
 from tslab.study.commands import results
-from tslab.study.commands.results import ResultsFormat
 
 __all__ = ['Results']
 
@@ -57,5 +57,5 @@ class Results:
         _warn_no_runs(context=context)
         if self.out == Path('-'):
             use_stderr()
-        output_format = ResultsFormat.JSON if self.json else ResultsFormat.CSV
+        output_format = OutputFormat.JSON if self.json else OutputFormat.TEXT
         return results(context=context, out=self.out, output_format=output_format)
