@@ -287,7 +287,7 @@ they have to read.
     opens directly is a `pathlib.PurePosixPath`; join it to a root `Path` before
     touching the disk, and save it with `.as_posix()`.
 19. **Atomic writes:** write a temporary file, `fsync`, then rename. Use the
-    helpers in `tslab.core.paths` (`atomic_write_text`, `atomic_write_json`).
+    helpers in `tslab.core.files` (`atomic_write_text`, `atomic_write_json`).
     A crash must never leave a half-written file that looks valid.
 20. **Names say what things are:** a scope prefix plus what it is
     (`TSForecastingDataInfo`, `LightningTrainer`, `DownstreamModel`), never a
