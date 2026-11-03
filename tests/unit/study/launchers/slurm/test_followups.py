@@ -105,7 +105,7 @@ def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm
     retry_script = job_file_of(
         project=project, job_file=retry.job_file, suffix='sbatch'
     ).read_text()
-    assert '--job-name=retry' in retry_script
+    assert '--job-name=s_retry' in retry_script
     assert '--dependency=afterany:1000' in retry_script
     assert '--array' not in retry_script
     assert '#SBATCH --time=00:30:00' in retry_script
@@ -119,7 +119,7 @@ def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm
     wbsync_script = job_file_of(
         project=project, job_file=wbsync.job_file, suffix='sbatch'
     ).read_text()
-    assert '--job-name=wbsync' in wbsync_script
+    assert '--job-name=s_wbsync' in wbsync_script
     wbsync_tasks = job_file_of(
         project=project, job_file=wbsync.job_file, suffix='tasks'
     ).read_text()
@@ -322,7 +322,7 @@ def test_followup_sbatch_failure_exits_one_and_skips_the_rest(
         )
     assert code == 1
     assert [job.kind for job in jobs_of(project=project)] == ['run']
-    assert 'follow-up retry not submitted' in caplog.text
+    assert 'follow-up s_retry not submitted' in caplog.text
     assert len(fake.calls('sbatch')) == 2
 
 

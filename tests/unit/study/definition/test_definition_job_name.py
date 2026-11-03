@@ -5,6 +5,8 @@ import re
 import pytest
 
 from tests.unit.study.configs import grid
+from tslab.study import Study
+from tslab.study.definition import followup_job_name, study_job_names
 
 
 def test_default_job_name_is_short_name() -> None:
@@ -56,3 +58,38 @@ def test_bad_job_name_templates_fail(template: str, needle: str) -> None:
 def test_placeholder_axis_names_are_reserved(axis: str) -> None:
     with pytest.raises(ValueError, match='reserved'):
         grid(axes={axis: {'a': {'seed': 1}}})
+
+
+def test_job_names_must_differ_across_grids() -> None:
+    with pytest.raises(ValueError, match="grid 'b'.*job name 'cost-paper'.*grid 'a'"):
+        Study(
+            name='s',
+            grids={
+                'a': grid(short_name='a', job_name='{recipe}'),
+                'b': grid(short_name='b', job_name='{recipe}'),
+            },
+        )
+
+
+def test_template_without_short_name_is_fine_when_unique() -> None:
+    Study(
+        name='s',
+        grids={
+            'a': grid(short_name='a', job_name='{recipe}_x'),
+            'b': grid(short_name='b', job_name='{recipe}_y'),
+        },
+    )
+
+
+def test_job_name_must_not_clash_with_followups() -> None:
+    with pytest.raises(ValueError, match="follow-up job name 's_retry'"):
+        Study(name='s', grids={'a': grid(short_name='s_retry')})
+
+
+def test_study_job_names() -> None:
+    study = Study(name='s', grids={'a': grid(short_name='a', job_name='{short_name}_{seed}')})
+    assert study_job_names(study=study) == {'a': frozenset({'a_42', 'a_7'})}
+
+
+def test_followup_job_name() -> None:
+    assert followup_job_name(study='aug', kind='retry') == 'aug_retry'

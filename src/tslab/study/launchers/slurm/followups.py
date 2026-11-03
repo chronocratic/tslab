@@ -9,6 +9,7 @@ import time
 
 from tslab.jobs.slurm import SlurmError
 from tslab.study.context import Context
+from tslab.study.definition import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
 from tslab.study.launchers.slurm.submit import submit_helper_job
 from tslab.study.machine import SlurmSettings
 from tslab.study.paths import study_folder
@@ -119,7 +120,7 @@ def _retry_command(*, context: Context) -> tuple[str, str] | None:
             '--auto',
         ]
     )
-    return 'retry', command
+    return followup_job_name(study=context.study.name, kind=RETRY_JOB), command
 
 
 def _followup_commands(*, context: Context) -> list[tuple[str, str]]:
@@ -132,7 +133,7 @@ def _followup_commands(*, context: Context) -> list[tuple[str, str]]:
     if followup.wandb_sync:
         commands.append(
             (
-                'wbsync',
+                followup_job_name(study=context.study.name, kind=WANDB_SYNC_JOB),
                 shlex.join(
                     [*machine.tslab_command, 'wandb-sync', context.study_directory.as_posix()]
                 ),
