@@ -16,8 +16,8 @@ the code is split, the project template, public API promises and git.
 
 [`CODING_RULES.md`](CODING_RULES.md) holds every coding convention: how to
 work on a change, control flow (no nested `if`), functional style, design
-patterns, types, names, errors, docstrings, prose and tests. Read it before
-you write code; reviewers hold every change to it.
+patterns, types, paths, enums for choices, names, errors, docstrings, prose
+and tests. Read it before you write code; reviewers hold every change to it.
 
 ## 1. Before you say a change is done
 

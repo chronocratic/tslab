@@ -274,11 +274,16 @@ they have to read.
     line. `tests/import_rules/test_dataclass_rules.py` checks every `.py` and
     `.md` file. Mappings in frozen dataclasses are read-only (`MappingProxyType`
     or a tuple of pairs), so frozen really means frozen.
-18. **Paths are `pathlib.Path`.** Every public parameter that is a location is
-    typed `Path`, never `str` or `str | Path`, and is checked with
-    `require_path(value=..., parameter=...)`, which raises `TypeError` for `str`.
-    Convert to `str` only at a third-party boundary. Saved files store paths
-    relative to the run folder with `.as_posix()`.
+18. **Paths are always `pathlib.Path`, never `str`.** Every value that is a
+    location is a `Path`: parameters (public and private), return values,
+    dataclass fields, attributes and local variables. Never `str` or
+    `str | Path`. Public parameters are checked with
+    `require_path(value=..., parameter=...)`, which raises `TypeError` for
+    `str`. Build paths with `/`, `.with_suffix()` and `.parent`, never with
+    `os.path` or string joins. Turn text into a `Path` once, where it enters
+    (CLI argument, TOML, YAML, environment variable). Convert to `str` only at
+    a third-party or subprocess boundary. Saved files store paths relative to
+    the run folder with `.as_posix()`.
 19. **Atomic writes:** write a temporary file, `fsync`, then rename. Use the
     helpers in `tslab.core.paths` (`atomic_write_text`, `atomic_write_json`).
     A crash must never leave a half-written file that looks valid.
@@ -377,3 +382,27 @@ they have to read.
    function, in its own module when it is a backend, and pick it once from a
    `Mapping` (Strategy), or call a method on the object you were given.
    `if kind == 'slurm': ... elif kind == 'local': ...` is never allowed.
+
+## 14. Choices and typed values
+
+51. **A fixed set of choices is a `StrEnum`, never a `str` or a `Literal`.**
+    Modes, kinds, states, reasons and backends are enum members:
+    `class RunStatus(StrEnum)` in `core/tracker.py`, `JobPhase` in
+    `study/launchers/`. A parameter or field that takes a choice is typed with
+    the enum (`status: RunStatus`), never `status: str` or
+    `status: Literal['ok', 'fail']`. Members use `auto()` or the lowercase text
+    saved to disk, so saved files stay readable. When you touch code with a
+    `Literal` set of choices, change it to a `StrEnum`.
+52. **Parse at the boundary, use types inside.** Text from the CLI, TOML,
+    YAML, JSON or the environment becomes an enum member, a `Path` or a
+    dataclass where it enters, with `RunStatus(value)` or a typed parser that
+    raises a clear error naming the field and the valid choices. Code past
+    the boundary never compares raw strings (`if mode == 'train'`) and never
+    passes them on. Turn a value back into text only when you write it out.
+53. **No `bool` flag that picks a mode.** A parameter that switches between
+    two behaviors is an enum (`direction: Direction`), not `minimize: bool`,
+    so a third mode never needs a second flag. A `bool` stays a `bool` when it
+    is a yes or no answer (`overwrite`, `dry_run`).
+54. **No magic values.** A string, number or key used in more than one place,
+    or that has a meaning, is an enum member or a named module constant
+    (`_DISK_WARNING_BYTES`), never a bare literal repeated across modules.
