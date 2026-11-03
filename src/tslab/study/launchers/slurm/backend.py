@@ -301,7 +301,7 @@ class SlurmBackend:
     def failure_usage(
         self, *, context: Context, reports: Sequence[RunReport]
     ) -> Mapping[str, JobUsage]:
-        """The accounting usage of the out-of-memory runs; no numbers on a failure."""
+        """The accounting usage of the failed and interrupted runs; no numbers on a failure."""
         from tslab.study.launchers.slurm.usage import failure_usage  # noqa: PLC0415
 
         return failure_usage(context=context, reports=reports)

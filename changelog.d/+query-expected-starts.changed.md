@@ -1,0 +1,1 @@
+`query_expected_starts` now returns one `SlurmQueueEntry` per task (the expected start time and the pending reason) instead of the start string or `None`. Read the start of the old value from `entry.start`.
