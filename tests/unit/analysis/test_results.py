@@ -187,3 +187,22 @@ def test_method_matrix_averages_and_raises_on_duplicates() -> None:
         method_matrix(
             frame=doubled, unit='dataset', method='recipe', value='metric/m', average_over=['seed']
         )
+
+
+def test_missing_runs_on_an_empty_frame() -> None:
+    assert missing_runs(results=pd.DataFrame()).empty
+
+
+def test_method_matrix_keeps_a_method_with_only_missing_scores() -> None:
+    frame = pd.DataFrame(
+        {
+            'dataset': ['d1', 'd1', 'd2', 'd2'],
+            'recipe': ['a', 'b', 'a', 'b'],
+            'metric/m': [0.8, float('nan'), 0.7, float('nan')],
+        }
+    )
+    matrix = method_matrix(
+        frame=frame, unit='dataset', method='recipe', value='metric/m', average_over=[]
+    )
+    assert list(matrix.columns) == ['a', 'b']
+    assert matrix['b'].isna().all()

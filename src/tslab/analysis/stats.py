@@ -27,6 +27,7 @@ __all__ = [
     'annotate_tests',
     'average_ranks',
     'bootstrap_median',
+    'complete_row_count',
     'correlations',
     'friedman',
     'holm_adjust',
@@ -332,6 +333,9 @@ def correlations(
     Returns:
         A frame with columns ``column, n, rho, p_value, p_holm, significance``.
     """
+    if target in columns:
+        message = f'target {target!r} must not be one of the columns'
+        raise ValueError(message)
     rows = []
     for column in columns:
         pairs = frame[[column, target]].dropna()
@@ -349,6 +353,20 @@ def correlations(
     return annotate_tests(table=table, alpha=alpha)
 
 
+def complete_row_count(*, matrix: pd.DataFrame) -> int:
+    """Count the rows that have a score for every method.
+
+    These are the rows that ``friedman``, ``per_unit_ranks`` and ``average_ranks`` use.
+
+    Args:
+        matrix: Rows by unit, columns by method.
+
+    Returns:
+        The number of rows without a missing value.
+    """
+    return len(matrix.dropna())
+
+
 def per_unit_ranks(*, matrix: pd.DataFrame, direction: Direction) -> pd.DataFrame:
     """Rank the methods within each complete row; 1 is best and ties share the average.
 
@@ -357,7 +375,7 @@ def per_unit_ranks(*, matrix: pd.DataFrame, direction: Direction) -> pd.DataFram
         direction: Which end of the scale is best.
 
     Returns:
-        Ranks for the complete rows only, same columns.
+        Ranks for the complete rows only (``complete_row_count`` of them), same columns.
     """
     complete = matrix.dropna()
     ranks = scipy.stats.rankdata(-direction.sign * complete.to_numpy(dtype=float), axis=1)
@@ -372,6 +390,7 @@ def average_ranks(*, matrix: pd.DataFrame, direction: Direction) -> pd.Series:
         direction: Which end of the scale is best.
 
     Returns:
-        Mean ranks sorted ascending (the best method first).
+        Mean ranks over the complete rows only (``complete_row_count`` of them),
+        sorted ascending (the best method first).
     """
     return per_unit_ranks(matrix=matrix, direction=direction).mean().sort_values(kind='stable')

@@ -102,7 +102,7 @@ numbers = numbers_frame(
 write_numbers(numbers=numbers, output=output, source='analysis.ipynb', now=datetime.now(tz=UTC))
 ```
 
-In LaTeX, `\input{results_numbers}` and then `\res{friedman-accuracy-p}`. A rerun updates
+In LaTeX, `\input{results_numbers}` and then `\res{friedman-accuracy-p}`. Text values (`NumberKind.TEXT`) are escaped for LaTeX, and `number_key` raises on a part that TeX cannot take in a macro name (`% \ { } # & ~ ^`). A rerun updates
 the paper and no number is copied by hand.
 
 ## The template notebook

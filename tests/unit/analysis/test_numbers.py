@@ -96,3 +96,18 @@ def test_write_numbers_rejects_duplicates_and_bad_stem(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match='Bad Stem'):
         write_numbers(numbers=two_numbers(), output=output, source='s', now=now, stem='Bad Stem')
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize('part', ['top-5%', 'a{b', 'a}b', 'a#b', 'a&b', r'a\b', 'a~b', 'a^b'])
+def test_number_key_rejects_tex_unsafe_characters(part: str) -> None:
+    with pytest.raises(ValueError, match='TeX'):
+        number_key(parts=['x', part])
+
+
+def test_text_numbers_are_tex_escaped() -> None:
+    assert format_number(value='patchtst_long', kind=NumberKind.TEXT) == r'patchtst\_long'
+    assert format_number(value='100% & $5 #1', kind=NumberKind.TEXT) == r'100\% \& \$5 \#1'
+    assert format_number(value='a{b}', kind=NumberKind.TEXT) == r'a\{b\}'
+    assert format_number(value=r'a\b~c^d', kind=NumberKind.TEXT) == (
+        r'a\textbackslash{}b\textasciitilde{}c\textasciicircum{}d'
+    )

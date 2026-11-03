@@ -97,3 +97,21 @@ def test_failed_save_restores_logger_and_leaves_no_file(
         AnalysisOutput(root=tmp_path).save_figure(figure=figure, category='c', name='n')
     assert logger.level == logging.INFO
     assert not any(path.is_file() for path in tmp_path.rglob('*'))
+
+
+def test_formats_are_coerced_and_checked(tmp_path: Path) -> None:
+    assert AnalysisOutput(root=tmp_path, formats=('png',)).formats == (FigureFormat.PNG,)  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError, match='tiff'):
+        AnalysisOutput(root=tmp_path, formats=('tiff',))  # ty: ignore[invalid-argument-type]
+    with pytest.raises(ValueError, match='more than once'):
+        AnalysisOutput(root=tmp_path, formats=(FigureFormat.PNG, FigureFormat.PNG))
+
+
+def test_per_call_formats_are_checked_before_anything_is_written(tmp_path: Path) -> None:
+    output = AnalysisOutput(root=tmp_path)
+    for bad in ((), (FigureFormat.PNG, FigureFormat.PNG)):
+        with pytest.raises(ValueError, match='formats'):
+            output.save_figure(figure=small_figure(), category='c', name='n', formats=bad)
+    paths = output.save_figure(figure=small_figure(), category='c', name='n', formats=('svg',))
+    assert paths == (tmp_path / 'plots/c/svg/n.svg',)
+    assert not list(tmp_path.rglob('*.png'))

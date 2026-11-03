@@ -25,6 +25,7 @@ EXPECTED = {
     'average_ranks',
     'bootstrap_median',
     'cd_diagram',
+    'complete_row_count',
     'correlations',
     'critical_difference',
     'format_number',
