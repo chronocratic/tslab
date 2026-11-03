@@ -1,7 +1,7 @@
 """The ``[local]`` table of a machine profile."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 from typing import cast
@@ -71,16 +71,12 @@ def timeout_seconds(*, local: LocalSettings) -> float | None:
 def settings_from(*, table: Mapping[str, object], path: Path) -> LocalSettings:
     """Read and validate this profile's local settings table."""
     local_table = table.get(TABLE)
-    decoded_table = local_table
-    gpus: tuple[int | str, ...] | GpuDiscovery = ()
     if isinstance(local_table, dict) and 'gpus' in local_table:
-        # why: the config codec reads an enum by member name; the file spells the choice by value
-        gpus = local_gpus(value=local_table['gpus'], location='local.gpus', path=path)
-        decoded_table = {name: item for name, item in local_table.items() if name != 'gpus'}
-    local = from_table(
-        cls=LocalSettings, table=decoded_table, location=TABLE, path=path, required=False
+        local_gpus(value=local_table['gpus'], location='local.gpus', path=path)
+    local = (
+        from_table(cls=LocalSettings, table=local_table, location=TABLE, path=path, required=False)
+        or LocalSettings()
     )
-    local = replace(local or LocalSettings(), gpus=gpus)
     check_local(local=local, table=cast('Mapping[str, object]', local_table or {}), path=path)
     return local
 

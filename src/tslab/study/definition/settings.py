@@ -9,7 +9,7 @@ settings to flags to ``tslab.parse_config`` is pinned by tests.
 from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import Field, fields, MISSING
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 import types
 from typing import Any, cast, get_args, get_origin, get_type_hints, Union
@@ -53,8 +53,8 @@ def _bool_flag(*, path: str, value: bool) -> list[str]:
 
 
 def _value_args(*, value: SettingValue, path: str) -> list[str]:
-    if isinstance(value, Enum):  # before str and int: StrEnum and IntEnum are both
-        return [value.name]
+    if isinstance(value, StrEnum):  # before str: a StrEnum member is a str
+        return [value.value]
     if isinstance(value, Path):
         return [value.as_posix()]
     if isinstance(value, tuple | list):
@@ -65,7 +65,7 @@ def _value_args(*, value: SettingValue, path: str) -> list[str]:
         return [str(value)]
     message = (
         f'{path}: cannot turn a value of type {type(value).__qualname__} into a flag; '
-        f'settings may hold str, int, float, bool, Path, Enum, tuples, lists and None'
+        f'settings may hold str, int, float, bool, Path, StrEnum, tuples, lists and None'
     )
     raise TypeError(message)
 

@@ -394,7 +394,8 @@ they have to read.
     the enum (`status: RunStatus`), never `status: str` or
     `status: Literal['ok', 'fail']`. Members use `auto()` or the lowercase text
     saved to disk, so saved files stay readable. When you touch code with a
-    `Literal` set of choices, change it to a `StrEnum`.
+    `Literal` set of choices, change it to a `StrEnum`. Enums are saved, read,
+    shown on the CLI and fingerprinted by their value, never by member name.
 52. **Parse at the boundary, use types inside.** Text from the CLI, TOML,
     YAML, JSON or the environment becomes an enum member, a `Path` or a
     dataclass where it enters, with `RunStatus(value)` or a typed parser that

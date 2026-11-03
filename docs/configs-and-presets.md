@@ -84,7 +84,7 @@ machine. The marker is **optional**; presets without it are unaffected.
 ### A preset as a study recipe
 
 `from_presets` turns presets into the settings of the recipe axis of a study. It
-keeps each choice field as the **name** of its member and every other field
+keeps each choice field as its enum member and every other field
 **only where it differs from the default**, plus every field without a
 default. `ts2vec-paper` above gives:
 
@@ -108,7 +108,7 @@ uv run python -m my_paper.classify no-preset model:ts2vec \
 
 Settings are **dotted paths** of the config class (`model.depth`,
 `trainer.max_epochs`) with values: `str`, `int`, `float`, `bool`, `Path`,
-`Enum`, tuples and lists, or `None`.
+`StrEnum`, tuples and lists, or `None`.
 
 - A path that ends at a **union field** with a string value becomes the
   subcommand word `<path>:<value>` — `model:ts2vec`, `data:ucr`. The names
@@ -116,7 +116,7 @@ Settings are **dotted paths** of the config class (`model.depth`,
   unions must be named with `tyro.conf.subcommand(name=...)` for that.
 - Every other path becomes `--<flag>` (underscores become dashes) plus its
   value: `--model.depth 10`, a bool as `--model.use-mask` or
-  `--model.no-use-mask`, a `Path` as POSIX text, an `Enum` by member name,
+  `--model.no-use-mask`, a `Path` as POSIX text, a `StrEnum` by its value (`--model.mask-mode continuous`),
   a tuple as one argument per item.
 - Subcommand words come first, then flags; `parse_config` reads them in any
   order.

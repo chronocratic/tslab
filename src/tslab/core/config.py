@@ -177,7 +177,7 @@ def parse_config[C](
         ValueError: If both ``presets`` and ``default`` are given, or a preset
             is named ``no-preset``.
     """
-    cascade = (tyro.conf.CascadeSubcommandArgs,)
+    cascade = (tyro.conf.CascadeSubcommandArgs, tyro.conf.EnumChoicesFromValues)
     if presets is not None:
         return _parse_preset(
             config_class=config_class, presets=presets, default=default, args=args, config=cascade
