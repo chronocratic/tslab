@@ -72,6 +72,7 @@ changelog.d/           towncrier fragments, one per pull request
 
 ### Dependency direction (enforced by `tests/import_rules/`)
 
+- `enums` imports nothing from TSLab, so every package may import it.
 - `core`, `interfaces` and `stages` never import Lightning,
   scikit-learn, any tracker SDK, chronocratic, or `tslab.adapters`,
   `tslab.lightning`, `tslab.tasks`, `tslab.probes`, `tslab.study`, `tslab.cli`.
