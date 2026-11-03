@@ -10,6 +10,7 @@ from tslab.cli.common import resolve_request, use_stderr
 from tslab.cli.study import _context_of, _warn_no_runs
 from tslab.core.meta import hostname
 from tslab.study.commands import results
+from tslab.study.commands.results import ResultsFormat
 
 __all__ = ['Results']
 
@@ -56,4 +57,5 @@ class Results:
         _warn_no_runs(context=context)
         if self.out == Path('-'):
             use_stderr()
-        return results(context=context, out=self.out, as_json=self.json)
+        output_format = ResultsFormat.JSON if self.json else ResultsFormat.CSV
+        return results(context=context, out=self.out, output_format=output_format)
