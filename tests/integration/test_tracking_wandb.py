@@ -9,6 +9,7 @@ import pytest
 
 from tslab.core.run import Run
 from tslab.core.tracker import RunStatus
+from tslab.enums import WandbMode
 from tslab.tracking.wandb import tracker as wandb_tracker_module
 from tslab.tracking.wandb.log import read_exit_codes, read_records
 from tslab.tracking.wandb.tracker import WandbTracker
@@ -40,7 +41,7 @@ def test_wandb_offline_run_records_exit_code(
 ) -> None:
     shell_log = tmp_path / 'slurm.out'
     shell_log.write_text('job output\n', encoding='utf-8')
-    tracker = WandbTracker(project='p', mode='offline', shell_log_path=shell_log)
+    tracker = WandbTracker(project='p', mode=WandbMode.OFFLINE, shell_log_path=shell_log)
 
     def script() -> None:
         with Run(
@@ -60,7 +61,7 @@ def test_wandb_offline_run_records_exit_code(
 
 @pytest.mark.slow
 def test_wandb_tracker_settings_and_tags(tmp_path: Path) -> None:
-    tracker = WandbTracker(project='p', mode='offline', tags=('extra',))
+    tracker = WandbTracker(project='p', mode=WandbMode.OFFLINE, tags=('extra',))
     tracker.start(run_directory=tmp_path, run_name='ts2vec/Coffee/seed_42')
     logger = tracker.lightning_logger
     assert isinstance(logger, WandbLogger)
@@ -88,7 +89,7 @@ def test_wandb_falls_back_to_offline_then_to_nothing(
         return CSVLogger(save_dir=run_directory)
 
     monkeypatch.setattr(WandbTracker, '_build', failing_build)
-    tracker = WandbTracker(project='p', mode='online')
+    tracker = WandbTracker(project='p', mode=WandbMode.ONLINE)
     tracker.start(run_directory=tmp_path, run_name='a')
     assert modes == ['online', 'offline']
     assert tracker.lightning_logger is not None
@@ -113,7 +114,7 @@ def test_missing_wandb_names_the_extra(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.setattr(wandb_tracker_module.importlib.util, 'find_spec', lambda _name: None)
-    tracker = WandbTracker(project='p', mode='offline')
+    tracker = WandbTracker(project='p', mode=WandbMode.OFFLINE)
     with caplog.at_level(logging.WARNING):
         tracker.start(run_directory=tmp_path, run_name='a')
     assert tracker.lightning_logger is None

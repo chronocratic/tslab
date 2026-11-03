@@ -23,6 +23,7 @@ from typing import override, TYPE_CHECKING
 from lightning.pytorch.loggers import Logger, WandbLogger
 
 from tslab.core.tracker import RunStatus
+from tslab.enums import WandbMode
 from tslab.tracking.lightning_bridge import LightningLoggerTracker
 
 if TYPE_CHECKING:
@@ -84,7 +85,7 @@ class WandbTracker(LightningLoggerTracker):
         *,
         project: str,
         entity: str | None = None,
-        mode: str = 'online',
+        mode: WandbMode = WandbMode.ONLINE,
         tags: tuple[str, ...] = (),
         shell_log_path: Path | None = None,
     ) -> None:
@@ -93,7 +94,7 @@ class WandbTracker(LightningLoggerTracker):
         Args:
             project: W&B project.
             entity: W&B entity (user or team); ``None`` uses the default entity.
-            mode: ``'online'`` or ``'offline'``.
+            mode: ``WandbMode.ONLINE`` or ``WandbMode.OFFLINE``.
             tags: Extra tags.
             shell_log_path: SLURM stdout/stderr file uploaded at finish, if it exists.
         """
@@ -110,7 +111,7 @@ class WandbTracker(LightningLoggerTracker):
             _LOGGER.warning('wandb is not installed; install tslab[wandb]. Continuing without W&B.')
             return None
         tags = [*self._tags, *Path(run_name).parts]
-        modes = [self._mode] if self._mode == 'offline' else [self._mode, 'offline']
+        modes = [self._mode] if self._mode is WandbMode.OFFLINE else [self._mode, WandbMode.OFFLINE]
         for mode in modes:
             built = self._try_build(
                 run_directory=run_directory,
@@ -124,7 +125,7 @@ class WandbTracker(LightningLoggerTracker):
         return None
 
     def _try_build(
-        self, *, run_directory: Path, run_name: str, tags: list[str], mode: str, last: bool
+        self, *, run_directory: Path, run_name: str, tags: list[str], mode: WandbMode, last: bool
     ) -> WandbLogger | None:
         """Build the logger in one mode; ``None`` with a warning when W&B fails."""
         try:
@@ -146,14 +147,14 @@ class WandbTracker(LightningLoggerTracker):
         return None
 
     def _build(
-        self, *, run_directory: Path, run_name: str, tags: list[str], mode: str
+        self, *, run_directory: Path, run_name: str, tags: list[str], mode: WandbMode
     ) -> WandbLogger:
         with _environment_variable(name='WANDB_DISABLE_CODE', value='1'):
             wandb_logger = WandbLogger(
                 project=self._project,
                 entity=self._entity,
                 name=run_name,
-                mode=mode,
+                mode=mode.value,
                 log_model=False,
                 # wandb.init(dir=X) creates X/wandb/ itself; passing .../trackers/wandb
                 # would give .../trackers/wandb/wandb.

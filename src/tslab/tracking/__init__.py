@@ -6,9 +6,9 @@ concrete trackers are imported inside ``build_trackers``.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 from tslab.core.tracker import Tracker
+from tslab.enums import WandbMode
 
 __all__ = ['TrackingOptions', 'build_trackers']
 
@@ -31,7 +31,7 @@ class TrackingOptions:
         shell_log_path: SLURM stdout/stderr file uploaded to W&B at the end of the run.
     """
 
-    wandb_mode: Literal['online', 'offline', 'disabled'] = 'disabled'
+    wandb_mode: WandbMode = WandbMode.DISABLED
     wandb_project: str = 'tslab'
     wandb_entity: str | None = None
     wandb_tags: tuple[str, ...] = ()
@@ -58,7 +58,7 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
     trackers: list[Tracker] = []
     # why: imported inside each branch so that `import tslab.tracking` never imports
     # Lightning or a tracker SDK, and a tracker nobody enabled is never imported.
-    if options.wandb_mode != 'disabled':
+    if options.wandb_mode is not WandbMode.DISABLED:
         from tslab.tracking.wandb.tracker import WandbTracker  # noqa: PLC0415
 
         trackers.append(

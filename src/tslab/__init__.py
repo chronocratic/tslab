@@ -21,7 +21,7 @@ from tslab.core.paths import InstanceName
 from tslab.core.run import JobTimeLimitSignal, Run, RunOptions
 from tslab.core.stage import Stage, stage
 from tslab.core.tracker import RunStatus, Tracker
-from tslab.enums import InstanceState, LogLevel, RunState
+from tslab.enums import InstanceState, LogLevel, RunState, WandbMode
 from tslab.stages.encoders import ModelAsEncoder
 
 try:
@@ -54,6 +54,7 @@ __all__ = [
     'UnavailableArtifact',
     'UnavailableArtifactError',
     'UnavailableReason',
+    'WandbMode',
     '__version__',
     'is_available',
     'load_config',
