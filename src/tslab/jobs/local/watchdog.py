@@ -98,6 +98,7 @@ class Watchdog:
         self.process.wait()
 
 
+# why: kill the job group when its owner is gone; end of input replaces polling
 def main(*, argv: Sequence[str], lines: Iterable[str]) -> int:
     """Hold the watched process groups, then kill them when the input ends.
 
