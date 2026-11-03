@@ -1,3 +1,4 @@
+import contextlib
 import os
 from pathlib import Path
 import signal
@@ -9,6 +10,7 @@ import time
 import pytest
 
 from tslab.jobs.local import boot_id, process_alive, run_process, stop_on_signals
+from tslab.jobs.local.process import _stop_group_and_reap
 
 
 def test_run_process_returns_exit_code_and_lines(*, tmp_path: Path) -> None:
@@ -88,6 +90,85 @@ def test_run_process_kills_after_grace(*, tmp_path: Path) -> None:
     )
     assert time.monotonic() - start < 4
     assert result.exit_code == -signal.SIGKILL
+
+
+def _wait_for_file(*, path: Path) -> None:
+    deadline = time.monotonic() + 10
+    while not path.exists():
+        if time.monotonic() > deadline:
+            pytest.fail(f'the process did not write {path} in time')
+        time.sleep(0.05)
+
+
+def _wait_until_dead(*, pid: int) -> None:
+    # why: a killed process is a zombie until init reaps it, and a zombie still answers kill 0
+    deadline = time.monotonic() + 5
+    while process_alive(pid=pid):
+        if time.monotonic() > deadline:
+            pytest.fail(f'the process {pid} did not die in time')
+        time.sleep(0.05)
+
+
+def test_stop_group_and_reap_escalates_to_kill(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ready = tmp_path / 'ready'
+    code = (
+        'import os, signal, time\n'
+        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+        f'open({str(ready)!r}, "w").close()\n'
+        'time.sleep(60)\n'
+    )
+    process = subprocess.Popen(  # noqa: S603 # why: a fixed test command
+        [sys.executable, '-c', code], cwd=tmp_path, env=os.environ, start_new_session=True
+    )
+    try:
+        # why: the handler is in before the stop, so the TERM cannot work
+        _wait_for_file(path=ready)
+        monkeypatch.setattr('tslab.jobs.local.process._LEFTOVER_WAIT_SECONDS', 0.5)
+        start = time.monotonic()
+        _stop_group_and_reap(pid=process.pid, process=process)
+        assert process.returncode == -signal.SIGKILL
+        # why: the wait ran, so the TERM was sent and did not stop the child
+        assert time.monotonic() - start >= 0.4
+    finally:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+
+def test_stop_group_and_reap_kills_descendants_that_survive_term(*, tmp_path: Path) -> None:
+    grandchild_pid_file = tmp_path / 'grandchild.pid'
+    ready = tmp_path / 'ready'
+    grandchild = tmp_path / 'grandchild.py'
+    grandchild.write_text(
+        'import os, signal, time\n'
+        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+        f'open({str(grandchild_pid_file)!r}, "w").write(str(os.getpid()))\n'
+        'time.sleep(60)\n'
+    )
+    leader = tmp_path / 'leader.py'
+    leader.write_text(
+        'import os, subprocess, sys, time\n'
+        f'subprocess.Popen([sys.executable, {str(grandchild)!r}])\n'
+        f'while not os.path.exists({str(grandchild_pid_file)!r}):\n'
+        '    time.sleep(0.05)\n'
+        f'open({str(ready)!r}, "w").close()\n'
+        'time.sleep(60)\n'
+    )
+    process = subprocess.Popen(  # noqa: S603 # why: a fixed test command
+        [sys.executable, str(leader)], cwd=tmp_path, env=os.environ, start_new_session=True
+    )
+    try:
+        # why: the grandchild ignores the TERM before the stop, the leader does not
+        _wait_for_file(path=ready)
+        _stop_group_and_reap(pid=process.pid, process=process)
+        grandchild_pid = int(grandchild_pid_file.read_text())
+        _wait_until_dead(pid=grandchild_pid)
+    finally:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
 
 
 def test_run_process_stop_event_terminates(*, tmp_path: Path) -> None:
