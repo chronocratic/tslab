@@ -7,6 +7,7 @@ output_root = "runs"
 # "tracking.wandb_mode" = "offline"
 # "trainer.max_epochs" = 100
 # "data.num_workers" = "{cpus}" # the CPUs this machine may use
+# "data.num_workers" = "{cpus_per_run}" # the CPUs of one run when several run at once
 
 # How the tasks of a launch run. Every key is optional.
 # [local]

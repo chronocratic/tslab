@@ -152,6 +152,12 @@ def test_slurm_settings_describe_their_record_and_requested_memory() -> None:
     assert SlurmSettings(partition='gpu').requested_memory is None
 
 
+def test_slurm_cpus_per_run_is_cpus_per_task() -> None:
+    slurm = SlurmSettings(partition='p', cpus_per_task=6)
+    assert slurm.cpus == 6
+    assert slurm.cpus_per_run == 6
+
+
 def test_slurm_for_merges_matching_overrides_in_order() -> None:
     base = SlurmSettings(partition='p', sbatch_extra=(('account', 'X'), ('constraint', 'v100')))
     overrides = (

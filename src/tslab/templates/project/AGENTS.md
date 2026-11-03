@@ -274,8 +274,9 @@ Writing a study:
 - `exclude=` drops combinations; `Override(match=..., settings=...)` changes
   settings of matching runs.
 - `${VAR}` in a string expands from the machine `[env]`, then the shell
-  environment. `{output_root}`, `{study}`, `{run_path}`, `{log_file}`, `{cpus}` expand per run;
-  `{cpus}` is `cpus_per_task` on SLURM and the usable CPUs on a local machine.
+  environment. `{output_root}`, `{study}`, `{run_path}`, `{log_file}`, `{cpus}`,
+  `{cpus_per_run}` expand per run; `{cpus}` is `cpus_per_task` on SLURM and the usable CPUs on
+  a local machine; `{cpus_per_run}` is the CPUs of one run when several run at once.
 - SLURM jobs run through `srun`; `gpus` means one task per GPU. `cpus_per_task` applies to each
   task, so 4 GPUs with 8 CPUs per task request 32 CPUs.
 - `[slurm] setup` lists shell lines that run before tasks. `gpu_type` selects the GPU type for the

@@ -424,6 +424,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     'run_path': run.run.run_path,
                     'log_file': str(log_file),
                     'cpus': str(run.resources.cpus),
+                    'cpus_per_run': str(run.resources.cpus_per_run),
                 },
             )
         except (ValueError, TypeError) as error:

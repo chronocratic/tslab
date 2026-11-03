@@ -26,9 +26,14 @@ from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit
 from tslab.study.commands.submit import submit_runs
 from tslab.study.definition import StudyRun
-from tslab.study.launchers import JobPhase, LaunchError, LaunchReport
+from tslab.study.launchers import JobPhase, LaunchError, LaunchReport, Resources
 import tslab.study.launchers.local.backend as local_backend
-from tslab.study.launchers.local.backend import _phase_of, LocalBackend, LocalResources
+from tslab.study.launchers.local.backend import (
+    _auto_gpu_count,
+    _phase_of,
+    LocalBackend,
+    LocalResources,
+)
 from tslab.study.launchers.local.run import LocalLauncher
 from tslab.study.launchers.local.states import _is_local_job_id
 from tslab.study.machine import FollowupSettings, LocalSettings
@@ -144,6 +149,55 @@ def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     assert resources.max_tasks_per_job is None
     assert resources.describe() == 'local'
     assert resources.signal_problem() is None
+
+
+def _local_resources(*, project: Path, local: LocalSettings, local_cpus: int) -> Resources:
+    ctx = context(project=project, machine_file='local.toml')
+    machine = replace(ctx.machine, local=local)
+    return LocalBackend().resources(
+        machine=machine, overrides=(), grid_name='g', values={}, local_cpus=local_cpus
+    )
+
+
+def test_cpus_per_run_splits_the_cpus_over_parallel_slots(*, project: Path) -> None:
+    resources = _local_resources(project=project, local=LocalSettings(max_parallel=4), local_cpus=8)
+    assert resources.cpus_per_run == 2
+
+
+def test_cpus_per_run_with_one_slot_is_every_cpu(*, project: Path) -> None:
+    resources = _local_resources(project=project, local=LocalSettings(max_parallel=1), local_cpus=8)
+    assert resources.cpus_per_run == 8
+
+
+def test_cpus_per_run_counts_gpu_lanes(*, project: Path) -> None:
+    resources = _local_resources(
+        project=project, local=LocalSettings(gpus=(0, 1), tasks_per_gpu=2), local_cpus=16
+    )
+    assert resources.cpus_per_run == 4
+
+
+def test_cpus_per_run_never_drops_below_one(*, project: Path) -> None:
+    resources = _local_resources(
+        project=project, local=LocalSettings(max_parallel=16), local_cpus=4
+    )
+    assert resources.cpus_per_run == 1
+
+
+def test_cpus_per_run_auto_without_nvidia_smi_uses_max_parallel(
+    *, project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _auto_gpu_count.cache_clear()
+    try:
+        monkeypatch.setenv('PATH', str(tmp_path / 'no-binaries'))
+        monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
+        # why: no nvidia-smi and no Apple GPU, so the auto profile sees no GPU
+        monkeypatch.setattr('tslab.jobs.local.gpus.platform.system', lambda: 'Linux')
+        resources = _local_resources(
+            project=project, local=LocalSettings(gpus='auto', max_parallel=2), local_cpus=8
+        )
+    finally:
+        _auto_gpu_count.cache_clear()
+    assert resources.cpus_per_run == 4
 
 
 def test_submit_while_a_local_launch_runs_fails_at_once(
@@ -358,7 +412,7 @@ def _code_snapshot_group(*, snapshot: CodeSnapshot, log_file: Path) -> JobGroup:
         resolved=ResolvedRun(
             run=StudyRun(grid='g', values={}, run_path='p', settings={}),
             settings={},
-            resources=LocalResources(cpus=1),
+            resources=LocalResources(cpus=1, cpus_per_run=1),
         ),
         index=1,
         log_file=log_file,
@@ -373,7 +427,7 @@ def _code_snapshot_group(*, snapshot: CodeSnapshot, log_file: Path) -> JobGroup:
     return JobGroup(
         grid='g',
         job_name='g',
-        resources=LocalResources(cpus=1),
+        resources=LocalResources(cpus=1, cpus_per_run=1),
         job_file=1,
         tasks=(task,),
         code_snapshot=snapshot,

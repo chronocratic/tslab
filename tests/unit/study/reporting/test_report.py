@@ -60,7 +60,7 @@ def test_format_table_gives_every_row_the_same_widths() -> None:
 
 
 def test_resources_of_names_every_set_field() -> None:
-    assert resources_of(resources=LocalResources(cpus=1)) == 'local'
+    assert resources_of(resources=LocalResources(cpus=1, cpus_per_run=1)) == 'local'
     slurm = SlurmSettings(
         partition='gpu', time='01:00:00', qos='high', mem_per_cpu='4G', gpus=2, cpus_per_task=8
     )
