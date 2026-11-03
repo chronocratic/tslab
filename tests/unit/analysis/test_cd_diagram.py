@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import numpy as np
 import pandas as pd
 import pytest
@@ -95,3 +96,28 @@ def test_cd_diagram_uses_no_pyplot(tmp_path: Path) -> None:
         encoding='utf-8',
     )
     subprocess.run([sys.executable, str(script)], check=True)  # noqa: S603 # why: runs this interpreter on a fixed script
+
+
+def test_cd_diagram_none_when_all_scores_tied() -> None:
+    matrix = pd.DataFrame({'a': [1.0, 1.0], 'b': [1.0, 1.0], 'c': [1.0, 1.0]})
+    result = cd_diagram(matrix=matrix, direction=Direction.HIGHER_IS_BETTER)
+    assert result.figure is None
+    assert 'finds no difference' in result.caption
+
+
+def test_cd_diagram_labels_fit_inside_the_figure() -> None:
+    matrix = clear_winner(np.random.default_rng(0))
+    long_name = 'a long method name here'
+    result = cd_diagram(
+        matrix=matrix,
+        direction=Direction.HIGHER_IS_BETTER,
+        labels={'best': long_name, 'last': 'another long name'},
+    )
+    figure = result.figure
+    assert figure is not None
+    renderer = FigureCanvasAgg(figure).get_renderer()
+    inside = figure.bbox
+    for text in figure.axes[0].texts:
+        box = text.get_window_extent(renderer)
+        assert box.x0 >= inside.x0 - 1
+        assert box.x1 <= inside.x1 + 1
