@@ -70,6 +70,62 @@ def test_failure_usage_queries_failed_runs_too(
     assert calls == [[reports[0].job_id, reports[1].job_id, reports[2].job_id]]
 
 
+def test_failure_usage_reads_the_exit_code_of_a_completed_job(
+    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submit_study(project=project)
+    ctx = context(project=project, machine_file='cluster.toml')
+    (report,) = [dataclasses.replace(ctx.reports[0], job_state='COMPLETED')]
+
+    def query_job_usage(*, job_ids: list[str]) -> Mapping[str, SlurmJobUsage]:
+        return {
+            job_ids[0]: SlurmJobUsage(
+                state='COMPLETED',
+                elapsed=timedelta(minutes=1),
+                time_limit=timedelta(minutes=10),
+                total_cpu=timedelta(seconds=30),
+                max_rss=1024,
+                alloc_cpus=2,
+                gpus=0,
+                exit_code='1:137',
+            )
+        }
+
+    monkeypatch.setattr(slurm_usage, 'query_job_usage', query_job_usage)
+    usage = slurm_usage.failure_usage(context=ctx, reports=[report])
+    assert report.job_id is not None
+
+    assert usage[report.job_id].exit_code == '1:137'
+
+
+def test_failure_usage_reads_the_exit_code_of_an_unknown_state_job(
+    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submit_study(project=project)
+    ctx = context(project=project, machine_file='cluster.toml')
+    (report,) = [dataclasses.replace(ctx.reports[0], job_state=None)]
+
+    def query_job_usage(*, job_ids: list[str]) -> Mapping[str, SlurmJobUsage]:
+        return {
+            job_ids[0]: SlurmJobUsage(
+                state='',
+                elapsed=timedelta(minutes=1),
+                time_limit=timedelta(minutes=10),
+                total_cpu=timedelta(seconds=30),
+                max_rss=1024,
+                alloc_cpus=2,
+                gpus=0,
+                exit_code='2:143',
+            )
+        }
+
+    monkeypatch.setattr(slurm_usage, 'query_job_usage', query_job_usage)
+    usage = slurm_usage.failure_usage(context=ctx, reports=[report])
+    assert report.job_id is not None
+
+    assert usage[report.job_id].exit_code == '2:143'
+
+
 def test_oom_hint_without_numbers_when_sacct_fails(
     project: Path,
     fake: FakeSlurm,
