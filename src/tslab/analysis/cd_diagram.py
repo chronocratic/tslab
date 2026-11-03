@@ -11,6 +11,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import math
 
+import matplotlib as mpl
 from matplotlib.figure import Figure
 import pandas as pd
 import scipy.stats
@@ -42,6 +43,9 @@ _GROUP_WIDTH = 2.5
 _SIDE_PADDING_RATIO = 0.5
 _MIN_SIDE_PADDING = 1.0
 _TEXT_GAP = 0.1
+_CHARACTER_WIDTH = 0.07  # inches of one character at the base font size
+_BASE_FONT = 8.0
+_MIN_CENTER_RATIO = 0.25
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -147,7 +151,8 @@ def cd_diagram(
             ranks=ranks, cd=float('nan'), friedman=test, figure=None, caption=Caption(caption)
         )
     cd = critical_difference(method_count=methods, dataset_count=datasets, alpha=alpha)
-    if test.p_value >= alpha:
+    # why: a NaN p-value (every score tied) is not below alpha, so it must not draw
+    if not test.p_value < alpha:
         caption = (
             f'No critical-difference diagram: the Friedman test finds no difference between '
             f'the {methods} methods over {datasets} datasets (p = {test.p_value:.2g}, '
@@ -163,6 +168,20 @@ def cd_diagram(
     return CdDiagram(ranks=ranks, cd=cd, friedman=test, figure=figure, caption=Caption(caption))
 
 
+def _side_padding(*, count: int, names: Sequence[str], width: float) -> float:
+    """Rank units of free room on each side so the longest name fits in the figure."""
+    label_inches = (
+        max(len(name) for name in names)
+        * _CHARACTER_WIDTH
+        * float(mpl.rcParams['font.size'])
+        / _BASE_FONT
+        + _TEXT_GAP
+    )
+    room = max(width - 2 * label_inches, _MIN_CENTER_RATIO * width)
+    needed = label_inches * (count - 1) / room
+    return float(max(_SIDE_PADDING_RATIO * (count - 1), _MIN_SIDE_PADDING, needed))
+
+
 def _draw(*, ranks: pd.Series, cd: float, labels: Mapping[str, str], width: float) -> Figure:
     values = [float(value) for value in ranks]
     count = len(values)
@@ -172,7 +191,9 @@ def _draw(*, ranks: pd.Series, cd: float, labels: Mapping[str, str], width: floa
     height = _TOP + depth
     figure = Figure(figsize=(width, height))
     axis = figure.add_axes((0, 0, 1, 1))
-    padding = max(_SIDE_PADDING_RATIO * (count - 1), _MIN_SIDE_PADDING)
+    padding = _side_padding(
+        count=count, names=[labels.get(str(n), str(n)) for n in ranks.index], width=width
+    )
     axis.set_xlim(1 - padding, count + padding)
     axis.set_ylim(-depth, _TOP)
     axis.set_axis_off()

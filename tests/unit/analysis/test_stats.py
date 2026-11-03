@@ -162,3 +162,8 @@ def test_correlations_columns_and_holm() -> None:
     assert table['column'].tolist() == ['x', 'y']
     assert table.loc[0, 'rho'] == pytest.approx(1.0)
     assert (table['p_holm'] >= table['p_value']).all()
+
+
+def test_holm_adjust_with_duplicate_index_labels() -> None:
+    p_values = pd.Series([0.01, 0.04, 0.03, 0.5], index=[0, 1, 0, 1])
+    assert holm_adjust(p_values=p_values).tolist() == pytest.approx([0.04, 0.09, 0.09, 0.5])

@@ -147,13 +147,15 @@ def holm_adjust(*, p_values: pd.Series) -> pd.Series:
     Returns:
         Adjusted p-values with the same index and order, capped at 1.
     """
-    valid = p_values.dropna().sort_values()
-    count = len(valid)
+    values = p_values.to_numpy(dtype=float)
+    valid = np.flatnonzero(~np.isnan(values))
+    order = valid[np.argsort(values[valid], kind='stable')]
+    count = len(order)
+    adjusted = np.full(len(values), np.nan)
     running = 0.0
-    adjusted: dict[object, float] = {}
-    for position, (label, value) in enumerate(valid.items()):
-        running = max(running, (count - position) * float(value))
-        adjusted[label] = min(running, 1.0)
+    for position, index in enumerate(order):
+        running = max(running, (count - position) * values[index])
+        adjusted[index] = min(running, 1.0)
     return pd.Series(adjusted, index=p_values.index, dtype=float)
 
 
@@ -240,12 +242,13 @@ def friedman(*, matrix: pd.DataFrame) -> FriedmanTest:
         matrix: Rows by unit (for example dataset), columns by method.
 
     Returns:
-        The test. With fewer than 3 methods or fewer than 2 complete rows the
-        statistic and p-value are NaN.
+        The test. With fewer than 3 methods, fewer than 2 complete rows, or every
+        score tied in every row, the statistic and p-value are NaN.
     """
     complete = matrix.dropna()
     methods = matrix.shape[1]
-    if methods < MIN_FRIEDMAN_METHODS or len(complete) < MIN_FRIEDMAN_DATASETS:
+    all_tied = bool((complete.max(axis=1) == complete.min(axis=1)).all())
+    if methods < MIN_FRIEDMAN_METHODS or len(complete) < MIN_FRIEDMAN_DATASETS or all_tied:
         return FriedmanTest(
             statistic=float('nan'), p_value=float('nan'), datasets=len(complete), methods=methods
         )
