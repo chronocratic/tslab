@@ -71,7 +71,8 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
     """The GPU ids of a local launch, with ``"auto"`` resolved and the busy ones left out.
 
     Args:
-        local: The ``[local]`` table: the ``gpus`` list and ``skip_busy_gpus``.
+        local: The ``[local]`` table: the ``gpus`` list, ``skip_busy_gpus`` and
+            ``busy_gpu_memory_fraction``.
         environment: The environment to discover the GPUs from.
 
     Returns:
@@ -81,7 +82,12 @@ def resolve_local_gpus(*, local: LocalSettings, environment: Mapping[str, str]) 
         ValueError: As ``select_gpus``.
     """
     gpus = 'auto' if local.gpus == 'auto' else tuple(str(gpu) for gpu in local.gpus)
-    gpu_ids = select_gpus(gpus=gpus, skip_busy=local.skip_busy_gpus, environment=environment)
+    gpu_ids = select_gpus(
+        gpus=gpus,
+        skip_busy=local.skip_busy_gpus,
+        environment=environment,
+        memory_fraction=local.busy_gpu_memory_fraction,
+    )
     if gpu_ids and local.max_parallel != 1:
         _LOGGER.warning('local.gpus is set, so local.max_parallel is ignored')
     if not gpu_ids and local.tasks_per_gpu > 1:

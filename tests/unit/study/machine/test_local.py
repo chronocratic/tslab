@@ -70,6 +70,7 @@ def test_local_table_reads_every_key(tmp_path: Path) -> None:
         'signal_seconds = 30\n'
         'gpus = [0, 1]\n'
         'skip_busy_gpus = true\n'
+        'busy_gpu_memory_fraction = 0.25\n'
         'tasks_per_gpu = 2\n'
         'keep_awake = false\n'
     )
@@ -81,6 +82,7 @@ def test_local_table_reads_every_key(tmp_path: Path) -> None:
         signal_seconds=30,
         gpus=(0, 1),
         skip_busy_gpus=True,
+        busy_gpu_memory_fraction=0.25,
         tasks_per_gpu=2,
         keep_awake=False,
     )
@@ -116,6 +118,15 @@ def test_local_gpus_mps_with_ids_fails(tmp_path: Path) -> None:
 def test_local_skip_busy_with_mps_fails(tmp_path: Path) -> None:
     text = LOCAL + '[local]\ngpus = ["mps"]\nskip_busy_gpus = true\n'
     with pytest.raises(MachineProfileError, match=r'local\.skip_busy_gpus'):
+        load_machine(path=write(tmp_path, text))
+
+
+@pytest.mark.parametrize('fraction', ['0', '1.5'])
+def test_fraction_out_of_range_fails(tmp_path: Path, fraction: str) -> None:
+    text = LOCAL + f'[local]\nbusy_gpu_memory_fraction = {fraction}\n'
+    with pytest.raises(
+        MachineProfileError, match=r'local\.busy_gpu_memory_fraction must be above 0 and at most 1'
+    ):
         load_machine(path=write(tmp_path, text))
 
 

@@ -251,6 +251,7 @@ that calls `tslab`. The optional `[local]` table sets how:
 | `signal_seconds` | `120` | Seconds before the limit to send `SIGUSR2`, so training saves a checkpoint; `0` disables it |
 | `gpus` | `[]` | GPU ids the launch may use: a list of NVIDIA ids, `["mps"]`, or `"auto"` to find them at launch |
 | `skip_busy_gpus` | `false` | Leave out NVIDIA GPUs that already run a compute process |
+| `busy_gpu_memory_fraction` | `0.1` | With `skip_busy_gpus`, also skip a GPU with more of its memory in use than this fraction |
 | `max_parallel` | `1` | Tasks at once when the resolved GPU list is empty; an error with an explicit `gpus` list |
 | `tasks_per_gpu` | `1` | Tasks that share one GPU id at once |
 | `keep_awake` | `true` | Keep the machine awake while a launch runs |

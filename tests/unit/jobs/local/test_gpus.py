@@ -174,6 +174,48 @@ def test_busy_gpus_maps_uuids(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert busy_gpus(gpu_ids=('0', '1')) == frozenset({'1'})
 
 
+def _memory_fake(*, tmp_path: Path) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        '  : # no compute apps\n'
+        'else\n'
+        "  echo '0,GPU-0,30000,40000'\n"
+        "  echo '1,GPU-1,10,40000'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+
+
+def test_busy_by_memory(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _memory_fake(tmp_path=tmp_path)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.1) == frozenset({'0'})
+
+
+def test_memory_rule_off_at_one(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _memory_fake(tmp_path=tmp_path)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=1.0) == frozenset()
+
+
+def test_rows_without_memory_use_compute_only(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    body = (
+        '#!/bin/sh\n'
+        'if [ "$1" = "--query-compute-apps=gpu_uuid" ]; then\n'
+        "  echo 'GPU-BUSY-1'\n"
+        'else\n'
+        "  echo '0,GPU-BUSY-0'\n"
+        "  echo '1,GPU-BUSY-1'\n"
+        'fi\n'
+    )
+    _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body=body)
+    monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')
+    assert busy_gpus(gpu_ids=('0', '1'), memory_fraction=0.1) == frozenset({'1'})
+
+
 def test_select_gpus_auto_uses_visible_gpus() -> None:
     environment = {'CUDA_VISIBLE_DEVICES': '1,3'}
     assert select_gpus(gpus='auto', skip_busy=False, environment=environment) == ('1', '3')
