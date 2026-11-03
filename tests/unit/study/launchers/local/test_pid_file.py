@@ -214,6 +214,16 @@ def test_list_of_pairs_run_pids_still_loads(tmp_path: Path) -> None:
     assert launch.run_pids == (('j_0', 4242),)
 
 
+def test_scalar_run_pids_are_rejected(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
+    path = tmp_path / LAUNCH_FILE
+    document = json.loads(path.read_text())
+    document['run_pids'] = 4242
+    atomic_write_json(path=path, document=document)
+    with pytest.raises(LocalLaunchError, match=r'not a local launch file'):
+        read_launch(study_folder=tmp_path)
+
+
 def test_status_reads_local_launch_states(project: Path) -> None:
     record_local_job(project=project)
     write_launch(

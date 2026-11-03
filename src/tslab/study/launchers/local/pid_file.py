@@ -108,7 +108,7 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
             run_pids=_run_pids_of(document=document),
             boot=str(boot) if boot is not None else None,
         )
-    except (KeyError, TypeError, ValueError) as error:
+    except (AttributeError, KeyError, TypeError, ValueError) as error:
         message = f'{path} is not a local launch file ({error}); remove it'
         raise LocalLaunchError(message) from error
 
