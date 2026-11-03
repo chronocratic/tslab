@@ -56,7 +56,7 @@ class CdStyle:
 
     text_space: float = 1.0
     min_center_ratio: float = 0.2
-    top: float = 0.75
+    top: float = 0.65
     cd_height: float = 0.4
     tick: float = 0.06
     half_tick: float = 0.03
@@ -231,7 +231,7 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
 
     groups = cd_groups(ranks=values, cd=cd)
     left_count = math.ceil(count / 2)
-    depth = style.elbow_start + style.group_step * len(groups) + style.label_step * (left_count + 1)
+    depth = style.elbow_start + style.group_step * len(groups) + style.label_step * left_count
     figure = Figure(figsize=(width, style.top + depth))
     axis = figure.add_axes((0, 0, 1, 1))
     text_space = _text_space(names=names, figure=figure, style=style)
@@ -266,7 +266,7 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
         row = position if better_half else count - 1 - position
         on_left = better_half != reverse
         side = -1 if on_left else 1
-        y = first_row - style.label_step * (row + 1)
+        y = first_row - style.label_step * row
         x_end = (1 if on_left else count) + side * style.elbow_overhang / unit
         line([x(rank), x(rank), x_end], [0, y, y])
         axis.text(
