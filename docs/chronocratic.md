@@ -121,10 +121,6 @@ For long classification series, `--model.max-train-length 3000` is a good starti
 
 ## Known limitations
 
-- chronocratic-models 0.1.0a20 draws part of the training randomness of
-  TS2Vec, AutoTCL and CoST (training crops, encoder masks, the crop-and-shift
-  views of TS2Vec) from NumPy generators that no seed controls. Two
-  trainings of these models with the same seed can therefore differ.
 - The built-in augmentation of a model (`default`) is not part of the fingerprint
   beyond the settings of the model; its constants change only with the
   chronocratic-models version.
