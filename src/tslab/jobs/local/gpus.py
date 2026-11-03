@@ -216,7 +216,7 @@ def visible_gpus(*, environment: Mapping[str, str]) -> tuple[str, ...]:
 _GPU_ROW_FIELDS = 4
 
 
-def _gpu_row(line: str) -> tuple[str, str, str, str]:
+def _gpu_row(*, line: str) -> tuple[str, str, str, str]:
     """The index, uuid, used memory and total memory of one gpu row.
 
     A row without the two memory fields gets empty strings for them.
@@ -266,7 +266,7 @@ def busy_gpus(*, gpu_ids: Sequence[str], memory_fraction: float = 1.0) -> frozen
         return frozenset[str]()
     index_by_uuid: dict[str, str] = {}
     busy: set[str] = set()
-    for index, uuid, used, total in (_gpu_row(line) for line in gpus.splitlines()):
+    for index, uuid, used, total in (_gpu_row(line=line) for line in gpus.splitlines()):
         if not uuid:
             continue
         index_by_uuid[uuid] = index
