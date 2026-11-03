@@ -116,6 +116,14 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
    :imported-members:
 ```
 
+## Analysis
+
+```{eval-rst}
+.. automodule:: tslab.analysis
+   :members:
+   :imported-members:
+```
+
 ## chronocratic adapters
 
 ```{eval-rst}

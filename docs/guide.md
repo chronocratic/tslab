@@ -20,6 +20,7 @@ studies
 project-settings
 hpc
 tracking
+analysis
 ```
 
 ```{toctree}
