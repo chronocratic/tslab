@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tslab.analysis.cd_diagram import cd_diagram, cd_groups, critical_difference
+from tslab.analysis.cd_diagram import cd_diagram, cd_groups, CdDiagram, CdStyle, critical_difference
 from tslab.analysis.stats import Direction
 
 
@@ -121,3 +121,48 @@ def test_cd_diagram_labels_fit_inside_the_figure() -> None:
         box = text.get_window_extent(renderer)
         assert box.x0 >= inside.x0 - 1
         assert box.x1 <= inside.x1 + 1
+
+
+def label_x(result: CdDiagram, name: str) -> float:
+    assert result.figure is not None
+    texts = result.figure.axes[0].texts
+    return next(float(text.get_position()[0]) for text in texts if text.get_text() == name)
+
+
+def test_cd_diagram_reverse_puts_rank_one_on_the_right() -> None:
+    for reverse in (False, True):
+        result = cd_diagram(
+            matrix=clear_winner(np.random.default_rng(0)),
+            direction=Direction.HIGHER_IS_BETTER,
+            reverse=reverse,
+        )
+        assert (label_x(result, '1') > label_x(result, '4')) is reverse
+        assert (label_x(result, 'best') > label_x(result, 'last')) is reverse
+
+
+def test_cd_diagram_draws_half_rank_ticks() -> None:
+    result = cd_diagram(
+        matrix=clear_winner(np.random.default_rng(0)), direction=Direction.HIGHER_IS_BETTER
+    )
+    assert result.figure is not None
+    tick_xs = set()
+    for line in result.figure.axes[0].lines:
+        xs = np.asarray(line.get_xdata(), dtype=float)
+        if len(xs) == 2 and xs[0] == xs[1]:
+            tick_xs.add(float(xs[0]))
+    assert {1.5, 2.5, 3.5} <= tick_xs
+
+
+def test_cd_diagram_style_sets_the_name_space() -> None:
+    def x_span(style: CdStyle) -> float:
+        figure = cd_diagram(
+            matrix=clear_winner(np.random.default_rng(0)),
+            direction=Direction.HIGHER_IS_BETTER,
+            style=style,
+        ).figure
+        assert figure is not None
+        low, high = figure.axes[0].get_xlim()
+        return high - low
+
+    # more room for names leaves less of the figure for the 1..4 rank scale
+    assert x_span(CdStyle(text_space=2.0)) > x_span(CdStyle(text_space=1.0))

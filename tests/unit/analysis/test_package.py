@@ -6,6 +6,7 @@ EXPECTED = {
     'Block',
     'Caption',
     'CdDiagram',
+    'CdStyle',
     'DEFAULT_ALPHA',
     'DEFAULT_BOOTSTRAP_SAMPLES',
     'DEFAULT_CONFIDENCE',

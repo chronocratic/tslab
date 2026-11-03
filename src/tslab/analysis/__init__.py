@@ -3,7 +3,7 @@
 Needs the ``analysis`` extra.
 """
 
-from tslab.analysis.cd_diagram import cd_diagram, CdDiagram, critical_difference
+from tslab.analysis.cd_diagram import cd_diagram, CdDiagram, CdStyle, critical_difference
 from tslab.analysis.numbers import (
     format_number,
     number_key,
@@ -59,6 +59,7 @@ __all__ = [
     'Block',
     'Caption',
     'CdDiagram',
+    'CdStyle',
     'Direction',
     'FigureFormat',
     'FriedmanTest',
