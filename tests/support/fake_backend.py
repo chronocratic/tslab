@@ -360,9 +360,9 @@ class FakeBackend:
         self._record(method='usage', context=context)
         return MappingProxyType(self.usage_answer), MappingProxyType(self.gpu_ids_answer)
 
-    def doctor_checks(self) -> tuple[DoctorCheck, ...]:
+    def doctor_checks(self, *, machine: MachineProfile) -> tuple[DoctorCheck, ...]:
         """The checks the test set."""
-        self._record(method='doctor_checks')
+        self._record(method='doctor_checks', machine=machine)
         return self.doctor_answer
 
 

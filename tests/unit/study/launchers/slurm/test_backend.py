@@ -252,11 +252,27 @@ def test_detach_rejects_slurm_machine(*, project: Path, fake: FakeSlurm) -> None
         SlurmBackend().detach(context=ctx, arguments=(), wait_command='tslab')
 
 
-def test_doctor_checks_reports_scheduler_commands(*, fake: FakeSlurm) -> None:
-    checks = SlurmBackend().doctor_checks()
+def test_doctor_checks_reports_scheduler_commands(*, project: Path, fake: FakeSlurm) -> None:
+    ctx = context(project=project, machine_file='cluster.toml')
+    checks = SlurmBackend().doctor_checks(machine=ctx.machine)
 
-    assert checks == (DoctorCheck(name='slurm', status='ok', message='SLURM commands found'),)
+    assert checks[0] == DoctorCheck(name='slurm', status='ok', message='SLURM commands found')
+    assert [check.name for check in checks[1:]] == ['slurm-array', 'slurm-partition']
     assert fake.calls('sbatch') == []
+
+
+def test_doctor_checks_skip_the_cluster_when_the_commands_are_missing(
+    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    ctx = context(project=project, machine_file='cluster.toml')
+    empty_path = tmp_path / 'empty-bin'
+    empty_path.mkdir()
+    monkeypatch.setenv('PATH', str(empty_path))
+
+    checks = SlurmBackend().doctor_checks(machine=ctx.machine)
+
+    assert [check.name for check in checks] == ['slurm']
+    assert checks[0].status == 'fail'
 
 
 def test_launch_delegates_to_shared_launch(

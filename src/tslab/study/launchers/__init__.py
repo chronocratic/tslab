@@ -481,8 +481,8 @@ class Backend(Protocol):
         """The usage by job id, and the GPU id by job id."""
         ...
 
-    def doctor_checks(self) -> tuple[DoctorCheck, ...]:
-        """The readiness checks of the machines the backend serves."""
+    def doctor_checks(self, *, machine: MachineProfile) -> tuple[DoctorCheck, ...]:
+        """The readiness checks of the machine profile the backend serves."""
         ...
 
 

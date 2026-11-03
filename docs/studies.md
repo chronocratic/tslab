@@ -641,8 +641,12 @@ uv run tslab study cancel my_paper.studies:example --machine cluster --dry-run -
 
 `tslab doctor --machine NAME [STUDY]` checks the profile, required commands,
 output storage, project, and optional study compatibility before submission.
-Warnings do not fail the command; inspect each check. It does not verify that a
-real cluster job succeeds. See the [Agent guide](agents.md).
+For a SLURM machine it also asks the cluster: the array size against the
+cluster `MaxArraySize` limit, and whether a node of the partition can hold the
+time, CPUs, memory and GPUs of one job. A missing or failing `scontrol` or
+`sinfo` warns, never fails. Warnings do not fail the command; inspect each
+check. It does not verify that a real cluster job succeeds. See the [Agent
+guide](agents.md).
 
 ```bash
 uv run tslab doctor --machine cluster my_paper.studies:example --json
