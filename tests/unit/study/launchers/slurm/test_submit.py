@@ -265,8 +265,6 @@ def test_job_name_and_log_pattern_use_name_and_short_name(
     groups = groups_of(study, machine)
     folder = study_folder(machine=machine, study=study)
     write_job_files(study_folder=folder, groups=groups, machine=machine, project_root=tmp_path)
-    scripts = [
-        (folder / 'jobs' / f'{group.job_file}.sbatch').read_text() for group in groups
-    ]
+    scripts = [(folder / 'jobs' / f'{group.job_file}.sbatch').read_text() for group in groups]
     assert any('--job-name=cost-paper_g1' in text for text in scripts)
     assert all(f'--output={folder}/logs/g1_%a.out' in text for text in scripts)

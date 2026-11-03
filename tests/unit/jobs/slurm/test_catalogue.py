@@ -12,8 +12,8 @@ from tslab.jobs.slurm.catalogue import (
     IdScope,
     run_slurm_command,
     select_ids,
-    SLURM_COMMANDS,
     slurm_command,
+    SLURM_COMMANDS,
 )
 
 VALUES = CommandValues(job_ids=('1', '2'), width=14, start='2026-11-02')
