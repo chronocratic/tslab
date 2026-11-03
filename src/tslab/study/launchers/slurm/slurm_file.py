@@ -78,7 +78,12 @@ def command_values(*, study: Study, study_folder: Path) -> CommandValues:
         study: The study the jobs belong to.
         study_folder: The ``.study`` folder holding ``submissions.jsonl``.
     """
-    records = read_jobs(path=study_folder / 'submissions.jsonl')
+    # why: a local record holds a host-pid id that no SLURM command accepts
+    records = [
+        record
+        for record in read_jobs(path=study_folder / 'submissions.jsonl')
+        if record.job_id.isdecimal()
+    ]
     names = {name for group in study_job_names(study=study).values() for name in group}
     names |= {
         followup_job_name(study=study.name, kind=kind) for kind in (RETRY_JOB, WANDB_SYNC_JOB)
