@@ -223,6 +223,25 @@ def test_query_job_usage_raises_on_failure(
         query_job_usage(job_ids=['1000_2'])
 
 
+def test_query_job_usage_reads_the_exit_code(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'sacct',
+        [
+            {
+                'exit': 0,
+                'stdout': (
+                    '1000_2|FAILED|00:01:00|02:00:00|00:00:30||4|cpu=4|1:0\n'
+                    '1000_3|COMPLETED|00:01:00|02:00:00|||4|\n'
+                ),
+            }
+        ],
+    )
+    usage = query_job_usage(job_ids=['1000_2', '1000_3'])
+    assert usage['1000_2'].exit_code == '1:0'
+    # why: rows without the ninth field keep the old shape; no code is invented
+    assert usage['1000_3'].exit_code is None
+
+
 def test_query_job_states(fake: FakeSlurm) -> None:
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '7_0|RUNNING\n7_1|PENDING\n'}])
     fake.set_answers(

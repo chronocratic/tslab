@@ -125,6 +125,7 @@ def _failure_entry(
                 backend=backend_for(machine=context.machine),
                 resources=resources,
             ),
+            'exit_code': None if usage is None else usage.exit_code,
         }
     )
     return entry
@@ -172,6 +173,9 @@ def _log_status_line(*, failure: Mapping[str, object]) -> None:
     reason = failure.get('reason')
     if isinstance(reason, str) and reason:
         parts.append(reason)
+    exit_code = failure.get('exit_code')
+    if isinstance(exit_code, str):
+        parts.append(f'exit {exit_code}')
     _LOGGER.info('%s', ' '.join(parts))
 
 

@@ -34,7 +34,7 @@ uv run tslab study submit example --json
 | `tslab.study-show/1` | `study`, `grids`, `total_runs`. Each grid has `name`, `short_name`, `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
 | `tslab.study-launch/1` | `dry_run`, `jobs`, `cancelled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
 | `tslab.study-wait/1` | The `tslab.study-status/1` fields without `expected_start`, `pending_reason` and `pending_stuck` on runs, plus `waited_seconds` and `timed_out`. |
-| `tslab.study-failures/1` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null). |
+| `tslab.study-failures/1` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null), `exit_code` (the code SLURM recorded for the job, or null). |
 | `tslab.study-cancel/1` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
 | `tslab.study-usage/1` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
 | `tslab.study-results/1` | `rows`, the same rows as the CSV. |

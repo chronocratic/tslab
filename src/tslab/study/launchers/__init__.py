@@ -160,6 +160,7 @@ class JobUsage:
         max_rss: The peak memory in bytes over the steps, or ``None``.
         alloc_cpus: The allocated CPUs, or ``None``.
         gpus: The GPUs of the allocation, else ``0``.
+        exit_code: The exit code the scheduler recorded for the job, or ``None``.
     """
 
     state: str
@@ -169,6 +170,7 @@ class JobUsage:
     max_rss: int | None
     alloc_cpus: int | None
     gpus: int
+    exit_code: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -544,11 +544,12 @@ instance errors and the last 30 lines of each job log and run log. Each run
 gets a `hint:` line with what the data shows: the peak and the requested
 memory for an out-of-memory run, a pointer to `time` or `job_time_share` for a
 run stopped by a limit, or a plain resubmit for a preemption or node failure.
-A Python error in the code gets no hint; the traceback is the answer.
-`--json` adds the `hint` field to the runs. Missing log files are named, not
-treated as command failures. Use `--states` and `--lines` to change the
-selection and tail size. The command only reads data. See the
-[Agent guide](agents.md).
+A Python error in the code gets no hint; the traceback is the answer. When
+SLURM recorded an exit code for the job, the line of the run ends with
+`exit <code>`. `--json` adds the `hint` and `exit_code` fields to the runs.
+Missing log files are named, not treated as command failures. Use `--states`
+and `--lines` to change the selection and tail size. The command only reads
+data. See the [Agent guide](agents.md).
 
 ```bash
 uv run tslab study failures my_paper.studies:example --machine cluster --json

@@ -49,6 +49,27 @@ def test_usage_queries_all_selected_job_ids(
     assert dataclasses.asdict(converted) == dataclasses.asdict(returned[expected[0]])
 
 
+def test_failure_usage_queries_failed_runs_too(
+    *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submit_study(project=project)
+    ctx = context(project=project, machine_file='cluster.toml')
+    reports = [
+        dataclasses.replace(ctx.reports[0], job_state='FAILED'),
+        dataclasses.replace(ctx.reports[1], job_state='OUT_OF_MEMORY'),
+        dataclasses.replace(ctx.reports[2], job_state='TIMEOUT'),
+    ]
+    calls: list[list[str]] = []
+
+    def query_job_usage(*, job_ids: list[str]) -> Mapping[str, SlurmJobUsage]:
+        calls.append(job_ids)
+        return dict[str, SlurmJobUsage]()
+
+    monkeypatch.setattr(slurm_usage, 'query_job_usage', query_job_usage)
+    slurm_usage.failure_usage(context=ctx, reports=reports)
+    assert calls == [[reports[0].job_id, reports[1].job_id, reports[2].job_id]]
+
+
 def test_oom_hint_without_numbers_when_sacct_fails(
     project: Path,
     fake: FakeSlurm,
