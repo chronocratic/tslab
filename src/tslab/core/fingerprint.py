@@ -12,7 +12,7 @@ explicit type names for dataclasses and enums).
 
 from collections.abc import Mapping
 import dataclasses
-from enum import Enum
+from enum import Enum, StrEnum
 import hashlib
 import json
 from pathlib import Path
@@ -135,6 +135,17 @@ def _canonicalize_mapping(*, value: Mapping[object, object]) -> dict[str, object
     return canonical_mapping
 
 
+def _enum_value(*, value: Enum) -> str:
+    """The value of a ``StrEnum`` member; any other enum cannot be fingerprinted."""
+    if isinstance(value, StrEnum):
+        return value.value
+    message = (
+        f'cannot fingerprint {type(value).__qualname__}.{value.name}; '
+        f'configs hold choices as StrEnum'
+    )
+    raise TypeError(message)
+
+
 # why: one branch per supported type keeps the rules readable
 def canonicalize(*, value: object) -> object:  # noqa: PLR0911
     """Convert ``value`` into a JSON-compatible form with a single spelling.
@@ -143,7 +154,8 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
         - ``None``, ``bool``, ``int``, ``str`` are kept as they are.
         - ``float`` becomes its ``repr`` string, which is exact.
         - ``Path`` becomes its POSIX string; the file content is *not* hashed.
-        - ``Enum`` becomes ``"module.ClassName.MEMBER"``.
+        - ``StrEnum`` becomes its value, so a rename of the class or member keeps the
+          fingerprint; any other ``Enum`` raises ``TypeError``.
         - Artifacts are replaced by their fingerprint. An artifact without one
           (created by user code, not by a stage) raises ``TypeError``.
         - ``Fingerprintable`` objects are replaced by their settings.
@@ -164,8 +176,8 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
         TypeError: If ``value`` has an unsupported type. Ignoring it silently
             would let stale results be reused.
     """
-    if isinstance(value, Enum):  # before scalars: StrEnum and IntEnum members are str and int
-        return f'{qualified_name(cls=type(value))}.{value.name}'
+    if isinstance(value, Enum):  # before scalars: a StrEnum member is a str
+        return _enum_value(value=value)
     if value is None or isinstance(value, bool | int | str):
         return value
     if isinstance(value, float):

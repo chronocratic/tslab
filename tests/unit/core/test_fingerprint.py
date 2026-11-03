@@ -12,7 +12,6 @@ from tslab.core.fingerprint import (
     hash_path_contents,
     NotFingerprinted,
 )
-from tslab.core.run import RunOptions
 
 
 class Color(Enum):
@@ -105,8 +104,7 @@ def test_not_fingerprinted_field_is_ignored() -> None:
 def test_scalars_paths_enums() -> None:
     assert canonicalize(value=0.1) == '0.1'
     assert canonicalize(value=Path('a') / 'b') == 'a/b'
-    assert canonicalize(value=Color.RED) == f'{__name__}.Color.RED'
-    assert canonicalize(value=Mask.BINOMIAL) == f'{__name__}.Mask.BINOMIAL'
+    assert canonicalize(value=Mask.BINOMIAL) == 'binomial'
     assert canonicalize(value=(1, [2])) == [1, [2]]
 
 
@@ -152,19 +150,19 @@ def test_missing_path_raises(tmp_path: Path) -> None:
         hash_path_contents(path=tmp_path / 'missing')
 
 
-def test_same_named_enums_of_different_modules_differ() -> None:
-    elsewhere = Enum('Color', {'RED': 1})  # ty: ignore[mismatched-type-name]
-    elsewhere.__module__ = 'elsewhere'
-    assert canonicalize(value=elsewhere.RED) != canonicalize(value=Color.RED)
+def test_plain_enum_cannot_be_fingerprinted() -> None:
+    with pytest.raises(TypeError, match='configs hold choices as StrEnum'):
+        canonicalize(value=Color.RED)
 
 
-def test_directory_hash_separates_name_and_content(tmp_path: Path) -> None:
-    (tmp_path / 'one').mkdir()
-    (tmp_path / 'two').mkdir()
-    (tmp_path / 'one' / 'a').write_text('x', encoding='utf-8')
-    (tmp_path / 'two' / 'a').write_text('y', encoding='utf-8')
-    assert hash_path_contents(path=tmp_path / 'one') != hash_path_contents(path=tmp_path / 'two')
+def test_enum_fingerprint_follows_the_value_not_the_class() -> None:
+    class Other(StrEnum):
+        BINOMIAL = 'binomial'
+        CONTINUOUS = 'continuous'
 
+    class Same(StrEnum):
+        RENAMED = 'binomial'
 
-def test_run_options_never_enter_a_fingerprint() -> None:
-    assert canonicalize(value=RunOptions(dry_run=True)) is None
+    assert canonicalize(value=Other.BINOMIAL) == canonicalize(value=Mask.BINOMIAL)
+    assert canonicalize(value=Same.RENAMED) == canonicalize(value=Mask.BINOMIAL)
+    assert canonicalize(value=Other.CONTINUOUS) != canonicalize(value=Mask.BINOMIAL)
