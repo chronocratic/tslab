@@ -58,7 +58,7 @@ tests = pairwise_wilcoxon(matrix=matrix)
 noisy scores are never averaged silently. `cd_diagram` and the Friedman test use only the
 datasets that every method finished, and the caption says how many that is. `diagram.figure`
 is `None`, with the reason in `diagram.caption`, when there are too few complete datasets or
-the methods do not differ. `average_ranks`, `friedman`, `bootstrap_median`,
+the methods do not differ. Pass `reverse=True` to put rank 1 on the right, and a `CdStyle` as `style=` to change the room for method names (`text_space`, in inches), tick lengths, spacing and line widths. `average_ranks`, `friedman`, `bootstrap_median`,
 `rank_agreement` and `correlations` cover the rest of the usual comparison, and
 `against_baseline` compares each condition with a baseline condition.
 
