@@ -15,8 +15,8 @@ from tslab.jobs.slurm import (
     RUNNING_JOB_STATES,
 )
 from tslab.study import StudyRun
-from tslab.study.launchers import JOB_RECORDS
 from tslab.study.launchers.slurm.states import slurm_task_ids
+from tslab.study.launchers.tables import JOB_RECORDS
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import (
     _grace_wait,

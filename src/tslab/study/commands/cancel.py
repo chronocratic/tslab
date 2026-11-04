@@ -3,8 +3,8 @@
 import logging
 
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for
 from tslab.study.launchers.common.types import LaunchError
+from tslab.study.launchers.tables import backend_for
 
 __all__ = ['cancel']
 

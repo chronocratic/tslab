@@ -10,8 +10,8 @@ import tyro
 from tslab.cli.common import print_json, resolve_request
 from tslab.cli.study import _context_of, _states_of
 from tslab.core.meta import hostname
-from tslab.study.launchers import backend_for
 from tslab.study.launchers.common.types import LaunchError
+from tslab.study.launchers.tables import backend_for
 from tslab.study.reporting.failures import collect_failures, log_failures
 from tslab.study.reporting.usage import log_usage, usage_document
 

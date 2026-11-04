@@ -69,7 +69,7 @@ def run_checks(
 
     if machine is not None:
         # why: the launcher package imports DoctorCheck from this module
-        from tslab.study.launchers import backend_for  # noqa: PLC0415
+        from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
 
         checks.extend(backend_for(machine=machine).doctor_checks(machine=machine))
         output_check, disk_path = _output_root_check(machine=machine)
