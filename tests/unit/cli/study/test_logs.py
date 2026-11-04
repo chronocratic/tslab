@@ -95,9 +95,10 @@ def test_logs_job_reads_the_scheduler_output(
         for task in job.tasks
         if task.run_path == PurePosixPath('g/small/1')
     )
-    logs = study_directory(project=project) / 'logs'
+    logs = study_directory(project=project) / '.study' / 'logs'
     logs.mkdir(exist_ok=True)
-    (logs / f'g1_{task.index}.out').write_text('the job of small/1\n', encoding='utf-8')
+    job_log = logs / f'{ctx.study.name}_g1_{task.index}.out'
+    job_log.write_text('the job of small/1\n', encoding='utf-8')
 
     code = Logs(study='toy_studies:study', machine='cluster.toml', only=_ONE, job=True).run()
 

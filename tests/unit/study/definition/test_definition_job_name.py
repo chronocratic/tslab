@@ -9,11 +9,11 @@ from tslab.study import Study
 from tslab.study.definition import followup_job_name, study_job_names
 
 
-def test_default_job_name_is_short_name() -> None:
+def test_default_job_name_is_study_and_short_name() -> None:
     g = grid()
-    assert g.job_name == '{short_name}'
+    assert g.job_name == '{study}_{short_name}'
     assert g.job_name_axes == ()
-    assert g.job_name_for(study='s', values={'recipe': 'cost-paper', 'seed': '7'}) == 'cls'
+    assert g.job_name_for(study='s', values={'recipe': 'cost-paper', 'seed': '7'}) == 's_cls'
 
 
 def test_empty_job_name_template_fails() -> None:
@@ -88,7 +88,7 @@ def test_template_without_short_name_is_fine_when_unique() -> None:
 
 def test_job_name_must_not_clash_with_followups() -> None:
     with pytest.raises(ValueError, match="follow-up job name 's_retry'"):
-        Study(name='s', grids={'a': grid(short_name='s_retry')})
+        Study(name='s', grids={'a': grid(short_name='retry')})
 
 
 def test_study_job_names() -> None:

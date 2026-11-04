@@ -139,7 +139,7 @@ def _write_local_usage(
     """Write the usage file of local task ``index`` of the recorded job, as the launcher does."""
     logs = study_directory(project=project) / '.study' / 'logs'
     logs.mkdir(parents=True, exist_ok=True)
-    (logs / f'g1_{index}.out.usage.json').write_text(
+    (logs / f'{logs.parent.parent.name}_g1_{index}.out.usage.json').write_text(
         json.dumps(
             {
                 'schema': 'tslab.local-usage/1',

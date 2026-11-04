@@ -7,21 +7,18 @@ from pathlib import Path
 from tslab.core.files import read_json_object
 from tslab.study.context import Context
 from tslab.study.launchers.common.types import JobUsage
-from tslab.study.paths import log_file_of, study_folder
 
 __all__ = ['usage']
 
 
 def usage(*, context: Context) -> tuple[dict[str, JobUsage], dict[str, str | None]]:
     """The latest local task usage, read from its usage file, with GPU ids."""
-    folder = study_folder(machine=context.machine, study=context.study)
     usage_by_job: dict[str, JobUsage] = {}
     gpu_ids: dict[str, str | None] = {}
     for report in context.reports:
         if report.job_id is None or report.task is None:
             continue
-        grid = context.study.grids[report.run.grid]
-        log_file = log_file_of(folder=folder, short_name=grid.short_name, index=report.task.index)
+        log_file = context.log_file(run=report.run, index=report.task.index)
         document = _read_usage_file(path=log_file.with_name(log_file.name + '.usage.json'))
         usage_by_job[report.job_id] = _local_job_usage(document=document, state=report.state.value)
         gpu_ids[report.job_id] = _gpu_id_of(document=document)

@@ -1,0 +1,1 @@
+Array indices are numbered per job name, so a grid split by `job_name` can exceed `max_array_size` as long as each array stays under it; log files are named `<job_name>_<index>.out`, and `tslab study logs --job` and `failures` now read them from `.study/logs/`. The default job name is now `<study>_<short_name>`.

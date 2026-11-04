@@ -22,9 +22,12 @@ def study_folder(*, machine: 'MachineProfile', study: 'Study') -> Path:
     return machine.output_root / study.name / '.study'
 
 
-def log_file_of(*, folder: Path, short_name: str, index: int) -> Path:
-    """The log file of one task: ``<folder>/logs/<short name>_<index>.out``."""
-    return folder / 'logs' / f'{short_name}_{index}.out'
+def log_file_of(*, folder: Path, job_name: str, index: int) -> Path:
+    """The log file of one task: ``<folder>/logs/<job name>_<index>.out``.
+
+    The index is numbered per job name, so the pair names one task of the study.
+    """
+    return folder / 'logs' / f'{job_name}_{index}.out'
 
 
 def next_job_file(*, study_folder: Path) -> int:

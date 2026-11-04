@@ -152,7 +152,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             study=context.study,
             machine=machine,
             resolved=[context.resolved[run.run_path] for run in runs],
-            indices=assign_indices(runs=runs, jobs=jobs),
+            indices=assign_indices(study=context.study, runs=runs, jobs=jobs),
             extra_args=extra_args,
             attempts={report.run.run_path: report.attempt for report in reports},
             uncounted={report.run.run_path: _uncounted(report=report) for report in reports},

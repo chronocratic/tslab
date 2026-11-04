@@ -331,7 +331,7 @@ def run_one(
         study=context.study,
         machine=context.machine,
         resolved=[resolved],
-        indices=assign_indices(runs=[run], jobs=context.jobs),
+        indices=assign_indices(study=context.study, runs=[run], jobs=context.jobs),
         extra_args={run.run_path: args},
         attempts={run.run_path: report.attempt},
         first_job_file=0,

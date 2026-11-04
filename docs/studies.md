@@ -68,7 +68,7 @@ UCR = ('Coffee', 'Wallet', 'EigenWorms')  # user code may compute these
 UEA = ('BasicMotions', 'Epilepsy')
 
 classification = Grid(
-    short_name='cls',  # the SLURM job name, and the stem of the log files
+    short_name='cls',  # names the SLURM jobs and log files of the grid
     command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
     config=classify.ClassifyConfig,
     axes={
@@ -361,15 +361,18 @@ uv run tslab study submit my_paper.studies:example --machine cluster \
   full command, resolved resources, attempt number and progress snapshot.
 
 **Run names on the cluster.** The first time a run is submitted it gets the
-next free array index of its grid and keeps it through every resubmit, so
-adding, removing or reordering axis values never moves an existing run. By
-default, SLURM names the job `<short_name>_<index>`; a grid's `job_name`
-template below changes that name. The log keeps `<short_name>_<index>.out`,
-such as `.study/logs/cls_17.out`, and collects every attempt under a header
-line. Cancel a run with its SLURM job id and array index: `scancel <job>_<index>`.
+next free array index of its job name and keeps it through every resubmit, so
+adding, removing or reordering axis values never moves an existing run. A run
+is named `<job_name>_<index>`; the job name is `<study>_<short_name>` unless
+a `job_name` template (below) sets it. The log is `<job_name>_<index>.out`,
+such as `.study/logs/my_paper_cls_17.out`, and collects every
+attempt under a header line. Cancel a run with its SLURM job id and array
+index: `scancel <job>_<index>`.
 An index at or above `max_array_size` stops the submission before
-anything is written, naming the grid — raise `max_array_size` (or the
-MaxArraySize of the cluster) for grids beyond about 1000 runs.
+anything is written, naming the grid. Indices restart at 0 for each job name,
+so the limit applies to one array, not to the whole grid: split a grid beyond
+about 1000 runs with `job_name`, or raise `max_array_size` (and the
+MaxArraySize of the cluster).
 
 Runs of one grid with identical resolved SLURM settings and the same job name
 share one array job (`--array=3,7,12%max_concurrent`, consecutive indices
@@ -377,7 +380,8 @@ written as ranges). A resubmit is a sparse array of the same indices. Each
 array has its own `%max_concurrent` cap, because SLURM cannot share one cap
 across arrays.
 
-**Job names.** By default every job of a grid is named `short_name`. A grid can
+**Job names.** By default every job of a grid is named `<study>_<short_name>`,
+so jobs of two studies are told apart in `squeue`. A grid can
 name its jobs from axis values with `job_name`, a template of `{short_name}`,
 `{study}` and axis names, written with single braces:
 
@@ -390,7 +394,10 @@ combination; the other axes stay tasks inside the array. Between placeholders
 only letters, digits, dot, dash and underscore are allowed, so `${VAR}`, `{{`
 and spaces are rejected. Two grids must not give the same job name, and no
 name may be `<study>_retry` or `<study>_wbsync`, the names of the follow-up
-jobs. Log files keep the name `<short_name>_<index>.out`. Each array is one
+jobs. Each job name numbers its runs from 0 and names its log files
+`<job_name>_<index>.out`, so arrays never share a log file. A run keeps its
+index when the template changes, but its log file follows the new name, so
+the logs of earlier attempts stay under the old one. Each array is one
 `sbatch` call, so a finer split costs more submit pauses.
 
 ## Status

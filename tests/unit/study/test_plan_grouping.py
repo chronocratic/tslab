@@ -10,7 +10,7 @@ from tslab.core.status import utc_now_iso
 from tslab.enums import LauncherKind
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.definition import expand_runs
+from tslab.study.definition import expand_runs, setting_axis
 from tslab.study.launchers.tables import JOB_RECORDS
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
@@ -68,7 +68,7 @@ def test_groups_by_grid_and_resources(
 ) -> None:
     runs = expand_runs(study=study)
     resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
-    indices = assign_indices(runs=runs, jobs=[])
+    indices = assign_indices(study=study, runs=runs, jobs=[])
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -84,10 +84,10 @@ def test_groups_by_grid_and_resources(
     assert groups[0].resources.max_tasks_per_job == 1000
     assert groups[1].resources.describe() == 'partition=gpu, time=01:00:00, cpus=1, gpus=1'
     assert [[t.index for t in g.tasks] for g in groups] == [[0, 1], [2, 3]]
-    assert [g.job_name for g in groups] == ['g1', 'g1']
+    assert [g.job_name for g in groups] == ['s_g1', 's_g1']
     task = groups[1].tasks[1]
     assert task.index == 3
-    assert task.log_file == machine.output_root / 's' / '.study' / 'logs' / 'g1_3.out'
+    assert task.log_file == machine.output_root / 's' / '.study' / 'logs' / 's_g1_3.out'
     assert task.command[:4] == study.grids['g'].command
     assert '--run-path' in task.command
     assert task.attempt == 1
@@ -99,7 +99,7 @@ def test_plan_jobs_splits_groups_by_code_snapshot(
     plain = dataclasses.replace(machine, overrides=())
     runs = expand_runs(study=study)
     resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
-    indices = assign_indices(runs=runs, jobs=[])
+    indices = assign_indices(study=study, runs=runs, jobs=[])
 
     def snapshot(folder: Path) -> CodeSnapshot:
         return CodeSnapshot(
@@ -135,7 +135,7 @@ def test_plan_jobs_without_code_snapshots_groups_as_before(
     plain = dataclasses.replace(machine, overrides=())
     runs = expand_runs(study=study)
     resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
-    indices = assign_indices(runs=runs, jobs=[])
+    indices = assign_indices(study=study, runs=runs, jobs=[])
     groups = plan_jobs(
         study=study,
         machine=plain,
@@ -151,7 +151,7 @@ def test_plan_jobs_without_code_snapshots_groups_as_before(
     assert [task.index for task in groups[0].tasks] == [0, 1, 2, 3]
 
 
-def test_indices_are_stable_when_the_grid_changes() -> None:
+def test_indices_are_stable_when_the_grid_changes(study: Study) -> None:
     jobs = [
         job_record('7', ((0, 'g/a/1'), (1, 'g/a/2'), (2, 'g/b/1'))),
         job_record('8', ((0, 'h/x/1'),)),
@@ -163,7 +163,7 @@ def test_indices_are_stable_when_the_grid_changes() -> None:
         study_run('g', 'g/b/1'),
         study_run('g', 'g/a0/2'),
     ]
-    assert assign_indices(runs=runs, jobs=jobs) == {
+    assert assign_indices(study=study, runs=runs, jobs=jobs) == {
         PurePosixPath('g/a0/1'): 3,
         PurePosixPath('g/a/1'): 0,
         PurePosixPath('g/a/2'): 1,
@@ -271,7 +271,7 @@ def _plan(*, study: Study, machine: MachineProfile) -> list[JobGroup]:
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=1,
@@ -282,13 +282,64 @@ def _plan(*, study: Study, machine: MachineProfile) -> list[JobGroup]:
 def test_default_job_name_keeps_one_group_per_grid(machine: MachineProfile) -> None:
     study = Study(name='s', grids={'g': grid(short_name='g1')})
     groups = _plan(study=study, machine=machine)
-    assert [g.job_name for g in groups] == ['g1', 'g1']  # split by resources only, as today
-    assert all(t.log_file.name == f'g1_{t.index}.out' for g in groups for t in g.tasks)
+    assert [g.job_name for g in groups] == ['s_g1', 's_g1']  # split by resources only, as today
+    assert all(t.log_file.name == f's_g1_{t.index}.out' for g in groups for t in g.tasks)
 
 
 def test_job_name_template_splits_groups(machine: MachineProfile) -> None:
     study = Study(name='s', grids={'g': grid(short_name='g1', job_name='{recipe}_{short_name}')})
     groups = _plan(study=study, machine=machine)
     assert sorted(g.job_name for g in groups) == ['cost-paper_g1', 'ts2vec-paper_g1']
-    assert sorted(t.index for g in groups for t in g.tasks) == list(range(4))
-    assert all(t.log_file.name == f'g1_{t.index}.out' for g in groups for t in g.tasks)
+    assert [[t.index for t in g.tasks] for g in groups] == [[0, 1], [0, 1]]
+    assert all(t.log_file.name == f'{g.job_name}_{t.index}.out' for g in groups for t in g.tasks)
+
+
+def _small_arrays(
+    *, machine: MachineProfile, job_name: str = '{recipe}_{short_name}'
+) -> tuple[Study, MachineProfile]:
+    """Six runs in a grid with max_array_size 3: two recipes times three seeds."""
+    seeds = setting_axis(path='seed', values=(1, 2, 3))
+    study = Study(
+        name='s',
+        grids={'g': grid(short_name='g1', job_name=job_name, axes={**grid().axes, 'seed': seeds})},
+    )
+    slurm = SlurmSettings(partition='gpu', time='01:00:00', max_array_size=3)
+    return study, dataclasses.replace(machine, slurm=slurm, overrides=())
+
+
+def test_grid_past_max_array_size_plans_when_job_name_splits_it(machine: MachineProfile) -> None:
+    study, small = _small_arrays(machine=machine)
+    groups = _plan(study=study, machine=small)
+    assert [[t.index for t in g.tasks] for g in groups] == [[0, 1, 2], [0, 1, 2]]
+    assert validate_jobs(study=study, groups=groups) == []
+    log_files = [t.log_file for g in groups for t in g.tasks]
+    assert len(set(log_files)) == len(log_files)
+
+
+def test_one_array_past_max_array_size_still_fails(machine: MachineProfile) -> None:
+    study, small = _small_arrays(machine=machine, job_name='{short_name}')
+    groups = _plan(study=study, machine=small)
+    problems = validate_jobs(study=study, groups=groups)
+    assert len(problems) == 3
+    assert 'needs array index 3, but max_array_size is 3' in problems[0][1]
+
+
+def test_indices_per_job_name_stay_stable_across_submits(machine: MachineProfile) -> None:
+    study, _ = _small_arrays(machine=machine)
+    runs = expand_runs(study=study)
+    first = assign_indices(study=study, runs=runs[:4], jobs=[])
+    recorded = [job_record('7', tuple((first[r.run_path], str(r.run_path)) for r in runs[:4]))]
+    again = assign_indices(study=study, runs=runs, jobs=recorded)
+    assert {path: again[path] for path in first} == first
+    assert sorted(again.values()) == [0, 0, 1, 1, 2, 2]
+    one = runs[2]
+    assert assign_indices(study=study, runs=[one], jobs=recorded) == {
+        one.run_path: first[one.run_path]
+    }
+
+
+def test_removed_run_keeps_its_index_reserved(machine: MachineProfile) -> None:
+    study, _ = _small_arrays(machine=machine)
+    recorded = [job_record('7', ((5, 'g/gone/1'),))]
+    indices = assign_indices(study=study, runs=expand_runs(study=study), jobs=recorded)
+    assert min(indices.values()) == 6

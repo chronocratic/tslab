@@ -10,7 +10,7 @@ from tslab.study.context import Context
 from tslab.study.launchers.common.protocols import Backend
 from tslab.study.launchers.common.types import JobUsage, Resources
 from tslab.study.launchers.tables import backend_for
-from tslab.study.paths import instance_directory, study_folder
+from tslab.study.paths import instance_directory
 from tslab.study.reporting.documents import run_entry
 from tslab.study.reporting.state import RunReport
 
@@ -103,12 +103,7 @@ def _failure_entry(
     log_file = None
     log_tail = None
     if report.task is not None:
-        grid = context.study.grids[report.run.grid]
-        job_log_path = (
-            study_folder(machine=context.machine, study=context.study).parent
-            / LOGS_DIRECTORY
-            / f'{grid.short_name}_{report.task.index}.out'
-        )
+        job_log_path = context.log_file(run=report.run, index=report.task.index)
         log_file = job_log_path.resolve().as_posix()
         log_tail = tail_lines(path=job_log_path, lines=lines)
     run_log_path = run_directory / LOGS_DIRECTORY / 'run.log'
