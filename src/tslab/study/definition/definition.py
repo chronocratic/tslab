@@ -368,20 +368,24 @@ class Study:
     def _check_run_paths(self) -> None:
         """Raise unless every run path is made of valid names and no two runs share one."""
         owners: dict[str, tuple[str, dict[str, str]]] = {}
-        for grid_name, grid in self.grids.items():
-            for values in _grid_runs(grid_name=grid_name, grid=grid):
-                text = grid.run_path_text(grid=grid_name, values=values)
-                for part in text.split('/'):
-                    validate_name(name=part, kind=f'grid {grid_name!r} run path {text!r} part')
-                if text in owners:
-                    other_grid, other_values = owners[text]
-                    message = (
-                        f'grid {grid_name!r} run {values} has run path {text!r}, which '
-                        f'grid {other_grid!r} run {other_values} has too; '
-                        f'name more axes in run_path'
-                    )
-                    raise ValueError(message)
-                owners[text] = (grid_name, values)
+        runs = [
+            (grid_name, grid, values)
+            for grid_name, grid in self.grids.items()
+            for values in _grid_runs(grid_name=grid_name, grid=grid)
+        ]
+        for grid_name, grid, values in runs:
+            text = grid.run_path_text(grid=grid_name, values=values)
+            for part in text.split('/'):
+                validate_name(name=part, kind=f'grid {grid_name!r} run path {text!r} part')
+            if text in owners:
+                other_grid, other_values = owners[text]
+                message = (
+                    f'grid {grid_name!r} run {values} has run path {text!r}, which '
+                    f'grid {other_grid!r} run {other_values} has too; '
+                    f'name more axes in run_path'
+                )
+                raise ValueError(message)
+            owners[text] = (grid_name, values)
 
     def _check_job_names(self) -> None:
         """Raise when two grids give one job name, or a grid gives a follow-up name."""

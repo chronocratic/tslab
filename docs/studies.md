@@ -115,10 +115,10 @@ seconds on a login node is normal.
 
 Rules that matter when writing one:
 
-- **Axis order is folder order.** The path of a run is
+- **Run paths.** By default the path of a run is
   `<grid>/<value of axis 1>/<value of axis 2>/…`, and its folder is
-  `<output_root>/<study>/<run path>`. Reorder the axes and the folders move
-  with them.
+  `<output_root>/<study>/<run path>`; reorder the axes and the folders move
+  with them. `Grid(run_path=...)` changes the layout.
 - **Merge order, later paths replace earlier ones:** the value of each axis in
   axis order, then `run_settings` of the grid, then matching `Grid.overrides`,
   then `[settings]` of the machine profile, then matching machine overrides.
@@ -153,6 +153,23 @@ Rules that matter when writing one:
   script stay complete and unchanged (see
   [Configs and presets](configs-and-presets.md)); the study only re-reads
   them through `from_presets` and drops the parts it chooses on its own axes.
+
+**Run paths.** `run_path` is a template of `{grid}` (the grid key),
+`{short_name}` and the axis names of the grid; between placeholders only
+letters, digits, dot, dash, underscore and slash are allowed. Examples:
+
+```python
+Grid(..., run_path='{grid}/{recipe}/{dataset}/seed_{seed}')  # seed_0 folder
+Grid(..., run_path='{dataset}/{recipe}/{seed}')  # no grid folder
+Grid(..., run_path='{short_name}-{recipe}-{dataset}-s{seed}')  # one flat folder
+```
+
+Value names do not change, so `--only seed=0` and the results table work as
+before. The study checks every filled path: each part between slashes is a
+valid name, and no two runs, in one grid or across grids, share a path. A
+template that leaves out an axis with two or more values fails this check.
+Changing the template of a study that already ran moves its folders, so resume
+and results no longer find the old runs.
 
 ## Machine profiles
 

@@ -35,6 +35,9 @@ example = Study(
                 # The seed, one value per run.
                 'seed': setting_axis(path='seed', values=(0, 1)),
             },
+            # Folders such as classification/ts2vec-archive-split/ToySpectra/seed_0;
+            # --only seed=0 still works.
+            run_path='{grid}/{recipe}/{dataset}/seed_{seed}',
         ),
         'forecasting': Grid(
             short_name='fc',
@@ -55,6 +58,8 @@ example = Study(
                 },
                 'seed': setting_axis(path='seed', values=(0,)),
             },
+            # Folders such as forecasting/cost-cropped/ETTh1/seed_0.
+            run_path='{grid}/{recipe}/{variant}/seed_{seed}',
             # The batch size of the preset lived in its data settings, which a study
             # drops; give the run its batch size back here.
             overrides=(
