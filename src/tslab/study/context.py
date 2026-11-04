@@ -99,7 +99,7 @@ def expected_starts(*, context: Context) -> Mapping[str, 'QueuedJob'] | None:
         the scheduler call fails (a failed call is logged as a warning).
     """
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers import backend_for  # noqa: PLC0415
+    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     return backend_for(machine=context.machine).expected_starts(context=context)
 
@@ -157,7 +157,7 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers import backend_for  # noqa: PLC0415
+    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     cache = {} if ended_states is None else ended_states
     job_states, new_cache = backend_for(machine=machine).job_states(
@@ -202,7 +202,7 @@ def refresh_context(*, context: Context) -> Context:
         path=study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
     )
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers import backend_for  # noqa: PLC0415
+    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     job_states, _ = backend_for(machine=context.machine).job_states(
         machine=context.machine, study=context.study, jobs=jobs, cache={}

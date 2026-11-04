@@ -20,9 +20,9 @@ from tslab.cli import main
 from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.enums import InstanceState, RunState, StudyState
-from tslab.study import launchers
 from tslab.study.context import Context
 from tslab.study.launchers.common.types import JobUsage
+from tslab.study.launchers.tables import backend_for
 from tslab.study.paths import instance_directory
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
 from tslab.study.reporting.state import RunReport
@@ -172,7 +172,7 @@ def _hint(*, report: RunReport, project: Path, fake_backend: FakeBackend) -> str
     return failure_hint(
         report=report,
         usage=None,
-        backend=launchers.backend_for(machine=ctx.machine),
+        backend=backend_for(machine=ctx.machine),
         resources=ctx.resolved[report.run.run_path].resources,
     )
 

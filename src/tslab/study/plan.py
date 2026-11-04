@@ -94,7 +94,7 @@ def resolve_runs(
     """
     check_machine(study=study, machine=machine, warned=warned)
     # why: the launcher door imports JobGroup from this module
-    from tslab.study.launchers import backend_for  # noqa: PLC0415
+    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     backend = backend_for(machine=machine)
     return [

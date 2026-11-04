@@ -11,7 +11,7 @@ from tslab.enums import LauncherKind
 from tslab.study import from_presets, Study, StudyRun
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import expand_runs
-from tslab.study.launchers import JOB_RECORDS
+from tslab.study.launchers.tables import JOB_RECORDS
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, validate_jobs

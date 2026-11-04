@@ -169,7 +169,7 @@ class JobRecord:
     """One submitted job: a group of run tasks or a follow-up job.
 
     The shared fields of every launcher; only the record class of a launcher
-    (``JOB_RECORDS`` of ``tslab.study.launchers``) is built.
+    (``JOB_RECORDS`` of ``tslab.study.launchers.tables``) is built.
 
     Args:
         kind: Whether the job runs tasks or is a follow-up job.
@@ -248,7 +248,7 @@ class JobRecord:
             message = f'format_version {version!r} is not {SUBMISSIONS_FORMAT_VERSION}'
             raise ValueError(message)
         # why: the launchers package imports this module, so a module-level import would cycle
-        from tslab.study.launchers import JOB_RECORDS  # noqa: PLC0415
+        from tslab.study.launchers.tables import JOB_RECORDS  # noqa: PLC0415
 
         return JOB_RECORDS[LauncherKind(document['launcher'])].from_document(document=document)
 

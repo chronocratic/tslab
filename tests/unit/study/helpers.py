@@ -12,9 +12,9 @@ from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, wr
 from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers import JOB_RECORDS
 from tslab.study.launchers.common.types import JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
+from tslab.study.launchers.tables import JOB_RECORDS
 from tslab.study.records import (
     append_job,
     JobKind,

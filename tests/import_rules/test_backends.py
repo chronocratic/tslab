@@ -1,7 +1,7 @@
 """SLURM and local never share a file, and the code never names a backend.
 
 The backend is picked once, through the ``BACKENDS`` table of
-``study/launchers/__init__.py`` and the ``PROFILE_BACKENDS`` table of
+``study/launchers/tables.py`` and the ``PROFILE_BACKENDS`` table of
 ``study/machine/load.py``. After that, the code calls the methods of the
 backend it was given; it never compares a backend name or
 ``.launcher``, and one module never imports both a SLURM module and a
@@ -31,7 +31,7 @@ KINDS = ('name_comparisons', 'none_checks', 'module_imports_both', 'test_imports
 BACKEND_NAMES = ('slurm', 'local')
 #: The only modules that may import both a SLURM module and a local one.
 IMPORTS_BOTH_ALLOWED = (
-    'src/tslab/study/launchers/__init__.py',
+    'src/tslab/study/launchers/tables.py',
     'src/tslab/study/machine/__init__.py',
     'src/tslab/study/machine/profile.py',
     'src/tslab/study/machine/load.py',
@@ -370,8 +370,8 @@ def test_neutral_study_code_names_no_slurm_type() -> None:
         if any(path == exempt or path.is_relative_to(exempt) for exempt in NEUTRAL_EXEMPT):
             continue
         leaks = _slurm_leaks(tree=_parse(path=path), path=path)
-        if path == SOURCE / 'study' / 'launchers' / '__init__.py':
-            # why: the BACKENDS table names both backends
+        if path == SOURCE / 'study' / 'launchers' / 'tables.py':
+            # why: the BACKENDS and JOB_RECORDS tables name both backends
             leaks = [leak for leak in leaks if not leak.startswith('tslab.study.launchers.slurm')]
         if leaks:
             problems.append(f'{path.relative_to(ROOT).as_posix()}: {sorted(set(leaks))}')

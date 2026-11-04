@@ -10,8 +10,8 @@ from typing import TextIO
 
 from tslab.enums import JobFlag, StudyState
 from tslab.study.context import Context, refresh_context
-from tslab.study.launchers import backend_for
 from tslab.study.launchers.common.types import SIGNAL_EXIT_BASE
+from tslab.study.launchers.tables import backend_for
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport
 
