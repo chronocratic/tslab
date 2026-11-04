@@ -222,6 +222,9 @@ class Grid:
 
     def _check_job_name(self) -> None:
         """Raise unless the template has plain characters and known placeholders."""
+        if not self.job_name:
+            message = 'grid job_name must not be empty'
+            raise ValueError(message)
         _check_template(
             label='grid job_name',
             template=self.job_name,
@@ -372,6 +375,7 @@ class Study:
     def _check_run_paths(self) -> None:
         """Raise unless every run path is made of valid names and no two runs share one."""
         owners: dict[str, tuple[str, dict[str, str]]] = {}
+        descendants: dict[str, tuple[str, tuple[str, dict[str, str]]]] = {}
         runs = [
             (grid_name, grid, values)
             for grid_name, grid in self.grids.items()
@@ -383,6 +387,8 @@ class Study:
                 validate_name(name=part, kind=f'grid {grid_name!r} run path {text!r} part')
                 validate_name_part(part=part)
             key = text.lower()  # a case-insensitive file system folds Coffee and coffee
+            parts = key.split('/')
+            prefixes = tuple('/'.join(parts[:index]) for index in range(1, len(parts)))
             if key in owners:
                 other_grid, other_values = owners[key]
                 message = (
@@ -391,20 +397,23 @@ class Study:
                     f'name more axes in run_path'
                 )
                 raise ValueError(message)
-            nested = [
-                (owner_text, owner)
-                for owner_text, owner in owners.items()
-                if owner_text.startswith(f'{key}/') or key.startswith(f'{owner_text}/')
-            ]
-            if nested:
-                owner_text, (other_grid, other_values) = nested[0]
+            nested = next(
+                ((prefix, owners[prefix]) for prefix in prefixes if prefix in owners), None
+            )
+            if nested is None:
+                nested = descendants.get(key)
+            if nested is not None:
+                owner_text, (other_grid, other_values) = nested
                 message = (
                     f'grid {grid_name!r} run {values} has run path {text!r}, which is inside '
                     f'or around run path {owner_text!r} of grid {other_grid!r} run '
                     f'{other_values}; name more axes in run_path'
                 )
                 raise ValueError(message)
-            owners[key] = (grid_name, values)
+            owner = (grid_name, values)
+            owners[key] = owner
+            for prefix in (*prefixes, key):
+                descendants.setdefault(prefix, (key, owner))
 
     def _check_job_names(self) -> None:
         """Raise when two grids give one job name, or a grid gives a follow-up name."""

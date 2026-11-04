@@ -18,6 +18,8 @@ from tslab.enums import LauncherKind
 from tslab.jobs.slurm import CommandValues, SLURM_COMMANDS
 from tslab.study import Study
 from tslab.study.commands import submit
+from tslab.study.launchers.slurm import backend as slurm_backend
+from tslab.study.launchers.slurm.backend import SlurmBackend
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.slurm_file import (
     command_values,
@@ -25,7 +27,7 @@ from tslab.study.launchers.slurm.slurm_file import (
     slurm_file_text,
     write_slurm_file,
 )
-from tslab.study.records import append_job, JobKind
+from tslab.study.records import append_job, JobKind, submission_in_progress
 
 STUDY = Study(name='aug', grids={'a': grid(short_name='a', job_name='{short_name}_{seed}')})
 VALUES = CommandValues(job_ids=('1000', '1001'), width=8, start='2026-11-01')
@@ -168,6 +170,28 @@ def test_write_slurm_file_returns_the_path(tmp_path: Path) -> None:
     folder = tmp_path / '.study'
     append_job(path=folder / 'submissions.jsonl', record=_record(job_id='7', time=utc_now_iso()))
     assert write_slurm_file(study=STUDY, study_folder=folder) == folder / SLURM_FILE
+
+
+def test_submit_writes_catalogue_while_holding_submission_lock(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        'tslab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (0, ())
+    )
+
+    def check_lock(*, study: Study, study_folder: Path) -> Path:
+        assert submission_in_progress(study_folder=study_folder)
+        return study_folder / SLURM_FILE
+
+    monkeypatch.setattr(slurm_backend, 'write_slurm_file', check_lock)
+    code = SlurmBackend().after_submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        submitted=(_record(job_id='1000', time=utc_now_iso()),),
+        retry=lambda: 0,
+        sleep=no_sleep,
+    )
+
+    assert code == 0
 
 
 def test_command_values_skip_local_job_ids(tmp_path: Path) -> None:

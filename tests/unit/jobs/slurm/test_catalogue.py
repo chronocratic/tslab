@@ -2,10 +2,12 @@
 
 from pathlib import Path
 import re
+import subprocess
 
 import pytest
 
 from tests.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
+from tslab.jobs.slurm import catalogue, SlurmError
 from tslab.jobs.slurm.catalogue import (
     command_lines,
     CommandOutput,
@@ -125,6 +127,25 @@ def test_a_hung_tool_times_out(fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch)
     output = run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
     assert output.returncode == 124
     assert 'seff did not answer within' in output.stderr
+
+
+def test_timeout_from_shared_runner_keeps_catalogue_timeout_code(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def timed_out_runner(*, command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
+        error = subprocess.TimeoutExpired(cmd=command, timeout=timeout)
+        message = f'{command[0]} did not answer within {timeout:g} seconds'
+        raise SlurmError(message) from error
+
+    monkeypatch.setenv('PATH', str(tmp_path))
+    monkeypatch.setattr(catalogue, 'QUERY_TIMEOUT_SECONDS', 0.3)
+    monkeypatch.setattr(catalogue, '_run', timed_out_runner)
+
+    output = catalogue.run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
+
+    assert output == CommandOutput(
+        returncode=124, stdout='', stderr='seff did not answer within 0.3 seconds\n'
+    )
 
 
 def test_fallback_says_that_sacct_did_not_answer(fake: FakeSlurm) -> None:

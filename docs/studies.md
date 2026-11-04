@@ -362,10 +362,11 @@ uv run tslab study submit my_paper.studies:example --machine cluster \
 
 **Run names on the cluster.** The first time a run is submitted it gets the
 next free array index of its grid and keeps it through every resubmit, so
-adding, removing or reordering axis values never moves an existing run. The
-index plus `short_name` of the grid names the run everywhere: `<short_name>_<index>`
-in `squeue`, in `scancel <job>_<index>`, and in its log
-`.study/logs/cls_17.out`, which collects every attempt under a header line.
+adding, removing or reordering axis values never moves an existing run. By
+default, SLURM names the job `<short_name>_<index>`; a grid's `job_name`
+template below changes that name. The log keeps `<short_name>_<index>.out`,
+such as `.study/logs/cls_17.out`, and collects every attempt under a header
+line. Cancel a run with its SLURM job id and array index: `scancel <job>_<index>`.
 An index at or above `max_array_size` stops the submission before
 anything is written, naming the grid — raise `max_array_size` (or the
 MaxArraySize of the cluster) for grids beyond about 1000 runs.
