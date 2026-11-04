@@ -29,10 +29,11 @@ from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers import JobUsage, LaunchError, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.machine import MachineOverride, MachineProfileError
 from tslab.study.paths import study_folder
-from tslab.study.records import append_job, JobKind, JobRecord
+from tslab.study.records import append_job, JobKind
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -186,7 +187,7 @@ def test_job_states_reports_live_followup_jobs(*, project: Path, fake: FakeSlurm
     submit_study(project=project)
     ctx = _context(project=project, fake=fake)
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '9000|PENDING\n'}])
-    followup = JobRecord(
+    followup = SlurmJobRecord(
         kind=JobKind.FOLLOWUP,
         submission_id='f1',
         time='2026-01-01T00:00:00+00:00',
@@ -620,7 +621,7 @@ def test_after_stopped_submit_writes_the_slurm_file_for_queued_jobs(
     *, project: Path, fake: FakeSlurm
 ) -> None:
     ctx = _context(project=project, fake=fake)
-    record = JobRecord(
+    record = SlurmJobRecord(
         kind=JobKind.RUN,
         submission_id='s1',
         time='2026-11-02T10:00:00+00:00',

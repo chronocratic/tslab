@@ -6,13 +6,14 @@ import logging
 import os
 from pathlib import Path, PurePosixPath
 import threading
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.enums import InstanceState, LauncherKind, RunState
 from tslab.study.code_snapshot import CodeSnapshot
+from tslab.study.launchers import JOB_RECORDS
 from tslab.study.records import (
     append_job,
     JobKind,
@@ -52,7 +53,21 @@ def job(**changes: object) -> JobRecord:
         'tasks': (),
     }
     values.update(changes)
-    return JobRecord(**values)  # ty: ignore[invalid-argument-type]
+    record_type = JOB_RECORDS[cast('LauncherKind', values['launcher'])]
+    return record_type(**values)  # ty: ignore[invalid-argument-type]
+
+
+def test_the_shared_job_record_is_not_built_directly() -> None:
+    with pytest.raises(TypeError, match='launcher'):
+        JobRecord(
+            kind=JobKind.RUN,
+            submission_id='s1',
+            time=utc_now_iso(),
+            launcher=LauncherKind.SLURM,
+            job_id='100',
+            job_file=1,
+            tasks=(),
+        )
 
 
 def test_task_record_run_path_round_trips_as_posix_text() -> None:

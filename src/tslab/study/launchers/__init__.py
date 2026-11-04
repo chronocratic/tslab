@@ -21,11 +21,12 @@ from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobKind, JobRecord, take_progress, TaskRecord
+from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
 from tslab.study.reporting.state import RunReport
 
 __all__ = [
     'BACKENDS',
+    'JOB_RECORDS',
     'SIGNAL_EXIT_BASE',
     'Backend',
     'JobStates',
@@ -304,15 +305,13 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
         def record_job(
             *, job_id: str, group: JobGroup = group, tasks: tuple[TaskRecord, ...] = tasks
         ) -> None:
-            record = JobRecord(
-                kind=JobKind.RUN,
+            record = JOB_RECORDS[machine.launcher].for_group(
+                group=group,
                 submission_id=submission_id,
                 time=now(),
                 launcher=machine.launcher,
                 job_id=job_id,
-                job_file=group.job_file,
                 tasks=tasks,
-                code_snapshot=group.code_snapshot,
             )
             records.append(record)
             append_job(path=folder / 'submissions.jsonl', record=record)
@@ -466,14 +465,22 @@ class Backend(Protocol):
 
 # why: the backends import the types from this door
 from tslab.study.launchers.local import LocalBackend  # noqa: E402
+from tslab.study.launchers.local.records import LocalJobRecord  # noqa: E402
 from tslab.study.launchers.local.resources import usable_cpus  # noqa: E402
 from tslab.study.launchers.slurm import SlurmBackend  # noqa: E402
+from tslab.study.launchers.slurm.records import SlurmJobRecord  # noqa: E402
 
 #: One backend per launcher; the only place beside the machine tables that
 #: names both.
 BACKENDS: Mapping[LauncherKind, Backend] = {
     LauncherKind.SLURM: SlurmBackend(),
     LauncherKind.LOCAL: LocalBackend(),
+}
+
+#: The job record class of each launcher; ``JobRecord.from_json`` reads it.
+JOB_RECORDS: Mapping[LauncherKind, type[JobRecord]] = {
+    LauncherKind.SLURM: SlurmJobRecord,
+    LauncherKind.LOCAL: LocalJobRecord,
 }
 
 

@@ -9,12 +9,15 @@ import json
 import logging
 import os
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Self, TYPE_CHECKING
 
 from tslab.core.paths import require_path, STATUS_FILE
 from tslab.core.status import read_status
 from tslab.enums import InstanceState, LauncherKind
 from tslab.study.code_snapshot import CodeSnapshot
+
+if TYPE_CHECKING:
+    from tslab.study.plan import JobGroup
 
 __all__ = [
     'SUBMISSIONS_FORMAT_VERSION',
@@ -165,6 +168,9 @@ class JobKind(StrEnum):
 class JobRecord:
     """One submitted job: a group of run tasks or a follow-up job.
 
+    The shared fields of every launcher; only the record class of a launcher
+    (``JOB_RECORDS`` of ``tslab.study.launchers``) is built.
+
     Args:
         kind: Whether the job runs tasks or is a follow-up job.
         submission_id: One id per ``launch`` call.
@@ -186,6 +192,35 @@ class JobRecord:
     tasks: tuple[TaskRecord, ...]
     code_snapshot: CodeSnapshot | None = None
 
+    def __post_init__(self) -> None:
+        """Refuse the shared class itself."""
+        if type(self) is JobRecord:
+            message = 'build the job record class of a launcher, not JobRecord'
+            raise TypeError(message)
+
+    @classmethod
+    def for_group(  # noqa: PLR0913 # why: one argument per shared field, all keyword-only
+        cls,
+        *,
+        group: 'JobGroup',
+        submission_id: str,
+        time: str,
+        launcher: LauncherKind,
+        job_id: str,
+        tasks: tuple[TaskRecord, ...],
+    ) -> Self:
+        """The record of a submitted group of run tasks."""
+        return cls(
+            kind=JobKind.RUN,
+            submission_id=submission_id,
+            time=time,
+            launcher=launcher,
+            job_id=job_id,
+            job_file=group.job_file,
+            tasks=tasks,
+            code_snapshot=group.code_snapshot,
+        )
+
     def to_json(self) -> dict[str, object]:
         """The JSON form of the record, with the format version."""
         document: dict[str, object] = {
@@ -204,11 +239,22 @@ class JobRecord:
 
     @classmethod
     def from_json(cls, *, document: Mapping[str, Any]) -> 'JobRecord':
-        """A record from its JSON form; the format version must be known."""
+        """A record from its JSON form, of the class of its launcher.
+
+        The format version must be known.
+        """
         version = document.get('format_version')
         if version != SUBMISSIONS_FORMAT_VERSION:
             message = f'format_version {version!r} is not {SUBMISSIONS_FORMAT_VERSION}'
             raise ValueError(message)
+        # why: the launchers package imports this module, so a module-level import would cycle
+        from tslab.study.launchers import JOB_RECORDS  # noqa: PLC0415
+
+        return JOB_RECORDS[LauncherKind(document['launcher'])].from_document(document=document)
+
+    @classmethod
+    def from_document(cls, *, document: Mapping[str, Any]) -> Self:
+        """A record of this class from its JSON form, without the version check."""
         code_snapshot = document.get('code_snapshot')
         return cls(
             kind=JobKind(document['kind']),

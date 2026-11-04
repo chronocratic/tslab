@@ -13,8 +13,9 @@ from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, wr
 from tslab.enums import InstanceState, LauncherKind, RunState
 from tslab.study.commands import resubmit, submit
 from tslab.study.launchers.slurm.followups import queue_followups
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import resolve_machine, write_register
-from tslab.study.records import append_job, JobKind, JobRecord, ProgressSnapshot, TaskRecord
+from tslab.study.records import append_job, JobKind, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six
 STUDIES = '''
@@ -62,7 +63,7 @@ def bump_attempts(
 ) -> None:
     """More attempts of one run, recorded like real submissions."""
     for attempt in range(2, up_to + 1):
-        record = JobRecord(
+        record = SlurmJobRecord(
             kind=JobKind.RUN,
             submission_id=f't{attempt}',
             time=utc_now_iso(),
@@ -124,6 +125,16 @@ def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm
         project=project, job_file=wbsync.job_file, suffix='tasks'
     ).read_text()
     assert wbsync_tasks == f'0 1 uv run tslab wandb-sync {(project / "runs" / "s").as_posix()}\n'
+
+
+def test_submit_records_the_job_name_of_every_slurm_job(project: Path, fake: FakeSlurm) -> None:
+    with_followups(project=project)
+    submit_study(project=project)
+    jobs = jobs_of(project=project)
+    assert all(isinstance(job, SlurmJobRecord) for job in jobs)
+    names = [job.job_name for job in jobs if isinstance(job, SlurmJobRecord)]
+    assert names[0] is not None
+    assert names[1:] == ['s_retry', 's_wbsync']
 
 
 def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(

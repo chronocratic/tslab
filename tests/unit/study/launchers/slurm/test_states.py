@@ -8,7 +8,7 @@ from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, submit_study
 from tslab.core.status import utc_now_iso
 from tslab.enums import LauncherKind
-from tslab.study.launchers import QueuedJob
+from tslab.study.launchers import JOB_RECORDS, QueuedJob
 from tslab.study.launchers.slurm import states
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
@@ -16,7 +16,7 @@ from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 def _job_record(
     *, job_id: str, kind: JobKind, launcher: LauncherKind, tasks: tuple[TaskRecord, ...] = ()
 ) -> JobRecord:
-    return JobRecord(
+    return JOB_RECORDS[launcher](
         kind=kind,
         submission_id=job_id,
         time=utc_now_iso(),
