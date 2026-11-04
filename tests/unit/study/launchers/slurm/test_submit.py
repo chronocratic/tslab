@@ -52,7 +52,7 @@ def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=3,
@@ -227,8 +227,8 @@ def test_resubmitted_task_keeps_its_array_index(project: Path, fake: FakeSlurm) 
     jobs = jobs_of(project=project)
     script = (project / 'runs' / 's' / '.study' / 'jobs' / f'{jobs[1].job_file}.sbatch').read_text()
     assert '#SBATCH --array=3%100' in script
-    assert '#SBATCH --job-name=g1' in script
-    assert 'logs/g1_%a.out' in script
+    assert '#SBATCH --job-name=s_g1' in script
+    assert 'logs/s_g1_%a.out' in script
 
 
 def test_dry_run_writes_the_script_and_describes_resources(
@@ -262,7 +262,7 @@ def test_write_job_files_writes_the_start_delay(
     assert '#SBATCH --begin=now+660' in script
 
 
-def test_job_name_and_log_pattern_use_name_and_short_name(
+def test_job_name_names_the_job_and_its_log_pattern(
     machine: MachineProfile, tmp_path: Path
 ) -> None:
     study = Study(name='s', grids={'g': grid(short_name='g1', job_name='{recipe}_{short_name}')})
@@ -271,7 +271,8 @@ def test_job_name_and_log_pattern_use_name_and_short_name(
     write_job_files(study_folder=folder, groups=groups, machine=machine, project_root=tmp_path)
     scripts = [(folder / 'jobs' / f'{group.job_file}.sbatch').read_text() for group in groups]
     assert any('--job-name=cost-paper_g1' in text for text in scripts)
-    assert all(f'--output={folder}/logs/g1_%a.out' in text for text in scripts)
+    for group, text in zip(groups, scripts, strict=True):
+        assert f'--output={folder}/logs/{group.job_name}_%a.out' in text
 
 
 def test_log_pattern_refuses_a_log_name_it_cannot_read(

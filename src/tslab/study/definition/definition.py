@@ -150,8 +150,9 @@ class Grid:
         run_settings: Settings every run of the grid gets, e.g. the run
             paths. Read-only once built.
         job_name: The job name as a template of ``{short_name}``,
-            ``{study}`` and axis names. Runs with different names go into
-            different arrays, so naming an axis splits the grid by it.
+            ``{study}`` and axis names; ``{study}_{short_name}`` by default.
+            Runs with different names go into different arrays, so naming an
+            axis splits the grid by it.
         run_path: The run path as a template of ``{grid}``, ``{short_name}``
             and axis names; ``None`` is the grid then the axis values in axis
             order.
@@ -164,7 +165,7 @@ class Grid:
     exclude: tuple[Match, ...] = ()
     overrides: tuple[Override, ...] = ()
     run_settings: Settings = DEFAULT_RUN_SETTINGS
-    job_name: str = '{short_name}'
+    job_name: str = '{study}_{short_name}'
     run_path: str | None = None
 
     @property
@@ -436,6 +437,10 @@ class Study:
                     f'which grid {owners[name]!r} gives too'
                 )
                 raise ValueError(message)
+
+    def job_name_of(self, *, run: 'StudyRun') -> str:
+        """The job name of one run: its grid ``job_name`` template filled in."""
+        return self.grids[run.grid].job_name_for(study=self.name, values=run.values)
 
     def results(self, *, machine: Path, environment: Mapping[str, str]) -> 'list[ResultRow]':
         """The rows of the results table of every run of the study.

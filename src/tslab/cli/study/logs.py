@@ -16,7 +16,7 @@ from tslab.core.meta import hostname
 from tslab.core.paths import LOGS_DIRECTORY
 from tslab.study.context import Context
 from tslab.study.launchers.local.pid_file import LAUNCH_LOGS
-from tslab.study.paths import log_file_of, study_folder
+from tslab.study.paths import study_folder
 
 __all__ = ['Logs']
 
@@ -99,11 +99,7 @@ class Logs:
         if report.task is None:
             _LOGGER.error('%s was never submitted, so it has no job output', report.run.run_path)
             return None
-        return log_file_of(
-            folder=context.study_directory,
-            short_name=context.study.grids[report.run.grid].short_name,
-            index=report.task.index,
-        )
+        return context.log_file(run=report.run, index=report.task.index)
 
 
 def _write(data: bytes) -> None:

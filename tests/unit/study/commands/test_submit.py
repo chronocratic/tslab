@@ -386,7 +386,7 @@ def gpu_ids_of_usage_files(*, project: Path) -> list[str | None]:
     assert len(jobs) == 1
     logs = study_directory(project=project) / '.study' / 'logs'
     return [
-        json.loads((logs / f'g1_{task.index}.out.usage.json').read_text())['gpu_id']
+        json.loads((logs / f's_g1_{task.index}.out.usage.json').read_text())['gpu_id']
         for task in jobs[0].tasks
     ]
 

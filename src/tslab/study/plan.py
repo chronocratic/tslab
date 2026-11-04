@@ -12,6 +12,7 @@ import tslab
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
     check_paths,
+    expand_runs,
     expand_setting,
     Grid,
     match_problems,
@@ -311,31 +312,45 @@ class JobGroup:
 
 
 def assign_indices(
-    *, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]
+    *, study: Study, runs: Sequence[StudyRun], jobs: Sequence[JobRecord]
 ) -> dict[PurePosixPath, int]:
     """The array index of every run: recorded ones keep theirs, new ones append.
 
+    Indices are numbered per job name, not per grid, so ``max_array_size``
+    limits the size of one array and a grid split by ``job_name`` can hold
+    more runs than that.
+
     Args:
-        runs: The runs of the study, in expansion order.
+        study: The study the runs came from; it gives every run its job name.
+        runs: The runs to index, in expansion order.
         jobs: The job records of the study, in submission order.
 
     Returns:
         The run path to index. A run with a task record keeps the index of
         that record; the others get, in the order of ``runs``, one plus the largest
-        index their grid already uses in ``jobs`` or was assigned earlier.
+        index their job name already uses in ``jobs`` or was assigned earlier.
+        A recorded run that left the study holds its index in every job name
+        of its grid, so no new run reuses its log file.
     """
+    names = {run.run_path: study.job_name_of(run=run) for run in [*expand_runs(study=study), *runs]}
     latest = latest_tasks(jobs=jobs)
     highest: dict[str, int] = {}
-    for _, task in latest.values():
-        highest[task.grid] = max(highest.get(task.grid, -1), task.index)
+    removed: dict[str, int] = {}
+    for run_path, (_, task) in latest.items():
+        name = names.get(run_path)
+        if name is None:
+            removed[task.grid] = max(removed.get(task.grid, -1), task.index)
+        else:
+            highest[name] = max(highest.get(name, -1), task.index)
     indices: dict[PurePosixPath, int] = {}
     for run in runs:
         recorded = latest.get(run.run_path)
         if recorded is not None:
             indices[run.run_path] = recorded[1].index
             continue
-        indices[run.run_path] = highest.get(run.grid, -1) + 1
-        highest[run.grid] = indices[run.run_path]
+        name = names[run.run_path]
+        indices[run.run_path] = max(highest.get(name, -1), removed.get(run.grid, -1)) + 1
+        highest[name] = indices[run.run_path]
     return indices
 
 
@@ -397,7 +412,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     for run in resolved:
         grid = study.grids[run.run.grid]
         code_snapshot = snapshots.get(run.run.run_path)
-        job_name = grid.job_name_for(study=study.name, values=run.run.values)
+        job_name = study.job_name_of(run=run.run)
         key = (run.run.grid, job_name, run.resources, code_snapshot)
         if key not in lookup:
             lookup[key] = len(groups)
@@ -415,7 +430,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             next_file += 1
         index = indices[run.run.run_path]
         args = extra_args.get(run.run.run_path, ())
-        log_file = log_file_of(folder=folder, short_name=grid.short_name, index=index)
+        log_file = log_file_of(folder=folder, job_name=job_name, index=index)
         try:
             arguments = run_arguments(
                 grid=grid,

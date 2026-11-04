@@ -61,7 +61,8 @@ def test_failures_lists_error_and_log_tails(project: Path, fake_backend: FakeBac
         if task.run_path == PurePosixPath('g/small/1')
     )
     grid = ctx.study.grids[task.grid]
-    job_log = ctx.study_directory / LOGS_DIRECTORY / f'{grid.short_name}_{task.index}.out'
+    logs = ctx.study_directory / '.study' / LOGS_DIRECTORY
+    job_log = logs / f'{ctx.study.name}_{grid.short_name}_{task.index}.out'
     job_log.parent.mkdir(parents=True)
     job_log.write_text(''.join(f'line {index}\n' for index in range(100)), encoding='utf-8')
     run_log = run_directory / LOGS_DIRECTORY / 'run.log'

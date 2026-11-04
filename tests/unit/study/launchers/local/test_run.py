@@ -89,7 +89,7 @@ def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=3,
@@ -151,7 +151,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=1,
@@ -169,7 +169,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
     assert report.submitted[0].job_id.startswith('local-')
     assert len(report.submitted[0].tasks) == 4
     folder = study_folder(machine=machine, study=study)
-    log = folder / 'logs' / 'g1_2.out'
+    log = folder / 'logs' / 's_g1_2.out'
     assert log.read_text().startswith('=== tslab attempt 1 | job local-')
     console = capfd.readouterr().out
     assert '--run-path' in console
@@ -179,7 +179,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts=attempts,
         first_job_file=2,
@@ -253,7 +253,7 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
         study=study,
         machine=machine,
         resolved=resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1),
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=1,
@@ -281,7 +281,7 @@ def _local_groups(study: Study, machine: MachineProfile, *, local_cpus: int = 1)
         study=study,
         machine=machine,
         resolved=resolved,
-        indices=assign_indices(runs=runs, jobs=[]),
+        indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
         first_job_file=1,
@@ -521,7 +521,7 @@ def test_omp_num_threads_is_set_for_local_runs(
         dry_run=False,
     )
     folder = study_folder(machine=local_machine, study=study)
-    assert '2' in (folder / 'logs' / 'g1_0.out').read_text().splitlines()
+    assert '2' in (folder / 'logs' / 's_g1_0.out').read_text().splitlines()
 
 
 def test_preset_omp_num_threads_is_kept(
@@ -541,7 +541,7 @@ def test_preset_omp_num_threads_is_kept(
         dry_run=False,
     )
     folder = study_folder(machine=local_machine, study=study)
-    assert '1' in (folder / 'logs' / 'g1_0.out').read_text().splitlines()
+    assert '1' in (folder / 'logs' / 's_g1_0.out').read_text().splitlines()
 
 
 def test_local_two_launchers_never_share_a_gpu(
@@ -632,9 +632,9 @@ def test_local_timeout_sends_usr2_and_logs_steps(machine: MachineProfile, tmp_pa
         dry_run=False,
     )
     folder = study_folder(machine=local_machine, study=study)
-    log = (folder / 'logs' / 'g1_0.out').read_text()
+    log = (folder / 'logs' / 's_g1_0.out').read_text()
     assert 'sent USR2' in log
-    usage = json.loads((folder / 'logs' / 'g1_0.out.usage.json').read_text())
+    usage = json.loads((folder / 'logs' / 's_g1_0.out.usage.json').read_text())
     assert usage['exit_code'] == 0
     assert usage['timed_out'] is False
     assert usage['timeout'] == 3.0
@@ -771,7 +771,7 @@ def test_local_sigterm_stops_tasks_and_reports_signal(
         timer.cancel()
     elapsed = time.monotonic() - start
     assert report.stopped_signal == signal.SIGTERM
-    assert [group.job_name for group in report.not_submitted] == ['g2']
+    assert [group.job_name for group in report.not_submitted] == ['s_g2']
     assert len(report.submitted) == 1
     assert elapsed < 5
 
@@ -808,7 +808,7 @@ def test_local_stop_kills_task_ignoring_sigterm(machine: MachineProfile, tmp_pat
     assert report.stopped_signal == signal.SIGTERM
     assert elapsed < 4
     folder = study_folder(machine=local_machine, study=study)
-    assert 'exit -9' in (folder / 'logs' / 'g1_0.out').read_text()
+    assert 'exit -9' in (folder / 'logs' / 's_g1_0.out').read_text()
 
 
 class _FakeWatchdog:

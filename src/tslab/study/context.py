@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from tslab.study.definition import expand_runs, load_study, select_runs, Study, StudyRun
 from tslab.study.machine import load_machine, MachineProfile
-from tslab.study.paths import study_folder
+from tslab.study.paths import log_file_of, study_folder
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun
 from tslab.study.records import JobRecord, read_jobs, submission_in_progress
 from tslab.study.reporting.state import collect_states, RunReport
@@ -75,6 +75,14 @@ class Context:
     def study_directory(self) -> Path:
         """The ``<output_root>/<study>`` folder that holds the runs."""
         return self.machine.output_root / self.study.name
+
+    def log_file(self, *, run: StudyRun, index: int) -> Path:
+        """The scheduler log file of one task, ``.study/logs/<job name>_<index>.out``."""
+        return log_file_of(
+            folder=study_folder(machine=self.machine, study=self.study),
+            job_name=self.study.job_name_of(run=run),
+            index=index,
+        )
 
     @property
     def followup_live(self) -> bool:
