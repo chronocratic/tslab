@@ -37,7 +37,7 @@ __all__ = [
 QOS_LIMIT_MARKERS = ('QOSMaxSubmitJobPerUserLimit', 'Job violates accounting/QOS policy')
 
 #: How long sbatch waits through QoS limit errors before it gives up.
-QOS_WAIT_CAP_SECONDS = 7200.0
+QOS_WAIT_CAP_SECONDS = 30 * 24 * 3600.0
 
 _LOGGER = logging.getLogger(__name__)
 
