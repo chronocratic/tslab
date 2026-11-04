@@ -261,6 +261,25 @@ def select_ids(*, scope: IdScope, job_ids: Sequence[str]) -> tuple[list[str], bo
     ), False
 
 
+def _command_error(
+    *, error: SlurmError, command: SlurmCommand, stdout: Sequence[str]
+) -> CommandOutput:
+    cause = error.__cause__
+    if isinstance(cause, subprocess.TimeoutExpired):
+        return CommandOutput(
+            returncode=124,
+            stdout=''.join(stdout),
+            stderr=f'{command.tool} did not answer within {QUERY_TIMEOUT_SECONDS:g} seconds\n',
+        )
+    if isinstance(cause, FileNotFoundError):
+        return CommandOutput(
+            returncode=127,
+            stdout=''.join(stdout),
+            stderr=f'{command.tool} is not installed on this machine\n',
+        )
+    raise error
+
+
 def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> CommandOutput:
     """Run a catalogue command for the jobs of a study; outputs are joined in order."""
     ids, fell_back = select_ids(scope=command.scope, job_ids=values.job_ids)
@@ -270,21 +289,9 @@ def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> Comman
     for line in command_lines(command=command, ids=ids, values=values):
         try:
             # why: fixed scheduler tool on PATH from the catalogue
-            process = subprocess.run(  # noqa: S603
-                line, capture_output=True, text=True, check=False, timeout=QUERY_TIMEOUT_SECONDS
-            )
-        except subprocess.TimeoutExpired:
-            return CommandOutput(
-                returncode=124,
-                stdout=''.join(stdout),
-                stderr=f'{command.tool} did not answer within {QUERY_TIMEOUT_SECONDS:g} seconds\n',
-            )
-        except FileNotFoundError:
-            return CommandOutput(
-                returncode=127,
-                stdout=''.join(stdout),
-                stderr=f'{command.tool} is not installed on this machine\n',
-            )
+            process = _run(command=line, timeout=QUERY_TIMEOUT_SECONDS)
+        except SlurmError as error:
+            return _command_error(error=error, command=command, stdout=stdout)
         stdout.append(process.stdout)
         stderr.append(process.stderr)
         code = process.returncode

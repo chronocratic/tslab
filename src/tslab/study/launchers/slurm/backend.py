@@ -48,7 +48,7 @@ from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileE
 from tslab.study.machine.slurm import slurm_for
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
+from tslab.study.records import JobRecord, submission_lock
 from tslab.study.reporting.state import RunReport
 
 __all__ = ['SlurmBackend']
@@ -243,7 +243,8 @@ class SlurmBackend:
         """Write ``slurm.sh``; a failure only warns, the jobs are already queued."""
         folder = study_folder(machine=context.machine, study=context.study)
         try:
-            path = write_slurm_file(study=context.study, study_folder=folder)
+            with submission_lock(study_folder=folder):
+                path = write_slurm_file(study=context.study, study_folder=folder)
         except OSError as error:
             # why: the jobs are already queued, so the exit code stays as it is
             _LOGGER.warning('could not write the SLURM commands file: %s', error)

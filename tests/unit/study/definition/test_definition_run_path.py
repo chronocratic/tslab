@@ -2,6 +2,7 @@
 
 from pathlib import PurePosixPath
 import re
+from time import perf_counter
 
 import pytest
 
@@ -102,3 +103,13 @@ def test_run_paths_that_differ_only_in_case_fail() -> None:
 def test_run_path_part_with_temporary_marker_fails() -> None:
     with pytest.raises(ValueError, match=r'\.tmp-'):
         Study(name='s', grids={'a': grid(run_path='{grid}/{recipe}/{dataset}/x.tmp-{seed}')})
+
+
+def test_study_checks_many_run_paths_without_quadratic_scan() -> None:
+    values = {str(index): {} for index in range(8_000)}
+    study_grid = grid(axes={'replicate': values})
+
+    started = perf_counter()
+    Study(name='s', grids={'g': study_grid})
+
+    assert perf_counter() - started < 3.0

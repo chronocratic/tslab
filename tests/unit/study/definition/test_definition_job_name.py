@@ -16,6 +16,11 @@ def test_default_job_name_is_short_name() -> None:
     assert g.job_name_for(study='s', values={'recipe': 'cost-paper', 'seed': '7'}) == 'cls'
 
 
+def test_empty_job_name_template_fails() -> None:
+    with pytest.raises(ValueError, match=r'job_name.*must not be empty'):
+        grid(job_name='')
+
+
 def test_job_name_template_expands_axes_in_template_order() -> None:
     g = grid(job_name='{recipe}_{short_name}_{seed}u')
     assert g.job_name_axes == ('recipe', 'seed')
