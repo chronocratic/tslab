@@ -46,6 +46,9 @@ def _finish_launch(
     """
     if code >= SIGNAL_EXIT_BASE:
         # why: the launch was stopped by a signal; resubmit continues it
+        backend_for(machine=context.machine).after_stopped_submit(
+            context=context, submitted=submitted
+        )
         return code
     return max(
         code,

@@ -431,6 +431,10 @@ class Backend(Protocol):
         """The follow-up of a finished launch, as an exit code."""
         ...
 
+    def after_stopped_submit(self, *, context: Context, submitted: Sequence[JobRecord]) -> None:
+        """The bookkeeping of a launch that a signal stopped; no follow-up is queued."""
+        ...
+
     def cancel(
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:

@@ -8,10 +8,12 @@ from typing import cast
 import pytest
 
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import finish_run, submit_study, write_run_status
+from tests.unit.study.helpers import context, finish_run, no_sleep, submit_study, write_run_status
 from tslab.cli import main
 from tslab.core.text import TextTable
 from tslab.enums import InstanceState, JobPhase, RunState
+from tslab.study.commands import _finish_launch
+from tslab.study.launchers import SIGNAL_EXIT_BASE
 
 
 def run_main(*args: str) -> int:
@@ -302,3 +304,17 @@ def test_dry_run_and_submit_log_tables(
     assert [table.header for table in _tables(caplog=caplog)] == [
         ('job', 'job id', 'runs', 'indices')
     ]
+
+
+def test_a_signal_exit_runs_the_stopped_hook_and_queues_no_follow_up(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    ctx = context(project=project, machine_file='cluster.toml')
+
+    code = _finish_launch(
+        code=SIGNAL_EXIT_BASE + 2, submitted=(), context=ctx, sleep=no_sleep, task_stream=None
+    )
+
+    assert code == SIGNAL_EXIT_BASE + 2
+    assert len(fake_backend.calls('after_stopped_submit')) == 1
+    assert not fake_backend.calls('after_submit')

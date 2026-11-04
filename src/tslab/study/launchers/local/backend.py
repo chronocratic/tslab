@@ -289,6 +289,14 @@ class LocalBackend:
             return retry()
         return 0
 
+    def after_stopped_submit(
+        self,
+        *,
+        context: Context,  # why: the Backend signature
+        submitted: Sequence[JobRecord],  # why: the Backend signature
+    ) -> None:
+        """Nothing: a local launch keeps no file besides its records."""
+
     def cancel(
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:

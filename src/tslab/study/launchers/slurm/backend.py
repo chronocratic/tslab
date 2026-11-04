@@ -231,6 +231,11 @@ class SlurmBackend:
             self._write_slurm_file(context=context)
         return code
 
+    def after_stopped_submit(self, *, context: Context, submitted: Sequence[JobRecord]) -> None:
+        """Write ``slurm.sh`` for the jobs queued before the stop."""
+        if submitted:
+            self._write_slurm_file(context=context)
+
     @staticmethod
     def _write_slurm_file(*, context: Context) -> None:
         """Write ``slurm.sh``; a failure only warns, the jobs are already queued."""
