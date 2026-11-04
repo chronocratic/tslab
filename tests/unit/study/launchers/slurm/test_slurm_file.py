@@ -18,20 +18,23 @@ from tslab.enums import LauncherKind
 from tslab.jobs.slurm import CommandValues, SLURM_COMMANDS
 from tslab.study import Study
 from tslab.study.commands import submit
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.slurm_file import (
     command_values,
     SLURM_FILE,
     slurm_file_text,
     write_slurm_file,
 )
-from tslab.study.records import append_job, JobKind, JobRecord
+from tslab.study.records import append_job, JobKind
 
 STUDY = Study(name='aug', grids={'a': grid(short_name='a', job_name='{short_name}_{seed}')})
 VALUES = CommandValues(job_ids=('1000', '1001'), width=8, start='2026-11-01')
 
 
-def _record(*, job_id: str, time: str, kind: JobKind = JobKind.RUN) -> JobRecord:
-    return JobRecord(
+def _record(
+    *, job_id: str, time: str, kind: JobKind = JobKind.RUN, job_name: str | None = None
+) -> SlurmJobRecord:
+    return SlurmJobRecord(
         kind=kind,
         submission_id='s1',
         time=time,
@@ -39,6 +42,7 @@ def _record(*, job_id: str, time: str, kind: JobKind = JobKind.RUN) -> JobRecord
         job_id=job_id,
         job_file=1,
         tasks=(),
+        job_name=job_name,
     )
 
 
@@ -122,6 +126,23 @@ def test_command_values_width_and_start(tmp_path: Path) -> None:
     assert command_values(study=study, study_folder=folder) == CommandValues(
         job_ids=('1000', '1001'), width=len('a_long_name_of_19'), start='2026-11-01'
     )
+
+
+def test_command_values_width_follows_recorded_job_names(tmp_path: Path) -> None:
+    # why: a job from a submit with an older, longer template must not be cut
+    folder = tmp_path / '.study'
+    append_job(
+        path=folder / 'submissions.jsonl',
+        record=_record(
+            job_id='1000', time='2026-11-02T10:00:00+00:00', job_name='an_older_and_longer_job_name'
+        ),
+    )
+    append_job(
+        path=folder / 'submissions.jsonl',
+        record=_record(job_id='1001', time='2026-11-02T10:00:00+00:00'),
+    )
+    values = command_values(study=STUDY, study_folder=folder)
+    assert values.width == len('an_older_and_longer_job_name')
 
 
 def test_submit_writes_slurm_file(project: Path, fake: FakeSlurm) -> None:

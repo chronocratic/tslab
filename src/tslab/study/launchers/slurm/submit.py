@@ -14,10 +14,11 @@ from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
 from tslab.study.launchers import LaunchError, RecordJob
 from tslab.study.launchers.slurm.job_script import job_script
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile, SlurmSettings
 from tslab.study.paths import next_job_file
 from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobKind, JobRecord
+from tslab.study.records import append_job, JobKind
 
 __all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']
 
@@ -122,7 +123,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
     dependency: str,
     now: Callable[[], str],
     sleep: Callable[[float], None] = time.sleep,
-) -> JobRecord:
+) -> SlurmJobRecord:
     """Write, submit and record one single-task helper job, e.g. a follow-up.
 
     Args:
@@ -164,7 +165,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
     job_id = sbatch(
         script=sbatch_file, sleep=sleep, environ=without_code_snapshot(environ=os.environ)
     )
-    record = JobRecord(
+    record = SlurmJobRecord(
         kind=JobKind.FOLLOWUP,
         submission_id=uuid4().hex,
         time=now(),
@@ -172,6 +173,7 @@ def submit_helper_job(  # noqa: PLR0913 # why: keyword-only public API; each opt
         job_id=job_id,
         job_file=job_file,
         tasks=(),
+        job_name=job_name,
     )
     append_job(path=study_folder / 'submissions.jsonl', record=record)
     return record

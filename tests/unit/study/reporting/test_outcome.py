@@ -15,7 +15,7 @@ from tests.unit.study.helpers import (
 )
 from tslab.core.status import utc_now_iso
 from tslab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
-from tslab.study.launchers import backend_for
+from tslab.study.launchers import backend_for, JOB_RECORDS
 from tslab.study.records import append_job, JobKind, JobRecord, submission_in_progress
 from tslab.study.reporting.outcome import (
     EXIT_DONE,
@@ -28,7 +28,7 @@ from tslab.study.reporting.outcome import (
 
 
 def _job_record(*, kind: JobKind, launcher: LauncherKind, job_id: str) -> JobRecord:
-    return JobRecord(
+    return JOB_RECORDS[launcher](
         kind=kind,
         submission_id=job_id,
         time=utc_now_iso(),

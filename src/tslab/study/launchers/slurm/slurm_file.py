@@ -19,6 +19,7 @@ from tslab.study.definition import (
     study_job_names,
     WANDB_SYNC_JOB,
 )
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.records import read_jobs
 
 __all__ = ['SLURM_FILE', 'command_values', 'slurm_file_text', 'write_slurm_file']
@@ -89,6 +90,12 @@ def command_values(*, study: Study, study_folder: Path) -> CommandValues:
         if record.job_id.isdecimal()
     ]
     names = {name for group in study_job_names(study=study).values() for name in group}
+    # why: a job from a submit with an older template can have a longer name
+    names |= {
+        record.job_name
+        for record in records
+        if isinstance(record, SlurmJobRecord) and record.job_name is not None
+    }
     names |= {
         followup_job_name(study=study.name, kind=kind) for kind in (RETRY_JOB, WANDB_SYNC_JOB)
     }

@@ -15,6 +15,7 @@ from tslab.jobs.slurm import (
     RUNNING_JOB_STATES,
 )
 from tslab.study import StudyRun
+from tslab.study.launchers import JOB_RECORDS
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import (
@@ -75,7 +76,7 @@ def task(index: int, run_path: str, attempt: int) -> TaskRecord:
 
 
 def job(job_id: str, tasks: tuple[TaskRecord, ...]) -> JobRecord:
-    return JobRecord(
+    return JOB_RECORDS[LauncherKind.SLURM](
         kind=JobKind.RUN,
         submission_id='s1',
         time=utc_now_iso(),
@@ -251,7 +252,7 @@ def test_slurm_task_ids() -> None:
 
 def test_run_report_job_id_is_the_local_id(tmp_path: Path) -> None:
     local_task = task(index=0, run_path='g/a/1', attempt=1)
-    local_job = JobRecord(
+    local_job = JOB_RECORDS[LauncherKind.LOCAL](
         kind=JobKind.RUN,
         submission_id='s2',
         time=utc_now_iso(),
@@ -412,7 +413,7 @@ def test_grace_wait_returns_new_facts(tmp_path: Path) -> None:
 
 
 def test_collect_states_local_task_ids_hold_index(tmp_path: Path) -> None:
-    record = JobRecord(
+    record = JOB_RECORDS[LauncherKind.LOCAL](
         kind=JobKind.RUN,
         submission_id='s1',
         time=utc_now_iso(),

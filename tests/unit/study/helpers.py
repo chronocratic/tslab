@@ -12,7 +12,7 @@ from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, wr
 from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState
 from tslab.study.commands import submit
 from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers import JobStates
+from tslab.study.launchers import JOB_RECORDS, JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.records import (
     append_job,
@@ -174,7 +174,7 @@ def record_local_job(*, project: Path) -> list[str]:
     )
     append_job(
         path=study_directory(project=project) / '.study' / 'submissions.jsonl',
-        record=JobRecord(
+        record=JOB_RECORDS[LauncherKind.LOCAL](
             kind=JobKind.RUN,
             submission_id='s1',
             time=utc_now_iso(),

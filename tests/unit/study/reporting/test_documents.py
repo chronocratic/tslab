@@ -21,8 +21,8 @@ from tslab.core.status import utc_now_iso
 from tslab.core.text import TextTable
 from tslab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
 from tslab.study.definition import expand_runs, load_study
-from tslab.study.launchers import QueuedJob
-from tslab.study.records import append_job, JobKind, JobRecord
+from tslab.study.launchers import JOB_RECORDS, QueuedJob
+from tslab.study.records import append_job, JobKind
 from tslab.study.reporting.documents import run_entry, show_document, status_document
 
 
@@ -106,7 +106,7 @@ def test_run_entry_names_live_auto_retry_job(project: Path, fake_backend: FakeBa
         run_state=RunState.RUNNING,
         instance=InstanceState.RUNNING,
     )
-    followup = JobRecord(
+    followup = JOB_RECORDS[LauncherKind.SLURM](
         kind=JobKind.FOLLOWUP,
         submission_id='followup',
         time=utc_now_iso(),
