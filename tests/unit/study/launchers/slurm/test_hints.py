@@ -1,6 +1,6 @@
 """Tests for the failure hints of the SLURM scheduler states."""
 
-from tslab.study.launchers import JobUsage
+from tslab.study.launchers.common.types import JobUsage
 from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.machine import SlurmSettings
 

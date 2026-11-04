@@ -13,7 +13,8 @@ from tslab.enums import StudyState
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, LaunchError, OnLaunch
+from tslab.study.launchers import backend_for
+from tslab.study.launchers.common.types import LaunchError, OnLaunch
 from tslab.study.paths import next_job_file, study_folder
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import JobRecord, read_jobs, submission_lock

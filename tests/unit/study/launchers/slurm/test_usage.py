@@ -11,7 +11,7 @@ from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, submit_study
 from tslab.enums import StudyState
 from tslab.jobs.slurm import SlurmJobUsage
-from tslab.study.launchers import JobUsage
+from tslab.study.launchers.common.types import JobUsage
 import tslab.study.launchers.slurm.usage as slurm_usage
 from tslab.study.reporting.failures import collect_failures
 

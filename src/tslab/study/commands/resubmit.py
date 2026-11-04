@@ -16,14 +16,15 @@ from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDE
 from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
 from tslab.study.context import Context
-from tslab.study.launchers import backend_for, OnLaunch
+from tslab.study.launchers import backend_for
+from tslab.study.launchers.common.types import OnLaunch
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
 from tslab.study.reporting.report import log_problems
 from tslab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import Backend
+    from tslab.study.launchers.common.protocols import Backend
     from tslab.study.records import JobRecord, TaskRecord
 
 __all__ = ['resubmit', 'run_one']

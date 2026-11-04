@@ -16,10 +16,10 @@ from tslab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, vi
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import (
+from tslab.study.launchers.common.launch import launch
+from tslab.study.launchers.common.types import (
     JobStates,
     JobUsage,
-    launch,
     LaunchReport,
     OnTaskState,
     QueuedJob,
@@ -27,6 +27,7 @@ from tslab.study.launchers import (
 )
 from tslab.study.launchers.local.foreground import foreground_script
 from tslab.study.launchers.local.pid_file import _check_free, hold_launch, LocalLaunchError
+from tslab.study.launchers.local.records import LocalJobRecord
 from tslab.study.launchers.local.run import (
     local_job_id,
     LocalLauncher,
@@ -377,6 +378,7 @@ def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forw
             stream=task_stream,
             on_task_state=on_task_state,
         ),
+        record_type=LocalJobRecord,
         write_job_files=write_job_files,
         machine=context.machine,
         study=context.study,

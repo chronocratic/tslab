@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 
 from tslab.enums import StudyState
 from tslab.study.context import Context
-from tslab.study.launchers import QueuedJob
+from tslab.study.launchers.common.types import QueuedJob
 from tslab.study.reporting.report import log_status
 
 __all__ = ['parse_states', 'status']

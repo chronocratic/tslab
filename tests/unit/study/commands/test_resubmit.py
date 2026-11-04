@@ -29,7 +29,7 @@ from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
 from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
 from tslab.study.context import Context, load_context, refresh_context, Selection
-from tslab.study.launchers import LaunchError
+from tslab.study.launchers.common.types import LaunchError
 from tslab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:

@@ -23,9 +23,11 @@ from tslab.enums import LauncherKind
 from tslab.jobs.local import PoolCommand, process_alive, Watchdog
 from tslab.study import setting_axis, Study
 from tslab.study.definition import expand_runs
-from tslab.study.launchers import launch as _launch, LaunchReport, OnTaskState
+from tslab.study.launchers.common.launch import launch as _launch
+from tslab.study.launchers.common.types import LaunchReport, OnTaskState
 from tslab.study.launchers.local import run as _local_run
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
+from tslab.study.launchers.local.records import LocalJobRecord
 from tslab.study.launchers.local.run import (
     local_job_id,
     LocalLauncher as _LocalLauncher,
@@ -111,6 +113,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
 ) -> LaunchReport:
     return _launch(
         launcher=launcher,
+        record_type=LocalJobRecord,
         write_job_files=write_job_files,
         machine=machine,
         study=study,

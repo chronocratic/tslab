@@ -27,7 +27,7 @@ from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import Resources
+    from tslab.study.launchers.common.types import Resources
 
 __all__ = [
     'JobGroup',

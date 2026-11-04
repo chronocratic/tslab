@@ -22,7 +22,7 @@ from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, wr
 from tslab.enums import InstanceState, RunState, StudyState
 from tslab.study import launchers
 from tslab.study.context import Context
-from tslab.study.launchers import JobUsage
+from tslab.study.launchers.common.types import JobUsage
 from tslab.study.paths import instance_directory
 from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
 from tslab.study.reporting.state import RunReport

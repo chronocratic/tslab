@@ -1,6 +1,6 @@
 """A fake backend for the study tests: recorded calls, canned answers, no SLURM.
 
-``FakeBackend`` implements every member of ``tslab.study.launchers.Backend``
+``FakeBackend`` implements every member of ``tslab.study.launchers.common.protocols.Backend``
 with neutral values. A test sets the answers it wants before the command
 runs, and reads the calls the command made. ``install_fake_backend`` puts
 the fake in place of both real backends, so a command that picks its
@@ -22,15 +22,13 @@ from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
 import tslab.study.launchers
-from tslab.study.launchers import (
-    Backend,
+from tslab.study.launchers.common.launch import launch
+from tslab.study.launchers.common.protocols import Backend, Launcher, RecordJob
+from tslab.study.launchers.common.types import (
     JobStates,
     JobUsage,
-    launch,
-    Launcher,
     LaunchReport,
     QueuedJob,
-    RecordJob,
     Resources,
 )
 from tslab.study.machine import MachineOverride, MachineProfile
@@ -304,6 +302,7 @@ class FakeBackend:
         launcher: Launcher = _FakeLauncher(next_job_id=self._take_job_id)
         return launch(
             launcher=launcher,
+            record_type=tslab.study.launchers.JOB_RECORDS[context.machine.launcher],
             write_job_files=_write_no_job_files,
             machine=context.machine,
             study=context.study,

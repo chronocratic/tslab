@@ -13,7 +13,7 @@ from tslab.cli import main
 from tslab.core.text import TextTable
 from tslab.enums import InstanceState, JobPhase, RunState
 from tslab.study.commands import _finish_launch
-from tslab.study.launchers import SIGNAL_EXIT_BASE
+from tslab.study.launchers.common.types import SIGNAL_EXIT_BASE
 
 
 def run_main(*args: str) -> int:

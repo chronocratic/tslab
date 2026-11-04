@@ -12,7 +12,7 @@ from tslab.jobs.slurm import (
     SlurmError,
 )
 from tslab.study.context import Context
-from tslab.study.launchers import QueuedJob
+from tslab.study.launchers.common.types import QueuedJob
 from tslab.study.records import JobKind, JobRecord, latest_tasks
 
 __all__ = ['expected_starts', 'followup_job_ids', 'slurm_task_ids']

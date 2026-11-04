@@ -15,7 +15,7 @@ from tslab.study.definition import StudyRun
 from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import JobStates
+    from tslab.study.launchers.common.types import JobStates
 
 __all__ = ['FolderFacts', 'RunReport', 'collect_states', 'read_folder', 'study_state']
 
