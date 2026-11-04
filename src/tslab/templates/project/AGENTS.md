@@ -278,8 +278,8 @@ Writing a study:
   `'model.depth': 10`, `'data': 'ett'`). Helpers: `from_presets(presets=PRESETS, names=..., without=('data', 'run_path'))`
   for recipes, `ucr_datasets` / `uea_datasets` for datasets,
   `setting_axis(path='seed', values=(0, 1))` for sweeps; combine axes with `|`.
-- **Axis order is folder order:** runs land in
-  `<output_root>/<study>/<grid>/<axis 1 value>/<axis 2 value>/...`.
+- **Run paths:** runs land in `<output_root>/<study>/<grid>/<axis 1 value>/...`;
+  `run_path='{grid}/{dataset}/seed_{seed}'` on the grid changes it.
 - Settings merge in this order, later wins: axes, grid `run_settings`, grid
   `overrides`, machine `[settings]`, machine `[[overrides]]`.
 - `exclude=` drops combinations; `Override(match=..., settings=...)` changes
