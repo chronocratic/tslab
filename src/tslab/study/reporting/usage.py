@@ -8,7 +8,9 @@ from typing import cast
 
 from tslab.core.text import format_bytes, format_duration, log_table
 from tslab.study.context import Context
-from tslab.study.launchers import Backend, backend_for, JobUsage, Resources
+from tslab.study.launchers import backend_for
+from tslab.study.launchers.common.protocols import Backend
+from tslab.study.launchers.common.types import JobUsage, Resources
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport
 

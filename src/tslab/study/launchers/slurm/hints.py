@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from types import MappingProxyType
 
 from tslab.jobs.slurm import format_slurm_memory
-from tslab.study.launchers import JobUsage, Resources
+from tslab.study.launchers.common.types import JobUsage, Resources
 
 __all__ = ['state_hint']
 

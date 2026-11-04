@@ -12,7 +12,8 @@ from tslab.core.files import atomic_write_text
 from tslab.enums import LauncherKind
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
-from tslab.study.launchers import LaunchError, RecordJob
+from tslab.study.launchers.common.protocols import RecordJob
+from tslab.study.launchers.common.types import LaunchError
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile, SlurmSettings

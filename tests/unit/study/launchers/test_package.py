@@ -8,7 +8,8 @@ from pathlib import Path
 import pytest
 
 from tslab.enums import LauncherKind
-from tslab.study.launchers import backend_for, BACKENDS, JobUsage, LaunchError
+from tslab.study.launchers import backend_for, BACKENDS
+from tslab.study.launchers.common.types import JobUsage, LaunchError
 from tslab.study.machine import (
     load_machine,
     LocalSettings,

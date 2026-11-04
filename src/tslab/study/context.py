@@ -14,7 +14,7 @@ from tslab.study.records import JobRecord, read_jobs, submission_in_progress
 from tslab.study.reporting.state import collect_states, RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers import JobStates, QueuedJob
+    from tslab.study.launchers.common.types import JobStates, QueuedJob
 
 __all__ = [
     'Context',

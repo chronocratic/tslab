@@ -26,7 +26,7 @@ from tslab.study.commands import cancel, resubmit, run_one
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import JobUsage, LaunchError, LaunchReport
+from tslab.study.launchers.common.types import JobUsage, LaunchError, LaunchReport
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.launchers.slurm.records import SlurmJobRecord

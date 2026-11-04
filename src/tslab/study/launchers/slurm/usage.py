@@ -5,7 +5,7 @@ import logging
 
 from tslab.jobs.slurm import query_job_usage, SlurmError, SlurmJobUsage
 from tslab.study.context import Context
-from tslab.study.launchers import JobUsage
+from tslab.study.launchers.common.types import JobUsage
 from tslab.study.reporting.state import RunReport
 
 __all__ = ['failure_usage', 'usage']

@@ -19,7 +19,7 @@ from tests.unit.study.helpers import (
 from tslab.cli import main
 from tslab.enums import InstanceState, RunState
 from tslab.study.context import Context
-from tslab.study.launchers import JobUsage, LaunchError
+from tslab.study.launchers.common.types import JobUsage, LaunchError
 from tslab.study.reporting.usage import log_usage, usage_document
 
 

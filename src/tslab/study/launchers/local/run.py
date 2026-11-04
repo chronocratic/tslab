@@ -26,7 +26,8 @@ from tslab.jobs.local import (
     without_scheduler_variables,
 )
 from tslab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
-from tslab.study.launchers import LaunchError, LaunchStopped, OnTaskState, RecordJob
+from tslab.study.launchers.common.protocols import RecordJob
+from tslab.study.launchers.common.types import LaunchError, LaunchStopped, OnTaskState
 from tslab.study.launchers.local.pid_file import DETACHED_VARIABLE
 from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
 from tslab.study.paths import usage_file

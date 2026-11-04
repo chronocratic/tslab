@@ -10,7 +10,7 @@ from tslab.core.text import format_index_ranges, log_table
 from tslab.enums import JobFlag, StudyState
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers import LaunchReport, QueuedJob, Resources, SIGNAL_EXIT_BASE
+from tslab.study.launchers.common.types import LaunchReport, QueuedJob, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.state import RunReport

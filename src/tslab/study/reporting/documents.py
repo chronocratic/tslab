@@ -8,7 +8,7 @@ from tslab.core.text import format_index_ranges
 from tslab.enums import StudyState
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers import LaunchReport, QueuedJob
+from tslab.study.launchers.common.types import LaunchReport, QueuedJob
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
 from tslab.study.reporting.outcome import counts_live

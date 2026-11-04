@@ -21,7 +21,7 @@ from tslab.cli.study import (
 )
 from tslab.core.meta import hostname
 from tslab.study.commands import submit
-from tslab.study.launchers import LaunchReport
+from tslab.study.launchers.common.types import LaunchReport
 from tslab.study.plan import JobGroup
 from tslab.study.reporting.documents import launch_document
 

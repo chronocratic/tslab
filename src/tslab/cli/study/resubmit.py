@@ -23,7 +23,8 @@ from tslab.cli.study import (
 from tslab.core.meta import hostname
 from tslab.study.code_snapshot import CodeSnapshotError
 from tslab.study.commands import resubmit, run_one
-from tslab.study.launchers import backend_for, LaunchReport
+from tslab.study.launchers import backend_for
+from tslab.study.launchers.common.types import LaunchReport
 from tslab.study.plan import JobGroup
 from tslab.study.reporting.documents import launch_document
 

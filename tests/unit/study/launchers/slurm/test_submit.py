@@ -14,7 +14,9 @@ from tslab.enums import LauncherKind
 from tslab.study import Study
 from tslab.study.commands import submit
 from tslab.study.definition import expand_runs
-from tslab.study.launchers import launch as _launch, LaunchError, LaunchReport
+from tslab.study.launchers.common.launch import launch as _launch
+from tslab.study.launchers.common.types import LaunchError, LaunchReport
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import study_folder
@@ -69,6 +71,7 @@ def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs
 ) -> LaunchReport:
     return _launch(
         launcher=launcher,
+        record_type=SlurmJobRecord,
         write_job_files=write_job_files,
         machine=machine,
         study=study,

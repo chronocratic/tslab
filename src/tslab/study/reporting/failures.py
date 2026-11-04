@@ -7,7 +7,9 @@ from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.enums import InstanceState, StudyState
 from tslab.jobs.local import tail_lines
 from tslab.study.context import Context
-from tslab.study.launchers import Backend, backend_for, JobUsage, Resources
+from tslab.study.launchers import backend_for
+from tslab.study.launchers.common.protocols import Backend
+from tslab.study.launchers.common.types import JobUsage, Resources
 from tslab.study.paths import instance_directory, study_folder
 from tslab.study.reporting.documents import run_entry
 from tslab.study.reporting.state import RunReport

@@ -23,10 +23,10 @@ from tslab.jobs.slurm import (
 from tslab.study.context import Context
 from tslab.study.definition import Study
 from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers import (
+from tslab.study.launchers.common.launch import launch
+from tslab.study.launchers.common.types import (
     JobStates,
     JobUsage,
-    launch,
     LaunchError,
     LaunchReport,
     QueuedJob,
@@ -35,6 +35,7 @@ from tslab.study.launchers import (
 from tslab.study.launchers.slurm.doctor import cluster_checks, slurm_check
 from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.launchers.slurm.job_script import foreground_script
+from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.slurm_file import write_slurm_file
 from tslab.study.launchers.slurm.states import (
     _query_states,
@@ -198,6 +199,7 @@ class SlurmBackend:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
         return launch(
             launcher=SlurmLauncher(sleep=sleep),
+            record_type=SlurmJobRecord,
             write_job_files=write_job_files,
             machine=context.machine,
             study=context.study,
