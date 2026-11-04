@@ -219,7 +219,7 @@ class Grid:
     def _check_job_name(self) -> None:
         """Raise unless the template has plain characters and known placeholders."""
         _check_template(
-            field='job_name',
+            label='grid job_name',
             template=self.job_name,
             literal=_JOB_NAME_LITERAL,
             literal_text='letters, digits, dot, dash or underscore',
@@ -229,7 +229,7 @@ class Grid:
     def _check_run_path(self) -> None:
         """Raise unless the run path template has plain characters and known placeholders."""
         _check_template(
-            field='run_path',
+            label='grid run_path',
             template=self.run_path_template,
             literal=_RUN_PATH_LITERAL,
             literal_text='letters, digits, dot, dash, underscore or slash',
@@ -385,6 +385,19 @@ class Study:
                     f'name more axes in run_path'
                 )
                 raise ValueError(message)
+            nested = [
+                (owner_text, owner)
+                for owner_text, owner in owners.items()
+                if owner_text.startswith(f'{text}/') or text.startswith(f'{owner_text}/')
+            ]
+            if nested:
+                owner_text, (other_grid, other_values) = nested[0]
+                message = (
+                    f'grid {grid_name!r} run {values} has run path {text!r}, which is inside '
+                    f'or around run path {owner_text!r} of grid {other_grid!r} run '
+                    f'{other_values}; name more axes in run_path'
+                )
+                raise ValueError(message)
             owners[text] = (grid_name, values)
 
     def _check_job_names(self) -> None:
@@ -430,20 +443,20 @@ FOLLOWUP_KINDS = (RETRY_JOB, WANDB_SYNC_JOB)
 
 
 def _check_template(
-    *, field: str, template: str, literal: re.Pattern[str], literal_text: str, allowed: set[str]
+    *, label: str, template: str, literal: re.Pattern[str], literal_text: str, allowed: set[str]
 ) -> None:
     """Raise unless the template has only plain characters and allowed placeholders."""
     for piece in _JOB_NAME_PLACEHOLDER.split(template)[::2]:
         if literal.fullmatch(piece) is None:
             message = (
-                f'grid {field} {template!r}: {piece!r} is not allowed; use {literal_text} '
+                f'{label} {template!r}: {piece!r} is not allowed; use {literal_text} '
                 f'between placeholders'
             )
             raise ValueError(message)
     for name in _JOB_NAME_PLACEHOLDER.findall(template):
         if name not in allowed:
             message = (
-                f'grid {field} {template!r}: unknown placeholder {name!r}; '
+                f'{label} {template!r}: unknown placeholder {name!r}; '
                 f'use {", ".join(sorted(allowed))}'
             )
             raise ValueError(message)

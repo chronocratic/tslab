@@ -115,7 +115,7 @@ seconds on a login node is normal.
 
 Rules that matter when writing one:
 
-- **Run paths.** By default the path of a run is
+- **Default run path.** By default the path of a run is
   `<grid>/<value of axis 1>/<value of axis 2>/…`, and its folder is
   `<output_root>/<study>/<run path>`; reorder the axes and the folders move
   with them. `Grid(run_path=...)` changes the layout.
