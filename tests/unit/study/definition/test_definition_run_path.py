@@ -80,3 +80,14 @@ def test_run_paths_must_differ_across_grids() -> None:
 
 def test_axis_with_one_value_may_be_left_out() -> None:
     Study(name='s', grids={'a': grid(run_path='{grid}/{recipe}/{seed}')})
+
+
+def test_run_path_inside_another_run_path_fails() -> None:
+    with pytest.raises(ValueError, match=r"grid 'b'.*inside or around"):
+        Study(
+            name='s',
+            grids={
+                'a': grid(short_name='a'),
+                'b': grid(short_name='b', run_path='a/{recipe}/{dataset}'),
+            },
+        )
