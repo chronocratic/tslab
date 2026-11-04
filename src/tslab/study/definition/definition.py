@@ -15,7 +15,7 @@ import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from tslab.core.paths import NAME_PART_PATTERN
+from tslab.core.paths import NAME_PART_PATTERN, validate_name_part
 from tslab.study.definition.expansion import PLACEHOLDERS
 from tslab.study.definition.settings import check_paths, Settings, SettingValue
 
@@ -48,6 +48,10 @@ _SHORT_NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]+')
 _JOB_NAME_PLACEHOLDER = re.compile(r'\{([A-Za-z_][A-Za-z0-9_]*)\}')
 _JOB_NAME_LITERAL = re.compile(r'[A-Za-z0-9._-]*')
 _RUN_PATH_LITERAL = re.compile(r'[A-Za-z0-9._/-]*')
+_TEMPLATE_HINTS = {
+    'grid job_name': 'short_name, study or an axis',
+    'grid run_path': 'grid, short_name or an axis',
+}
 
 #: The kinds of follow-up job; their SLURM names are ``<study>_<kind>``.
 RETRY_JOB = 'retry'
@@ -377,8 +381,10 @@ class Study:
             text = grid.run_path_text(grid=grid_name, values=values)
             for part in text.split('/'):
                 validate_name(name=part, kind=f'grid {grid_name!r} run path {text!r} part')
-            if text in owners:
-                other_grid, other_values = owners[text]
+                validate_name_part(part=part)
+            key = text.lower()  # a case-insensitive file system folds Coffee and coffee
+            if key in owners:
+                other_grid, other_values = owners[key]
                 message = (
                     f'grid {grid_name!r} run {values} has run path {text!r}, which '
                     f'grid {other_grid!r} run {other_values} has too; '
@@ -388,7 +394,7 @@ class Study:
             nested = [
                 (owner_text, owner)
                 for owner_text, owner in owners.items()
-                if owner_text.startswith(f'{text}/') or text.startswith(f'{owner_text}/')
+                if owner_text.startswith(f'{key}/') or key.startswith(f'{owner_text}/')
             ]
             if nested:
                 owner_text, (other_grid, other_values) = nested[0]
@@ -398,7 +404,7 @@ class Study:
                     f'{other_values}; name more axes in run_path'
                 )
                 raise ValueError(message)
-            owners[text] = (grid_name, values)
+            owners[key] = (grid_name, values)
 
     def _check_job_names(self) -> None:
         """Raise when two grids give one job name, or a grid gives a follow-up name."""
@@ -457,7 +463,7 @@ def _check_template(
         if name not in allowed:
             message = (
                 f'{label} {template!r}: unknown placeholder {name!r}; '
-                f'use {", ".join(sorted(allowed))}'
+                f'use {_TEMPLATE_HINTS[label]}: {", ".join(sorted(allowed))}'
             )
             raise ValueError(message)
 
