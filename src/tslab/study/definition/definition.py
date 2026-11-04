@@ -47,6 +47,7 @@ type Match = Mapping[str, str | Sequence[str]]
 _SHORT_NAME_PATTERN = re.compile(r'[A-Za-z0-9_-]+')
 _JOB_NAME_PLACEHOLDER = re.compile(r'\{([A-Za-z_][A-Za-z0-9_]*)\}')
 _JOB_NAME_LITERAL = re.compile(r'[A-Za-z0-9._-]*')
+_RUN_PATH_LITERAL = re.compile(r'[A-Za-z0-9._/-]*')
 
 #: The kinds of follow-up job; their SLURM names are ``<study>_<kind>``.
 RETRY_JOB = 'retry'
@@ -147,6 +148,9 @@ class Grid:
         job_name: The job name as a template of ``{short_name}``,
             ``{study}`` and axis names. Runs with different names go into
             different arrays, so naming an axis splits the grid by it.
+        run_path: The run path as a template of ``{grid}``, ``{short_name}``
+            and axis names; ``None`` is the grid then the axis values in axis
+            order.
     """
 
     short_name: str
@@ -157,6 +161,7 @@ class Grid:
     overrides: tuple[Override, ...] = ()
     run_settings: Settings = DEFAULT_RUN_SETTINGS
     job_name: str = '{short_name}'
+    run_path: str | None = None
 
     @property
     def job_name_axes(self) -> tuple[str, ...]:
@@ -177,24 +182,59 @@ class Grid:
         known = {'short_name': self.short_name, 'study': study, **values}
         return _JOB_NAME_PLACEHOLDER.sub(lambda match: known[match.group(1)], self.job_name)
 
+    @property
+    def run_path_template(self) -> str:
+        """The run path template: the given one, or the grid then the axis values."""
+        if self.run_path is not None:
+            return self.run_path
+        return '/'.join(['{grid}', *(f'{{{axis}}}' for axis in self.axes)])
+
+    def run_path_text(self, *, grid: str, values: Mapping[str, str]) -> str:
+        """The run path of one run as text, with empty parts kept for the checks.
+
+        Args:
+            grid: The grid name.
+            values: The axis values of the run, as ``StudyRun.values``.
+
+        Returns:
+            The template with its placeholders filled in.
+        """
+        known = {'grid': grid, 'short_name': self.short_name, **values}
+        return _JOB_NAME_PLACEHOLDER.sub(
+            lambda match: known[match.group(1)], self.run_path_template
+        )
+
+    def run_path_for(self, *, grid: str, values: Mapping[str, str]) -> PurePosixPath:
+        """The run path of one run.
+
+        Args:
+            grid: The grid name.
+            values: The axis values of the run, as ``StudyRun.values``.
+
+        Returns:
+            The filled template as a path.
+        """
+        return PurePosixPath(self.run_path_text(grid=grid, values=values))
+
     def _check_job_name(self) -> None:
         """Raise unless the template has plain characters and known placeholders."""
-        template = self.job_name
-        for piece in _JOB_NAME_PLACEHOLDER.split(template)[::2]:
-            if _JOB_NAME_LITERAL.fullmatch(piece) is None:
-                message = (
-                    f'grid job_name {template!r}: {piece!r} is not allowed; use letters, '
-                    f'digits, dot, dash or underscore between placeholders'
-                )
-                raise ValueError(message)
-        allowed = {'short_name', 'study', *self.axes}
-        for name in _JOB_NAME_PLACEHOLDER.findall(template):
-            if name not in allowed:
-                message = (
-                    f'grid job_name {template!r}: unknown placeholder {name!r}; '
-                    f'use short_name, study or an axis: {", ".join(sorted(allowed))}'
-                )
-                raise ValueError(message)
+        _check_template(
+            field='job_name',
+            template=self.job_name,
+            literal=_JOB_NAME_LITERAL,
+            literal_text='letters, digits, dot, dash or underscore',
+            allowed={'short_name', 'study', *self.axes},
+        )
+
+    def _check_run_path(self) -> None:
+        """Raise unless the run path template has plain characters and known placeholders."""
+        _check_template(
+            field='run_path',
+            template=self.run_path_template,
+            literal=_RUN_PATH_LITERAL,
+            literal_text='letters, digits, dot, dash, underscore or slash',
+            allowed={'grid', 'short_name', *self.axes},
+        )
 
     def __post_init__(self) -> None:
         """Check the shape: names, command, config, axes."""
@@ -229,6 +269,7 @@ class Grid:
             for value_name in values:
                 validate_name(name=value_name, kind=f'axis {axis_name!r} value')
         self._check_job_name()
+        self._check_run_path()
 
     def _check_shapes(self) -> None:
         """Type-check the containers; the usual slip is a missing trailing comma."""
@@ -322,6 +363,25 @@ class Study:
                 message = f'grid {grid_name!r} has no runs; every run is excluded'
                 raise ValueError(message)
         self._check_job_names()
+        self._check_run_paths()
+
+    def _check_run_paths(self) -> None:
+        """Raise unless every run path is made of valid names and no two runs share one."""
+        owners: dict[str, tuple[str, dict[str, str]]] = {}
+        for grid_name, grid in self.grids.items():
+            for values in _grid_runs(grid_name=grid_name, grid=grid):
+                text = grid.run_path_text(grid=grid_name, values=values)
+                for part in text.split('/'):
+                    validate_name(name=part, kind=f'grid {grid_name!r} run path {text!r} part')
+                if text in owners:
+                    other_grid, other_values = owners[text]
+                    message = (
+                        f'grid {grid_name!r} run {values} has run path {text!r}, which '
+                        f'grid {other_grid!r} run {other_values} has too; '
+                        f'name more axes in run_path'
+                    )
+                    raise ValueError(message)
+                owners[text] = (grid_name, values)
 
     def _check_job_names(self) -> None:
         """Raise when two grids give one job name, or a grid gives a follow-up name."""
@@ -363,6 +423,26 @@ class Study:
 
 
 FOLLOWUP_KINDS = (RETRY_JOB, WANDB_SYNC_JOB)
+
+
+def _check_template(
+    *, field: str, template: str, literal: re.Pattern[str], literal_text: str, allowed: set[str]
+) -> None:
+    """Raise unless the template has only plain characters and allowed placeholders."""
+    for piece in _JOB_NAME_PLACEHOLDER.split(template)[::2]:
+        if literal.fullmatch(piece) is None:
+            message = (
+                f'grid {field} {template!r}: {piece!r} is not allowed; use {literal_text} '
+                f'between placeholders'
+            )
+            raise ValueError(message)
+    for name in _JOB_NAME_PLACEHOLDER.findall(template):
+        if name not in allowed:
+            message = (
+                f'grid {field} {template!r}: unknown placeholder {name!r}; '
+                f'use {", ".join(sorted(allowed))}'
+            )
+            raise ValueError(message)
 
 
 def followup_job_name(*, study: str, kind: str) -> str:
@@ -633,7 +713,7 @@ def _study_run(*, grid_name: str, grid: Grid, values: Mapping[str, str]) -> Stud
     return StudyRun(
         grid=grid_name,
         values=dict(values),
-        run_path=PurePosixPath(grid_name, *values.values()),
+        run_path=grid.run_path_for(grid=grid_name, values=values),
         settings=settings,
     )
 
