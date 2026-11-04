@@ -31,7 +31,8 @@ import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.machine import MachineOverride, MachineProfileError
-from tslab.study.records import JobKind, JobRecord
+from tslab.study.paths import study_folder
+from tslab.study.records import append_job, JobKind, JobRecord
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -613,3 +614,26 @@ def test_cancel_live_passes_only_live_job_ids(project: Path, fake: FakeSlurm) ->
     assert code == 0
     # why: the timed out job already ended; scancel on an ended id would fail
     assert fake.calls('scancel') == [['1000_0']]
+
+
+def test_after_stopped_submit_writes_the_slurm_file_for_queued_jobs(
+    *, project: Path, fake: FakeSlurm
+) -> None:
+    ctx = _context(project=project, fake=fake)
+    record = JobRecord(
+        kind=JobKind.RUN,
+        submission_id='s1',
+        time='2026-11-02T10:00:00+00:00',
+        launcher=LauncherKind.SLURM,
+        job_id='1000',
+        job_file=1,
+        tasks=(),
+    )
+    folder = study_folder(machine=ctx.machine, study=ctx.study)
+
+    SlurmBackend().after_stopped_submit(context=ctx, submitted=())
+    assert not (folder / 'slurm.sh').exists()
+
+    append_job(path=folder / 'submissions.jsonl', record=record)
+    SlurmBackend().after_stopped_submit(context=ctx, submitted=(record,))
+    assert (folder / 'slurm.sh').exists()

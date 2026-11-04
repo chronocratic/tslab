@@ -328,6 +328,10 @@ class FakeBackend:
         )
         return self.after_submit_code
 
+    def after_stopped_submit(self, *, context: Context, submitted: Sequence[JobRecord]) -> None:
+        """Record the call."""
+        self._record(method='after_stopped_submit', context=context, submitted=submitted)
+
     def cancel(
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:
