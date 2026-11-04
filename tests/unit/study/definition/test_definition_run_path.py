@@ -91,3 +91,14 @@ def test_run_path_inside_another_run_path_fails() -> None:
                 'b': grid(short_name='b', run_path='a/{recipe}/{dataset}'),
             },
         )
+
+
+def test_run_paths_that_differ_only_in_case_fail() -> None:
+    axes = {'a': {'Coffee': {}, 'coffee': {}}}
+    with pytest.raises(ValueError, match='run path'):
+        Study(name='s', grids={'g': grid(axes=axes)})
+
+
+def test_run_path_part_with_temporary_marker_fails() -> None:
+    with pytest.raises(ValueError, match=r'\.tmp-'):
+        Study(name='s', grids={'a': grid(run_path='{grid}/{recipe}/{dataset}/x.tmp-{seed}')})
