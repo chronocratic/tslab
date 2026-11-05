@@ -13,7 +13,6 @@ from typing import Annotated, Any, cast, Protocol, Union
 
 import tyro
 
-from tslab.cli import _Machine, _Study
 from tslab.cli.doctor import Doctor
 from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
@@ -22,6 +21,26 @@ from tslab.cli.study import STUDY_COMMANDS
 from tslab.cli.wandb_sync import WandbSync
 
 __all__ = ['Command']
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Study:
+    """Run a study of experiments: submit, status, resubmit, results."""
+
+    def run(self) -> int:
+        # why: never reached; `_parse` hands every `study` call to the study group
+        msg = 'unreachable'
+        raise AssertionError(msg)
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Machine:
+    """Register machine profiles under names: add, list, remove."""
+
+    def run(self) -> int:
+        # why: never reached; `_parse` hands every `machine` call to the machine group
+        msg = 'unreachable'
+        raise AssertionError(msg)
 
 
 class Command(Protocol):

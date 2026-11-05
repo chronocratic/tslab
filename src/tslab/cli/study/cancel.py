@@ -8,7 +8,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request
-from tslab.cli.study import _context_of, _selection_args
+from tslab.cli.study.shared import _context_of, _selection_args
 from tslab.core.meta import hostname
 from tslab.study.commands import cancel
 from tslab.study.reporting.documents import cancel_document

@@ -9,7 +9,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import resolve_request
-from tslab.cli.study import _context_of
+from tslab.cli.study.shared import _context_of
 from tslab.core.meta import hostname
 from tslab.jobs.slurm import run_slurm_command, slurm_command, SLURM_COMMANDS
 from tslab.study.launchers.slurm.slurm_file import command_values

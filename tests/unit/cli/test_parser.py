@@ -1,8 +1,9 @@
+from importlib.util import find_spec
 import re
 
 import pytest
 
-from tslab.cli import main
+from tslab.cli import main, parser
 
 COMMANDS: list[list[str]] = [
     [],
@@ -22,6 +23,13 @@ COMMANDS: list[list[str]] = [
     ['machine', 'remove'],
 ]
 LEAF_COMMANDS = COMMANDS[3:]
+
+
+def test_entrypoint_and_group_commands_live_in_sibling_modules() -> None:
+    assert find_spec('tslab.cli.entrypoint') is not None
+    assert main.__module__ == 'tslab.cli.entrypoint'
+    assert vars(parser)['_Study'].__module__ == 'tslab.cli.parser'
+    assert vars(parser)['_Machine'].__module__ == 'tslab.cli.parser'
 
 
 def _command_id(*, command: list[str]) -> str:

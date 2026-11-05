@@ -8,7 +8,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request
-from tslab.cli.study import _context_of, _states_of
+from tslab.cli.study.shared import _context_of, _states_of
 from tslab.core.meta import hostname
 from tslab.study.launchers.common.types import LaunchError
 from tslab.study.launchers.tables import backend_for
