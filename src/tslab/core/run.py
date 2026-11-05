@@ -27,6 +27,7 @@ from tslab.core.lock import acquire_lock, Heartbeat, release_lock
 from tslab.core.meta import (
     collect_code_snapshot,
     collect_git_state,
+    collect_hardware,
     collect_versions,
     hostname,
     META_FORMAT_VERSION,
@@ -250,21 +251,22 @@ class Run:
         return self._directory.joinpath(validate_stage_name(name=stage_name), *parts)
 
     def environment(self) -> dict[str, object]:
-        """Return the package versions and git state of the code that runs now.
+        """Return the package versions, git state and hardware of this run.
 
         Computed once per ``Run``. Stages record it in the ``meta.json`` of every
         instance they execute, so a result keeps the commit that produced it even
         after a later execution rewrites the ``meta.json`` of the run.
 
         Returns:
-            Mapping with keys ``versions`` and ``git``. The git state is read from
-            the folder of the main script, not from the working directory, because
-            ``sbatch`` may start the script from elsewhere.
+            Mapping with keys ``versions``, ``git`` and ``hardware``. The git
+            state is read from the folder of the main script, not from the
+            working directory, because ``sbatch`` may start the script from elsewhere.
         """
         if self._environment is None:
             self._environment = {
                 'versions': collect_versions(),
                 'git': collect_git_state(directory=_project_directory()),
+                'hardware': collect_hardware(),
             }
         return self._environment
 

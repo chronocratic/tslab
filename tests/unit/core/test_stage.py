@@ -296,7 +296,7 @@ def test_instance_meta_records_the_environment(tmp_path: Path) -> None:
     meta = json.loads(
         (tmp_path / 'r' / 'count' / 'default' / 'meta.json').read_text(encoding='utf-8')
     )
-    assert set(meta['environment']) == {'git', 'versions'}
+    assert set(meta['environment']) == {'git', 'hardware', 'versions'}
     assert meta['environment']['versions']['python']
 
 
