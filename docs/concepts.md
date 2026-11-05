@@ -57,7 +57,7 @@ fingerprinted by its content, for example a pretrained checkpoint.
 ```
 runs/ts2vec/Coffee/seed_0/
   config.yaml        the parsed config; reload it with tslab.load_config
-  meta.json          versions, git commit, host, config hashes
+  meta.json          versions, git commit, hardware, host, config hashes
   status.json        the state of every instance
   logs/run.log       everything logged during the run
   trackers/csv/      always-on CSV metrics

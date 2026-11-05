@@ -1,13 +1,24 @@
+from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
 
+import pytest
+import torch
+
 from tslab.core.meta import (
     collect_code_snapshot,
     collect_git_state,
+    collect_hardware,
     collect_versions,
     package_version,
 )
+from tslab.core.run import Run
+
+
+@dataclass(frozen=True, kw_only=True)
+class _MetadataConfig:
+    seed: int = 0
 
 
 def test_versions_include_python_and_torch() -> None:
@@ -15,6 +26,46 @@ def test_versions_include_python_and_torch() -> None:
     assert versions['python'] is not None
     assert versions['torch'] is not None
     assert package_version(distribution='surely-not-installed-package') is None
+
+
+def test_collect_hardware_has_expected_keys() -> None:
+    assert set(collect_hardware()) == {
+        'cpu_count',
+        'cuda_available',
+        'cuda_version',
+        'gpus',
+        'cuda_visible_devices',
+    }
+
+
+def test_collect_hardware_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
+    monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
+
+    hardware = collect_hardware()
+
+    assert hardware['cuda_available'] is False
+    assert hardware['gpus'] == []
+    assert hardware['cuda_visible_devices'] is None
+
+
+def test_collect_hardware_lists_visible_gpus(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, 'is_available', lambda: True)
+    monkeypatch.setattr(torch.cuda, 'device_count', lambda: 2)
+    monkeypatch.setattr(torch.cuda, 'get_device_name', lambda index: f'GPU {index}')
+    monkeypatch.setenv('CUDA_VISIBLE_DEVICES', '2,4')
+
+    hardware = collect_hardware()
+
+    assert hardware['cuda_available'] is True
+    assert hardware['gpus'] == ['GPU 0', 'GPU 1']
+    assert hardware['cuda_visible_devices'] == '2,4'
+
+
+def test_run_environment_includes_hardware(tmp_path: Path) -> None:
+    run = Run(config=_MetadataConfig(), root=tmp_path, relative_path=Path('run'))
+
+    assert set(run.environment()) == {'versions', 'git', 'hardware'}
 
 
 def test_collect_code_snapshot_without_the_variable_is_none() -> None:

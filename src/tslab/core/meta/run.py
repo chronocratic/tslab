@@ -7,6 +7,7 @@ reproduce a run (versions, git commit).
 
 from collections.abc import Mapping
 from importlib.metadata import PackageNotFoundError, version
+import os
 from pathlib import Path
 import platform
 import shutil
@@ -19,6 +20,7 @@ __all__ = [
     'META_FORMAT_VERSION',
     'collect_code_snapshot',
     'collect_git_state',
+    'collect_hardware',
     'collect_versions',
     'hostname',
     'package_version',
@@ -55,6 +57,26 @@ def collect_versions() -> dict[str, str | None]:
         'tslab': package_version(distribution='tslab'),
         'torch': package_version(distribution='torch'),
         'lightning': package_version(distribution='lightning'),
+    }
+
+
+def collect_hardware() -> dict[str, object]:
+    """Return the CPU and CUDA hardware visible to this process.
+
+    Returns:
+        Mapping with keys ``cpu_count``, ``cuda_available``, ``cuda_version``,
+        ``gpus`` and ``cuda_visible_devices``.
+    """
+    import torch  # noqa: PLC0415 # why: torch is slow to import and metadata is read by CLI paths
+
+    cuda_available = torch.cuda.is_available()
+    gpu_count = torch.cuda.device_count() if cuda_available else 0
+    return {
+        'cpu_count': os.cpu_count() or 0,
+        'cuda_available': cuda_available,
+        'cuda_version': torch.version.cuda,
+        'gpus': [torch.cuda.get_device_name(index) for index in range(gpu_count)],
+        'cuda_visible_devices': os.environ.get('CUDA_VISIBLE_DEVICES'),
     }
 
 
