@@ -73,7 +73,9 @@ classification = Grid(
     config=classify.ClassifyConfig,
     axes={
         'recipe': from_presets(
-            presets=classify.PRESETS, names=('ts2vec-paper', 'cost-paper'), without=('data',)
+            presets=classify.PRESETS,
+            names=('ts2vec-paper', 'cost-paper'),
+            without=('data', 'trainer.max_epochs', 'trainer.max_training_time'),
         ),
         'dataset': ucr_datasets(root=Path('${UCR_ROOT}'), names=UCR)
         | uea_datasets(root=Path('${UEA_ROOT}'), names=UEA),
@@ -94,7 +96,9 @@ forecasting = Grid(
     config=forecast.ForecastConfig,
     axes={
         'recipe': from_presets(
-            presets=forecast.PRESETS, names=('ts2vec-paper',), without=('data',)
+            presets=forecast.PRESETS,
+            names=('ts2vec-paper',),
+            without=('data', 'trainer.max_epochs', 'trainer.max_training_time'),
         ),
         'variant': {
             v: {'data': 'ett', 'data.dataset_file_path': '${ETT_ROOT}/ETT.csv', 'data.variant': v}
@@ -105,9 +109,19 @@ forecasting = Grid(
 )
 
 example = Study(
-    name='example', grids={'classification': classification, 'forecasting': forecasting}
+    name='example',
+    settings={'trainer.max_epochs': 500, 'trainer.max_training_time': '6:00:00'},
+    grids={'classification': classification, 'forecasting': forecasting},
 )
 ```
+
+### Study settings
+
+Put experiment-wide settings on `Study`. Each path applies only to grids whose
+config has that path. A study setting cannot overlap a path from any axis or
+`Grid.run_settings`; equal paths and parent-child paths both count. Remove a
+recipe value with `from_presets(..., without=(...))` when the study owns it.
+`Grid.overrides` may still set a study path for matching runs.
 
 From the shell a study is referenced as `module:attribute`:
 `my_paper.studies:example`. Importing it imports the user's scripts, so a few
@@ -119,10 +133,11 @@ Rules that matter when writing one:
   `<grid>/<value of axis 1>/<value of axis 2>/…`, and its folder is
   `<output_root>/<study>/<run path>`; reorder the axes and the folders move
   with them. `Grid(run_path=...)` changes the layout.
-- **Merge order, later paths replace earlier ones:** the value of each axis in
-  axis order, then `run_settings` of the grid, then matching `Grid.overrides`,
-  then `[settings]` of the machine profile, then matching machine overrides.
-  Machine profile settings may name only fields marked `MachineSetting` or
+- **Merge order, later paths replace earlier ones:** values of each axis in
+  axis order, `Study.settings`, default run settings, `Grid.run_settings`,
+  matching `Grid.overrides`, `[settings]` of the machine profile, then matching
+  machine overrides. Study settings apply only to grids whose config has each
+  path. Machine profiles may name only fields marked `MachineSetting` or
   `HardwareSetting`; move experiment settings to the study. After the merge
   each path appears once.
 - **Names.** Study, grid, axis and value names match `[A-Za-z0-9._-]+` and
