@@ -10,6 +10,7 @@ from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import Field, fields, MISSING
 from enum import Enum, StrEnum
+import functools
 from pathlib import Path
 import types
 from typing import Any, cast, get_args, get_origin, get_type_hints, Union
@@ -38,6 +39,16 @@ type SettingValue = (
     | None
 )
 type Settings = Mapping[str, SettingValue]
+
+
+@functools.cache
+def _hints(holder: type) -> Mapping[str, Any]:
+    """The type hints of a class, extras kept; read only.
+
+    Cached: a study command walks the same few config classes once per setting
+    of every run, and ``get_type_hints`` dominated the planning time.
+    """
+    return get_type_hints(holder, include_extras=True)
 
 
 def _flag(*, path: str) -> str:
@@ -90,7 +101,7 @@ def _default_choice_name(*, holder: type, field_name: str) -> str | None:
         instance = field.default_factory()
     if instance is None:
         return None
-    choices = union_choices(annotation=get_type_hints(holder, include_extras=True)[field_name])
+    choices = union_choices(annotation=_hints(holder)[field_name])
     if choices is None:
         return None
     for name, cls in choices.items():
@@ -146,7 +157,7 @@ def _dataclass_holder(*, path: str, holder: object, part: str) -> type:
 
 def _field_hint(*, path: str, holder: type, part: str) -> object:
     """The annotation of one field of a dataclass."""
-    hints = get_type_hints(holder, include_extras=True)
+    hints = _hints(holder)
     if part not in hints:
         message = f'{path}: {holder.__name__} has no field {part!r}'
         raise ValueError(message)
@@ -381,7 +392,7 @@ def _preset_settings(
         message = f'preset {preset_name} holds a non-dataclass at {prefix or "the top level"}'
         raise TypeError(message)
     cls = type(config)
-    hints = get_type_hints(cls, include_extras=True)
+    hints = _hints(cls)
     settings: dict[str, SettingValue] = {}
     for field in fields(cls):
         if not field.init:
@@ -488,7 +499,7 @@ def _path_exists(*, path: str, config_class: type, settings: Settings) -> bool:
 
 def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
     """The dataclass holders below a field, all members of an unchosen union."""
-    hints = get_type_hints(holder, include_extras=True)
+    hints = _hints(holder)
     if part not in hints:
         return []
     annotation = hints[part]
@@ -502,7 +513,7 @@ def _steps_into(*, holder: type, part: str, name: object) -> list[type]:
 
 
 def _final_exists(*, holder: type, part: str, name: object) -> bool:
-    hints = get_type_hints(holder, include_extras=True)
+    hints = _hints(holder)
     if part not in hints:
         return False
     choices = union_choices(annotation=hints[part])

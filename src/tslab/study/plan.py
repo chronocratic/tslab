@@ -1,11 +1,15 @@
 """Resolving runs on a machine: settings and resources, merged per run."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, replace
 from io import StringIO
 import logging
+import os
 from pathlib import Path, PurePosixPath
+import pickle
 from typing import TYPE_CHECKING
 
 import tslab
@@ -45,6 +49,19 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_VALIDATION_FROM = 700
+"""From this many tasks on, ``validate_jobs`` checks the arguments in worker processes.
+
+Each worker imports the config classes on start, a few seconds in all; below
+this count one process is faster.
+"""
+
+_CPU_SHARE = 0.5
+"""The share of the usable CPUs the argument checks may take; a login node is shared."""
+
+_CHUNKS_PER_WORKER = 4
+"""Argument checks are handed to each worker in about this many batches."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -477,31 +494,87 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     ]
 
 
-def validate_jobs(*, study: Study, groups: Sequence[JobGroup]) -> list[tuple[PurePosixPath, str]]:
+def validate_jobs(
+    *, study: Study, groups: Sequence[JobGroup], parallel_from: int = PARALLEL_VALIDATION_FROM
+) -> list[tuple[PurePosixPath, str]]:
     """The run paths and messages of task argument and group resource problems.
 
     Args:
         study: The study the groups came from.
         groups: The planned groups.
+        parallel_from: The task count from which the arguments are checked in
+            worker processes.
 
     Returns:
         One pair per task or group problem, in group and task order. A task
         whose arguments could not even be built reports its building error.
     """
-    return [problem for group in groups for problem in _group_problems(study=study, group=group)]
-
-
-def _group_problems(*, study: Study, group: JobGroup) -> list[tuple[PurePosixPath, str]]:
-    """The task and resource problems of one group, in task order."""
-    problems = [
-        problem
+    checks = [
+        (study.grids[group.grid].config, task.command[len(study.grids[group.grid].command) :])
+        for group in groups
         for task in group.tasks
-        if (problem := _task_problem(study=study, group=group, task=task)) is not None
+        if task.error is None
     ]
-    group_problem = _group_signal_problem(group=group)
-    if group_problem is not None:
-        problems.append(group_problem)
+    errors = iter(_argument_errors(checks=checks, parallel=len(checks) >= parallel_from))
+    problems: list[tuple[PurePosixPath, str]] = []
+    for group in groups:
+        problems.extend(_task_problems(group=group, errors=errors))
+        group_problem = _group_signal_problem(group=group)
+        if group_problem is not None:
+            problems.append(group_problem)
     return problems
+
+
+def _task_problems(
+    *, group: JobGroup, errors: Iterator[str | None]
+) -> list[tuple[PurePosixPath, str]]:
+    """The problems of the tasks of one group; tasks that were checked consume ``errors``."""
+    problems = []
+    for task in group.tasks:
+        message = task.error if task.error is not None else _stripped(next(errors))
+        if message is not None:
+            problems.append((task.resolved.run.run_path, message))
+    return problems
+
+
+def _stripped(error: str | None) -> str | None:
+    """The error without surrounding whitespace, or ``None``."""
+    return None if error is None else error.strip()
+
+
+def _argument_errors(
+    *, checks: Sequence[tuple[type, tuple[str, ...]]], parallel: bool
+) -> list[str | None]:
+    """The ``validate_arguments`` result of each (config class, arguments) pair, in order."""
+    if parallel:
+        try:
+            return _errors_in_workers(checks=checks)
+        except (OSError, BrokenProcessPool, pickle.PicklingError, AttributeError) as error:
+            # why: a config class the workers cannot import (a local class) or a
+            # pool that cannot start still validates, one process slower
+            _LOGGER.warning('checking the run arguments in one process: %s', error)
+    return [_check(check) for check in checks]
+
+
+def _errors_in_workers(*, checks: Sequence[tuple[type, tuple[str, ...]]]) -> list[str | None]:
+    """The ``validate_arguments`` result of each pair, computed in worker processes."""
+    workers = _worker_count()
+    chunksize = max(1, len(checks) // (workers * _CHUNKS_PER_WORKER))
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        return list(pool.map(_check, checks, chunksize=chunksize))
+
+
+def _worker_count() -> int:
+    """The ``_CPU_SHARE`` of the CPUs this process may use, at least one."""
+    # why: on Linux the affinity mask (cgroups, taskset) is what this process may use
+    cpus = len(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else os.cpu_count() or 1
+    return max(1, int(cpus * _CPU_SHARE))
+
+
+def _check(check: tuple[type, tuple[str, ...]]) -> str | None:
+    """``validate_arguments`` on one (config class, arguments) pair; a worker entry point."""
+    config_class, arguments = check
+    return validate_arguments(config_class=config_class, arguments=arguments)
 
 
 def _group_signal_problem(*, group: JobGroup) -> tuple[PurePosixPath, str] | None:
@@ -511,17 +584,3 @@ def _group_signal_problem(*, group: JobGroup) -> tuple[PurePosixPath, str] | Non
         return None
     run_path = group.tasks[0].resolved.run.run_path
     return run_path, f'job file {group.job_file}: {problem}'
-
-
-def _task_problem(
-    *, study: Study, group: JobGroup, task: PlannedTask
-) -> tuple[PurePosixPath, str] | None:
-    """The (run path, message) of a task whose arguments do not parse, else ``None``."""
-    run_path = task.resolved.run.run_path
-    if task.error is not None:
-        return run_path, task.error
-    error = validate_arguments(
-        config_class=study.grids[group.grid].config,
-        arguments=task.command[len(study.grids[group.grid].command) :],
-    )
-    return None if error is None else (run_path, error.strip())

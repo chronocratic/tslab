@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from tslab.study.definition import expand_runs
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     _override_warnings,
+    _worker_count,
     check_machine,
     expansion_env,
     JobGroup,
@@ -138,6 +140,36 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
     messages = dict(validate_jobs(study=study, groups=groups))
     assert 'nope' in messages[runs[1].run_path]
     assert 'max_array_size' in messages[runs[1].run_path]
+
+
+def test_validate_jobs_in_worker_processes_matches_one_process(
+    study: Study, tmp_path: Path
+) -> None:
+    machine = _local(tmp_path)
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    groups = plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolved,
+        indices={run.run_path: i for i, run in enumerate(runs)},
+        extra_args={runs[0].run_path: ('--nope', '1'), runs[2].run_path: ('--seed', 'x')},
+        attempts={},
+        first_job_file=1,
+        environment={},
+    )
+    serial = validate_jobs(study=study, groups=groups)
+    parallel = validate_jobs(study=study, groups=groups, parallel_from=1)
+    assert [path for path, _ in serial] == [runs[0].run_path, runs[2].run_path]
+    assert parallel == serial
+
+
+@pytest.mark.parametrize(('cpus', 'workers'), [(1, 1), (2, 1), (12, 6), (13, 6)])
+def test_argument_checks_use_at_most_half_the_cpus(
+    monkeypatch: pytest.MonkeyPatch, cpus: int, workers: int
+) -> None:
+    monkeypatch.setattr(os, 'sched_getaffinity', lambda _pid: set(range(cpus)), raising=False)
+    assert _worker_count() == workers
 
 
 def test_fake_resources_have_no_signal_problem() -> None:
