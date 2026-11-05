@@ -268,6 +268,10 @@ Rules:
   must end at a `MachineSetting` or `HardwareSetting` field of each applicable
   grid config. A choice-union field itself is not a machine setting. Put
   experiment settings in the study instead.
+- **Pinned machine settings.** A study or grid may set a machine setting to
+  require a specific device or worker count. If the machine profile resolves
+  that path to a different value after placeholder expansion, planning fails
+  with both values and the profile path. Matching values pass silently.
 - **Overrides** (`[[overrides]]`) carry a `match` (one value or an explicit
   list per axis, plus the optional `grid` key), and may set `slurm` values
   and `settings`. Every matching override applies; more matched keys wins

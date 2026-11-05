@@ -42,6 +42,7 @@ __all__ = [
     'assign_indices',
     'check_machine',
     'expansion_env',
+    'pin_conflicts',
     'plan_jobs',
     'resolve_runs',
     'run_arguments',
@@ -284,6 +285,37 @@ def run_arguments(
     return settings_to_args(config_class=grid.config, settings=expanded)
 
 
+def pin_conflicts(
+    *,
+    before: Mapping[str, SettingValue],
+    after: Mapping[str, SettingValue],
+    env: Mapping[str, str],
+    placeholders: Mapping[str, str],
+) -> list[tuple[str, SettingValue, SettingValue]]:
+    """The study-set paths changed by machine settings, after expansion.
+
+    Args:
+        before: Settings after study and grid merges, before machine settings.
+        after: Settings after machine settings and machine overrides.
+        env: The environment used to expand values.
+        placeholders: The run placeholders used to expand values.
+
+    Returns:
+        Conflicts as ``(path, study value, machine value)`` in ``before`` order.
+    """
+    conflicts: list[tuple[str, SettingValue, SettingValue]] = []
+    for path, study_value in before.items():
+        if path not in after:
+            continue
+        machine_value = after[path]
+        expanded_study = expand_setting(value=study_value, env=env, values=placeholders)
+        expanded_machine = expand_setting(value=machine_value, env=env, values=placeholders)
+        if str(expanded_study) == str(expanded_machine):
+            continue
+        conflicts.append((path, study_value, machine_value))
+    return conflicts
+
+
 def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str | None:
     """Whether tyro reads the arguments back into the config class.
 
@@ -458,6 +490,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     lookup: dict[tuple[str, str, Resources, CodeSnapshot | None], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
+    pin_conflicts_found: list[tuple[str, SettingValue, SettingValue]] = []
     env = expansion_env(machine=machine, environment=environment)
     counters = uncounted or {}
     snapshots = code_snapshots or {}
@@ -483,24 +516,26 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         index = indices[run.run.run_path]
         args = extra_args.get(run.run.run_path, ())
         log_file = log_file_of(folder=folder, job_name=job_name, index=index)
+        placeholders = {
+            'output_root': str(machine.output_root),
+            'study': study.name,
+            'run_path': run.run.run_path.as_posix(),
+            'log_file': str(log_file),
+            'cpus': str(run.resources.cpus),
+            'cpus_per_run': str(run.resources.cpus_per_run),
+        }
         try:
+            run_pin_conflicts = pin_conflicts(
+                before=run.run.settings, after=run.settings, env=env, placeholders=placeholders
+            )
             arguments = run_arguments(
-                grid=grid,
-                settings=run.settings,
-                env=env,
-                placeholders={
-                    'output_root': str(machine.output_root),
-                    'study': study.name,
-                    'run_path': run.run.run_path.as_posix(),
-                    'log_file': str(log_file),
-                    'cpus': str(run.resources.cpus),
-                    'cpus_per_run': str(run.resources.cpus_per_run),
-                },
+                grid=grid, settings=run.settings, env=env, placeholders=placeholders
             )
         except (ValueError, TypeError) as error:
             arguments = []
             error_text = str(error)
         else:
+            pin_conflicts_found.extend(run_pin_conflicts)
             error_text = None
         max_tasks_per_job = run.resources.max_tasks_per_job
         if max_tasks_per_job is not None and index >= max_tasks_per_job:
@@ -523,6 +558,18 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             uncounted_in_row=counters.get(run.run.run_path, (0, 0))[1],
         )
         tasks_of[lookup[key]].append(task)
+    if pin_conflicts_found:
+        unique_conflicts: list[tuple[str, SettingValue, SettingValue]] = []
+        for conflict in pin_conflicts_found:
+            if conflict in unique_conflicts:
+                continue
+            unique_conflicts.append(conflict)
+        message = '; '.join(
+            f'study {study.name!r} pins {path} = {study_value!r}, but '
+            f'{machine.path} sets {machine_value!r}; remove it from one of them'
+            for path, study_value, machine_value in unique_conflicts
+        )
+        raise ValueError(message)
     return [
         replace(group, tasks=tuple(sorted(tasks_of[position], key=lambda task: task.index)))
         for position, group in enumerate(groups)
