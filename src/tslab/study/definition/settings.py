@@ -17,6 +17,7 @@ from typing import Any, cast, get_args, get_origin, get_type_hints, Union
 
 from tslab.core.codec import strip_annotated, union_choices
 from tslab.core.config import REQUIRED
+from tslab.core.markers import is_machine_setting
 
 __all__ = [
     'SettingValue',
@@ -24,6 +25,7 @@ __all__ = [
     'check_paths',
     'field_annotation',
     'from_presets',
+    'non_machine_paths',
     'settings_to_args',
 ]
 
@@ -479,6 +481,48 @@ def check_paths(*, config_class: type, settings: Settings) -> list[str]:
         for path in settings
         if not _path_exists(path=path, config_class=config_class, settings=settings)
     ]
+
+
+def non_machine_paths(*, config_class: type, settings: Settings) -> list[str]:
+    """The existing paths of ``settings`` that do not end at machine settings.
+
+    At a choice union that is not chosen in ``settings``, every member that has
+    the path must carry ``MachineSetting``. A path naming the union itself is
+    never a machine setting.
+
+    Args:
+        config_class: The config dataclass the paths are relative to.
+        settings: The settings mapping whose paths are checked.
+
+    Returns:
+        Existing paths that are not machine settings, in mapping order.
+    """
+    return [
+        path
+        for path in settings
+        if _machine_path_status(path=path, config_class=config_class, settings=settings) is False
+    ]
+
+
+def _machine_path_status(*, path: str, config_class: type, settings: Settings) -> bool | None:
+    """Whether an existing path is a machine setting; ``None`` means it is unknown."""
+    parts = path.split('.')
+    holders: list[type] = [config_class]
+    for position, part in enumerate(parts):
+        name = settings.get('.'.join(parts[: position + 1]))
+        if position == len(parts) - 1:
+            annotations = [_hints(holder)[part] for holder in holders if part in _hints(holder)]
+            if not annotations:
+                return None
+            return all(is_machine_setting(annotation=annotation) for annotation in annotations)
+        holders = [
+            next_holder
+            for holder in holders
+            for next_holder in _steps_into(holder=holder, part=part, name=name)
+        ]
+        if not holders:
+            return None
+    return None
 
 
 def _path_exists(*, path: str, config_class: type, settings: Settings) -> bool:

@@ -25,8 +25,9 @@ under SLURM and pause training until the next job.
   Other stages stop without a checkpoint. Resubmit the study to resume training;
   set `[slurm] signal_seconds = 0` to disable the signal.
 
-Machine profiles set `trainer.job_time_share` (and `[slurm] time`) for the
-time budget, not `max_training_time`: that setting is fingerprinted, so a
+Machine profiles may set `trainer.job_time_share` (and `[slurm] time`) for the
+time budget, but not `trainer.max_training_time`. Profiles reject that
+experiment setting; put it in the study instead. It is fingerprinted, so a
 profile that sets it would make the same study train differently on every
 machine.
 

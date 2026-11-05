@@ -60,7 +60,7 @@ tslab_command = ["uv", "run", "tslab"]
 
 [settings]
 "tracking.wandb_mode" = "offline"
-"tracking.shell_log_path" = "{log_file}"
+"trainer.accelerator" = "gpu"
 
 [env]
 WANDB_ENTITY = "my-team"
@@ -111,10 +111,7 @@ def test_full_example_loads(cluster_toml: Path) -> None:
     profile = _load_machine(path=cluster_toml, environment={'SCRATCH': '/scratch/me'})
     assert profile.output_root == Path('/scratch/me/exps')
     assert profile.env['UCR_ROOT'] == '/scratch/me/data/UCR'
-    assert profile.settings == {
-        'tracking.wandb_mode': 'offline',
-        'tracking.shell_log_path': '{log_file}',
-    }
+    assert profile.settings == {'tracking.wandb_mode': 'offline', 'trainer.accelerator': 'gpu'}
     assert profile.slurm == SlurmSettings(
         partition='CHANGE_ME',
         qos='normal',
@@ -156,12 +153,12 @@ def test_nested_settings_tables_flatten(tmp_path: Path) -> None:
     path = tmp_path / 'laptop.toml'
     path.write_text(
         'launcher = "local"\noutput_root = "runs"\n'
-        '[settings]\n"trainer.max_epochs" = 3\n'
+        '[settings]\n"trainer.accelerator" = "gpu"\n'
         '[settings.tracking]\nwandb_mode = "offline"\n'
     )
     assert load_machine(path=path).settings == {
         'tracking.wandb_mode': 'offline',
-        'trainer.max_epochs': 3,
+        'trainer.accelerator': 'gpu',
     }
 
 

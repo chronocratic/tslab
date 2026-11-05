@@ -76,6 +76,7 @@ class UCRSettings:
     dataset_folder_path: Path
     target_column_name: str = 'target'
     batch_size: int = 8
+    num_workers: Annotated[int, tslab.HardwareSetting] = 0
     splitting_strategy: SplitMode = SplitMode.ARCHIVE
 
 
@@ -85,6 +86,7 @@ class UEASettings:
 
     dataset_folder_path: Path
     batch_size: int = 16
+    num_workers: int = 0
 
 
 DataChoice = (
@@ -100,6 +102,7 @@ class Trainer:
     max_epochs: int = 100
     deterministic: bool = False
     max_training_time: str | None = None
+    accelerator: Annotated[str, tslab.HardwareSetting] = 'auto'
 
 
 @dataclass(frozen=True, kw_only=True)

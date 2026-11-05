@@ -27,6 +27,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
+from tslab.study.definition.settings import non_machine_paths
 from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import log_file_of, study_folder
 from tslab.study.records import JobRecord, latest_tasks
@@ -174,6 +175,13 @@ def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
                 f'{grid.config.__name__} (grid {grid_name!r}): {", ".join(bad)}'
             )
             raise ValueError(message)
+        _check_machine_settings(
+            grid_name=grid_name,
+            grid=grid,
+            machine=machine,
+            settings=machine.settings,
+            location='[settings]',
+        )
     for position, override in enumerate(machine.overrides):
         _override_problems(study=study, machine=machine, position=position, override=override)
 
@@ -192,6 +200,33 @@ def _override_problems(
                 f'of {grid.config.__name__} (grid {grid_name!r}): {", ".join(bad)}'
             )
             raise ValueError(message)
+        _check_machine_settings(
+            grid_name=grid_name,
+            grid=grid,
+            machine=machine,
+            settings=override.settings,
+            location=f'overrides[{position}].settings',
+        )
+
+
+def _check_machine_settings(
+    *,
+    grid_name: str,
+    grid: Grid,
+    machine: MachineProfile,
+    settings: Mapping[str, SettingValue],
+    location: str,
+) -> None:
+    bad = non_machine_paths(config_class=grid.config, settings=settings)
+    if not bad:
+        return
+    message = (
+        f'{machine.path}: {location} sets {", ".join(bad)}, which '
+        f'{"is" if len(bad) == 1 else "are"} not a machine setting of '
+        f'{grid.config.__name__} (grid {grid_name!r}); '
+        f'set {"it" if len(bad) == 1 else "them"} in the study instead'
+    )
+    raise ValueError(message)
 
 
 def _override_grids(
