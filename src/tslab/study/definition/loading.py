@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from tslab.study.definition.definition import Study
+from tslab.study.project import _drop_foreign_modules
 
 __all__ = ['load_study']
 
@@ -34,7 +35,7 @@ def load_study(*, reference: str) -> Study:
         message = f'reference {reference!r} is malformed; references are module:attribute'
         raise ValueError(message)
     cwd = Path.cwd()
-    _drop_foreign_module(module_name=module_name, cwd=cwd)
+    _drop_foreign_modules(module_name=module_name, cwd=cwd)
     inserted = str(cwd) not in sys.path
     if inserted:
         sys.path.insert(0, str(cwd))
@@ -48,18 +49,10 @@ def load_study(*, reference: str) -> Study:
         if inserted and str(cwd) in sys.path:
             sys.path.remove(str(cwd))
     if not hasattr(module, attribute_name):
-        message = f'module {module_name!r} has no attribute {attribute_name!r}'
+        message = f'{module_name} has no attribute {attribute_name!r}'
         raise ValueError(message)
     study = getattr(module, attribute_name)
     if not isinstance(study, Study):
         message = f'{reference!r} does not name a Study, it is a {type(study).__name__}'
         raise TypeError(message)
     return study
-
-
-def _drop_foreign_module(*, module_name: str, cwd: Path) -> None:
-    """Forget a cached module of this name that came from another folder."""
-    cached = sys.modules.get(module_name)
-    origin = getattr(cached, '__file__', None)
-    if cached is not None and (origin is None or Path(origin).parent.resolve() != cwd.resolve()):
-        sys.modules.pop(module_name, None)

@@ -31,11 +31,11 @@ class Logs:
     """Print the run log of one run, or follow it as it grows.
 
     For example:
-        tslab study logs my_paper.studies:example --machine local --only seed=1 -f
+        tslab study logs example --machine local --only seed=1 -f
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.

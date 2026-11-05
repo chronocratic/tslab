@@ -28,11 +28,11 @@ class Slurm:
     the job ids of the study filled in and the full job name shown.
 
     For example:
-        tslab study slurm my_paper.studies:example squeue-full-name
+        tslab study slurm example squeue-full-name
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         name: The command, <tool>-<variant>; leave out to list them.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.

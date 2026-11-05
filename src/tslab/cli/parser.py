@@ -69,9 +69,10 @@ _GROUPS: Mapping[str, _Group] = MappingProxyType(
             commands=STUDY_COMMANDS,
             prog=f'tslab {_STUDY}',
             description=(
-                'Launch and follow the runs of a study. STUDY is module:attribute, for example '
-                'my_paper.studies:example; a short name expands against the studies module of '
-                'the nearest tslab.toml; --machine is a name from tslab machine list, '
+                'Launch and follow the runs of a study. STUDY is a short name, such as example, or '
+                'a full module:attribute reference, such as '
+                'my_paper.studies.example:study; a short name expands against the studies package '
+                'of the nearest tslab.toml; --machine is a name from tslab machine list, '
                 'machines/<name>.toml above the working folder, or a profile path.'
             ),
         ),
@@ -116,8 +117,9 @@ def _parse(*, argv: Sequence[str]) -> Command:
             '  tslab study resubmit STUDY --machine local                    '
             'retry interrupted runs\n'
             '  tslab study results STUDY --machine local --out results.csv   collect metrics\n\n'
-            'STUDY is module:attribute, for example my_paper.studies:example; a short name '
-            'expands against the studies module of tslab.toml.'
+            'STUDY is a short name, such as example, or a full module:attribute reference, such as '
+            'my_paper.studies.example:study; a short name expands against the studies package of '
+            'tslab.toml.'
         ),
     )
 

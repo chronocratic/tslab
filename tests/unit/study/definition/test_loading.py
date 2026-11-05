@@ -28,8 +28,10 @@ def test_load_study(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     assert load_study(reference='my_studies:rbs').name == 'rbs'
     with pytest.raises(ValueError, match='reference'):
         load_study(reference='my_studies')
-    with pytest.raises(ValueError, match='attribute'):
+    with pytest.raises(ValueError, match=r"my_studies has no attribute 'nope'"):
         load_study(reference='my_studies:nope')
+    with pytest.raises(ValueError, match=r"my_studies has no attribute 'study'"):
+        load_study(reference='my_studies:study')
     with pytest.raises(TypeError):
         load_study(reference='my_studies:NOT_A_STUDY')
 
@@ -86,6 +88,28 @@ def test_load_study_prefers_the_module_of_the_current_folder(
     assert load_study(reference='my_studies:rbs').name == 'first'
     monkeypatch.chdir(tmp_path / 'two')
     assert load_study(reference='my_studies:rbs').name == 'second'
+
+
+def test_load_study_prefers_the_nested_package_of_the_current_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for folder, name in (('one', 'first'), ('two', 'second')):
+        root = tmp_path / folder
+        study_package = root / 'pkg' / 'studies' / 'quick'
+        study_package.mkdir(parents=True)
+        for package in (root / 'pkg', root / 'pkg' / 'studies'):
+            (package / '__init__.py').write_text('', encoding='utf-8')
+        (study_package / '__init__.py').write_text(
+            'from tests.unit.study.configs import grid\n'
+            'from tslab.study import Study\n'
+            f"study = Study(name='{name}', grids={{'g': grid()}})\n",
+            encoding='utf-8',
+        )
+
+    monkeypatch.chdir(tmp_path / 'one')
+    assert load_study(reference='pkg.studies.quick:study').name == 'first'
+    monkeypatch.chdir(tmp_path / 'two')
+    assert load_study(reference='pkg.studies.quick:study').name == 'second'
 
 
 def test_three_part_reference_is_malformed() -> None:

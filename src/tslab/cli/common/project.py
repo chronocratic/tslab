@@ -2,7 +2,7 @@
 
 The typed study and machine are turned into full values here, before
 anything is loaded or recorded. A short study name expands against the
-``studies`` module of the nearest ``tslab.toml``; a missing machine is
+``studies`` package of the nearest ``tslab.toml``; a missing machine is
 picked from its ``[machine_by_host]`` table for this host. Every later
 step sees only the full reference and the machine name.
 """

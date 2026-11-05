@@ -4,6 +4,7 @@ The argument dataclasses in the submodules hold only the flags of one command;
 the behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
+import builtins
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 import logging
@@ -19,11 +20,13 @@ from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers.cpus import available_cpus
 from tslab.study.launchers.tables import backend_for
 from tslab.study.machine import resolve_machine
+from tslab.study.project import find_studies, load_project_settings, ProjectSettings
 
 __all__ = [
     'STUDY_COMMANDS',
     'Cancel',
     'Failures',
+    'List',
     'Logs',
     'Resubmit',
     'Results',
@@ -107,13 +110,33 @@ def _usage_errors(*, study: str) -> Generator[None]:
         # why: only a missing study module is a usage error worth a hint; a missing
         # dependency inside it keeps its own message
         if error.name is not None and f'{module_name}.'.startswith(f'{error.name}.'):
-            message = (
-                f'cannot import the study module {module_name!r} ({error}); run tslab from '
-                'the project folder, or check STUDY (module:attribute)'
-            )
+            message = _missing_study_message(error=error, module_name=module_name)
         raise UsageError(message) from error
     except (ValueError, TypeError, FileNotFoundError) as error:
         raise UsageError(str(error)) from error
+
+
+def _missing_study_message(*, error: ModuleNotFoundError, module_name: str) -> str:
+    """The useful usage error for a short name whose module cannot import."""
+    message = (
+        f'cannot import the study module {module_name!r} ({error}); run tslab from '
+        'the project folder, or check STUDY (module:attribute)'
+    )
+    settings: ProjectSettings = load_project_settings(start=Path.cwd())
+    if settings.studies is None:
+        return message
+    prefix = f'{settings.studies}.'
+    if not module_name.startswith(prefix):
+        return message
+    short_name = module_name.removeprefix(prefix)
+    if not short_name or '.' in short_name:
+        return message
+    try:
+        found = find_studies(settings=settings)
+    except (ModuleNotFoundError, ValueError):
+        return message
+    names = ', '.join(found) if found else 'none'
+    return f'no study {short_name!r}: cannot import {module_name}; studies found: {names}'
 
 
 def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:
@@ -142,8 +165,8 @@ def _log_next_step(*, dry_run: bool, selection: str) -> None:
     _LOGGER.info('follow progress: tslab study status %s', selection)
 
 
-def _selection_options(*, grid: tuple[str, ...], only: tuple[str, ...]) -> list[str]:
-    options: list[str] = []
+def _selection_options(*, grid: tuple[str, ...], only: tuple[str, ...]) -> builtins.list[str]:
+    options: builtins.list[str] = []
     for grid_name in grid:
         options.extend(('--grid', grid_name))
     for selection in only:
@@ -223,6 +246,7 @@ def _status_hints(
 # why: the submodules import the shared helpers from this door
 from tslab.cli.study.cancel import Cancel  # noqa: E402
 from tslab.cli.study.failures import Failures, Usage  # noqa: E402
+from tslab.cli.study.list import List  # noqa: E402
 from tslab.cli.study.logs import Logs  # noqa: E402
 from tslab.cli.study.resubmit import Resubmit, RunOne  # noqa: E402
 from tslab.cli.study.results import Results  # noqa: E402
@@ -236,6 +260,7 @@ STUDY_COMMANDS = {
     'resubmit': Resubmit,
     'results': Results,
     'show': Show,
+    'list': List,
     'wait': Wait,
     'failures': Failures,
     'logs': Logs,

@@ -1,6 +1,6 @@
 """The project settings: the committed ``tslab.toml`` at the project root.
 
-The file holds the studies module, a host-to-machine table and the default
+The file holds the studies package, a host-to-machine table and the default
 runs folder, so the study commands take short names and no ``--machine``.
 It is found by walking up from the working folder; without one, the
 built-in defaults hold and nothing errors.
@@ -9,7 +9,10 @@ built-in defaults hold and nothing errors.
 from collections.abc import Mapping
 from dataclasses import dataclass
 import fnmatch
+import importlib
 from pathlib import Path
+import pkgutil
+import sys
 import tomllib
 
 from tslab.core.text import unknown_key_message
@@ -19,6 +22,7 @@ __all__ = [
     'ProjectSettings',
     'expand_study',
     'find_project_file',
+    'find_studies',
     'load_project_settings',
     'machine_for_host',
 ]
@@ -41,7 +45,7 @@ class ProjectSettings:
 
     Attributes:
         path: The absolute path of the file in use; ``None`` without one.
-        studies: The studies module, e.g. ``my_paper.studies``; short study
+        studies: The studies package, e.g. ``my_paper.studies``; short study
             names expand against it.
         machine_by_host: The host pattern to machine name pairs, in file
             order; the first pattern that matches wins.
@@ -114,7 +118,7 @@ def load_project_settings(*, start: Path) -> ProjectSettings:
 
 
 def expand_study(*, reference: str, settings: ProjectSettings) -> str:
-    """The full ``module:attribute`` reference behind a typed study name.
+    """The full ``module:attribute`` reference behind a short study name.
 
     Args:
         reference: The study as typed, short or full.
@@ -122,11 +126,60 @@ def expand_study(*, reference: str, settings: ProjectSettings) -> str:
 
     Returns:
         ``reference`` unchanged when it holds a ``:`` or the settings have no
-        studies module; otherwise the short name under that module.
+        studies package; otherwise the study package for that short name.
     """
     if ':' in reference or settings.studies is None:
         return reference
-    return f'{settings.studies}:{reference}'
+    return f'{settings.studies}.{reference}:study'
+
+
+def _drop_foreign_modules(*, module_name: str, cwd: Path) -> None:
+    """Forget cached study modules from another folder, including parent packages."""
+    names = module_name.split('.')
+    root = cwd.resolve()
+    for count in range(1, len(names) + 1):
+        name = '.'.join(names[:count])
+        cached = sys.modules.get(name)
+        if cached is None:
+            continue
+        origin = getattr(cached, '__file__', None)
+        if origin is not None and Path(origin).resolve().is_relative_to(root):
+            continue
+        sys.modules.pop(name, None)
+
+
+def find_studies(*, settings: ProjectSettings) -> list[str]:
+    """Sorted short names of public modules and packages in the studies package.
+
+    Args:
+        settings: The project settings naming the studies package.
+
+    Returns:
+        The module and package names directly under the studies package, excluding
+        ``common`` and private names; empty when no package is configured.
+    """
+    if settings.studies is None:
+        return []
+    cwd = Path.cwd()
+    cwd_text = str(cwd)
+    _drop_foreign_modules(module_name=settings.studies, cwd=cwd)
+    inserted = cwd_text not in sys.path
+    if inserted:
+        sys.path.insert(0, cwd_text)
+    try:
+        package = importlib.import_module(settings.studies)
+    finally:
+        if inserted and cwd_text in sys.path:
+            sys.path.remove(cwd_text)
+    package_path = getattr(package, '__path__', None)
+    if package_path is None:
+        message = f'{settings.studies!r} is not a package'
+        raise ValueError(message)
+    return sorted(
+        name
+        for _, name, _ in pkgutil.iter_modules(package_path)
+        if name != 'common' and not name.startswith('_')
+    )
 
 
 def machine_for_host(*, settings: ProjectSettings, host: str) -> tuple[str, str] | None:

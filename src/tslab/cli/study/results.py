@@ -20,11 +20,11 @@ class Results:
     """Collect the metrics of every run of a study into one CSV file.
 
     For example:
-        tslab study results my_paper.studies:example --machine local --out results.csv
+        tslab study results example --machine local --out results.csv
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path. Default: from
             [machine_by_host] in tslab.toml.

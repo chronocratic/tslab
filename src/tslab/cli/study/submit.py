@@ -49,12 +49,12 @@ class Submit:
     """Submit the runs of a study to a machine, or dry-run the plan.
 
     For example:
-        tslab study submit my_paper.studies:example --machine local --dry-run
-        tslab study submit my_paper.studies:example --machine local -- --trainer.max-epochs 5
+        tslab study submit example --machine local --dry-run
+        tslab study submit example --machine local -- --trainer.max-epochs 5
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path. Default: from
             [machine_by_host] in tslab.toml.

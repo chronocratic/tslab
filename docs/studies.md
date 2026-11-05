@@ -10,10 +10,10 @@ For an agent workflow with JSON documents and exit codes, see the
 [Agent guide](agents.md).
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine cluster
-uv run tslab study status   my_paper.studies:example --machine cluster
-uv run tslab study resubmit my_paper.studies:example --machine cluster
-uv run tslab study results  my_paper.studies:example --machine cluster \
+uv run tslab study submit example --machine cluster
+uv run tslab study status   example --machine cluster
+uv run tslab study resubmit example --machine cluster
+uv run tslab study results  example --machine cluster \
     --out results.csv
 ```
 
@@ -123,9 +123,12 @@ config has that path. A study setting cannot overlap a path from any axis or
 recipe value with `from_presets(..., without=(...))` when the study owns it.
 `Grid.overrides` may still set a study path for matching runs.
 
-From the shell a study is referenced as `module:attribute`:
-`my_paper.studies:example`. Importing it imports the user's scripts, so a few
-seconds on a login node is normal.
+With `studies = "my_paper.studies"` in `tslab.toml`, the short name `example`
+resolves to `my_paper.studies.example:study`. Put each study in its own module
+or package; shared definitions belong in `common`. Run `tslab study list` to
+discover the available names; `--json` emits the `tslab.study-list/1` schema.
+Importing a study imports the user's scripts, so a few seconds on a login node
+is normal.
 
 Rules that matter when writing one:
 
@@ -363,7 +366,7 @@ steps. A run stopped by `max_training_time` logs a warning.
 ## Submit
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine cluster \
+uv run tslab study submit example --machine cluster \
     [--grid NAME] [--only AXIS=V1,V2] [--include-done] [--dry-run] [-- extra args]
 ```
 
@@ -428,7 +431,7 @@ the logs of earlier attempts stay under the old one. Each array is one
 ## Status
 
 ```bash
-uv run tslab study status my_paper.studies:example --machine cluster \
+uv run tslab study status example --machine cluster \
     [--grid NAME] [--only AXIS=V1,V2] [--states STATE]
 ```
 
@@ -463,7 +466,7 @@ status report is not a failure.
 ## Resubmit
 
 ```bash
-uv run tslab study resubmit my_paper.studies:example --machine cluster \
+uv run tslab study resubmit example --machine cluster \
     [--states failed,interrupted,missing] [--cancel-live] [--dry-run] [-- extra args]
 ```
 
@@ -490,7 +493,7 @@ jobs import that copy, so later edits never change queued or resubmitted
 runs. It is opt-in and off by default.
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine cluster --code-snapshot
+uv run tslab study submit example --machine cluster --code-snapshot
 ```
 
 `code_snapshot = true` in [tslab.toml](project-settings.md) turns it on for
@@ -571,7 +574,7 @@ no network (see below).
 ## Results
 
 ```bash
-uv run tslab study results my_paper.studies:example --machine cluster \
+uv run tslab study results example --machine cluster \
     --out results.csv
 ```
 
@@ -591,8 +594,8 @@ Use `--out -` to write CSV to standard output. Add `--json` to write the
 versioned `tslab.study-results/1` document to a file or standard output:
 
 ```bash
-uv run tslab study results my_paper.studies:example --machine cluster --out -
-uv run tslab study results my_paper.studies:example --machine cluster --out - --json
+uv run tslab study results example --machine cluster --out -
+uv run tslab study results example --machine cluster --out - --json
 ```
 
 ## Show a study
@@ -603,7 +606,7 @@ counts without needing a machine profile. Use those names to form `--grid` and
 `tslab.study-show/1` document. See the [Agent guide](agents.md).
 
 ```bash
-uv run tslab study show my_paper.studies:example --json
+uv run tslab study show example --json
 ```
 
 ## Wait for a study
@@ -617,7 +620,7 @@ stops, even after failures. It works in a background shell and supports
 `--json`. See the [Agent guide](agents.md) for exit-code actions.
 
 ```bash
-uv run tslab study wait my_paper.studies:example --machine cluster --json
+uv run tslab study wait example --machine cluster --json
 ```
 
 ## Inspect failures
@@ -635,7 +638,7 @@ and `--lines` to change the selection and tail size. The command only reads
 data. See the [Agent guide](agents.md).
 
 ```bash
-uv run tslab study failures my_paper.studies:example --machine cluster --json
+uv run tslab study failures example --machine cluster --json
 ```
 
 ## Read the log of a run
@@ -649,7 +652,7 @@ for a run that has not started yet. `-n N` changes the number of lines.
 of the latest local launch started with `--detach`.
 
 ```bash
-uv run tslab study logs my_paper.studies:example --machine local --only seed=1 -f
+uv run tslab study logs example --machine local --only seed=1 -f
 ```
 
 ## Run one task in the foreground
@@ -670,7 +673,7 @@ those are reused. The command starts one process; for a multi-GPU job it says
 how many tasks the job would start.
 
 ```bash
-uv run tslab study run my_paper.studies:example --machine cluster \
+uv run tslab study run example --machine cluster \
     --grid classification --only dataset=Coffee --only seed=42
 ```
 
@@ -695,7 +698,7 @@ it reads the usage files of the tasks instead of `sacct` (see
 [Local machines](#local-machines)).
 
 ```bash
-uv run tslab study usage my_paper.studies:example --machine cluster
+uv run tslab study usage example --machine cluster
 ```
 
 ## Cancel live jobs
@@ -711,7 +714,7 @@ for the test. On a local machine it stops the live local launch (see
 [Agent guide](agents.md).
 
 ```bash
-uv run tslab study cancel my_paper.studies:example --machine cluster --dry-run --json
+uv run tslab study cancel example --machine cluster --dry-run --json
 ```
 
 ## Check a machine
@@ -726,7 +729,7 @@ check. It does not verify that a real cluster job succeeds. See the [Agent
 guide](agents.md).
 
 ```bash
-uv run tslab doctor --machine cluster my_paper.studies:example --json
+uv run tslab doctor --machine cluster example --json
 ```
 
 ## HPC environment notes

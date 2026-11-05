@@ -64,7 +64,7 @@ def test_broken_file_fails_even_with_a_flag(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ('text', 'typed', 'expected'),
     [
-        ('studies = "pkg"\n', 'ablation', 'pkg:ablation'),
+        ('studies = "pkg"\n', 'ablation', 'pkg.ablation:study'),
         ('studies = "pkg"\n', 'other:x', 'other:x'),
         ('[machine_by_host]\n"*" = "m"\n', 'ablation', 'ablation'),
         (None, 'ablation', 'ablation'),

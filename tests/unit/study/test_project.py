@@ -6,6 +6,7 @@ import pytest
 
 from tslab.study.project import (
     expand_study,
+    find_studies,
     load_project_settings,
     machine_for_host,
     ProjectSettings,
@@ -94,10 +95,47 @@ def test_code_snapshot_not_bool_is_an_error(tmp_path: Path, text: str) -> None:
 
 def test_expand_study() -> None:
     settings = ProjectSettings(path=None, studies='pkg.studies')
-    assert expand_study(reference='ablation', settings=settings) == 'pkg.studies:ablation'
+    assert expand_study(reference='ablation', settings=settings) == 'pkg.studies.ablation:study'
     assert expand_study(reference='other:x', settings=settings) == 'other:x'
     bare = ProjectSettings(path=None)
     assert expand_study(reference='ablation', settings=bare) == 'ablation'
+
+
+def test_find_studies_lists_public_modules_and_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = f'project_{tmp_path.name.replace("-", "_")}'
+    studies = tmp_path / package / 'studies'
+    (studies / 'common').mkdir(parents=True)
+    (studies / 'quick').mkdir()
+    for folder in (tmp_path / package, studies, studies / 'common', studies / 'quick'):
+        (folder / '__init__.py').write_text('', encoding='utf-8')
+    (studies / 'full.py').write_text('', encoding='utf-8')
+    (studies / '_private.py').write_text('', encoding='utf-8')
+    monkeypatch.syspath_prepend(tmp_path.as_posix())
+
+    assert find_studies(settings=ProjectSettings(path=None, studies=f'{package}.studies')) == [
+        'full',
+        'quick',
+    ]
+
+
+def test_find_studies_prefers_package_of_current_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = f'project_{tmp_path.name.replace("-", "_")}'
+    for folder, name in (('one', 'first'), ('two', 'second')):
+        studies = tmp_path / folder / package / 'studies'
+        studies.mkdir(parents=True)
+        for parent in (tmp_path / folder / package, studies):
+            (parent / '__init__.py').write_text('', encoding='utf-8')
+        (studies / f'{name}.py').write_text('', encoding='utf-8')
+
+    settings = ProjectSettings(path=None, studies=f'{package}.studies')
+    monkeypatch.chdir(tmp_path / 'one')
+    assert find_studies(settings=settings) == ['first']
+    monkeypatch.chdir(tmp_path / 'two')
+    assert find_studies(settings=settings) == ['second']
 
 
 def test_machine_for_host_keeps_file_order() -> None:
