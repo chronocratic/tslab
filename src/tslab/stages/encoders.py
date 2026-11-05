@@ -6,6 +6,7 @@ from typing import Annotated, cast, ClassVar, Protocol
 import torch
 
 from tslab.core.fingerprint import NotFingerprinted
+from tslab.core.markers import HardwareSetting
 from tslab.interfaces.encoder import Encoder, SequenceEncoder
 
 __all__ = ['ModelAsEncoder', 'resolve_device']
@@ -49,7 +50,7 @@ class ModelAsEncoder:
             in one call.
     """
 
-    device: Annotated[str, NotFingerprinted] = 'auto'
+    device: Annotated[str, HardwareSetting, NotFingerprinted] = 'auto'
     batch_size: int | None = None
 
     # why: keep the pre-move spelling in fingerprints, so cached encodings

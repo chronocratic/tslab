@@ -12,6 +12,7 @@ from chronocratic.models.enums import EncodingOutputShape
 import torch
 
 from tslab.core.fingerprint import NotFingerprinted
+from tslab.core.markers import HardwareSetting
 from tslab.interfaces import Encoder
 from tslab.stages.encoders import resolve_device
 
@@ -38,8 +39,8 @@ class ChronocraticEncoder:
             model encodes per timestep.
     """
 
-    device: Annotated[str, NotFingerprinted] = 'auto'
-    num_workers: Annotated[int, NotFingerprinted] = 0
+    device: Annotated[str, HardwareSetting, NotFingerprinted] = 'auto'
+    num_workers: Annotated[int, HardwareSetting, NotFingerprinted] = 0
     batch_size: int = 256
     sliding_padding: int = 200
 

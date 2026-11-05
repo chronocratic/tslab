@@ -16,6 +16,7 @@ import tyro
 
 from tslab.adapters.chronocratic.generated import make_settings_class, unknown_settings
 from tslab.core.fingerprint import NotFingerprinted
+from tslab.core.markers import HardwareSetting
 
 __all__ = [
     'DATAMODULES',
@@ -74,7 +75,7 @@ def _settings_class(*, datamodule_class: Any) -> type:  # noqa: ANN401 # why: a 
             continue
         annotation: Any = hints[parameter.name]
         if parameter.name in NOT_FINGERPRINTED_PARAMETERS:
-            annotation = Annotated[annotation, NotFingerprinted]
+            annotation = Annotated[annotation, HardwareSetting, NotFingerprinted]
         default = (
             dataclasses.field()
             if parameter.default is inspect.Parameter.empty

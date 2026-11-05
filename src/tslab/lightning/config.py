@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Annotated, override
 
 from tslab.core.fingerprint import NotFingerprinted
+from tslab.core.markers import HardwareSetting, MachineSetting
 
 __all__ = ['LightningTrainerConfig']
 
@@ -48,7 +49,7 @@ class LightningTrainerConfig:
         max_epochs: Upper bound on training epochs.
         min_epochs: Epochs trained before early stopping or ``max_training_time`` is honored.
         accelerator: Lightning accelerator (``'auto'``, ``'cpu'``, ``'gpu'``, ...).
-        devices: Number of devices, or ``'auto'``.
+        devices: Number of devices. Defaults to one; use ``'auto'`` to use every visible device.
         check_val_every_n_epoch: Validation interval in epochs.
         log_every_n_steps: Logging interval in optimizer steps; 200 keeps W&B
             traffic under the per-project rate limit.
@@ -69,17 +70,17 @@ class LightningTrainerConfig:
 
     max_epochs: int = 2500
     min_epochs: int = 3
-    accelerator: Annotated[str, NotFingerprinted] = 'auto'
-    devices: Annotated[int | str, NotFingerprinted] = 'auto'
+    accelerator: Annotated[str, HardwareSetting, NotFingerprinted] = 'auto'
+    devices: Annotated[int | str, HardwareSetting, NotFingerprinted] = 1
     check_val_every_n_epoch: int = 1
     log_every_n_steps: Annotated[int, NotFingerprinted] = 200
-    enable_progress_bar: Annotated[bool, NotFingerprinted] = True
+    enable_progress_bar: Annotated[bool, MachineSetting, NotFingerprinted] = True
     monitor: str = 'val_loss_epoch'
     checkpoint_save_top_k: Annotated[int, NotFingerprinted] = 3
     early_stopping_patience: int | None = None
     early_stopping_min_delta: float = 0.001
     max_training_time: str | None = None
-    job_time_share: Annotated[float, NotFingerprinted] = 0.5
+    job_time_share: Annotated[float, MachineSetting, NotFingerprinted] = 0.5
     extra_trainer_kwargs: Mapping[str, bool | int | float | str] = field(
         default_factory=FrozenKwargs
     )
