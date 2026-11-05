@@ -7,9 +7,8 @@ launcher = "slurm"
 output_root = "${SCRATCH}/runs"
 tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
 
-[settings] # the same settings as the grids of the study, for every run on this machine
+[settings] # only machine settings; put experiment settings on the study
 # "tracking.wandb_mode" = "offline"
-# "tracking.shell_log_path" = "{log_file}"
 # "data.num_workers" = "{cpus}" # the cpus_per_task of each run, overrides included
 # "data.num_workers" = "{cpus_per_run}" # the CPUs of one run when several run at once
 

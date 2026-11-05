@@ -30,10 +30,10 @@ uv run python -m my_paper.toy_data data
 | `src/my_paper/stages.py` | an example custom stage, `add_noise` |
 | `src/my_paper/augmentations.py` | an example augmentation recipe |
 | `src/my_paper/models.py` | the model choice shared by the scripts |
-| `src/my_paper/studies.py` | an example study over both scripts (see {doc}`studies`) |
+| `src/my_paper/studies/` | one package per study; `common/` holds shared grids (see {doc}`studies`) |
 | `machines/` | a local and an example SLURM machine profile |
 | `src/my_paper/toy_data.py` | writes small synthetic datasets, so everything runs before you have real data |
-| `tests/test_smoke.py` | runs both scripts on the toy data with one training batch |
+| `tests/test_smoke.py` | runs both scripts on toy data and dry-runs the `example` and `quick` studies |
 
 ## Run
 

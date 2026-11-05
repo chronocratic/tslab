@@ -43,6 +43,23 @@ FORECAST_NO_PRESET = (
 )
 
 
+@pytest.mark.parametrize('study_name', ['example', 'quick'])
+def test_study_names_dry_run(
+    study_name: str, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = Path(__file__).parents[1]
+    monkeypatch.setenv('UV_PROJECT', str(root))
+    machine = str(root / 'machines' / 'local.toml')
+    (project / 'tslab.toml').write_text(
+        (root / 'tslab.toml').read_text(encoding='utf-8'), encoding='utf-8'
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        tslab_main(args=['study', 'submit', study_name, '--machine', machine, '--dry-run'])
+
+    assert raised.value.code == 0
+
+
 @pytest.fixture
 def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A working folder with the toy data in ``data/``, as the presets expect."""
@@ -73,7 +90,7 @@ def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.M
     monkeypatch.setenv('UV_PROJECT', str(root))
     machine = str(root / 'machines' / 'local.toml')
     # The working folder holds the toy data; copy the project settings there
-    # so the short study name expands against the studies module.
+    # so the short study name expands against the studies package.
     (project / 'tslab.toml').write_text(
         (root / 'tslab.toml').read_text(encoding='utf-8'), encoding='utf-8'
     )
@@ -104,7 +121,7 @@ def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.M
         / 'classification'
         / 'ts2vec-archive-split'
         / 'ToySpectra'
-        / '0'
+        / 'seed_0'
         / 'status.json'
     )
     assert json.loads(status_file.read_text(encoding='utf-8'))['run_state'] == 'finished'

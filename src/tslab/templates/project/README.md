@@ -40,13 +40,15 @@ build the settings by name.
 
 ## Run a study
 
-A study runs one command of a script over a product of axes (see
-`src/{{package_name}}/studies.py` for the example), on a machine profile in
-`machines/`:
+A study runs one command of a script over a product of axes. Each study lives
+in `src/{{package_name}}/studies/<name>/study.py`; shared datasets and recipe
+axes live in `src/{{package_name}}/studies/common/`:
 
 ```bash
+uv run tslab study list
 uv run tslab study show example
 uv run tslab study submit example --machine local --dry-run
+uv run tslab study submit quick --machine local --dry-run
 uv run tslab study submit example --machine local
 uv run tslab study status example --machine local  # add --watch 60 to refresh
 uv run tslab study wait example --machine local
@@ -59,10 +61,11 @@ uv run tslab study results example \
     --machine local --out results.csv
 ```
 
-`tslab.toml` at the project root names the studies module, so `example` stands
-for `{{package_name}}.studies:example`. Its `[machine_by_host]` table, commented
-out by default, picks the machine by host: uncomment it and drop `--machine`
-from every command.
+`tslab.toml` at the project root names the studies package, so `example`
+stands for `{{package_name}}.studies.example:study`. Keep experiment settings
+on `Study.settings`; machine profiles accept only machine settings. Its
+`[machine_by_host]` table, commented out by default, picks the machine by host:
+uncomment it and drop `--machine` from every command.
 
 `--grid classification --only seed=0` keeps a slice of the runs; arguments
 after `--` go to every run. Add `--code-snapshot` to a `submit` so the jobs

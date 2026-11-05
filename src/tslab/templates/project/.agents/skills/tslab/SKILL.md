@@ -9,14 +9,17 @@ Any coding agent with shell access can use this workflow to run or inspect a stu
 commands return versioned JSON so you can make decisions from fields, not tables.
 
 The study argument is the short name `example`; `tslab.toml` at the project
-root expands it against the studies module. Its `[machine_by_host]` table can
-pick the machine by host, so `--machine` can be dropped from every command.
+root expands it to `<package>.studies.example:study`. Each package defines its
+study in `study.py` and exposes `study`; shared definitions live in
+`studies/common/`. Its `[machine_by_host]` table can pick the machine by host,
+so `--machine` can be dropped from every command.
 
 ## Before submitting
 
 For a new machine, run its readiness checks before the first submit:
 
 ```bash
+uv run tslab study list --json
 uv run tslab doctor --machine local example --json
 ```
 
