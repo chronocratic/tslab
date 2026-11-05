@@ -122,7 +122,9 @@ Rules that matter when writing one:
 - **Merge order, later paths replace earlier ones:** the value of each axis in
   axis order, then `run_settings` of the grid, then matching `Grid.overrides`,
   then `[settings]` of the machine profile, then matching machine overrides.
-  After the merge each path appears once.
+  Machine profile settings may name only fields marked `MachineSetting` or
+  `HardwareSetting`; move experiment settings to the study. After the merge
+  each path appears once.
 - **Names.** Study, grid, axis and value names match `[A-Za-z0-9._-]+` and
   are not `.` or `..`; `short_name` matches `[A-Za-z0-9_-]+` and is unique
   among the grids. No axis may be named `short_name`, `study`, `output_root`,
@@ -215,7 +217,7 @@ expands short study names.
 | `launcher` | required | `"local"` or `"slurm"` |
 | `output_root` | required | Root of the run folders, e.g. `"${SCRATCH}/exps"` |
 | `tslab_command` | `["uv", "run", "tslab"]` | How follow-up jobs call TSLab |
-| `[settings]` | none | Settings of the kind of the study, applied to every run on this machine |
+| `[settings]` | none | Machine settings marked `MachineSetting` or `HardwareSetting`, applied to every run on this machine |
 | `[env]` | none | Variables exported in every job and read by `${...}` at submit |
 | `[slurm]` | — | Job settings (below) |
 | `[followup]` | — | Automatic helper jobs (below) |
@@ -247,6 +249,10 @@ Rules:
 - **`[env]` values may use `${VAR}`**; they expand at submit, are exported in
   the job script, and are visible to `${...}` in study settings during that
   submit.
+- **Settings paths.** Every `[settings]` and `[[overrides]].settings` path
+  must end at a `MachineSetting` or `HardwareSetting` field of each applicable
+  grid config. A choice-union field itself is not a machine setting. Put
+  experiment settings in the study instead.
 - **Overrides** (`[[overrides]]`) carry a `match` (one value or an explicit
   list per axis, plus the optional `grid` key), and may set `slurm` values
   and `settings`. Every matching override applies; more matched keys wins

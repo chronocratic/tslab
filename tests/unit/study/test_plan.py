@@ -63,16 +63,11 @@ def test_local_machine_with_a_slurm_override_resolves_without_slurm(
     )
 
 
-def test_machine_setting_that_switches_a_choice_drops_stale_children(
-    study: Study, tmp_path: Path
-) -> None:
+def test_machine_setting_cannot_switch_a_choice(study: Study, tmp_path: Path) -> None:
     machine = _local(tmp_path, settings={'model': 'cost'})
     runs = expand_runs(study=study)
-    assert any('model.depth' in run.settings for run in runs)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
-    ts2vec = next(run for run in resolved if run.run.values['recipe'] == 'ts2vec-paper')
-    assert ts2vec.settings['model'] == 'cost'
-    assert not any(path.startswith('model.') for path in ts2vec.settings)
+    with pytest.raises(ValueError, match=r'\[settings\] sets model'):
+        resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
 
 
 def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
@@ -122,7 +117,7 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
     machine = _local(
         tmp_path,
         launcher='slurm',
-        settings={'trainer.max_training_time': '{nope}'},
+        settings={'trainer.accelerator': '{nope}'},
         slurm=SlurmSettings(partition='p', time='1:00:00', max_array_size=1),
     )
     runs = expand_runs(study=study)
@@ -176,10 +171,10 @@ def test_fake_resources_have_no_signal_problem() -> None:
     assert FakeResources().signal_problem() is None
 
 
-def _epochs_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
+def _accelerators_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
     return {
         task.resolved.run.values['recipe']: task.command[
-            task.command.index('--trainer.max-epochs') + 1
+            task.command.index('--trainer.accelerator') + 1
         ]
         for group in groups
         for task in group.tasks
@@ -205,11 +200,14 @@ def test_cpus_placeholder_is_the_cpus_per_task_of_the_run(study: Study, tmp_path
     machine = _local(
         tmp_path,
         launcher='slurm',
-        settings={'trainer.max_epochs': '{cpus}'},
+        settings={'trainer.accelerator': '{cpus}'},
         slurm=SlurmSettings(partition='p', cpus_per_task=6),
         overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'cpus_per_task': 8}),),
     )
-    assert _epochs_by_recipe(_plan(study, machine)) == {'ts2vec-paper': '6', 'cost-paper': '8'}
+    assert _accelerators_by_recipe(_plan(study, machine)) == {
+        'ts2vec-paper': '6',
+        'cost-paper': '8',
+    }
 
 
 def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -> None:
@@ -271,14 +269,14 @@ def test_validate_jobs_checks_slurm_signal_seconds_against_override_time(
 def test_cpus_placeholder_on_a_local_machine_is_the_usable_cpus(
     study: Study, tmp_path: Path
 ) -> None:
-    machine = _local(tmp_path, settings={'trainer.max_epochs': '{cpus}'})
-    assert set(_epochs_by_recipe(_plan(study, machine, local_cpus=3)).values()) == {'3'}
+    machine = _local(tmp_path, settings={'trainer.accelerator': '{cpus}'})
+    assert set(_accelerators_by_recipe(_plan(study, machine, local_cpus=3)).values()) == {'3'}
 
 
 def test_cpus_per_run_placeholder_expands(study: Study, tmp_path: Path) -> None:
     machine = _local(
         tmp_path,
         local=LocalSettings(max_parallel=2),
-        settings={'trainer.max_epochs': '{cpus_per_run}'},
+        settings={'trainer.accelerator': '{cpus_per_run}'},
     )
-    assert set(_epochs_by_recipe(_plan(study, machine, local_cpus=4)).values()) == {'2'}
+    assert set(_accelerators_by_recipe(_plan(study, machine, local_cpus=4)).values()) == {'2'}
