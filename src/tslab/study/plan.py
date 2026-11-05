@@ -558,12 +558,12 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             uncounted_in_row=counters.get(run.run.run_path, (0, 0))[1],
         )
         tasks_of[lookup[key]].append(task)
-    if pin_conflicts_found:
-        unique_conflicts: list[tuple[str, SettingValue, SettingValue]] = []
-        for conflict in pin_conflicts_found:
-            if conflict in unique_conflicts:
-                continue
-            unique_conflicts.append(conflict)
+    unique_conflicts = [
+        conflict
+        for position, conflict in enumerate(pin_conflicts_found)
+        if conflict not in pin_conflicts_found[:position]
+    ]
+    if unique_conflicts:
         message = '; '.join(
             f'study {study.name!r} pins {path} = {study_value!r}, but '
             f'{machine.path} sets {machine_value!r}; remove it from one of them'

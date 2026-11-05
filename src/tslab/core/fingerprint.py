@@ -35,8 +35,6 @@ __all__ = [
     'FINGERPRINT_FORMAT_VERSION',
     'CarriesFingerprint',
     'Fingerprintable',
-    'HardwareSetting',
-    'MachineSetting',
     'NotFingerprinted',
     'canonicalize',
     'compute_fingerprint',
@@ -58,14 +56,6 @@ class NotFingerprinted:
 
         num_workers: Annotated[int, NotFingerprinted] = 0
     """
-
-
-class MachineSetting:
-    """May be set in a machine profile: what the machine decides, never the experiment."""
-
-
-class HardwareSetting(MachineSetting):
-    """A machine setting that names the hardware the run uses."""
 
 
 @runtime_checkable
