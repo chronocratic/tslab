@@ -113,30 +113,52 @@ def _usage_errors(*, study: str) -> Generator[None]:
             message = _missing_study_message(error=error, module_name=module_name)
         raise UsageError(message) from error
     except (ValueError, TypeError, FileNotFoundError) as error:
-        raise UsageError(str(error)) from error
+        message = _missing_study_attribute_message(study=study, error=error)
+        raise UsageError(message) from error
+
+
+def _missing_study_attribute_message(
+    *, study: str, error: ValueError | TypeError | FileNotFoundError
+) -> str:
+    """Add available names when a short-name module lacks its ``study`` attribute."""
+    if not isinstance(error, ValueError):
+        return str(error)
+    module_name, separator, attribute_name = study.partition(':')
+    if not separator or attribute_name != 'study':
+        return str(error)
+    if str(error) != f'{module_name} has no attribute {attribute_name!r}':
+        return str(error)
+    return _study_lookup_error(module_name=module_name, problem=str(error), fallback=str(error))
 
 
 def _missing_study_message(*, error: ModuleNotFoundError, module_name: str) -> str:
     """The useful usage error for a short name whose module cannot import."""
-    message = (
+    fallback = (
         f'cannot import the study module {module_name!r} ({error}); run tslab from '
         'the project folder, or check STUDY (module:attribute)'
     )
+    return _study_lookup_error(
+        module_name=module_name, problem=f'cannot import {module_name}', fallback=fallback
+    )
+
+
+def _study_lookup_error(*, module_name: str, problem: str, fallback: str) -> str:
+    """The short-name error with discovered studies, or its fallback."""
     settings: ProjectSettings = load_project_settings(start=Path.cwd())
     if settings.studies is None:
-        return message
+        return fallback
     prefix = f'{settings.studies}.'
     if not module_name.startswith(prefix):
-        return message
+        return fallback
     short_name = module_name.removeprefix(prefix)
     if not short_name or '.' in short_name:
-        return message
+        return fallback
     try:
         found = find_studies(settings=settings)
     except (ModuleNotFoundError, ValueError):
-        return message
+        return fallback
     names = ', '.join(found) if found else 'none'
-    return f'no study {short_name!r}: cannot import {module_name}; studies found: {names}'
+    return f'no study {short_name!r}: {problem}; studies found: {names}'
 
 
 def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:

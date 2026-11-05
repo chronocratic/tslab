@@ -99,5 +99,11 @@ def test_short_name_module_without_study_reports_attribute(
     _write_studies(project=tmp_path, package=package, missing_quick_study=True)
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(UsageError, match=rf"{package}\.studies\.quick has no attribute 'study'"):
+    with pytest.raises(
+        UsageError,
+        match=(
+            rf"no study 'quick': {package}\.studies\.quick has no attribute 'study'; "
+            r'studies found: full, quick'
+        ),
+    ):
         Show(study='quick').run()
