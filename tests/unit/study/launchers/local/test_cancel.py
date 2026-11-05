@@ -82,8 +82,10 @@ def test_local_cancel_signals_supervisor(project: Path, tmp_path: Path) -> None:
         ctx = context(project=project, machine_file='local.toml')
         assert cancel(context=ctx, dry_run=False) == (0, [str(child.pid)])
         deadline = time.monotonic() + 3
-        while not marker.exists() and time.monotonic() < deadline:
+        while time.monotonic() < deadline and (not marker.exists() or marker.read_text() != 'term'):
             time.sleep(0.05)
+        # why: the handler creates the marker before buffered text is visible.
+        assert marker.exists()
         assert marker.read_text() == 'term'
     finally:
         child.kill()
