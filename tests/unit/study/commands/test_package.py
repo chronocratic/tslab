@@ -1,5 +1,6 @@
 """``tslab study <command>`` end to end through ``main``: the run bodies and usage errors."""
 
+from importlib.util import find_spec
 import json
 import logging
 from pathlib import Path
@@ -22,6 +23,11 @@ def run_main(*args: str) -> int:
     code = exit_info.value.code
     assert isinstance(code, int)
     return code
+
+
+def test_command_support_lives_in_sibling_module_and_stays_on_package_door() -> None:
+    assert find_spec('tslab.study.commands.support') is not None
+    assert _finish_launch.__module__ == 'tslab.study.commands.support'
 
 
 def test_status_prints_an_aligned_table(

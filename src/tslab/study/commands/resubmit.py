@@ -13,8 +13,8 @@ from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.enums import JobFlag, JobPhase, StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
-from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.commands.submit import submit_runs
+from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
 from tslab.study.launchers.common.types import OnLaunch
 from tslab.study.launchers.tables import backend_for

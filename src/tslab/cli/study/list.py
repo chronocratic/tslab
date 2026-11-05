@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.cli.study import _usage_errors
+from tslab.cli.study.shared import _usage_errors
 from tslab.core.meta import hostname
 from tslab.study.definition import load_study
 from tslab.study.project import expand_study, find_studies

@@ -7,7 +7,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request, UsageError, watch
-from tslab.cli.study import _context_of, _states_of, _status_hints, _usage_errors
+from tslab.cli.study.shared import _context_of, _states_of, _status_hints, _usage_errors
 from tslab.core.meta import hostname
 from tslab.study.commands import status
 from tslab.study.context import Context, expected_starts

@@ -11,7 +11,7 @@ from typing import TextIO
 from tslab.core.status import utc_now_iso
 from tslab.enums import StudyState
 from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.commands import _finish_launch, _uncounted, LIVE_STATES
+from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context
 from tslab.study.launchers.common.types import LaunchError, OnLaunch
 from tslab.study.launchers.tables import backend_for

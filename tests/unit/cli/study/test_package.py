@@ -1,5 +1,6 @@
 """The ``tslab study`` command group: parsing, filters and pass-through."""
 
+from importlib.util import find_spec
 import logging
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
@@ -10,7 +11,7 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.cli.study.helpers import toy_project
 from tests.unit.study.helpers import submit_study
 from tslab.cli import main
-from tslab.cli.study import Resubmit, Results, Submit
+from tslab.cli.study import _context_of, Resubmit, Results, Submit
 from tslab.enums import JobPhase
 
 if TYPE_CHECKING:
@@ -23,6 +24,11 @@ def run_main(*args: str) -> int:
     code = exit_info.value.code
     assert isinstance(code, int)
     return code
+
+
+def test_shared_helpers_live_in_sibling_module_and_stay_on_package_door() -> None:
+    assert find_spec('tslab.cli.study.shared') is not None
+    assert _context_of.__module__ == 'tslab.cli.study.shared'
 
 
 def _tslab_toml_with_cluster(*, project: Path) -> None:

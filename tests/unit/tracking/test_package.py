@@ -20,6 +20,11 @@ def test_build_trackers_follows_options() -> None:
     ]
 
 
+def test_package_exports_are_defined_in_sibling_modules() -> None:
+    assert TrackingOptions.__module__ == 'tslab.tracking.options'
+    assert build_trackers.__module__ == 'tslab.tracking.factory'
+
+
 def test_tracking_options_never_enter_fingerprints() -> None:
     assert TrackingOptions(wandb_mode=WandbMode.ONLINE).fingerprint_settings() is None
 

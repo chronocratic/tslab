@@ -10,7 +10,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.cli.study import (
+from tslab.cli.study.shared import (
     _context_of,
     _detach,
     _log_next_step,
