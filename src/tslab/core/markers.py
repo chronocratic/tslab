@@ -2,9 +2,15 @@
 
 from typing import Annotated, get_args, get_origin
 
-from tslab.core.fingerprint import HardwareSetting, MachineSetting
-
 __all__ = ['HardwareSetting', 'MachineSetting', 'is_hardware_setting', 'is_machine_setting']
+
+
+class MachineSetting:
+    """May be set in a machine profile: what the machine decides, never the experiment."""
+
+
+class HardwareSetting(MachineSetting):
+    """A machine setting that names the hardware the run uses."""
 
 
 def _matches_marker(*, metadata: object, marker: type[MachineSetting]) -> bool:

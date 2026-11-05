@@ -684,29 +684,41 @@ def _drop_children(
 
 def _study_setting_conflicts(*, study: Study, grid_name: str, grid: Grid) -> list[str]:
     """The axis and run-setting clashes of the study settings for one grid."""
-    problems: list[str] = []
-    for study_path in study.settings:
-        for axis_name, values in grid.axes.items():
-            for value_name, axis_settings in values.items():
-                if any(
-                    _setting_paths_overlap(first=study_path, second=axis_path)
-                    for axis_path in axis_settings
-                ):
-                    problems.append(
-                        f'study {study.name!r} sets {study_path}, also set by grid '
-                        f'{grid_name!r}, axis {axis_name!r}, value {value_name!r}; '
-                        f'keep it in one place, e.g. drop it from the axis with '
-                        f'without=({study_path!r},)'
-                    )
-        run_settings = merge_settings(base=DEFAULT_RUN_SETTINGS, update=grid.run_settings)
+    return [
+        problem
+        for study_path in study.settings
+        for problem in _study_path_conflicts(
+            study=study, grid_name=grid_name, grid=grid, study_path=study_path
+        )
+    ]
+
+
+def _study_path_conflicts(
+    *, study: Study, grid_name: str, grid: Grid, study_path: str
+) -> list[str]:
+    """The axis and run-setting clashes for one study setting path."""
+    axis_conflicts = [
+        f'study {study.name!r} sets {study_path}, also set by grid '
+        f'{grid_name!r}, axis {axis_name!r}, value {value_name!r}; '
+        f'keep it in one place, e.g. drop it from the axis with '
+        f'without=({study_path!r},)'
+        for axis_name, values in grid.axes.items()
+        for value_name, axis_settings in values.items()
         if any(
-            _setting_paths_overlap(first=study_path, second=run_path) for run_path in run_settings
-        ):
-            problems.append(
-                f'study {study.name!r} sets {study_path}, also set by grid '
-                f'{grid_name!r}, run_settings; keep it in one place'
-            )
-    return problems
+            _setting_paths_overlap(first=study_path, second=axis_path)
+            for axis_path in axis_settings
+        )
+    ]
+    run_settings = merge_settings(base=DEFAULT_RUN_SETTINGS, update=grid.run_settings)
+    if not any(
+        _setting_paths_overlap(first=study_path, second=run_path) for run_path in run_settings
+    ):
+        return axis_conflicts
+    message = (
+        f'study {study.name!r} sets {study_path}, also set by grid '
+        f'{grid_name!r}, run_settings; keep it in one place'
+    )
+    return [*axis_conflicts, message]
 
 
 def _setting_paths_overlap(*, first: str, second: str) -> bool:

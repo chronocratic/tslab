@@ -511,10 +511,7 @@ def _machine_path_status(*, path: str, config_class: type, settings: Settings) -
     for position, part in enumerate(parts):
         name = settings.get('.'.join(parts[: position + 1]))
         if position == len(parts) - 1:
-            annotations = [_hints(holder)[part] for holder in holders if part in _hints(holder)]
-            if not annotations:
-                return None
-            return all(is_machine_setting(annotation=annotation) for annotation in annotations)
+            return _machine_leaf_status(holders=holders, part=part)
         holders = [
             next_holder
             for holder in holders
@@ -523,6 +520,14 @@ def _machine_path_status(*, path: str, config_class: type, settings: Settings) -
         if not holders:
             return None
     return None
+
+
+def _machine_leaf_status(*, holders: Sequence[type], part: str) -> bool | None:
+    """Whether the path leaf is machine-controlled; ``None`` when it does not exist."""
+    annotations = [_hints(holder)[part] for holder in holders if part in _hints(holder)]
+    if not annotations:
+        return None
+    return all(is_machine_setting(annotation=annotation) for annotation in annotations)
 
 
 def _path_exists(*, path: str, config_class: type, settings: Settings) -> bool:
