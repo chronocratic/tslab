@@ -147,8 +147,8 @@ class Grid:
         axes: Axis name to ``{value name: settings}``, in run-path order.
         exclude: Matches naming the runs to drop.
         overrides: Settings applied to matching runs.
-        run_settings: Settings every run of the grid gets, e.g. the run
-            paths. Read-only once built.
+        run_settings: Settings every run of the grid gets, added to the default
+            run settings. Read-only once built.
         job_name: The job name as a template of ``{short_name}``,
             ``{study}`` and axis names; ``{study}_{short_name}`` by default.
             Runs with different names go into different arrays, so naming an
@@ -337,13 +337,24 @@ def _kind(*, value: object) -> str:
 
 @dataclass(frozen=True, kw_only=True)
 class Study:
-    """A named round of experiments: a mapping of grid name to grid."""
+    """A named round of experiments with settings shared across its grids.
+
+    Args:
+        name: The study name.
+        grids: The grid name to grid mapping.
+        settings: Settings applied to every grid that has each path.
+    """
 
     name: str
     grids: Mapping[str, Grid]
+    settings: Settings = MappingProxyType({})
 
     def __post_init__(self) -> None:
-        """Check the study name, the grid names and the short names."""
+        """Freeze and validate settings, grids, names and run paths."""
+        if not isinstance(self.settings, Mapping):
+            message = f'study settings must be a mapping, got {_kind(value=self.settings)}'
+            raise TypeError(message)
+        object.__setattr__(self, 'settings', MappingProxyType(dict(self.settings)))
         validate_name(name=self.name, kind='study')
         if not self.grids:
             message = 'study must have at least one grid'
@@ -370,8 +381,28 @@ class Study:
             if next(_grid_runs(grid_name=grid_name, grid=grid), None) is None:
                 message = f'grid {grid_name!r} has no runs; every run is excluded'
                 raise ValueError(message)
+        self._check_settings()
         self._check_job_names()
         self._check_run_paths()
+
+    def _check_settings(self) -> None:
+        """Check that study paths exist and do not duplicate axes or run settings."""
+        for path, value in self.settings.items():
+            if any(
+                not check_paths(config_class=grid.config, settings={path: value})
+                for grid in self.grids.values()
+            ):
+                continue
+            message = f'study {self.name!r} settings: {path} is no field of any grid'
+            raise ValueError(message)
+        problems = [
+            problem
+            for grid_name, grid in self.grids.items()
+            for problem in _study_setting_conflicts(study=self, grid_name=grid_name, grid=grid)
+        ]
+        if problems:
+            message = '; '.join(problems)
+            raise ValueError(message)
 
     def _check_run_paths(self) -> None:
         """Raise unless every run path is made of valid names and no two runs share one."""
@@ -651,6 +682,38 @@ def _drop_children(
         del result[stale]
 
 
+def _study_setting_conflicts(*, study: Study, grid_name: str, grid: Grid) -> list[str]:
+    """The axis and run-setting clashes of the study settings for one grid."""
+    problems: list[str] = []
+    for study_path in study.settings:
+        for axis_name, values in grid.axes.items():
+            for value_name, axis_settings in values.items():
+                if any(
+                    _setting_paths_overlap(first=study_path, second=axis_path)
+                    for axis_path in axis_settings
+                ):
+                    problems.append(
+                        f'study {study.name!r} sets {study_path}, also set by grid '
+                        f'{grid_name!r}, axis {axis_name!r}, value {value_name!r}; '
+                        f'keep it in one place, e.g. drop it from the axis with '
+                        f'without=({study_path!r},)'
+                    )
+        run_settings = merge_settings(base=DEFAULT_RUN_SETTINGS, update=grid.run_settings)
+        if any(
+            _setting_paths_overlap(first=study_path, second=run_path) for run_path in run_settings
+        ):
+            problems.append(
+                f'study {study.name!r} sets {study_path}, also set by grid '
+                f'{grid_name!r}, run_settings; keep it in one place'
+            )
+    return problems
+
+
+def _setting_paths_overlap(*, first: str, second: str) -> bool:
+    """Whether one dotted setting path equals or contains the other."""
+    return first == second or first.startswith(f'{second}.') or second.startswith(f'{first}.')
+
+
 def matching_in_order(
     *, matches: Sequence[Match], grid_name: str, values: Mapping[str, str]
 ) -> list[int]:
@@ -731,18 +794,29 @@ def expand_runs(*, study: Study) -> list[StudyRun]:
         excluded, in grid order and then axis order.
     """
     return [
-        _study_run(grid_name=grid_name, grid=grid, values=values)
+        _study_run(grid_name=grid_name, grid=grid, values=values, study_settings=study.settings)
         for grid_name, grid in study.grids.items()
         for values in _grid_runs(grid_name=grid_name, grid=grid)
     ]
 
 
-def _study_run(*, grid_name: str, grid: Grid, values: Mapping[str, str]) -> StudyRun:
+def _study_run(
+    *, grid_name: str, grid: Grid, values: Mapping[str, str], study_settings: Settings
+) -> StudyRun:
     """The run of one point of the axis product of a grid, with its merged settings."""
     overrides = [(override.match, override.settings) for override in grid.overrides]
     settings: dict[str, SettingValue] = {}
     for name in grid.axes:
         settings = merge_settings(base=settings, update=grid.axes[name][values[name]])
+    settings = merge_settings(
+        base=settings,
+        update={
+            path: value
+            for path, value in study_settings.items()
+            if not check_paths(config_class=grid.config, settings={path: value})
+        },
+    )
+    settings = merge_settings(base=settings, update=DEFAULT_RUN_SETTINGS)
     settings = merge_settings(base=settings, update=grid.run_settings)
     settings = merge_overrides(
         base=settings, overrides=overrides, grid_name=grid_name, values=values

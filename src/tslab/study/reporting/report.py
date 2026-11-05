@@ -107,6 +107,10 @@ def log_show(*, study: Study) -> None:
     Returns:
         None.
     """
+    if study.settings:
+        _LOGGER.info('study settings:')
+        for path, value in study.settings.items():
+            _LOGGER.info('%s = %s', path, value)
     runs = expand_runs(study=study)
     rows = [
         (

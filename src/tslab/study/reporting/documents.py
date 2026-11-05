@@ -8,6 +8,7 @@ from tslab.core.text import format_index_ranges
 from tslab.enums import StudyState
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs, Study
+from tslab.study.definition.settings import SettingValue
 from tslab.study.launchers.common.types import LaunchReport, QueuedJob
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
@@ -133,9 +134,21 @@ def show_document(*, study: Study) -> dict[str, object]:
     return {
         'schema': 'tslab.study-show/1',
         'study': study.name,
+        'settings': {
+            path: _json_setting_value(value=value) for path, value in study.settings.items()
+        },
         'grids': grids,
         'total_runs': len(runs),
     }
+
+
+def _json_setting_value(*, value: SettingValue) -> object:
+    """Make a study setting JSON-safe, stringifying values JSON cannot encode."""
+    if value is None or isinstance(value, str | int | float | bool):
+        return value
+    if isinstance(value, tuple | list):
+        return [_json_setting_value(value=item) for item in value]
+    return str(value)
 
 
 def cancel_document(
