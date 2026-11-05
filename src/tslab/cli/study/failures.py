@@ -25,11 +25,11 @@ class Failures:
     """Show error details and recent logs for failed or interrupted runs.
 
     For example:
-        tslab study failures my_paper.studies:example --machine local
+        tslab study failures example --machine local
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
@@ -78,11 +78,11 @@ class Usage:
     """Show what each run used, and the sizes to suggest for the next jobs.
 
     For example:
-        tslab study usage my_paper.studies:example --machine cluster
+        tslab study usage example --machine cluster
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.

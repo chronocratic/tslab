@@ -23,11 +23,11 @@ class Cancel:
     """Cancel queued and running SLURM jobs, or stop the live local launch.
 
     For example:
-        tslab study cancel my_paper.studies:example --machine cluster
+        tslab study cancel example --machine cluster
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.

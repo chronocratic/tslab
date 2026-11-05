@@ -1,7 +1,7 @@
 # Project settings
 
 A `tslab.toml` at the project root holds the settings every study command of
-the project shares: the studies module, the machine per host, and the default
+the project shares: the studies package, the machine per host, and the default
 runs folder. It is committed with the project.
 
 ```toml
@@ -24,7 +24,7 @@ file. Without a file, the built-in defaults hold and nothing errors.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `studies` | none | The module that holds the studies. A study argument without `:` expands against it: `ablation` means `my_paper.studies:ablation`. |
+| `studies` | none | The package that holds the studies. A short name expands to its `study` attribute: `ablation` means `my_paper.studies.ablation:study`. |
 | `machine_by_host` | none | Host pattern to machine name. Used when `--machine` is not passed. |
 | `runs` | none | The default folder of `tslab status` without a `FOLDER` argument. |
 | `code_snapshot` | `false` | Take a [code snapshot](studies.md#code-snapshots) of `src/` when a study is submitted, so the jobs run the code of submit time. Resubmits keep the snapshot recorded on their runs and ignore this key. |
@@ -33,7 +33,8 @@ file. Without a file, the built-in defaults hold and nothing errors.
 Precedence: a `--machine` flag wins over the table, a full `module:attribute`
 reference wins over a short name, and the file wins over the built-in
 defaults. A short name is expanded before anything is loaded or recorded, so
-contexts and records hold only the full reference and the machine name.
+contexts and records hold only the full reference and the machine name. Run
+`tslab study list` to list the public study packages under `studies`.
 
 ## The machine per host
 

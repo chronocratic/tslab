@@ -27,13 +27,13 @@ class Doctor:
 
     For example:
         tslab doctor --machine local
-        tslab doctor --machine cluster my_paper.studies:example
+        tslab doctor --machine cluster example
 
     Attributes:
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
-        study: Optional study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: Optional short study name or full module:attribute reference. A short name
+            expands against the studies package of tslab.toml.
         json: Print one doctor JSON document.
     """
 

@@ -24,9 +24,14 @@ def git_project(
     machines = project / 'machines'
     machines.mkdir()
     (machines / 'local.toml').write_text((project / 'local.toml').read_text(encoding='utf-8'))
+    studies = project / 'toy_project' / 'studies'
+    studies.mkdir(parents=True)
+    (project / 'toy_project' / '__init__.py').write_text('', encoding='utf-8')
+    (studies / '__init__.py').write_text('', encoding='utf-8')
+    (studies / 'study.py').write_text('from toy_studies import study\n', encoding='utf-8')
     (project / 'src' / 'pkg').mkdir(parents=True)
     (project / 'src' / 'pkg' / '__init__.py').write_text('# package\n', encoding='utf-8')
-    toml = 'studies = "toy_studies"\n'
+    toml = 'studies = "toy_project.studies"\n'
     if code_snapshot:
         toml += 'code_snapshot = true\n'
     toml += '\n[machine_by_host]\n"*" = "local"\n'

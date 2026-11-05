@@ -29,6 +29,7 @@ uv run tslab study submit example --json
 |---|---|
 | `tslab.error/1` | `exit_code`, `message`; used for command and usage errors. |
 | `tslab.machine-list/1` | `machines`: `name`, `source`, `profile`, `note`. |
+| `tslab.study-list/1` | `studies`: `short_name`, `name`. |
 | `tslab.run-status/1` | `exit_code`, `runs`: `directory`, `state`, `instances` (`instance`, `stage`, `state`, `fingerprint`, `seconds`, `error`). |
 | `tslab.study-status/1` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, and, when the scheduler reports a start for a queued job, `expected_start` (null when unknown), `pending_reason` (null when unknown) and `pending_stuck` (bool, false when no reason). |
 | `tslab.study-show/1` | `study`, `settings` (dotted path to value), `grids`, `total_runs`. Each grid has `name`, `short_name`, `job_name` (the template), `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
@@ -72,7 +73,7 @@ small canary after setup checks; doctor does not prove that a real cluster job
 will succeed.
 
 ```bash
-STUDY=my_paper.studies:example
+STUDY=example
 MACHINE=local
 
 uv run tslab doctor --machine "$MACHINE" "$STUDY" --json

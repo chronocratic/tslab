@@ -27,12 +27,12 @@ class Status:
     """Show the state of every run of a study, and the runs not done.
 
     For example:
-        tslab study status my_paper.studies:example --machine local
-        tslab study status my_paper.studies:example --machine local --watch 60
+        tslab study status example --machine local
+        tslab study status example --machine local --watch 60
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path. Default: from
             [machine_by_host] in tslab.toml.
@@ -95,11 +95,11 @@ class Show:
     """Show the grids, axes, and run counts of a study.
 
     For example:
-        tslab study show my_paper.studies:example
+        tslab study show example
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         json: Print one study-show JSON document.
     """
 
@@ -126,11 +126,11 @@ class Wait:
     """Wait for selected runs to finish or need attention.
 
     For example:
-        tslab study wait my_paper.studies:example --machine local
+        tslab study wait example --machine local
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.

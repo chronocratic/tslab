@@ -26,9 +26,14 @@ def run_main(*args: str) -> int:
 
 
 def _tslab_toml_with_cluster(*, project: Path) -> None:
-    """The project file: the toy module, and every host on the cluster."""
+    """The project file: the toy study package, and every host on the cluster."""
+    studies = project / 'toy_project' / 'studies'
+    studies.mkdir(parents=True)
+    (project / 'toy_project' / '__init__.py').write_text('', encoding='utf-8')
+    (studies / '__init__.py').write_text('', encoding='utf-8')
+    (studies / 'study.py').write_text('from toy_studies import study\n', encoding='utf-8')
     (project / 'tslab.toml').write_text(
-        'studies = "toy_studies"\n\n[machine_by_host]\n"*" = "cluster"\n', encoding='utf-8'
+        'studies = "toy_project.studies"\n\n[machine_by_host]\n"*" = "cluster"\n', encoding='utf-8'
     )
     machines = project / 'machines'
     machines.mkdir()
@@ -131,7 +136,7 @@ def test_submit_with_short_name_and_no_machine_records_the_full_reference(
     _tslab_toml_with_cluster(project=project)
     assert run_main('submit', 'study') == 0
     context = cast('Context', fake_backend.calls('launch')[0]['context'])
-    assert context.reference == 'toy_studies:study'
+    assert context.reference == 'toy_project.studies.study:study'
 
 
 def test_status_hint_repeats_the_full_reference(
@@ -151,7 +156,7 @@ def test_status_hint_repeats_the_full_reference(
         for record in caplog.records
         if record.getMessage().startswith('follow progress')
     ]
-    assert 'toy_studies:study --machine cluster' in hint
+    assert 'toy_project.studies.study:study --machine cluster' in hint
 
 
 def test_broken_tslab_toml_exits_two(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

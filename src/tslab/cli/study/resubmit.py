@@ -53,11 +53,11 @@ class RunOne:
     train for the whole allocation.
 
     For example:
-        tslab study run my_paper.studies:example --machine cluster --only model=small,seed=1
+        tslab study run example --machine cluster --only model=small,seed=1
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name or profile path. Default: from
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
@@ -93,12 +93,12 @@ class Resubmit:
     """Submit the interrupted, missing or failed runs of a study again.
 
     For example:
-        tslab study resubmit my_paper.studies:example --machine local
-        tslab study resubmit my_paper.studies:example --machine local --dry-run
+        tslab study resubmit example --machine local
+        tslab study resubmit example --machine local --dry-run
 
     Attributes:
-        study: The study reference, module:attribute. A short name is
-            expanded against the studies module of tslab.toml.
+        study: The short study name or full module:attribute reference. A short name expands
+            against the studies package of tslab.toml.
         machine: A machine name (machines/<name>.toml above the working folder, or
             registered with tslab machine add) or a profile path. Default: from
             [machine_by_host] in tslab.toml.

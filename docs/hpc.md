@@ -43,7 +43,7 @@ To test the pause path, submit one run with a tiny share; the training then
 pauses with `TrainingPaused` after one batch:
 
 ```bash
-uv run tslab study submit my_paper.studies:example --machine cluster \
+uv run tslab study submit example --machine cluster \
     --grid classification --only dataset=Coffee --only seed=42 \
     -- --trainer.job-time-share 0.01
 ```

@@ -13,6 +13,7 @@ COMMANDS: list[list[str]] = [
     ['wandb-sync'],
     ['study', 'submit'],
     ['study', 'status'],
+    ['study', 'list'],
     ['study', 'resubmit'],
     ['study', 'results'],
     ['study', 'logs'],
