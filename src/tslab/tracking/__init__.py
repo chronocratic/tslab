@@ -6,7 +6,9 @@ concrete trackers are imported inside ``build_trackers``.
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Annotated
 
+from tslab.core.markers import MachineSetting
 from tslab.core.tracker import Tracker
 from tslab.enums import WandbMode
 
@@ -31,7 +33,7 @@ class TrackingOptions:
         shell_log_path: SLURM stdout/stderr file uploaded to W&B at the end of the run.
     """
 
-    wandb_mode: WandbMode = WandbMode.DISABLED
+    wandb_mode: Annotated[WandbMode, MachineSetting] = WandbMode.DISABLED
     wandb_project: str = 'tslab'
     wandb_entity: str | None = None
     wandb_tags: tuple[str, ...] = ()
