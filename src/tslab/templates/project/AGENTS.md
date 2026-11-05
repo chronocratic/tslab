@@ -44,10 +44,13 @@ src/{{package_name}}/
   models.py                     `Models`: the model choice shared by both scripts and the study
   augmentations.py              your augmentation recipes, offered on matching models
   stages.py                     your own stages (example: add_noise)
-  studies.py                    studies: grids of runs over the scripts
+  studies/
+    common/                      datasets, recipes and grids shared by studies
+    example/study.py             classification and forecasting study
+    quick/study.py               small classification canary study
   toy_data.py                   writes small synthetic datasets into data/
 tests/
-  test_smoke.py                 runs every preset and the example study for one batch
+  test_smoke.py                 runs presets and one example run; dry-runs both studies
 data/                           datasets (git-ignored)
 runs/                           run folders (git-ignored)
 ```
@@ -73,9 +76,11 @@ runs/                           run folders (git-ignored)
   which models offer the recipe (`ViewPair`: TSTCC, MHCCL, SimCLR, CoST;
   `AlignedPair`: TS2Vec; `SingleView`: AutoTCL).
 - **`stages.py`** holds your own `@tslab.stage` functions.
-- **`studies.py`** holds `tslab.study.Study` objects: data only, no logic.
+- **`studies/<name>/study.py`** defines one `tslab.study.Study` as `study` per package;
+  `studies/common/` holds shared datasets, recipes and grid builders.
 - **`machines/*.toml`** says where and how study runs execute (local or
-  SLURM, output root, environment, SLURM limits, per-grid overrides).
+  SLURM, output root, environment, SLURM limits, per-grid overrides). Its
+  settings may contain only machine settings; put experiment settings on the study.
 
 ## 3. Setup and everyday commands
 
@@ -206,7 +211,8 @@ Then call it from `main` like a function:
 Copy the closer of `classify.py` and `forecast.py` to a new module, rename the
 config class, keep the three parts (config, `PRESETS`, `main`) and the
 `if __name__ == '__main__':` line, add a test to `tests/test_smoke.py`, and a
-grid to `studies.py` if it runs in a study.
+grid to `studies/<name>/study.py` if it runs in a study; keep shared grid
+builders in `studies/common/`.
 
 ### Add an augmentation recipe
 
@@ -232,11 +238,13 @@ Never commit datasets.
 ## 5. Studies (many runs, local or SLURM)
 
 A study runs one script command over the product of its axes. See
-`studies.py` for the example.
+`studies/example/` for the example and `studies/common/` for shared grids.
 
 ```bash
+uv run tslab study list
 uv run tslab study show example
 uv run tslab study submit example --machine local --dry-run
+uv run tslab study submit quick --machine local --dry-run
 uv run tslab study submit example --machine local --detach  # background launch; never submit in the foreground
 uv run tslab study status example --machine local  # add --watch 60 to refresh
 uv run tslab study wait example --machine local
@@ -249,10 +257,11 @@ uv run tslab study cancel example --machine local  # stops the live local launch
 uv run tslab study results example --machine local --out results.csv
 ```
 
-`tslab.toml` at the project root names the studies module, so `example` stands
-for `{{package_name}}.studies:example`. Its `[machine_by_host]` table, commented
-out by default, picks the machine by host: uncomment it and drop `--machine`
-from every command.
+`tslab.toml` at the project root names the studies package, so `example` stands
+for `{{package_name}}.studies.example:study`. Experiment settings belong in
+`Study.settings`; machine profiles may set only machine settings. Its
+`[machine_by_host]` table, commented out by default, picks the machine by host:
+uncomment it and drop `--machine` from every command.
 
 `--grid NAME` and `--only axis=value` select a slice; arguments after `--` go
 to every run (`-- --trainer.max-epochs 1`). Always `--dry-run` first.
@@ -280,8 +289,9 @@ Writing a study:
   `setting_axis(path='seed', values=(0, 1))` for sweeps; combine axes with `|`.
 - **Run paths:** runs land in `<output_root>/<study>/<grid>/<axis 1 value>/...`;
   `run_path='{grid}/{dataset}/seed_{seed}'` on the grid changes it.
-- Settings merge in this order, later wins: axes, grid `run_settings`, grid
-  `overrides`, machine `[settings]`, machine `[[overrides]]`.
+- Settings merge in this order, later wins: axes, `Study.settings`, default run
+  settings, grid `run_settings`, grid `overrides`, machine `[settings]`, machine
+  `[[overrides]]`. Machine profiles may set only marked machine settings.
 - `exclude=` drops combinations; `Override(match=..., settings=...)` changes
   settings of matching runs.
 - `${VAR}` in a string expands from the machine `[env]`, then the shell

@@ -1,8 +1,8 @@
 # The project settings of this TSLab project. Committed with the project; the
 # study commands read it from the working folder or a folder above it.
 
-# The module that holds the studies. A short name like `example` expands to
-# `<module>:example`.
+# The package that holds the studies. A short name like `example` expands to
+# `<package>.example:study`.
 studies = "{{package_name}}.studies"
 
 # The default runs folder of `tslab status` without a FOLDER argument.

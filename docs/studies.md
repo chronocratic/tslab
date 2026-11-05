@@ -22,98 +22,67 @@ command and hands them to a launcher. TSLab never runs experiment code.
 
 ## Define a study
 
-The `tslab new` template ships `src/<package>/studies.py`, a two-grid example
-over the presets and toy data of the template:
+The `tslab new` template ships one package per study and keeps shared datasets,
+recipes and grid builders under `studies/common/`:
 
-```python
-# my_paper/studies.py
-from pathlib import Path
-
-from tslab.adapters.chronocratic.datasets import ucr_datasets
-from tslab.study import from_presets, Grid, Override, setting_axis, Study
-
-from my_paper import classify, forecast
-
-example = Study(
-    name='example',
-    grids={
-        'classification': Grid(
-            short_name='cls',
-            command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
-            config=classify.ClassifyConfig,
-            axes={
-                'recipe': from_presets(
-                    presets=classify.PRESETS,
-                    names=('ts2vec-archive-split',),
-                    without=('data', 'run_path'),
-                ),
-                'dataset': ucr_datasets(root=Path('data'), names=('ToySpectra',)),
-                'seed': setting_axis(path='seed', values=(0, 1)),
-            },
-        )
-        # ...
-    },
-)
+```
+my_paper/studies/
+  common/
+    __init__.py
+    datasets.py
+    recipes.py
+    grids.py
+  example/
+    __init__.py
+    study.py
+  quick/
+    __init__.py
+    study.py
 ```
 
-A larger study: classification over UCR and UEA in one grid, forecasting with
-a `variant` axis, an `exclude`, and an `Override`:
+The common package can build a grid from shared axes and recipes:
 
 ```python
-from pathlib import Path
+# my_paper/studies/common/grids.py
+from tslab.study import Grid, setting_axis
 
-from tslab.adapters.chronocratic.datasets import ucr_datasets, uea_datasets
+from my_paper import classify
+from my_paper.studies.common.datasets import TOY_UCR
+from my_paper.studies.common.recipes import classification_recipes
 
-UCR = ('Coffee', 'Wallet', 'EigenWorms')  # user code may compute these
-UEA = ('BasicMotions', 'Epilepsy')
 
-classification = Grid(
-    short_name='cls',  # names the SLURM jobs and log files of the grid
-    command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
-    config=classify.ClassifyConfig,
-    axes={
-        'recipe': from_presets(
-            presets=classify.PRESETS,
-            names=('ts2vec-paper', 'cost-paper'),
-            without=('data', 'trainer.max_epochs', 'trainer.max_training_time'),
-        ),
-        'dataset': ucr_datasets(root=Path('${UCR_ROOT}'), names=UCR)
-        | uea_datasets(root=Path('${UEA_ROOT}'), names=UEA),
-        'seed': setting_axis(path='seed', values=(42, 7)),
-    },
-    exclude=({'recipe': 'cost-paper', 'dataset': 'EigenWorms'},),
-    overrides=(
-        Override(
-            match={'recipe': 'ts2vec-paper', 'dataset': 'EigenWorms'},
-            settings={'data.batch_size': 2},
-        ),
-    ),
-)
-
-forecasting = Grid(
-    short_name='fc',
-    command=('uv', 'run', 'python', '-m', 'my_paper.forecast', 'no-preset'),
-    config=forecast.ForecastConfig,
-    axes={
-        'recipe': from_presets(
-            presets=forecast.PRESETS,
-            names=('ts2vec-paper',),
-            without=('data', 'trainer.max_epochs', 'trainer.max_training_time'),
-        ),
-        'variant': {
-            v: {'data': 'ett', 'data.dataset_file_path': '${ETT_ROOT}/ETT.csv', 'data.variant': v}
-            for v in ('ETTh1', 'ETTh2')
+def classification_grid(*, seeds: tuple[int, ...]) -> Grid:
+    return Grid(
+        short_name='cls',
+        command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
+        config=classify.ClassifyConfig,
+        axes={
+            'recipe': classification_recipes(),
+            'dataset': TOY_UCR,
+            'seed': setting_axis(path='seed', values=seeds),
         },
-        'seed': setting_axis(path='seed', values=(42,)),
-    },
-)
+    )
+```
 
-example = Study(
+Each study package exposes its `Study` as `study`. Experiment settings stay on
+that study, while machine profiles set only machine settings:
+
+```python
+# my_paper/studies/example/study.py
+from tslab.study import Study
+
+from my_paper.studies.common import classification_grid
+
+study = Study(
     name='example',
     settings={'trainer.max_epochs': 500, 'trainer.max_training_time': '6:00:00'},
-    grids={'classification': classification, 'forecasting': forecasting},
+    grids={'classification': classification_grid(seeds=(0, 1))},
 )
 ```
+
+A sibling `quick/study.py` can reuse the grid with `seeds=(0,)` and shorter
+training limits. Package `__init__.py` files expose `study`; the template also
+shares a forecasting grid in `common`.
 
 ### Study settings
 
