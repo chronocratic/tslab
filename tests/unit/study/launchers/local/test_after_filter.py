@@ -131,16 +131,13 @@ def test_after_filter_drops_tasks_when_the_upstream_failed(
     _write_pretrain_state(
         project=project, dataset='b', run_state=RunState.FINISHED, instance=InstanceState.DONE
     )
-    groups = _groups(ctx=ctx)
-    # why: the targets differ per run, so each probe run is planned as its own group
-    group_a = _group_of(groups=groups, run_path='probe/a')
-    group_b = _group_of(groups=groups, run_path='probe/b')
-    assert group_a is not group_b
+    # why: both probe runs pair one to one with a pretrain run at the same index, so they
+    # share one aftercorr array and the filter drops tasks inside it
+    group = _group_of(groups=_groups(ctx=ctx), run_path='probe/a')
+    assert len(group.tasks) == 2
 
     with caplog.at_level('INFO'):
-        filtered_a = after_filter(context=ctx)(group_a)
-        filtered_b = after_filter(context=ctx)(group_b)
+        filtered = after_filter(context=ctx)(group)
 
-    assert filtered_a.tasks == ()
-    assert filtered_b is group_b
+    assert [task.resolved.run.run_path.as_posix() for task in filtered.tasks] == ['probe/b']
     assert 'probe/a' in caplog.text
