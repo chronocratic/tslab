@@ -313,7 +313,7 @@ def _local_retry_context(*, project: Path, max_attempts: int) -> Context:
     """The local context of the run g/small/1, with the automatic retry on."""
     local = project / 'local.toml'
     local.write_text(
-        local.read_text() + f'\n[followup]\nauto_retry = true\nmax_attempts = {max_attempts}\n'
+        local.read_text() + f'\n[followup]\nretry = "resubmit"\nmax_attempts = {max_attempts}\n'
     )
     return load_context(
         reference='toy_studies:study',
@@ -329,7 +329,7 @@ def _local_attempts(*, project: Path) -> int:
     return int((project / 'runs' / 's' / 'g/small/1' / 'attempts').read_text())
 
 
-def test_local_auto_retry_finishes_after_three_attempts(
+def test_local_retry_finishes_after_three_attempts(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv('TOY_SUCCEED_ON', '3')
@@ -341,7 +341,7 @@ def test_local_auto_retry_finishes_after_three_attempts(
     assert len(jobs_of(project=project)) == 3
 
 
-def test_local_auto_retry_stops_at_max_attempts(
+def test_local_retry_stops_at_max_attempts(
     project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.setenv('TOY_SUCCEED_ON', '3')

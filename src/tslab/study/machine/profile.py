@@ -8,7 +8,7 @@ from tslab.study.definition import SettingValue
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.slurm import SlurmSettings
 
-__all__ = ['FollowupSettings', 'MachineOverride', 'MachineProfile']
+__all__ = ['FollowupSettings', 'MachineOverride', 'MachineProfile', 'wants_retry_followup']
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -28,6 +28,18 @@ class FollowupSettings:
     max_attempts: int = 3
     wandb_sync: bool = False
     time: str = '00:30:00'
+
+
+def wants_retry_followup(*, followup: FollowupSettings) -> bool:
+    """Whether either retry setting needs a follow-up job.
+
+    Args:
+        followup: The follow-up settings of the machine profile.
+
+    Returns:
+        Whether automatic resubmission is enabled.
+    """
+    return followup.retry is not Retry.MANUAL or followup.chained_retry is not ChainedRetry.MANUAL
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -95,7 +95,7 @@ def test_run_entry_names_submission_in_progress(project: Path, fake_backend: Fak
     assert run_entry(report=ctx.reports[0], context=ctx)['reason'] == 'submission in progress'
 
 
-def test_run_entry_names_live_auto_retry_job(project: Path, fake_backend: FakeBackend) -> None:
+def test_run_entry_names_live_retry_job(project: Path, fake_backend: FakeBackend) -> None:
     submit_study(project=project)
     job = jobs_of(project=project)[0]
     task = job.tasks[0]

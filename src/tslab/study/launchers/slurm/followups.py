@@ -12,6 +12,7 @@ from tslab.study.context import Context
 from tslab.study.definition import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
 from tslab.study.launchers.slurm.submit import submit_helper_job
 from tslab.study.machine import SlurmSettings
+from tslab.study.machine.profile import wants_retry_followup
 from tslab.study.paths import study_folder
 from tslab.study.records import JobRecord, submission_lock
 
@@ -29,7 +30,7 @@ def queue_followups(
 ) -> tuple[int, list[JobRecord]]:
     """The small helper jobs of the study, after the runs it was called for.
 
-    With ``followup.auto_retry``: one job that resubmits the interrupted
+    With ``followup.retry`` or ``followup.chained_retry``: one job resubmits interrupted
     runs with ``--auto``, so the retry chain continues on the cluster
     without a person at the keyboard. With ``followup.wandb_sync``: one job
     that syncs the run folders of the study to W&B. Each waits for ``job_ids``
@@ -48,7 +49,11 @@ def queue_followups(
     """
     machine = context.machine
     followup = machine.followup
-    if machine.slurm is None or not job_ids or not (followup.auto_retry or followup.wandb_sync):
+    if (
+        machine.slurm is None
+        or not job_ids
+        or not (wants_retry_followup(followup=followup) or followup.wandb_sync)
+    ):
         return 0, []
     dependency = 'afterany:' + ':'.join(job_ids)
     slurm = dataclasses.replace(
@@ -127,7 +132,7 @@ def _followup_commands(*, context: Context) -> list[tuple[str, str]]:
     machine = context.machine
     followup = machine.followup
     commands: list[tuple[str, str]] = []
-    retry = _retry_command(context=context) if followup.auto_retry else None
+    retry = _retry_command(context=context) if wants_retry_followup(followup=followup) else None
     if retry is not None:
         commands.append(retry)
     if followup.wandb_sync:
