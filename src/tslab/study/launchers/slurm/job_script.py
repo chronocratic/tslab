@@ -81,10 +81,12 @@ def _array_section(*, tasks_file: Path, chain_check: Sequence[str] | None) -> st
         + 'set +e\n'
         + srun_command(variable='TASK_LINE')
         + '\nRUN_EXIT=$?\n'
+        + f'{command} --index ${{SLURM_ARRAY_TASK_ID}}\n'
+        + 'CHECK_EXIT=$?\n'
         + 'if [ "$RUN_EXIT" -ne 0 ]; then\n'
         + '    exit "$RUN_EXIT"\n'
         + 'fi\n'
-        + f'exec {command} --index ${{SLURM_ARRAY_TASK_ID}}\n'
+        + 'exit "$CHECK_EXIT"\n'
     )
 
 

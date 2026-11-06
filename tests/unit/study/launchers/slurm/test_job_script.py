@@ -233,13 +233,15 @@ def test_chained_script_checks_run_state_after_srun(tmp_path: Path) -> None:
 
     assert '#SBATCH --kill-on-invalid-dep=yes' in text
     assert text.index('set +e') < text.index('srun --unbuffered')
-    assert text.rstrip().endswith(
-        'exec uv run tslab study chain-exit pkg.studies.chain:study --machine m.toml '
+    command = (
+        'uv run tslab study chain-exit pkg.studies.chain:study --machine m.toml '
         '--job-file 3 --index ${SLURM_ARRAY_TASK_ID}'
     )
+    assert text.index(command) > text.index('srun --unbuffered')
+    assert text.rstrip().endswith('exit "$CHECK_EXIT"')
 
 
-def test_chain_check_does_not_hide_srun_failure(tmp_path: Path) -> None:
+def test_chain_check_runs_after_srun_failure_and_preserves_its_exit_code(tmp_path: Path) -> None:
     tasks_file = tmp_path / '0.tasks'
     tasks_file.write_text('3 1 true\n')
     script = tmp_path / 'job.sbatch'
@@ -268,7 +270,7 @@ def test_chain_check_does_not_hide_srun_failure(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 9
-    assert not checker_called.exists()
+    assert checker_called.is_file()
 
 
 def test_chain_check_exit_code_becomes_job_exit_code(tmp_path: Path) -> None:
