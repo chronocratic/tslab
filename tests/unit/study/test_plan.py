@@ -1,16 +1,19 @@
 """Planning rules: machine checks, local overrides, error text."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import logging
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
-from tslab.study import Study
-from tslab.study.definition import expand_runs
+from tslab.study import After, Grid, setting_axis, Study
+from tslab.study.definition import expand_runs, Settings
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.plan import (
     _override_warnings,
@@ -23,6 +26,9 @@ from tslab.study.plan import (
     validate_arguments,
     validate_jobs,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @pytest.fixture
@@ -280,3 +286,80 @@ def test_cpus_per_run_placeholder_expands(study: Study, tmp_path: Path) -> None:
         settings={'trainer.accelerator': '{cpus_per_run}'},
     )
     assert set(_accelerators_by_recipe(_plan(study, machine, local_cpus=4)).values()) == {'2'}
+
+
+@dataclass(frozen=True, kw_only=True)
+class _ChainConfig:
+    seed: int = 0
+    checkpoint: Path = Path()
+    output_root: Path = Path('runs')
+    run_path: Path = Path('run')
+
+
+def _chained_study(*, fan_out: bool = False) -> Study:
+    pretrain = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=_ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}, 'seed': setting_axis(path='seed', values=(0, 1))},
+        run_path='{grid}/{dataset}/seed_{seed}',
+    )
+    probe_axes: dict[str, Mapping[str, Settings]] = {
+        'dataset': {'a': {}, 'b': {}},
+        'head': {'svm': {}},
+    }
+    probe_path = '{grid}/{dataset}/{head}'
+    match = ()
+    if not fan_out:
+        probe_axes = {
+            'dataset': {'a': {}, 'b': {}},
+            'seed': setting_axis(path='seed', values=(0, 1)),
+            'head': {'svm': {}},
+        }
+        probe_path = '{grid}/{dataset}/seed_{seed}/{head}'
+        match = None
+    probe = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=_ChainConfig,
+        axes=probe_axes,
+        after=(After(grid='pretrain', match=match),),
+        run_settings={'checkpoint': '{after:pretrain}/train'},
+        run_path=probe_path,
+    )
+    return Study(name='chain', grids={'pretrain': pretrain, 'probe': probe})
+
+
+def test_plan_jobs_expands_after_placeholder_for_each_matched_run(tmp_path: Path) -> None:
+    study = _chained_study()
+    machine = _local(tmp_path)
+    tasks = [
+        task
+        for group in _plan(study, machine)
+        for task in group.tasks
+        if task.resolved.run.grid == 'probe'
+    ]
+    expected = [
+        str(tmp_path / 'out' / 'chain' / 'pretrain' / 'a' / 'seed_0' / 'train'),
+        str(tmp_path / 'out' / 'chain' / 'pretrain' / 'a' / 'seed_1' / 'train'),
+        str(tmp_path / 'out' / 'chain' / 'pretrain' / 'b' / 'seed_0' / 'train'),
+        str(tmp_path / 'out' / 'chain' / 'pretrain' / 'b' / 'seed_1' / 'train'),
+    ]
+
+    assert len(tasks) == 4
+    assert [task.command[task.command.index('--checkpoint') + 1] for task in tasks] == expected
+
+
+def test_plan_jobs_reports_fan_out_after_placeholder_error(tmp_path: Path) -> None:
+    study = _chained_study(fan_out=True)
+    machine = _local(tmp_path)
+    tasks = [
+        task
+        for group in _plan(study, machine)
+        for task in group.tasks
+        if task.resolved.run.grid == 'probe'
+    ]
+
+    assert tasks[0].error == (
+        "run probe/a/svm matches 4 runs of grid 'pretrain'; {after:pretrain} needs exactly one"
+    )
