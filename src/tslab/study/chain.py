@@ -86,7 +86,6 @@ def downstream_of(
         themselves are left out.
     """
     given = set(run_paths)
-    reached = set(given)
     candidates = [
         report
         for report in reports
@@ -94,16 +93,27 @@ def downstream_of(
         and report.run.run_path not in given
     ]
     found: set[PurePosixPath] = set()
-    changed = True
-    while changed:
-        changed = False
-        for report in candidates:
-            path = report.run.run_path
-            if path not in found and _depends_on(study=study, run=report.run, paths=reached):
-                found.add(path)
-                reached.add(path)
-                changed = True
+    reached = set(given)
+    while added := _reachable(study=study, candidates=candidates, reached=reached, found=found):
+        found |= added
+        reached |= added
     return [report for report in candidates if report.run.run_path in found]
+
+
+def _reachable(
+    *,
+    study: Study,
+    candidates: Sequence[RunReport],
+    reached: Collection[PurePosixPath],
+    found: Collection[PurePosixPath],
+) -> set[PurePosixPath]:
+    """The candidate run paths not yet found that depend on a reached run."""
+    return {
+        report.run.run_path
+        for report in candidates
+        if report.run.run_path not in found
+        and _depends_on(study=study, run=report.run, paths=reached)
+    }
 
 
 def _depends_on(*, study: Study, run: StudyRun, paths: Collection[PurePosixPath]) -> bool:
