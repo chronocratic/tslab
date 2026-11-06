@@ -6,7 +6,7 @@ import os
 from pathlib import PurePosixPath
 import socket
 import time
-from typing import TextIO
+from typing import TextIO, TYPE_CHECKING
 
 from tslab.core.status import utc_now_iso
 from tslab.enums import StudyState
@@ -17,9 +17,13 @@ from tslab.study.launchers.common.types import LaunchError, OnLaunch
 from tslab.study.launchers.tables import backend_for
 from tslab.study.paths import next_job_file, study_folder
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
+from tslab.study.plan_after import AfterTarget, local_after_problems, order_runs, plan_targets
 from tslab.study.records import JobRecord, read_jobs, submission_lock
 from tslab.study.reporting.report import log_launch, log_problems
 from tslab.study.reporting.state import RunReport
+
+if TYPE_CHECKING:
+    from tslab.study.launchers.common.protocols import Backend
 
 __all__ = ['submit', 'submit_runs']
 
@@ -36,6 +40,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
     sleep: Callable[[float], None] = time.sleep,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
+    ignore_after: bool = False,
 ) -> int:
     """Submit the runs that need submitting, on the machine of the context.
 
@@ -53,6 +58,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         sleep: What waits out the submission pause of the cluster.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
+        ignore_after: Submit without dependency targets or the local dependency filter.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -80,6 +86,7 @@ def submit(  # noqa: PLR0913 # why: keyword-only public API; each option is docu
         sleep=sleep,
         on_launch=on_launch,
         task_stream=task_stream,
+        ignore_after=ignore_after,
     )
     return _finish_launch(
         code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
@@ -109,6 +116,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
     code_snapshots: Mapping[PurePosixPath, CodeSnapshot | None] | None = None,
+    ignore_after: bool = False,
 ) -> tuple[int, list[JobRecord]]:
     """Plan, validate and launch the given runs; the shared tail of the commands.
 
@@ -130,35 +138,40 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         task_stream: Stream for task output on a local machine.
         code_snapshots: The run path to code snapshot; ``None`` when absent,
             which means the run submits with the live code.
+        ignore_after: Submit without dependency targets or the local dependency filter.
 
     Returns:
         The exit code and the submitted run jobs; empty records on a dry
         run or when nothing was submitted.
     """
     machine = context.machine
-    if not context.job_states.known and not dry_run:
-        _LOGGER.error('the job states could not be read; not submitting, to avoid duplicates')
-        return 1, []
     backend = backend_for(machine=machine)
-    blocker = backend.launch_blocker(context=context)
-    if blocker is not None:
-        _LOGGER.error('%s', blocker)
-        return 1, []
-    runs = [report.run for report in reports]
+    preflight_error = _launch_preflight(context=context, dry_run=dry_run, backend=backend)
+    if preflight_error is not None:
+        return preflight_error, []
     folder = study_folder(machine=machine, study=context.study)
     with submission_lock(study_folder=folder):
         jobs = read_jobs(path=folder / 'submissions.jsonl')
+        ordered_reports, after_targets, planning_error = _plan_after(
+            context=context, reports=reports, jobs=jobs, ignore_after=ignore_after
+        )
+        if planning_error is not None or not ordered_reports:
+            return planning_error or 0, []
+        runs = [report.run for report in ordered_reports]
         groups = plan_jobs(
             study=context.study,
             machine=machine,
             resolved=[context.resolved[run.run_path] for run in runs],
             indices=assign_indices(study=context.study, runs=runs, jobs=jobs),
             extra_args=extra_args,
-            attempts={report.run.run_path: report.attempt for report in reports},
-            uncounted={report.run.run_path: _uncounted(report=report) for report in reports},
+            attempts={report.run.run_path: report.attempt for report in ordered_reports},
+            uncounted={
+                report.run.run_path: _uncounted(report=report) for report in ordered_reports
+            },
             first_job_file=next_job_file(study_folder=folder),
             environment=os.environ,
             code_snapshots=code_snapshots,
+            after=after_targets,
         )
         problems = validate_jobs(study=context.study, groups=groups)
         if problems:
@@ -185,3 +198,49 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
         if on_launch is not None:
             on_launch(report=report, groups=groups)
     return log_launch(report=report, groups=groups)
+
+
+def _launch_preflight(*, context: Context, dry_run: bool, backend: 'Backend') -> int | None:
+    """Return the error code when job states or the backend blocks submission."""
+    if not context.job_states.known and not dry_run:
+        _LOGGER.error('the job states could not be read; not submitting, to avoid duplicates')
+        return 1
+    blocker = backend.launch_blocker(context=context)
+    if blocker is not None:
+        _LOGGER.error('%s', blocker)
+        return 1
+    return None
+
+
+def _plan_after(
+    *, context: Context, reports: Sequence[RunReport], jobs: Sequence[JobRecord], ignore_after: bool
+) -> tuple[list[RunReport], dict[PurePosixPath, tuple[AfterTarget, ...]], int | None]:
+    """Order runs, validate local conditions and remove unschedulable dependents."""
+    runs = order_runs(study=context.study, runs=[report.run for report in reports])
+    reports_by_path = {report.run.run_path: report for report in reports}
+    ordered_reports = [reports_by_path[run.run_path] for run in runs]
+    if ignore_after:
+        return ordered_reports, {}, None
+    problems = local_after_problems(
+        study=context.study, runs=runs, launcher=context.machine.launcher
+    )
+    if problems:
+        for problem in problems:
+            _LOGGER.error('%s', problem)
+        return [], {}, 1
+    all_reports = {**context.upstream_reports, **reports_by_path}
+    targets, blocked = plan_targets(
+        study=context.study,
+        runs=runs,
+        reports=all_reports,
+        submitting=frozenset(run.run_path for run in runs),
+        jobs=jobs,
+        followup=context.machine.followup,
+    )
+    for report in ordered_reports:
+        if report.run.run_path in blocked:
+            _LOGGER.warning(
+                'not submitting %s: upstream dependencies cannot be satisfied', report.run.run_path
+            )
+    active = [report for report in ordered_reports if report.run.run_path not in blocked]
+    return active, targets, None

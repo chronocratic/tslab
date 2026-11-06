@@ -35,6 +35,7 @@ from tslab.study.records import JobRecord, latest_tasks
 
 if TYPE_CHECKING:
     from tslab.study.launchers.common.types import Resources
+    from tslab.study.plan_after import AfterTarget
 
 __all__ = [
     'JobGroup',
@@ -383,6 +384,7 @@ class JobGroup:
         resources: The resources of the job, as declared by its backend.
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
+        after: The upstream dependencies of each task in the group.
         code_snapshot: The code snapshot the jobs of the group run from;
             ``None`` means the live code. A group has at most one, so one
             job file carries one ``PYTHONPATH``.
@@ -393,6 +395,7 @@ class JobGroup:
     resources: 'Resources'
     job_file: int
     tasks: tuple[PlannedTask, ...]
+    after: tuple['AfterTarget', ...] = ()
     code_snapshot: CodeSnapshot | None = None
 
 
@@ -488,6 +491,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     environment: Mapping[str, str],
     uncounted: Mapping[PurePosixPath, tuple[int, int]] | None = None,
     code_snapshots: Mapping[PurePosixPath, CodeSnapshot | None] | None = None,
+    after: Mapping[PurePosixPath, tuple['AfterTarget', ...]] | None = None,
 ) -> list[JobGroup]:
     """The runs grouped into numbered jobs, ready for validation and launch.
 
@@ -511,6 +515,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             see ``TaskRecord``; ``(0, 0)`` when absent.
         code_snapshots: The run path to code snapshot; ``None`` when absent,
             which means the run submits with the live code.
+        after: The upstream targets for each run path.
 
     Returns:
         The groups, numbered from ``first_job_file`` in first-appearance
@@ -518,18 +523,20 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     """
     folder = study_folder(machine=machine, study=study)
     groups: list[JobGroup] = []
-    lookup: dict[tuple[str, str, Resources, CodeSnapshot | None], int] = {}
+    lookup: dict[tuple[str, str, Resources, CodeSnapshot | None, tuple[AfterTarget, ...]], int] = {}
     next_file = first_job_file
     tasks_of: dict[int, list[PlannedTask]] = {}
     pin_conflicts_found: list[tuple[str, SettingValue, SettingValue]] = []
     env = expansion_env(machine=machine, environment=environment)
     counters = uncounted or {}
     snapshots = code_snapshots or {}
+    targets = after or {}
     for run in resolved:
         grid = study.grids[run.run.grid]
         code_snapshot = snapshots.get(run.run.run_path)
+        run_after = targets.get(run.run.run_path, ())
         job_name = study.job_name_of(run=run.run)
-        key = (run.run.grid, job_name, run.resources, code_snapshot)
+        key = (run.run.grid, job_name, run.resources, code_snapshot, run_after)
         if key not in lookup:
             lookup[key] = len(groups)
             tasks_of[lookup[key]] = []
@@ -540,6 +547,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     resources=run.resources,
                     job_file=next_file,
                     tasks=(),
+                    after=run_after,
                     code_snapshot=code_snapshot,
                 )
             )

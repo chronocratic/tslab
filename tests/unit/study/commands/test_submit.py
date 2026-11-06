@@ -1,22 +1,37 @@
 """``tslab study submit``: plans, writes, launches and records study runs."""
 
+import dataclasses
+from dataclasses import dataclass
+from importlib import import_module
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import signal
 import subprocess
 import sys
 import threading
 import time
+from typing import cast, TYPE_CHECKING
 
 import pytest
 
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
-from tslab.enums import JobPhase, StudyState
+from tslab.core.status import utc_now_iso
+from tslab.enums import AfterCondition, JobPhase, StudyState
+from tslab.study import After, Grid, Study
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit, submit_runs
-from tslab.study.context import load_context, Selection
+from tslab.study.context import Context, context_for, load_context, Selection
+from tslab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from tslab.study.plan import JobGroup
+
+_SUBMIT_MODULE = import_module('tslab.study.commands.submit')
 
 # why: the small model has no ``depth`` field, so a study that sets
 # ``model.depth`` for it does not load; the parse-bad study leaves the
@@ -165,6 +180,134 @@ def test_submit_launches_and_records(project: Path, fake_backend: FakeBackend) -
         ('g/large/2', 3),
     ]
     assert all(t.attempt == 1 for t in jobs[0].tasks)
+
+
+def _chained_study(*, condition: AfterCondition = AfterCondition.OK) -> Study:
+    """A chain whose definition inserts downstream grid before its upstream."""
+
+    @dataclass(frozen=True, kw_only=True)
+    class ChainConfig:
+        seed: int = 0
+        output_root: Path = Path('runs')
+        run_path: Path = Path('run')
+
+    pretrain = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}},
+    )
+    probe = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}, 'head': {'svm': {}, 'knn': {}}},
+        after=(After(grid='pretrain', condition=condition),),
+    )
+    return Study(name='chain', grids={'probe': probe, 'pretrain': pretrain})
+
+
+def _chained_context(
+    *, project: Path, study: Study, grids: tuple[str, ...] = (), machine_file: str = 'local.toml'
+) -> Context:
+    return context_for(
+        study=study,
+        machine_path=project / machine_file,
+        selection=Selection(grids=grids),
+        project_root=project,
+        local_cpus=1,
+        environment=os.environ,
+    )
+
+
+def test_submit_orders_upstream_groups_first(project: Path, fake_backend: FakeBackend) -> None:
+    ctx = _chained_context(project=project, study=_chained_study())
+
+    code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+
+    assert code == 0
+    groups = cast('Sequence[JobGroup]', fake_backend.calls('launch')[0]['groups'])
+    assert [group.grid for group in groups] == ['pretrain', 'probe', 'probe']
+
+
+def test_submit_uses_job_records_read_under_lock_for_targets(
+    project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = _chained_context(
+        project=project, study=_chained_study(), grids=('probe',), machine_file='cluster.toml'
+    )
+    upstream_path = PurePosixPath('pretrain/a')
+    upstream = dataclasses.replace(ctx.upstream_reports[upstream_path], state=StudyState.RUNNING)
+    ctx = dataclasses.replace(ctx, upstream_reports={upstream_path: upstream})
+    task = TaskRecord(
+        index=3,
+        grid='pretrain',
+        run_path=upstream_path,
+        command=(),
+        extra_args=(),
+        resources={},
+        attempt=1,
+        progress=ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None),
+    )
+    job = SlurmJobRecord(
+        kind=JobKind.RUN,
+        submission_id='prior',
+        time=utc_now_iso(),
+        launcher=ctx.machine.launcher,
+        job_id='41',
+        job_file=1,
+        tasks=(task,),
+    )
+    monkeypatch.setattr(_SUBMIT_MODULE, 'read_jobs', lambda _: [job])
+
+    code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+
+    assert code == 0
+    launches = fake_backend.calls('launch')
+    assert len(launches) == 1
+    groups = cast('Sequence[JobGroup]', launches[0]['groups'])
+    assert groups[0].after[0].job_tasks == ('41_3',)
+
+
+def test_ignore_after_submits_runs_blocked_by_upstream(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    ctx = _chained_context(project=project, study=_chained_study(), grids=('probe',))
+    upstream_path = PurePosixPath('pretrain/a')
+    upstream = dataclasses.replace(ctx.upstream_reports[upstream_path], state=StudyState.FAILED)
+    ctx = dataclasses.replace(ctx, upstream_reports={upstream_path: upstream})
+
+    code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+
+    assert code == 0
+    assert fake_backend.calls('launch') == []
+    code = submit(
+        context=ctx,
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+        ignore_after=True,
+    )
+
+    assert code == 0
+    (group,) = cast('Sequence[JobGroup]', fake_backend.calls('launch')[0]['groups'])
+    assert group.after == ()
+
+
+def test_started_dependency_is_rejected_on_local_machine(
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    ctx = _chained_context(
+        project=project, study=_chained_study(condition=AfterCondition.STARTED), grids=('probe',)
+    )
+
+    with caplog.at_level('ERROR'):
+        code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
+
+    assert code == 1
+    assert "grid 'probe': condition 'started' needs SLURM" in caplog.text
+    assert fake_backend.calls('launch') == []
 
 
 def test_submit_runs_records_the_code_snapshot(project: Path, fake_backend: FakeBackend) -> None:
