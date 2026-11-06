@@ -312,6 +312,26 @@ def main() -> None:
     if os.environ.get('TOY_CHAIN_FAIL'):
         with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
             raise RuntimeError('pretrain fails on purpose')
+    folder = config.output_root / config.run_path
+    if os.environ.get('TOY_CHAIN_TIME_LIMIT'):
+        # the first attempt saves a checkpoint and stops at the time limit, the next finishes
+        limited = not (folder / 'last.ckpt').exists()
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / 'last.ckpt').write_text('checkpoint')
+        record = (
+            InstanceRecord(state=InstanceState.FAILED, error='JobTimeLimitSignal: time limit')
+            if limited
+            else InstanceRecord(state=InstanceState.DONE)
+        )
+        write_status(
+            path=folder / 'status.json',
+            snapshot=RunStatusSnapshot(
+                run_state=RunState.RUNNING if limited else RunState.FINISHED,
+                updated_at=utc_now_iso(),
+                instances={'train': record},
+            ),
+        )
+        raise SystemExit(1 if limited else 0)
     if os.environ.get('TOY_CHAIN_FAIL_INSTANCE'):
         folder = config.output_root / config.run_path
         folder.mkdir(parents=True, exist_ok=True)
@@ -560,6 +580,36 @@ def test_local_failed_instance_blocks_ok_probe(
         'pretrain/b': StudyState.FAILED,
         'probe/a': StudyState.DEPENDENCY_FAILED,
         'probe/b': StudyState.DEPENDENCY_FAILED,
+        'other/c': StudyState.DONE,
+    }
+
+
+@pytest.mark.slow
+def test_local_chained_resubmit_reruns_probe_after_upstream_time_limit(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_chain_project(project=project)
+    machine = project / 'local.toml'
+    machine.write_text(machine.read_text() + '\n[followup]\nchained_retry = "resubmit"\n')
+    monkeypatch.setenv('TOY_CHAIN_TIME_LIMIT', '1')
+
+    code = submit(
+        context=chain_context(project=project),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
+    attempts = {(task.run_path.as_posix(), task.attempt) for task in tasks}
+    assert {('pretrain/a', 1), ('pretrain/a', 2), ('probe/a', 1), ('probe/b', 1)} <= attempts
+    assert chain_states(project=project) == {
+        'pretrain/a': StudyState.DONE,
+        'pretrain/b': StudyState.DONE,
+        'probe/a': StudyState.DONE,
+        'probe/b': StudyState.DONE,
         'other/c': StudyState.DONE,
     }
 
