@@ -1,6 +1,6 @@
 """What a study command reads before it does anything: the ``Context``."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -32,6 +32,8 @@ __all__ = [
     'expected_starts',
     'load_context',
     'refresh_context',
+    'study_reports',
+    'widen_context',
 ]
 
 
@@ -320,3 +322,65 @@ def _upstream_paths(*, study: Study, runs: list[StudyRun]) -> set[PurePosixPath]
         for after in study.grids[run.grid].after
         for upstream in upstream_runs(study=study, run=run, after=after)
     }
+
+
+def study_reports(*, context: Context) -> dict[PurePosixPath, RunReport]:
+    """The reports of every run of the study, chain states applied.
+
+    Args:
+        context: The context whose job records and states are read.
+
+    Returns:
+        The report per run path, selected or not.
+    """
+    raw = collect_states(
+        study_directory=context.study_directory,
+        runs=expand_runs(study=context.study),
+        jobs=context.jobs,
+        job_states=context.job_states,
+    )
+    reports = raw
+    # why: a run behind two links needs the adjusted state of its direct upstream
+    for _ in range(2):
+        reports = apply_chain_states(
+            study=context.study,
+            reports=raw,
+            upstream={report.run.run_path: report for report in reports},
+            followup=context.machine.followup,
+        )
+    return {report.run.run_path: report for report in reports}
+
+
+def widen_context(*, context: Context, reports: Sequence[RunReport]) -> Context:
+    """The context with extra runs added, so commands can submit or cancel them.
+
+    Args:
+        context: The context to widen.
+        reports: Reports of the runs to add; runs the context already holds are skipped.
+
+    Returns:
+        The context with the new runs, their resolved settings and reports, and the
+        upstream reports their dependencies need.
+    """
+    # why: the launcher door imports Context, so this import must wait until calls
+    from tslab.study.launchers.cpus import available_cpus  # noqa: PLC0415
+
+    new = [report for report in reports if report.run.run_path not in context.resolved]
+    if not new:
+        return context
+    runs = [report.run for report in new]
+    resolved = resolve_runs(
+        study=context.study, machine=context.machine, runs=runs, local_cpus=available_cpus()
+    )
+    everything = study_reports(context=context)
+    upstream_paths = _upstream_paths(study=context.study, runs=runs)
+    return dataclasses.replace(
+        context,
+        runs=[*context.runs, *runs],
+        resolved={**context.resolved, **{item.run.run_path: item for item in resolved}},
+        reports=[*context.reports, *new],
+        upstream_reports={
+            **context.upstream_reports,
+            **{path: everything[path] for path in upstream_paths if path in everything},
+        },
+    )

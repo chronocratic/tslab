@@ -1,7 +1,6 @@
 """``tslab study submit``: plans, writes, launches and records study runs."""
 
 import dataclasses
-from dataclasses import dataclass
 from importlib import import_module
 import json
 import os
@@ -16,13 +15,19 @@ from typing import cast, TYPE_CHECKING
 import pytest
 
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory
+from tests.unit.study.helpers import (
+    chained_context,
+    chained_study,
+    context,
+    jobs_of,
+    no_sleep,
+    study_directory,
+)
 from tslab.core.status import utc_now_iso
 from tslab.enums import AfterCondition, JobPhase, StudyState
-from tslab.study import After, Grid, Study
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit, submit_runs
-from tslab.study.context import Context, context_for, load_context, Selection
+from tslab.study.context import Context, load_context, Selection
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
@@ -182,46 +187,8 @@ def test_submit_launches_and_records(project: Path, fake_backend: FakeBackend) -
     assert all(t.attempt == 1 for t in jobs[0].tasks)
 
 
-def _chained_study(*, condition: AfterCondition = AfterCondition.OK) -> Study:
-    """A chain whose definition inserts downstream grid before its upstream."""
-
-    @dataclass(frozen=True, kw_only=True)
-    class ChainConfig:
-        seed: int = 0
-        output_root: Path = Path('runs')
-        run_path: Path = Path('run')
-
-    pretrain = Grid(
-        short_name='pre',
-        command=('python', '-m', 'pretrain'),
-        config=ChainConfig,
-        axes={'dataset': {'a': {}, 'b': {}}},
-    )
-    probe = Grid(
-        short_name='probe',
-        command=('python', '-m', 'probe'),
-        config=ChainConfig,
-        axes={'dataset': {'a': {}, 'b': {}}, 'head': {'svm': {}, 'knn': {}}},
-        after=(After(grid='pretrain', condition=condition),),
-    )
-    return Study(name='chain', grids={'probe': probe, 'pretrain': pretrain})
-
-
-def _chained_context(
-    *, project: Path, study: Study, grids: tuple[str, ...] = (), machine_file: str = 'local.toml'
-) -> Context:
-    return context_for(
-        study=study,
-        machine_path=project / machine_file,
-        selection=Selection(grids=grids),
-        project_root=project,
-        local_cpus=1,
-        environment=os.environ,
-    )
-
-
 def test_submit_orders_upstream_groups_first(project: Path, fake_backend: FakeBackend) -> None:
-    ctx = _chained_context(project=project, study=_chained_study())
+    ctx = chained_context(project=project, study=chained_study())
 
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
 
@@ -233,8 +200,8 @@ def test_submit_orders_upstream_groups_first(project: Path, fake_backend: FakeBa
 def test_submit_uses_job_records_read_under_lock_for_targets(
     project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    ctx = _chained_context(
-        project=project, study=_chained_study(), grids=('probe',), machine_file='cluster.toml'
+    ctx = chained_context(
+        project=project, study=chained_study(), grids=('probe',), machine_file='cluster.toml'
     )
     upstream_path = PurePosixPath('pretrain/a')
     upstream = dataclasses.replace(ctx.upstream_reports[upstream_path], state=StudyState.RUNNING)
@@ -276,7 +243,7 @@ def test_submit_uses_job_records_read_under_lock_for_targets(
 def test_ignore_after_submits_runs_blocked_by_upstream(
     project: Path, fake_backend: FakeBackend
 ) -> None:
-    ctx = _chained_context(project=project, study=_chained_study(), grids=('probe',))
+    ctx = chained_context(project=project, study=chained_study(), grids=('probe',))
     upstream_path = PurePosixPath('pretrain/a')
     upstream = dataclasses.replace(ctx.upstream_reports[upstream_path], state=StudyState.FAILED)
     ctx = dataclasses.replace(ctx, upstream_reports={upstream_path: upstream})
@@ -302,8 +269,8 @@ def test_ignore_after_submits_runs_blocked_by_upstream(
 def test_started_dependency_is_rejected_on_local_machine(
     project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
-    ctx = _chained_context(
-        project=project, study=_chained_study(condition=AfterCondition.STARTED), grids=('probe',)
+    ctx = chained_context(
+        project=project, study=chained_study(condition=AfterCondition.STARTED), grids=('probe',)
     )
 
     with caplog.at_level('ERROR'):

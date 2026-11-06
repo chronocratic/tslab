@@ -8,14 +8,14 @@ from tslab.enums import AfterCondition, AfterVerdict, ChainedRetry, Satisfy, Stu
 from tslab.study.definition import upstream_runs
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Collection, Mapping, Sequence
     from pathlib import PurePosixPath
 
     from tslab.study.definition import After, Study, StudyRun
     from tslab.study.machine.profile import FollowupSettings
     from tslab.study.reporting.state import RunReport
 
-__all__ = ['after_verdict', 'upstream_verdict']
+__all__ = ['after_verdict', 'downstream_of', 'upstream_verdict']
 
 
 def upstream_verdict(
@@ -68,6 +68,51 @@ def after_verdict(
     if all(verdict is AfterVerdict.MET for verdict in verdicts):
         return AfterVerdict.MET
     return AfterVerdict.OPEN
+
+
+def downstream_of(
+    *, study: Study, run_paths: Collection[PurePosixPath], reports: Sequence[RunReport]
+) -> list[RunReport]:
+    """The waiting and dependency-failed runs that depend on the given runs.
+
+    Args:
+        study: The study containing the grids.
+        run_paths: The upstream run paths, e.g. the runs selected for resubmission.
+        reports: Reports of every run that may depend on them.
+
+    Returns:
+        The ``WAITING`` and ``DEPENDENCY_FAILED`` reports with a given run among their
+        upstream runs, transitively, in the order of ``reports``; the given runs
+        themselves are left out.
+    """
+    given = set(run_paths)
+    reached = set(given)
+    candidates = [
+        report
+        for report in reports
+        if report.state in (StudyState.WAITING, StudyState.DEPENDENCY_FAILED)
+        and report.run.run_path not in given
+    ]
+    found: set[PurePosixPath] = set()
+    changed = True
+    while changed:
+        changed = False
+        for report in candidates:
+            path = report.run.run_path
+            if path not in found and _depends_on(study=study, run=report.run, paths=reached):
+                found.add(path)
+                reached.add(path)
+                changed = True
+    return [report for report in candidates if report.run.run_path in found]
+
+
+def _depends_on(*, study: Study, run: StudyRun, paths: Collection[PurePosixPath]) -> bool:
+    """Whether any upstream run of ``run`` is in ``paths``."""
+    return any(
+        upstream.run_path in paths
+        for after in study.grids[run.grid].after
+        for upstream in upstream_runs(study=study, run=run, after=after)
+    )
 
 
 def _entry_verdict(
