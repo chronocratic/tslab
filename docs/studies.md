@@ -563,7 +563,9 @@ Two states belong to chained runs:
 `resubmit` takes `dependency_failed` runs by default. Resubmitting an upstream run
 also cancels and resubmits the `waiting` and `dependency_failed` runs behind it,
 with dependencies on the new job ids. `cancel` of upstream runs also cancels
-the `waiting` runs behind them. `submit` and `resubmit` take `--ignore-after` to
+the `waiting` runs behind them. A cancelled upstream run reads `failed`; when
+`resubmit` takes a `dependency_failed` run behind it, it resubmits the cancelled
+upstream run too, so cancel then `resubmit` brings the whole chain back. `submit` and `resubmit` take `--ignore-after` to
 submit without dependencies.
 
 ### Requeue mode

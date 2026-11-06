@@ -1,0 +1,1 @@
+`study resubmit` now resubmits a cancelled upstream run together with the `dependency_failed` runs behind it, so cancelling a chain and running `resubmit` submits it again instead of leaving the downstream runs blocked.

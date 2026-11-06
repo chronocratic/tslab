@@ -18,7 +18,7 @@ from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDE
 from tslab.study.commands.submit import submit_runs
 from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
 from tslab.study.context import Context, study_reports, widen_context
-from tslab.study.definition import chained_grids, StudyRun
+from tslab.study.definition import chained_grids, StudyRun, upstream_runs
 from tslab.study.launchers.common.types import OnLaunch
 from tslab.study.launchers.tables import backend_for
 from tslab.study.machine.profile import FollowupSettings
@@ -127,6 +127,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     ]
     if auto:
         selected = _auto_selection(reports=selected, context=context)
+    else:
+        context, selected = _with_cancelled_upstream(context=context, selected=selected)
     live = _live_reports(reports=context.reports, cancel_live=cancel_live)
     selected += live
     # why: SLURM holds a job at MaxBatchRequeue; it shows interrupted but is still queued
@@ -243,6 +245,45 @@ def _with_downstream(
     waiting = [report for report in extra if report.state in LIVE_STATES]
     failed = [report for report in extra if report.state not in LIVE_STATES]
     return context, [*selected, *failed], waiting
+
+
+def _with_cancelled_upstream(
+    *, context: Context, selected: list[RunReport]
+) -> tuple[Context, list[RunReport]]:
+    """Add the cancelled upstream runs that keep selected runs ``dependency_failed``.
+
+    A run cancelled by the user (``study cancel``, ``scancel``) reads ``failed``, so the
+    default states leave it out, and its downstream runs could never be submitted.
+
+    Returns:
+        The context widened to hold them and the selection with them added.
+    """
+    if not chained_grids(study=context.study):
+        return context, selected
+    everything = study_reports(context=context)
+    chosen = {report.run.run_path: report for report in selected}
+    pending = [report for report in selected if report.state is StudyState.DEPENDENCY_FAILED]
+    while pending:
+        report = pending.pop()
+        for after in context.study.grids[report.run.grid].after:
+            for upstream in upstream_runs(study=context.study, run=report.run, after=after):
+                found = everything.get(upstream.run_path)
+                if found is None or upstream.run_path in chosen or not _cancelled(report=found):
+                    continue
+                chosen[upstream.run_path] = found
+                pending.append(found)
+    given = {report.run.run_path for report in selected}
+    extra = [report for path, report in chosen.items() if path not in given]
+    if not extra:
+        return context, selected
+    for report in extra:
+        _LOGGER.info('also resubmitting %s: it was cancelled', report.run.run_path)
+    return widen_context(context=context, reports=extra), [*selected, *extra]
+
+
+def _cancelled(*, report: RunReport) -> bool:
+    """Whether a failed run ended because its job was cancelled."""
+    return report.state is StudyState.FAILED and JobFlag.CANCELLED in report.job_flags
 
 
 def _code_snapshots_of(
