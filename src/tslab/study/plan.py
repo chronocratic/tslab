@@ -13,7 +13,7 @@ import pickle
 from typing import TYPE_CHECKING
 
 import tslab
-from tslab.enums import AfterCondition, Satisfy
+from tslab.enums import AfterCondition, ChainedRetry, Satisfy
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
     chained_grids,
@@ -163,15 +163,37 @@ def check_machine(*, study: Study, machine: MachineProfile, warned: set[str] | N
     Raises:
         ValueError: If a machine setting path is not a field of a grid it
             applies to; the error names the profile file, the override index
-            or ``settings``, the grid and the paths.
+            or ``settings``, the grid and the paths; or if a grid waits with
+            ``condition='failed'`` while ``chained_retry`` is not ``"manual"``.
     """
     _settings_problems(study=study, machine=machine)
+    _check_failed_condition(study=study, machine=machine)
     seen = warned if warned is not None else set()
     for text in _override_warnings(study=study, machine=machine):
         if text in seen:
             continue
         seen.add(text)
         _LOGGER.warning('%s', text)
+
+
+def _check_failed_condition(*, study: Study, machine: MachineProfile) -> None:
+    """Refuse ``condition='failed'`` together with chained retries.
+
+    An upstream run that is retried later has already ended non-zero on SLURM, so
+    ``afternotok`` starts the downstream run, while a local launch waits for the retry.
+    """
+    retry = machine.followup.chained_retry
+    if retry is ChainedRetry.MANUAL:
+        return
+    for name, grid in study.grids.items():
+        if any(after.condition is AfterCondition.FAILED for after in grid.after):
+            message = (
+                f"grid {name!r}: condition 'failed' cannot be used with [followup] "
+                f'chained_retry = "{retry.value}" in {machine.path}: an upstream run that is '
+                'retried later already counts as failed on SLURM; set chained_retry = "manual" '
+                "or use condition 'any'"
+            )
+            raise ValueError(message)
 
 
 def _settings_problems(*, study: Study, machine: MachineProfile) -> None:

@@ -537,7 +537,11 @@ probe = Grid(
   run.
 - `condition`: when the upstream run lets the downstream run start. `ok` (default,
   the run is `done`), `any` (the run ended in any way), `failed` (the run failed)
-  and `started` (the run began, SLURM only; `delay_minutes` adds a wait).
+  and `started` (the run began, SLURM only; `delay_minutes` adds a wait). `failed`
+  needs `[followup] chained_retry = "manual"`; every command refuses it with
+  `resubmit` or `requeue`, because a retried upstream run has already ended
+  non-zero on SLURM, so `afternotok` would start the downstream run while a local
+  launch waits for the retry.
 - `satisfy`: `all` (default) needs every matched upstream run, `any` needs one. `any`
   works with a single `After` entry only, because SLURM allows one separator per
   job.
@@ -598,8 +602,8 @@ Limits to know: a job whose next requeue would reach `MaxBatchRequeue` ends inst
 follow-up resubmits it. Requeues SLURM makes on its own count toward that limit too; a job SLURM
 holds there stays pending, so the follow-up job, which waits for every job of the submission,
 waits with it. `status` shows such a run `interrupted` (held at MaxBatchRequeue); run `resubmit`
-by hand. With `condition="failed"`, an upstream run that is retried later is already
-"failed" for SLURM (`afternotok`), while a local launch keeps the downstream waiting for the retry.
+by hand. `condition="failed"` works only with `chained_retry = "manual"` (see
+[Chaining grids](#chaining-grids)).
 
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index
 of their upstream run when it is free, and wait with `aftercorr`: each downstream task starts

@@ -12,9 +12,12 @@ import pytest
 
 from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
+from tests.unit.study.helpers import chained_study
+from tslab.enums import AfterCondition, ChainedRetry
 from tslab.study import After, Grid, setting_axis, Study
 from tslab.study.definition import expand_runs, Settings
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
+from tslab.study.machine.profile import FollowupSettings
 from tslab.study.plan import (
     _override_warnings,
     _worker_count,
@@ -362,4 +365,24 @@ def test_plan_jobs_reports_fan_out_after_placeholder_error(tmp_path: Path) -> No
 
     assert tasks[0].error == (
         "run probe/a/svm matches 4 runs of grid 'pretrain'; {after:pretrain} needs exactly one"
+    )
+
+
+@pytest.mark.parametrize('chained_retry', [ChainedRetry.RESUBMIT, ChainedRetry.REQUEUE])
+def test_check_machine_rejects_failed_condition_with_chained_retry(
+    tmp_path: Path, chained_retry: ChainedRetry
+) -> None:
+    study = chained_study(condition=AfterCondition.FAILED)
+    machine = _local(tmp_path, followup=FollowupSettings(chained_retry=chained_retry))
+    with pytest.raises(ValueError, match=r"grid 'probe'.*condition 'failed'.*chained_retry"):
+        check_machine(study=study, machine=machine)
+
+
+def test_check_machine_accepts_failed_condition_with_manual_chained_retry(tmp_path: Path) -> None:
+    study = chained_study(condition=AfterCondition.FAILED)
+    check_machine(study=study, machine=_local(tmp_path))
+    ok = chained_study(condition=AfterCondition.OK)
+    check_machine(
+        study=ok,
+        machine=_local(tmp_path, followup=FollowupSettings(chained_retry=ChainedRetry.RESUBMIT)),
     )

@@ -1,0 +1,1 @@
+A grid that waits with `condition="failed"` is now refused when `[followup] chained_retry` is `"resubmit"` or `"requeue"`: a retried upstream run would start the downstream run on SLURM but not on a local machine. The error names the grid, the condition and the setting.
