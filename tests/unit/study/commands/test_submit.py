@@ -258,7 +258,11 @@ def test_submit_uses_job_records_read_under_lock_for_targets(
         job_file=1,
         tasks=(task,),
     )
-    monkeypatch.setattr(_SUBMIT_MODULE, 'read_jobs', lambda _: [job])
+    monkeypatch.setattr(
+        _SUBMIT_MODULE,
+        'read_jobs',
+        lambda *, path: [job] if path.name == 'submissions.jsonl' else [],
+    )
 
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
 
