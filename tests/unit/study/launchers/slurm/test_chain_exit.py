@@ -14,7 +14,7 @@ from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, wr
 from tslab.enums import InstanceState, LauncherKind, RunState, StudyState
 from tslab.jobs.slurm import SlurmError
 from tslab.study.commands.resubmit import may_retry
-from tslab.study.context import Context
+from tslab.study.context import Context, records_context
 from tslab.study.definition import StudyRun
 from tslab.study.launchers.slurm.chain_exit import chain_exit
 from tslab.study.launchers.slurm.records import SlurmJobRecord
@@ -380,3 +380,44 @@ def test_chain_exit_does_not_requeue_at_max_batch_requeue(
     monkeypatch.setattr(_REQUEUE_MODULE, 'query_cluster_config', lambda: {'MaxBatchRequeue': '2'})
     assert chain_exit(context=ctx, job_file=3, index=17) == 1
     assert requeued == []
+
+
+def test_chain_exit_reads_records_only_without_scheduler_or_other_runs(
+    project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(project=project, machine_file='cluster.toml')
+    run = ctx.runs[0]
+    job = _job_record(run=run, job_file=3, index=17)
+    append_job(
+        path=study_folder(machine=ctx.machine, study=ctx.study) / 'submissions.jsonl', record=job
+    )
+    write_status(
+        path=ctx.study_directory / run.run_path / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FINISHED,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.DONE)},
+        ),
+    )
+    before = len(fake_backend.calls('job_states'))
+    read: list[Path] = []
+    read_folder = _STATE_MODULE.read_folder
+
+    def counted_read(*, run_directory: Path) -> FolderFacts:
+        read.append(run_directory)
+        return read_folder(run_directory=run_directory)
+
+    monkeypatch.setattr(_STATE_MODULE, 'read_folder', counted_read)
+
+    light = records_context(
+        reference='toy_studies:study',
+        machine_path=project / 'cluster.toml',
+        project_root=project,
+        environment=os.environ,
+    )
+
+    assert len(fake_backend.calls('job_states')) == before
+    assert light.reports == []
+    assert light.jobs == [job]
+    assert chain_exit(context=light, job_file=3, index=17) == 0
+    assert read == [ctx.study_directory / run.run_path]

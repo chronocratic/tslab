@@ -7,7 +7,7 @@ from typing import Annotated, cast
 import tyro
 
 from tslab.cli.common import resolve_request
-from tslab.cli.study.shared import _context_of
+from tslab.cli.study.shared import _records_context_of
 from tslab.core.meta import hostname
 from tslab.study.launchers.slurm.chain_exit import chain_exit
 
@@ -42,11 +42,10 @@ class ChainExit:
         request = resolve_request(
             study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
         )
-        context = _context_of(
+        # why: every task of a chained array runs this check between the time limit
+        # signal and the hard kill, so it reads the job records and its own run only
+        context = _records_context_of(
             study=cast('str', request.study),  # why: this command requires a study reference
             machine=cast('str', request.machine),  # why: machine is a required CLI argument
-            grid=(),
-            only=(),
-            read_only=True,
         )
         return chain_exit(context=context, job_file=self.job_file, index=self.index)

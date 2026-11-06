@@ -1,0 +1,1 @@
+The run state check at the end of a chained SLURM task now reads only the job records and its own run folder, without querying the scheduler or reading the whole study, so a large array ending at once checks and requeues within the time limit margin.

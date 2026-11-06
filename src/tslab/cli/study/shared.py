@@ -12,7 +12,7 @@ from tslab.cli.common import Request, UsageError
 from tslab.enums import StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
 from tslab.study.commands import parse_states
-from tslab.study.context import Context, load_context, Selection
+from tslab.study.context import Context, load_context, records_context, Selection
 from tslab.study.launchers.cpus import available_cpus
 from tslab.study.launchers.tables import backend_for
 from tslab.study.machine import resolve_machine
@@ -41,6 +41,18 @@ def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag o
             read_only=read_only,
             ended_states=ended_states,
             local_cpus=available_cpus(),
+            environment=os.environ,
+        )
+
+
+def _records_context_of(*, study: str, machine: str) -> Context:
+    """The study, machine and job records only; a bad reference or profile is a usage error."""
+    with _usage_errors(study=study):
+        location = resolve_machine(machine=machine, start=Path.cwd(), environment=os.environ)
+        return records_context(
+            reference=study,
+            machine_path=location.path,
+            project_root=location.project_root,
             environment=os.environ,
         )
 
