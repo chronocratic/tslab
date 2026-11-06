@@ -13,6 +13,7 @@ import pickle
 from typing import TYPE_CHECKING
 
 import tslab
+from tslab.enums import AfterCondition, Satisfy
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
     chained_grids,
@@ -20,6 +21,8 @@ from tslab.study.definition import (
     expand_runs,
     expand_setting,
     Grid,
+    grid_order,
+    match_axes,
     match_problems,
     merge_overrides,
     merge_settings,
@@ -32,7 +35,8 @@ from tslab.study.definition import (
 from tslab.study.definition.settings import non_machine_paths
 from tslab.study.machine import MachineOverride, MachineProfile
 from tslab.study.paths import log_file_of, study_folder
-from tslab.study.records import JobRecord, latest_tasks
+from tslab.study.plan_after import merge_corr_groups
+from tslab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
     from tslab.study.launchers.common.types import Resources
@@ -425,24 +429,62 @@ def assign_indices(
     """
     names = {run.run_path: study.job_name_of(run=run) for run in [*expand_runs(study=study), *runs]}
     latest = latest_tasks(jobs=jobs)
-    highest: dict[str, int] = {}
-    removed: dict[str, int] = {}
+    taken: dict[str, set[int]] = {}
+    removed: dict[str, set[int]] = {}
     for run_path, (_, task) in latest.items():
         name = names.get(run_path)
         if name is None:
-            removed[task.grid] = max(removed.get(task.grid, -1), task.index)
+            removed.setdefault(task.grid, set()).add(task.index)
         else:
-            highest[name] = max(highest.get(name, -1), task.index)
+            taken.setdefault(name, set()).add(task.index)
+    ordered = _upstream_first(study=study, runs=runs)
     indices: dict[PurePosixPath, int] = {}
-    for run in runs:
+    for run in ordered:
         recorded = latest.get(run.run_path)
         if recorded is not None:
             indices[run.run_path] = recorded[1].index
             continue
         name = names[run.run_path]
-        indices[run.run_path] = max(highest.get(name, -1), removed.get(run.grid, -1)) + 1
-        highest[name] = indices[run.run_path]
-    return indices
+        blocked = taken.setdefault(name, set()) | removed.get(run.grid, set())
+        index = _upstream_index(study=study, run=run, latest=latest, indices=indices)
+        if index is None or index in blocked:
+            index = max(blocked, default=-1) + 1
+        taken[name].add(index)
+        indices[run.run_path] = index
+    return {run.run_path: indices[run.run_path] for run in runs}
+
+
+def _upstream_first(*, study: Study, runs: Sequence[StudyRun]) -> list[StudyRun]:
+    """The runs with upstream grids first; unchanged for a study without chained grids."""
+    if not chained_grids(study=study):
+        return list(runs)
+    rank = {name: position for position, name in enumerate(grid_order(study=study))}
+    return sorted(runs, key=lambda run: rank[run.grid])
+
+
+def _upstream_index(
+    *,
+    study: Study,
+    run: StudyRun,
+    latest: Mapping[PurePosixPath, tuple[JobRecord, TaskRecord]],
+    indices: Mapping[PurePosixPath, int],
+) -> int | None:
+    """The array index of the one upstream run a one-to-one downstream run pairs with."""
+    grid = study.grids[run.grid]
+    if len(grid.after) != 1:
+        return None
+    (after,) = grid.after
+    paired = match_axes(study=study, grid_name=run.grid, after=after)
+    plain = after.condition is AfterCondition.OK and after.satisfy is Satisfy.ALL
+    if not plain or not set(grid.axes) <= set(paired):
+        return None
+    upstream = upstream_runs(study=study, run=run, after=after)
+    if len(upstream) != 1:
+        return None
+    path = upstream[0].run_path
+    if path in indices:
+        return indices[path]
+    return latest[path][1].index if path in latest else None
 
 
 def _task_error(*, grid_name: str, run_path: PurePosixPath, index: int, max_array_size: int) -> str:
@@ -620,10 +662,11 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             for path, study_value, machine_value in unique_conflicts
         )
         raise ValueError(message)
-    return [
+    planned = [
         replace(group, tasks=tuple(sorted(tasks_of[position], key=lambda task: task.index)))
         for position, group in enumerate(groups)
     ]
+    return merge_corr_groups(groups=planned, indices=indices)
 
 
 def validate_jobs(
