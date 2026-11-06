@@ -21,7 +21,7 @@ __all__ = [
 ]
 
 TABLE = LauncherKind.LOCAL
-FOLLOWUP_KEYS = frozenset(('auto_retry',))
+FOLLOWUP_KEYS = frozenset(('retry', 'chained_retry'))
 _DURATION_HINT = 'use an sbatch --time format: "M", "M:S", "H:M:S", "D-H", "D-H:M" or "D-H:M:S"'
 
 

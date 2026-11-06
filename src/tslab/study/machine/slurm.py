@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 TABLE = LauncherKind.SLURM
-FOLLOWUP_KEYS = frozenset(('auto_retry', 'wandb_sync', 'time'))
+FOLLOWUP_KEYS = frozenset(('retry', 'chained_retry', 'wandb_sync', 'time'))
 _SBATCH_NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9_-]*')
 _UNSUPPORTED_SBATCH = frozenset({'clusters', 'cluster'})
 

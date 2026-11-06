@@ -26,7 +26,7 @@ def test_local_settings_from_loads_its_profile_table(tmp_path: Path) -> None:
         table={'local': {'timeout': '00:05:00', 'gpus': 'auto'}}, path=tmp_path / 'local.toml'
     )
 
-    assert ('local', frozenset({'auto_retry'})) == (
+    assert ('local', frozenset({'retry', 'chained_retry'})) == (
         local_machine.TABLE,
         local_machine.FOLLOWUP_KEYS,
     )
