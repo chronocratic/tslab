@@ -55,6 +55,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     sleep: Callable[[float], None] = time.sleep,
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
+    ignore_after: bool = False,
 ) -> int:
     """Submit the runs in the given states again, one attempt further on.
 
@@ -88,6 +89,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         sleep: What waits out the submission pause of the cluster.
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
+        ignore_after: Submit without dependency targets or the local dependency filter.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -147,6 +149,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         before_launch=before_launch,
         on_launch=on_launch,
         task_stream=task_stream,
+        ignore_after=ignore_after,
     )
     return _finish_launch(
         code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream

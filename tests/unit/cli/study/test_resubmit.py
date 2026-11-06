@@ -10,6 +10,7 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.cli.study.helpers import git_project
 from tests.unit.study.helpers import jobs_of
 from tslab.cli import main
+from tslab.cli.study import Resubmit
 from tslab.enums import JobPhase
 
 
@@ -121,3 +122,15 @@ def test_missing_folder_exit_2(
     assert code == 2
     assert str(recorded.folder) in caplog.text
     assert '--new-code-snapshot' in caplog.text
+
+
+def test_cli_parses_ignore_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[bool] = []
+
+    def run(self: Resubmit) -> int:
+        seen.append(self.ignore_after)
+        return 0
+
+    monkeypatch.setattr(Resubmit, 'run', run)
+    assert run_main('resubmit', 'study', '--ignore-after') == 0
+    assert seen == [True]

@@ -121,6 +121,7 @@ class Resubmit:
             snapshot.
         code_snapshot_include_untracked: With --new-code-snapshot, copy
             untracked files under src/ instead of stopping.
+        ignore_after: Submit without dependency targets or the local dependency filter.
         extra_args: The arguments after --; taken from the last
             submission when omitted.
         json: Print one study-launch JSON document.
@@ -142,6 +143,7 @@ class Resubmit:
     new_code_snapshot: bool = False
     no_code_snapshot: bool = False
     code_snapshot_include_untracked: bool = False
+    ignore_after: bool = False
     extra_args: tyro.conf.Suppress[tuple[str, ...]] = ()
     json: bool = False
 
@@ -179,6 +181,7 @@ class Resubmit:
                     ('--new-code-snapshot', self.new_code_snapshot),
                     ('--no-code-snapshot', self.no_code_snapshot),
                     ('--code-snapshot-include-untracked', self.code_snapshot_include_untracked),
+                    ('--ignore-after', self.ignore_after),
                 )
                 if on
             ]
@@ -216,6 +219,7 @@ class Resubmit:
                 auto=self.auto,
                 new_code_snapshot=code_snapshot,
                 drop_code_snapshot=self.no_code_snapshot,
+                ignore_after=self.ignore_after,
                 on_launch=remember_launch if self.json else None,
                 task_stream=sys.stderr if self.json else None,
             )

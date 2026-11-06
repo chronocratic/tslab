@@ -153,3 +153,15 @@ def test_detach_forwards_code_snapshot_flags(
     assert '--code-snapshot' in arguments
     assert '--code-snapshot-include-untracked' in arguments
     assert '--no-code-snapshot' not in arguments
+
+
+def test_cli_parses_ignore_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[bool] = []
+
+    def run(self: Submit) -> int:
+        seen.append(self.ignore_after)
+        return 0
+
+    monkeypatch.setattr(Submit, 'run', run)
+    assert run_main('submit', 'study', '--ignore-after') == 0
+    assert seen == [True]
