@@ -5,7 +5,7 @@ import os
 
 from tslab.jobs.slurm import query_cluster_config, scontrol_requeue, SlurmError
 
-__all__ = ['requeue_task', 'restarted_attempt']
+__all__ = ['at_requeue_limit', 'requeue_task', 'restarted_attempt']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def restarted_attempt(*, attempt: int) -> int:
     return attempt + int(os.environ.get('SLURM_RESTART_COUNT', '0'))
 
 
-def _at_requeue_limit() -> bool:
+def at_requeue_limit() -> bool:
     """Whether one more requeue would reach ``MaxBatchRequeue``, where SLURM holds the job."""
     try:
         limit = int(query_cluster_config().get('MaxBatchRequeue', ''))
@@ -33,11 +33,6 @@ def requeue_task(*, task_id: str) -> bool:
     Returns:
         Whether the requeue call succeeded.
     """
-    if _at_requeue_limit():
-        _LOGGER.warning(
-            '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', task_id
-        )
-        return False
     try:
         scontrol_requeue(task_id=task_id)
     except SlurmError as error:
