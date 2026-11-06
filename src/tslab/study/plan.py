@@ -26,6 +26,7 @@ from tslab.study.definition import (
     SettingValue,
     Study,
     StudyRun,
+    upstream_runs,
 )
 from tslab.study.definition.settings import non_machine_paths
 from tslab.study.machine import MachineOverride, MachineProfile
@@ -445,6 +446,36 @@ def _task_error(*, grid_name: str, run_path: PurePosixPath, index: int, max_arra
     )
 
 
+def _after_placeholders(
+    *, study: Study, machine: MachineProfile, grid: Grid, run: StudyRun
+) -> tuple[dict[str, str], dict[str, tuple[StudyRun, ...]]]:
+    """The single upstream run paths a downstream run can use as placeholders."""
+    upstream_by_grid = {
+        after.grid: upstream_runs(study=study, run=run, after=after) for after in grid.after
+    }
+    values = {
+        f'after:{grid_name}': str(machine.output_root / study.name / runs[0].run_path)
+        for grid_name, runs in upstream_by_grid.items()
+        if len(runs) == 1
+    }
+    return values, upstream_by_grid
+
+
+def _after_placeholder_error(
+    *, error: str, run: StudyRun, upstream_by_grid: Mapping[str, tuple[StudyRun, ...]]
+) -> str:
+    """Name a missing or multi-run after placeholder as a planning problem."""
+    return next(
+        (
+            f'run {run.run_path} matches {len(runs)} runs of grid {grid_name!r}; '
+            f'{{after:{grid_name}}} needs exactly one'
+            for grid_name, runs in upstream_by_grid.items()
+            if error == f"'after:{grid_name}' is not a placeholder value for this run"
+        ),
+        error,
+    )
+
+
 def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     study: Study,
@@ -524,6 +555,10 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             'cpus': str(run.resources.cpus),
             'cpus_per_run': str(run.resources.cpus_per_run),
         }
+        after_placeholders, upstream_by_grid = _after_placeholders(
+            study=study, machine=machine, grid=grid, run=run.run
+        )
+        placeholders.update(after_placeholders)
         try:
             run_pin_conflicts = pin_conflicts(
                 before=run.run.settings, after=run.settings, env=env, placeholders=placeholders
@@ -533,7 +568,9 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             )
         except (ValueError, TypeError) as error:
             arguments = []
-            error_text = str(error)
+            error_text = _after_placeholder_error(
+                error=str(error), run=run.run, upstream_by_grid=upstream_by_grid
+            )
         else:
             pin_conflicts_found.extend(run_pin_conflicts)
             error_text = None

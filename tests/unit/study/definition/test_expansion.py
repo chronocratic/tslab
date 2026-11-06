@@ -30,6 +30,24 @@ def test_placeholders() -> None:
         expand_placeholders(text='{seed}', values=values)
 
 
+def test_after_placeholder_expands() -> None:
+    assert (
+        expand_placeholders(
+            text='{after:pre-train.v2}/train', values={'after:pre-train.v2': '/r/s/pre/a'}
+        )
+        == '/r/s/pre/a/train'
+    )
+
+
+def test_unknown_after_placeholder_raises() -> None:
+    with pytest.raises(ValueError, match="'after:other' is not a placeholder value for this run"):
+        expand_placeholders(text='{after:other}', values={})
+
+
+def test_braces_and_plain_placeholders_unchanged() -> None:
+    assert expand_placeholders(text='{{x}} {study}', values={'study': 's'}) == '{x} s'
+
+
 def test_expand_setting_types() -> None:
     env, values = {'R': '/d'}, {'study': 's'}
     assert expand_setting(value=Path('${R}/{study}'), env=env, values=values) == Path('/d/s')

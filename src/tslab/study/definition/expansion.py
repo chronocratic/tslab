@@ -13,8 +13,11 @@ __all__ = ['PLACEHOLDERS', 'expand_placeholders', 'expand_setting', 'expand_vari
 PLACEHOLDERS = ('output_root', 'study', 'run_path', 'log_file', 'cpus', 'cpus_per_run')
 
 _VARIABLE_PATTERN = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}')
-_PLACEHOLDER_PATTERN = re.compile(r'\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)\}')
-_BOTH_PATTERN = re.compile(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\{\{|\}\}|\{([A-Za-z_][A-Za-z0-9_]*)\}')
+_PLACEHOLDER_NAME = r'(?:after:[A-Za-z0-9._-]+|[A-Za-z_][A-Za-z0-9_]*)'
+_PLACEHOLDER_PATTERN = re.compile(rf'\{{\{{|\}}\}}|\{{({_PLACEHOLDER_NAME})\}}')
+_BOTH_PATTERN = re.compile(
+    rf'\$\{{([A-Za-z_][A-Za-z0-9_]*)\}}|\{{\{{|\}}\}}|\{{({_PLACEHOLDER_NAME})\}}'
+)
 
 
 def expand_variables(*, text: str, env: Mapping[str, str]) -> str:
@@ -50,9 +53,9 @@ def _replace_variable(*, env: Mapping[str, str]) -> Callable[[re.Match[str]], st
 def expand_placeholders(*, text: str, values: Mapping[str, str]) -> str:
     """Every ``{name}`` in ``text`` replaced with ``values[name]``.
 
-    Only the names in ``PLACEHOLDERS`` are accepted; any other ``{...}``
-    raises, so a typo in a study setting cannot hide in a path. ``{{`` and
-    ``}}`` stand for a literal brace, e.g. for a checkpoint filename template.
+    The names in ``PLACEHOLDERS`` and supplied ``after:<grid>`` names are
+    accepted; any other ``{...}`` raises, so a typo in a study setting cannot
+    hide in a path. ``{{`` and ``}}`` stand for a literal brace.
 
     Args:
         text: The text to expand.
@@ -62,8 +65,7 @@ def expand_placeholders(*, text: str, values: Mapping[str, str]) -> str:
         The text with every placeholder replaced.
 
     Raises:
-        ValueError: If the text holds a ``{name}`` that is not one of
-            ``PLACEHOLDERS`` or has no value.
+        ValueError: If the text holds an unknown placeholder or one with no value.
     """
     return _PLACEHOLDER_PATTERN.sub(_replace_placeholder(values=values), text)
 
@@ -73,7 +75,7 @@ def _replace_placeholder(*, values: Mapping[str, str]) -> Callable[[re.Match[str
         name = match.group(1)
         if name is None:
             return match.group(0)[0]
-        if name not in PLACEHOLDERS or name not in values:
+        if (name not in PLACEHOLDERS and not name.startswith('after:')) or name not in values:
             message = f'{name!r} is not a placeholder value for this run'
             raise ValueError(message)
         return values[name]
