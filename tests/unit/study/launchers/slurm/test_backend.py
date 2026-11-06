@@ -22,6 +22,7 @@ from tslab.jobs.slurm import (
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
 )
+from tslab.study import After, Study
 from tslab.study.commands import cancel, resubmit, run_one
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.definition import load_study
@@ -124,9 +125,42 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
     assert states.flags == {
         '1000_0': frozenset({JobFlag.TIME_LIMIT}),
         '1000_1': frozenset({JobFlag.NOT_COUNTED}),
+        '1000_3': frozenset({JobFlag.CANCELLED}),
         '1000_4': frozenset({JobFlag.NOT_COUNTED}),
     }
     assert states.states['1000_5'] == 'unknown'
+
+
+def _chained_study(*, study: Study) -> Study:
+    """A second grid depending on every run of the toy grid."""
+    downstream = replace(study.grids['g'], short_name='probe', after=(After(grid='g'),))
+    return replace(study, grids={**study.grids, 'probe': downstream})
+
+
+def test_job_states_flags_dependency_reasons(*, project: Path, fake: FakeSlurm) -> None:
+    submit_study(project=project)
+    ctx = _context(project=project, fake=fake)
+    chained_study = _chained_study(study=ctx.study)
+    prior_squeue = len(fake.calls('squeue'))
+    prior_sacct = len(fake.calls('sacct'))
+    fake.set_answers(
+        'squeue',
+        [{'stdout': ''}] * prior_squeue
+        + [{'stdout': '1000_0|PENDING\n'}, {'stdout': '1000_0|Dependency\n'}],
+    )
+    fake.set_answers(
+        'sacct',
+        [{'stdout': ''}] * prior_sacct
+        + [{'stdout': '1000_1|CANCELLED by 0\n'}, {'stdout': '1000_1|DependencyNeverSatisfied\n'}],
+    )
+
+    states, _ = SlurmBackend().job_states(
+        machine=ctx.machine, study=chained_study, jobs=jobs_of(project=project), cache={}
+    )
+
+    assert states.flags['1000_0'] == frozenset({JobFlag.DEPENDENCY_PENDING})
+    assert states.flags['1000_1'] == frozenset({JobFlag.CANCELLED, JobFlag.DEPENDENCY_NEVER})
+    assert fake.calls('squeue')[-1][-1] == '--format=%i|%r'
 
 
 def test_job_states_skips_cached_ended_jobs(*, project: Path, fake: FakeSlurm) -> None:

@@ -11,6 +11,7 @@ from tslab.jobs.slurm import (
     gres_gpus,
     query_cluster_config,
     query_expected_starts,
+    query_job_reasons,
     query_job_states,
     query_job_usage,
     query_partition,
@@ -320,6 +321,31 @@ def test_query_job_states(fake: FakeSlurm) -> None:
         '6_1': 'TIMEOUT',
     }
     assert fake.calls('squeue')[0][:2] == ['--array', '--jobs']
+
+
+def test_query_job_reasons_reads_squeue_and_sacct(fake: FakeSlurm) -> None:
+    fake.set_answers(
+        'squeue', [{'exit': 0, 'stdout': '7_0|Dependency\n7_1|None\n7_2|\n7_4|QueueReason\n'}]
+    )
+    fake.set_answers(
+        'sacct',
+        [{'exit': 0, 'stdout': '7_0|OtherReason\n7_2|DependencyNeverSatisfied\n7_3|None\n'}],
+    )
+
+    assert query_job_reasons(job_ids=['7']) == {
+        '7_0': 'Dependency',
+        '7_2': 'DependencyNeverSatisfied',
+        '7_4': 'QueueReason',
+    }
+    assert fake.calls('squeue')[0] == ['--array', '--jobs', '7', '--noheader', '--format=%i|%r']
+    assert fake.calls('sacct')[0] == [
+        '--jobs',
+        '7',
+        '--noheader',
+        '--parsable2',
+        '--allocations',
+        '--format=JobID,Reason',
+    ]
 
 
 def test_query_job_states_raises_when_squeue_fails(
