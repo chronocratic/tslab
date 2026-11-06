@@ -129,6 +129,12 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         selected = _auto_selection(reports=selected, context=context)
     live = _live_reports(reports=context.reports, cancel_live=cancel_live)
     selected += live
+    # why: SLURM holds a job at MaxBatchRequeue; it shows interrupted but is still queued
+    live += [
+        report
+        for report in selected
+        if JobFlag.REQUEUE_HELD in report.job_flags and report.job_id is not None
+    ]
     context, selected, waiting = _with_downstream(context=context, selected=selected)
     live += waiting
     selected += waiting

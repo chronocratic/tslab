@@ -873,3 +873,18 @@ def test_auto_does_not_resubmit_probe_of_failed_upstream(
     before = len(fake_backend.calls('launch'))
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     assert len(fake_backend.calls('launch')) == before
+
+
+def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: FakeBackend) -> None:
+    submit_study(project=project)
+    fake_backend.set_states(
+        phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
+    )
+    fake_backend.cancellable_answer = ['job-0']
+    ctx = context(project=project, machine_file='cluster.toml')
+    assert ctx.reports[0].state is StudyState.INTERRUPTED
+    assert resubmit(context=ctx, sleep=no_sleep) == 0
+    (cancel_call,) = fake_backend.calls('cancel')
+    cancelled = cast('Context', cancel_call['context']).reports
+    assert [r.run.run_path.as_posix() for r in cancelled] == ['g/small/1']
+    assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)

@@ -299,7 +299,13 @@ def test_doctor_checks_reports_scheduler_commands(*, project: Path, fake: FakeSl
     assert checks[0] == DoctorCheck(
         name='slurm', status=CheckStatus.OK, message='SLURM commands found'
     )
-    assert [check.name for check in checks[1:]] == ['slurm-array', 'slurm-partition']
+    assert [check.name for check in checks[1:]] == [
+        'slurm-array',
+        'slurm-partition',
+        'slurm-max-batch-requeue',
+        'slurm-accrue-always',
+        'slurm-expedited-requeue',
+    ]
     assert fake.calls('sbatch') == []
 
 
@@ -699,3 +705,19 @@ def test_expedite_only_when_cluster_allows(
     groups = cast('Sequence[JobGroup]', [SimpleNamespace(chained=True)])
     monkeypatch.setattr(slurm_backend, 'query_cluster_config', lambda: config)
     assert slurm_backend._expedite_allowed(context=ctx, groups=groups) is expected  # noqa: SLF001
+
+
+def test_small_signal_seconds_warns_for_requeue(
+    *, project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    cluster = project / 'cluster.toml'
+    cluster.write_text(cluster.read_text() + '\n[followup]\nchained_retry = "requeue"\n')
+    ctx = _context(project=project, fake=fake)
+    small = SimpleNamespace(chained=True, resources=SimpleNamespace(signal_seconds=30))
+    big = SimpleNamespace(chained=True, resources=SimpleNamespace(signal_seconds=300))
+    with caplog.at_level('WARNING'):
+        slurm_backend._warn_small_signal(  # noqa: SLF001
+            context=ctx, groups=cast('Sequence[JobGroup]', [small, big])
+        )
+    assert 'signal_seconds 30 is below 120' in caplog.text
+    assert 'signal_seconds 300' not in caplog.text

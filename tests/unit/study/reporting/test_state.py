@@ -452,3 +452,14 @@ def test_report_carries_job_reason_and_flags(tmp_path: Path) -> None:
     )[0]
     assert report.job_reason == 'SLURM TIMEOUT'
     assert report.job_flags == frozenset({JobFlag.TIME_LIMIT})
+
+
+def test_held_at_max_batch_requeue_is_interrupted() -> None:
+    state, reason = study_state(
+        job_reason=None,
+        job_phase=JobPhase.QUEUED,
+        folder=facts(),
+        job_flags=frozenset({JobFlag.REQUEUE_HELD}),
+    )
+    assert state is StudyState.INTERRUPTED
+    assert reason == 'held at MaxBatchRequeue'

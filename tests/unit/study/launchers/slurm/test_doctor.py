@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm
+from tslab.enums import ChainedRetry
 from tslab.study.doctor import DoctorCheck, run_checks
 from tslab.study.launchers.slurm import doctor
 from tslab.study.machine import SlurmSettings
+from tslab.study.machine.profile import FollowupSettings
 
 
 def test_slurm_check_lists_missing_scheduler_commands(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -233,3 +235,52 @@ def test_profile_without_slurm_table_warns() -> None:
     assert len(checks) == 1
     assert checks[0].status == 'warn'
     assert 'no [slurm] table' in checks[0].message
+
+
+def _config(*lines: str) -> list[dict[str, object]]:
+    return [{'exit': 0, 'stdout': '\n'.join(('MaxArraySize = 1001', *lines)) + '\n'}]
+
+
+def _chained_checks(
+    *, fake: FakeSlurm, lines: tuple[str, ...], max_attempts: int = 3
+) -> tuple[DoctorCheck, ...]:
+    fake.set_answers('scontrol', _config(*lines))
+    fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'infinite|32|128000|(null)\n'}])
+    followup = FollowupSettings(chained_retry=ChainedRetry.REQUEUE, max_attempts=max_attempts)
+    return doctor.cluster_checks(slurm=SlurmSettings(partition='gpu'), followup=followup)
+
+
+def test_doctor_warns_when_max_attempts_exceeds_max_batch_requeue(fake: FakeSlurm) -> None:
+    checks = _chained_checks(fake=fake, lines=('MaxBatchRequeue = 2',), max_attempts=3)
+    check = _check(checks=checks, name='slurm-max-batch-requeue')
+    assert check.status == 'warn'
+    assert 'max_attempts 3' in check.message
+    assert 'MaxBatchRequeue 2' in check.message
+
+
+def test_doctor_max_batch_requeue_ok_within_limit(fake: FakeSlurm) -> None:
+    checks = _chained_checks(fake=fake, lines=('MaxBatchRequeue = 5',), max_attempts=3)
+    assert _check(checks=checks, name='slurm-max-batch-requeue').status == 'ok'
+
+
+@pytest.mark.parametrize(
+    ('line', 'status'),
+    [('PriorityFlags = ACCRUE_ALWAYS,FAIR_TREE', 'ok'), ('PriorityFlags = FAIR_TREE', 'warn')],
+)
+def test_doctor_reports_accrue_always(fake: FakeSlurm, line: str, status: str) -> None:
+    check = _check(checks=_chained_checks(fake=fake, lines=(line,)), name='slurm-accrue-always')
+    assert check.status == status
+    if status == 'warn':
+        assert 'pending downstream jobs earn no priority age on this cluster' in check.message
+
+
+@pytest.mark.parametrize(
+    ('line', 'status'),
+    [
+        ('SlurmctldParameters = enable_expedited_requeue', 'ok'),
+        ('SlurmctldParameters = other', 'warn'),
+    ],
+)
+def test_doctor_reports_expedited_requeue(fake: FakeSlurm, line: str, status: str) -> None:
+    check = _check(checks=_chained_checks(fake=fake, lines=(line,)), name='slurm-expedited-requeue')
+    assert check.status == status

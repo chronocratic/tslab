@@ -1,0 +1,1 @@
+`[followup] chained_retry = "requeue"` requeues an interrupted chained job in place on SLURM, so downstream jobs keep waiting. A job held at `MaxBatchRequeue` shows as interrupted and `resubmit` cancels and resubmits it. `tslab doctor` reports `MaxBatchRequeue`, `ACCRUE_ALWAYS` and expedited requeue.

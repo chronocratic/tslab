@@ -93,6 +93,7 @@ _DEPENDENCY_REASON_FLAGS: Mapping[str, frozenset[JobFlag]] = MappingProxyType(
     {
         'Dependency': frozenset({JobFlag.DEPENDENCY_PENDING}),
         'DependencyNeverSatisfied': frozenset({JobFlag.DEPENDENCY_NEVER}),
+        'JobHoldMaxRequeue': frozenset({JobFlag.REQUEUE_HELD}),
     }
 )
 
@@ -225,6 +226,7 @@ class SlurmBackend:
     ) -> LaunchReport | None:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
         chain_check = _chain_check(context=context, groups=groups)
+        _warn_small_signal(context=context, groups=groups)
         if any(group.chained for group in groups) and chain_check is None:
             return None
         return launch(
@@ -308,7 +310,7 @@ class SlurmBackend:
         return [
             report.job_id
             for report in reports
-            if report.state in _CANCELLABLE_STATES and report.job_id is not None
+            if _cancellable(report=report) and report.job_id is not None
         ]
 
     def detach(
@@ -387,7 +389,7 @@ class SlurmBackend:
         check = slurm_check()
         if check.status != CheckStatus.OK:
             return (check,)
-        return (check, *cluster_checks(slurm=machine.slurm))
+        return (check, *cluster_checks(slurm=machine.slurm, followup=machine.followup))
 
 
 def _expedite_allowed(*, context: Context, groups: Sequence[JobGroup]) -> bool:
@@ -422,15 +424,38 @@ def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, 
     )
 
 
+# why: a job held at MaxBatchRequeue shows as interrupted but is still in the queue
 _CANCELLABLE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
 
 
+def _cancellable(*, report: RunReport) -> bool:
+    """Whether the run holds a job a cancel can reach."""
+    held = JobFlag.REQUEUE_HELD in report.job_flags
+    return (report.state in _CANCELLABLE_STATES or held) and report.job_id is not None
+
+
+CHAINED_SIGNAL_MARGIN_SECONDS = 120
+
+
+def _warn_small_signal(*, context: Context, groups: Sequence[JobGroup]) -> None:
+    """Warn when a requeued chained group leaves little time between signal and kill."""
+    if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
+        return
+    seconds = {
+        cast('SlurmSettings', group.resources).signal_seconds for group in groups if group.chained
+    }
+    for value in sorted(seconds):
+        if value < CHAINED_SIGNAL_MARGIN_SECONDS:
+            _LOGGER.warning(
+                'signal_seconds %d is below %d: a chained job may be killed before it '
+                'saves, checks and requeues itself',
+                value,
+                CHAINED_SIGNAL_MARGIN_SECONDS,
+            )
+
+
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:
-    live = [
-        report
-        for report in reports
-        if report.state in _CANCELLABLE_STATES and report.job_id is not None
-    ]
+    live = [report for report in reports if _cancellable(report=report)]
     if signal is None:
         return live
     queued = [
