@@ -6,6 +6,7 @@ the behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 
 # why: the package door preserves command and helper imports while implementations live in siblings
 from tslab.cli.study.cancel import Cancel
+from tslab.cli.study.chain_exit import ChainExit as _ChainExit
 from tslab.cli.study.failures import Failures, Usage
 from tslab.cli.study.list import List
 from tslab.cli.study.logs import Logs
@@ -62,3 +63,5 @@ STUDY_COMMANDS = {
     'slurm': Slurm,
     'run': RunOne,
 }
+
+_INTERNAL_STUDY_COMMANDS = {'chain-exit': _ChainExit}

@@ -459,7 +459,7 @@ def test_local_task_imports_from_code_snapshot_env(tmp_path: Path) -> None:
     log_file.parent.mkdir(parents=True)
     group = _code_snapshot_group(snapshot=snapshot, log_file=log_file)
     _launcher(tmp_path).submit(
-        group=group, study_folder=study_folder, record=lambda **_kwargs: None
+        group=group, study_folder=study_folder, record=lambda **_kwargs: None, upstream={}
     )
     lines = [line for line in log_file.read_text().splitlines() if 'abc123def456' in line]
     assert len(lines) == 1
@@ -482,7 +482,9 @@ def test_local_missing_code_snapshot_stops_before_record(tmp_path: Path) -> None
         recorded.append(job_id)
 
     with pytest.raises(LaunchError) as excinfo:
-        _launcher(tmp_path).submit(group=group, study_folder=study_folder, record=record)
+        _launcher(tmp_path).submit(
+            group=group, study_folder=study_folder, record=record, upstream={}
+        )
     assert str(excinfo.value) == (
         f'code snapshot {folder}/src is missing; '
         'not running the live code; rerun with --new-code-snapshot'

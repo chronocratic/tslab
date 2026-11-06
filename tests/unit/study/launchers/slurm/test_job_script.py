@@ -208,6 +208,99 @@ def test_job_script_without_code_snapshot_is_unchanged() -> None:
     assert actual == expected.read_text()
 
 
+def test_chained_script_checks_run_state_after_srun(tmp_path: Path) -> None:
+    text = job_script(
+        job_name='train',
+        slurm=SlurmSettings(partition='compute', time='1:00:00'),
+        indices=(0, 1),
+        tasks_file=tmp_path / '0.tasks',
+        log_pattern=tmp_path / 'logs' / 'train_%a.out',
+        project_root=tmp_path,
+        env={},
+        chain_check=(
+            'uv',
+            'run',
+            'tslab',
+            'study',
+            'chain-exit',
+            'pkg.studies.chain:study',
+            '--machine',
+            'm.toml',
+            '--job-file',
+            '3',
+        ),
+    )
+
+    assert '#SBATCH --kill-on-invalid-dep=yes' in text
+    assert text.index('set +e') < text.index('srun --unbuffered')
+    assert text.rstrip().endswith(
+        'exec uv run tslab study chain-exit pkg.studies.chain:study --machine m.toml '
+        '--job-file 3 --index ${SLURM_ARRAY_TASK_ID}'
+    )
+
+
+def test_chain_check_does_not_hide_srun_failure(tmp_path: Path) -> None:
+    tasks_file = tmp_path / '0.tasks'
+    tasks_file.write_text('3 1 true\n')
+    script = tmp_path / 'job.sbatch'
+    script.write_text(
+        job_script(
+            job_name='train',
+            slurm=SlurmSettings(partition='compute', time='1:00:00'),
+            indices=(3,),
+            tasks_file=tasks_file,
+            log_pattern=tmp_path / 'logs' / 'train_%a.out',
+            project_root=tmp_path,
+            env={},
+            chain_check=('chain-check',),
+        )
+    )
+    environment = _task_section_env(script=script, task_id='3')
+    srun = script.parent / 'bin' / 'srun'
+    srun.write_text('#!/bin/sh\nexit 9\n')
+    checker_called = tmp_path / 'checker-called'
+    checker = script.parent / 'bin' / 'chain-check'
+    checker.write_text(f'#!/bin/sh\ntouch {shlex.quote(str(checker_called))}\nexit 0\n')
+    checker.chmod(0o755)
+
+    result = subprocess.run(  # noqa: S603 # why: the test runs the generated script under bash
+        _task_section_command(script), check=False, env=environment, capture_output=True, text=True
+    )
+
+    assert result.returncode == 9
+    assert not checker_called.exists()
+
+
+def test_chain_check_exit_code_becomes_job_exit_code(tmp_path: Path) -> None:
+    tasks_file = tmp_path / '0.tasks'
+    tasks_file.write_text('3 1 true\n')
+    script = tmp_path / 'job.sbatch'
+    script.write_text(
+        job_script(
+            job_name='train',
+            slurm=SlurmSettings(partition='compute', time='1:00:00'),
+            indices=(3,),
+            tasks_file=tasks_file,
+            log_pattern=tmp_path / 'logs' / 'train_%a.out',
+            project_root=tmp_path,
+            env={},
+            chain_check=('chain-check',),
+        )
+    )
+    environment = _task_section_env(script=script, task_id='3')
+    checker_called = tmp_path / 'checker-called'
+    checker = script.parent / 'bin' / 'chain-check'
+    checker.write_text(f'#!/bin/sh\ntouch {shlex.quote(str(checker_called))}\nexit 7\n')
+    checker.chmod(0o755)
+
+    result = subprocess.run(  # noqa: S603 # why: the test runs the generated script under bash
+        _task_section_command(script), check=False, env=environment, capture_output=True, text=True
+    )
+
+    assert result.returncode == 7
+    assert checker_called.is_file()
+
+
 def test_job_script_writes_gpu_type(tmp_path: Path) -> None:
     script = _script(tmp_path, slurm=SlurmSettings(partition='p', gpus=2, gpu_type='a100'))
     assert '#SBATCH --gres=gpu:a100:2' in script.splitlines()

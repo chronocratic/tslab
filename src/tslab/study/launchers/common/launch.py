@@ -1,7 +1,7 @@
 """The launch loop: submit each group and record its job before its tasks run."""
 
 from collections.abc import Callable, Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from tslab.study.definition import Study
@@ -61,6 +61,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     submission_id = uuid4().hex
     study_directory = machine.output_root / study.name
     records: list[JobRecord] = []
+    upstream: dict[PurePosixPath, str] = {}
     error: str | None = None
     stopped_signal: int | None = None
     for group in groups:
@@ -93,9 +94,10 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
             )
             records.append(record)
             append_job(path=folder / 'submissions.jsonl', record=record)
+            upstream.update({task.run_path: f'{job_id}_{task.index}' for task in tasks})
 
         try:
-            launcher.submit(group=group, study_folder=folder, record=record_job)
+            launcher.submit(group=group, study_folder=folder, record=record_job, upstream=upstream)
         except LaunchError as exc:
             error = str(exc)
             break

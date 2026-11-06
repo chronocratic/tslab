@@ -61,8 +61,8 @@ def _wait_section(*, tasks_file: Path) -> str:
     return f'{wait_for_file_line(path=tasks_file, seconds=60)}\n'
 
 
-def _array_section(*, tasks_file: Path) -> str:
-    return _wait_section(tasks_file=tasks_file) + (
+def _array_section(*, tasks_file: Path, chain_check: Sequence[str] | None) -> str:
+    section = _wait_section(tasks_file=tasks_file) + (
         'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" ' + shlex.quote(str(tasks_file)) + ')\n'
         'if [ -z "$TASK_LINE" ]; then\n'
         '    echo "no task ${SLURM_ARRAY_TASK_ID} in "' + shlex.quote(str(tasks_file)) + ' >&2\n'
@@ -72,7 +72,19 @@ def _array_section(*, tasks_file: Path) -> str:
         'TASK_LINE=${TASK_LINE#* }\n'
         'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
         ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
+    )
+    if chain_check is None:
+        return section + srun_command(variable='TASK_LINE')
+    command = shlex.join(chain_check)
+    return (
+        section
+        + 'set +e\n'
         + srun_command(variable='TASK_LINE')
+        + '\nRUN_EXIT=$?\n'
+        + 'if [ "$RUN_EXIT" -ne 0 ]; then\n'
+        + '    exit "$RUN_EXIT"\n'
+        + 'fi\n'
+        + f'exec {command} --index ${{SLURM_ARRAY_TASK_ID}}\n'
     )
 
 
@@ -129,6 +141,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     env: Mapping[str, str],
     dependency: str | None = None,
     begin: str | None = None,
+    chain_check: Sequence[str] | None = None,
     code_snapshot: CodeSnapshot | None = None,
 ) -> str:
     """The full ``.sbatch`` script of one study job.
@@ -143,6 +156,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         env: Variables to export before the command.
         dependency: A ``--dependency`` value, when given.
         begin: A ``--begin`` value, when given.
+        chain_check: The run-state check after ``srun``; the array index is added.
         code_snapshot: The code snapshot the job runs from; the script checks
             its ``src`` folder, exports its variables and puts it first on
             ``PYTHONPATH``. ``None`` runs the live code.
@@ -159,6 +173,55 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         job_name=job_name, slurm=slurm, log_pattern=log_pattern, dependency=dependency, begin=begin
     )
     array = indices is not None
+    options = _job_options(
+        job_name=job_name,
+        slurm=slurm,
+        indices=indices,
+        log_pattern=log_pattern,
+        dependency=dependency,
+        begin=begin,
+        chain_check=chain_check,
+    )
+    lines = ['#!/bin/bash', *sbatch_directives(options=options)]
+    lines += [
+        'set -euo pipefail',
+        f'cd {shlex.quote(str(project_root))}',
+        # why: a killed job would lose the output still held in the buffer
+        'export PYTHONUNBUFFERED=1',
+    ]
+    lines += export_lines(env=env)
+    lines += list(slurm.setup)
+    if slurm.node_local_tmp:
+        lines += node_local_tmp_lines(prefix='tslab', array=array)
+        lines.extend(
+            [
+                'export WANDB_CACHE_DIR=$TMPDIR/wandb-cache',
+                'export WANDB_CONFIG_DIR=$TMPDIR/wandb-config',
+            ]
+        )
+    if code_snapshot is not None:
+        lines += _code_snapshot_lines(code_snapshot=code_snapshot)
+    if chain_check is not None and indices is None:
+        message = 'chain_check requires an array job'
+        raise ValueError(message)
+    if indices is None:
+        lines.append(_single_section(tasks_file=tasks_file))
+    else:
+        lines.append(_array_section(tasks_file=tasks_file, chain_check=chain_check))
+    return '\n'.join(lines) + '\n'
+
+
+def _job_options(  # noqa: PLR0913 # why: options depend on seven independent script fields
+    *,
+    job_name: str,
+    slurm: SlurmSettings,
+    indices: Sequence[int] | None,
+    log_pattern: Path,
+    dependency: str | None,
+    begin: str | None,
+    chain_check: Sequence[str] | None,
+) -> dict[str, object]:
+    """The sbatch options shared by array groups and helper jobs."""
     options: dict[str, object] = {'job_name': job_name, 'partition': slurm.partition}
     if slurm.qos is not None:
         options['qos'] = slurm.qos
@@ -183,28 +246,9 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if begin is not None:
         options['begin'] = begin
     options.update((key.replace('-', '_'), value) for key, value in slurm.sbatch_extra)
-    lines = ['#!/bin/bash', *sbatch_directives(options=options)]
-    lines += [
-        'set -euo pipefail',
-        f'cd {shlex.quote(str(project_root))}',
-        # why: a killed job would lose the output still held in the buffer
-        'export PYTHONUNBUFFERED=1',
-    ]
-    lines += export_lines(env=env)
-    lines += list(slurm.setup)
-    if slurm.node_local_tmp:
-        lines += node_local_tmp_lines(prefix='tslab', array=array)
-        lines.extend(
-            [
-                'export WANDB_CACHE_DIR=$TMPDIR/wandb-cache',
-                'export WANDB_CONFIG_DIR=$TMPDIR/wandb-config',
-            ]
-        )
-    if code_snapshot is not None:
-        lines += _code_snapshot_lines(code_snapshot=code_snapshot)
-    task_section = _single_section if indices is None else _array_section
-    lines.append(task_section(tasks_file=tasks_file))
-    return '\n'.join(lines) + '\n'
+    if chain_check is not None:
+        options['kill_on_invalid_dep'] = 'yes'
+    return options
 
 
 def _code_snapshot_lines(*, code_snapshot: CodeSnapshot) -> list[str]:

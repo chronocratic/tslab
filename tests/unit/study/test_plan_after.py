@@ -260,3 +260,11 @@ def test_order_runs_sorts_grids_stably() -> None:
         'probe',
         'probe',
     ]
+
+
+def test_plan_marks_upstream_and_downstream_groups_chained(tmp_path: Path) -> None:
+    study = _study()
+    runs = expand_runs(study=study)
+    groups = _plan_groups(study=study, runs=runs, after={}, tmp_path=tmp_path)
+
+    assert {group.grid for group in groups if group.chained} == {'pretrain', 'probe'}

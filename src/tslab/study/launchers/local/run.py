@@ -3,7 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 import logging
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shlex
 import signal
 import sys
@@ -201,6 +201,7 @@ class LocalLauncher:
         group: JobGroup,
         study_folder: Path,  # noqa: ARG002 # why: the Protocol signature
         record: RecordJob,
+        upstream: Mapping[PurePosixPath, str],  # noqa: ARG002 # why: the Protocol signature
     ) -> str:
         """Run every task in slots, continuing after a failing one; the job id.
 

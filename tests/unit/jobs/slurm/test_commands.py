@@ -137,6 +137,23 @@ def test_sbatch_other_errors_raise(fake: FakeSlurm, tmp_path: Path) -> None:
         sbatch(script=tmp_path / 'x.sbatch', sleep=lambda _: None)
 
 
+def test_sbatch_places_options_before_script(fake: FakeSlurm, tmp_path: Path) -> None:
+    fake.set_answers(command='sbatch', answers=[{'exit': 0, 'stdout': '7;c'}])
+
+    assert (
+        sbatch(
+            script=tmp_path / 'x.sbatch',
+            options={'dependency': 'afterok:41_0', 'hold': True, 'exclusive': False},
+            sleep=lambda _: None,
+        )
+        == '7'
+    )
+
+    assert fake.calls('sbatch') == [
+        ['--parsable', '--dependency=afterok:41_0', '--hold', str(tmp_path / 'x.sbatch')]
+    ]
+
+
 def test_sbatch_timeout_raises_without_retry(
     fake: FakeSlurm, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

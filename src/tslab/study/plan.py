@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import tslab
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
+    chained_grids,
     check_paths,
     expand_runs,
     expand_setting,
@@ -385,6 +386,7 @@ class JobGroup:
         job_file: The ``jobs/<n>.tasks`` / ``jobs/<n>.sbatch`` number.
         tasks: The tasks of the group, sorted by index.
         after: The upstream dependencies of each task in the group.
+        chained: Whether the grid participates in a dependency chain.
         code_snapshot: The code snapshot the jobs of the group run from;
             ``None`` means the live code. A group has at most one, so one
             job file carries one ``PYTHONPATH``.
@@ -396,6 +398,7 @@ class JobGroup:
     job_file: int
     tasks: tuple[PlannedTask, ...]
     after: tuple['AfterTarget', ...] = ()
+    chained: bool = False
     code_snapshot: CodeSnapshot | None = None
 
 
@@ -531,6 +534,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     counters = uncounted or {}
     snapshots = code_snapshots or {}
     targets = after or {}
+    chained = chained_grids(study=study)
     for run in resolved:
         grid = study.grids[run.run.grid]
         code_snapshot = snapshots.get(run.run.run_path)
@@ -548,6 +552,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
                     job_file=next_file,
                     tasks=(),
                     after=run_after,
+                    chained=run.run.grid in chained,
                     code_snapshot=code_snapshot,
                 )
             )

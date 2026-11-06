@@ -10,7 +10,7 @@ backend by machine profile reaches the fake, for ``slurm`` and ``local``.
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shlex
 from types import MappingProxyType
 from typing import TextIO
@@ -83,7 +83,14 @@ class _FakeLauncher:
     def __init__(self, *, next_job_id: Callable[[], str]) -> None:
         self._next_job_id = next_job_id
 
-    def submit(self, *, group: JobGroup, study_folder: Path, record: RecordJob) -> str:
+    def submit(
+        self,
+        *,
+        group: JobGroup,
+        study_folder: Path,
+        record: RecordJob,
+        upstream: Mapping[PurePosixPath, str],  # why: the shared launcher signature
+    ) -> str:
         """Submit one group and record its job id before its tasks run."""
         job_id = self._next_job_id()
         record(job_id=job_id)

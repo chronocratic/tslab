@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Protocol, TextIO
 
 from tslab.enums import LauncherKind
@@ -34,7 +34,14 @@ class RecordJob(Protocol):
 class Launcher(Protocol):
     """What one launch does with a written group: returns the job id."""
 
-    def submit(self, *, group: JobGroup, study_folder: Path, record: RecordJob) -> str:
+    def submit(
+        self,
+        *,
+        group: JobGroup,
+        study_folder: Path,
+        record: RecordJob,
+        upstream: Mapping[PurePosixPath, str],
+    ) -> str:
         """Submit one group and record its job id before tasks run."""
         ...
 

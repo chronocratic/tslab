@@ -2,6 +2,7 @@
 
 import dataclasses
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 
@@ -10,17 +11,19 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import context, jobs_of, no_sleep
-from tslab.enums import LauncherKind
+from tslab.enums import AfterCondition, LauncherKind, Satisfy
 from tslab.study import Study
 from tslab.study.commands import submit
 from tslab.study.definition import expand_runs
 from tslab.study.launchers.common.launch import launch as _launch
 from tslab.study.launchers.common.types import LaunchError, LaunchReport
+from tslab.study.launchers.slurm.backend import SlurmBackend
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
 from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
 from tslab.study.paths import study_folder
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
+from tslab.study.plan_after import AfterTarget
 from tslab.study.records import read_jobs
 
 
@@ -86,7 +89,9 @@ def test_slurm_launch_writes_submits_and_records(
     fake: FakeSlurm, machine: MachineProfile, study: Study, tmp_path: Path
 ) -> None:
     groups = groups_of(study, machine)
-    fake.set_answers('sbatch', [{'exit': 0, 'stdout': '1000'}, {'exit': 0, 'stdout': '1001'}])
+    fake.set_answers(
+        command='sbatch', answers=[{'exit': 0, 'stdout': '1000'}, {'exit': 0, 'stdout': '1001'}]
+    )
     folder = study_folder(machine=machine, study=study)
     report = launch(
         launcher=SlurmLauncher(sleep=lambda _: None),
@@ -102,6 +107,81 @@ def test_slurm_launch_writes_submits_and_records(
     assert jobs[0].kind == 'run'
     assert (folder / 'jobs' / '3.tasks').read_text().splitlines()[1].startswith('1 1 ')
     assert fake.calls('sbatch')[0] == ['--parsable', str(folder / 'jobs' / '3.sbatch')]
+
+
+def test_slurm_launch_resolves_same_launch_dependency(
+    fake: FakeSlurm, machine: MachineProfile, study: Study, tmp_path: Path
+) -> None:
+    upstream, downstream = groups_of(study, machine)
+    upstream_path = upstream.tasks[0].resolved.run.run_path
+    downstream = dataclasses.replace(
+        downstream,
+        after=(
+            AfterTarget(
+                condition=AfterCondition.OK,
+                delay_minutes=0,
+                satisfy=Satisfy.ALL,
+                job_tasks=(),
+                run_paths=(upstream_path,),
+            ),
+        ),
+    )
+    fake.set_answers(
+        command='sbatch', answers=[{'exit': 0, 'stdout': '1000'}, {'exit': 0, 'stdout': '1001'}]
+    )
+
+    report = launch(
+        launcher=SlurmLauncher(sleep=lambda _: None),
+        machine=machine,
+        study=study,
+        groups=[upstream, downstream],
+        project_root=tmp_path,
+        dry_run=False,
+    )
+
+    assert [record.job_id for record in report.submitted] == ['1000', '1001']
+    assert fake.calls('sbatch')[1][1] == f'--dependency=afterok:1000_{upstream.tasks[0].index}'
+
+
+def test_backend_writes_chain_exit_check_for_chained_grid(
+    fake: FakeSlurm, project: Path, machine: MachineProfile, study: Study, tmp_path: Path
+) -> None:
+    ctx = context(project=project, machine_file='cluster.toml')
+    group = dataclasses.replace(groups_of(study, machine)[0], chained=True)
+
+    report = SlurmBackend().launch(
+        context=ctx,
+        groups=[group],
+        folder=study_folder(machine=ctx.machine, study=ctx.study),
+        dry_run=True,
+        start_delay_seconds=None,
+        sleep=no_sleep,
+        task_stream=None,
+        environment={},
+        pid=1,
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
+    )
+
+    assert report is not None
+    assert fake.calls('sbatch') == []
+    script = (
+        study_folder(machine=ctx.machine, study=ctx.study) / 'jobs' / f'{group.job_file}.sbatch'
+    ).read_text()
+    chain_command = shlex.join(
+        [
+            *ctx.machine.tslab_command,
+            'study',
+            'chain-exit',
+            ctx.reference,
+            '--machine',
+            ctx.machine_path.as_posix(),
+            '--job-file',
+            str(group.job_file),
+        ]
+    )
+    assert '#SBATCH --kill-on-invalid-dep=yes' in script
+    assert script.rstrip().endswith(f'exec {chain_command} --index ${{SLURM_ARRAY_TASK_ID}}')
 
 
 def test_dry_run_writes_files_but_submits_nothing(
@@ -156,7 +236,7 @@ def test_launcher_submit_raises_launch_error_when_sbatch_fails(
     write_job_files(study_folder=folder, groups=groups, machine=machine, project_root=tmp_path)
     with pytest.raises(LaunchError, match='invalid partition'):
         SlurmLauncher(sleep=lambda _: None).submit(
-            group=groups[0], study_folder=folder, record=lambda **_kwargs: None
+            group=groups[0], study_folder=folder, record=lambda **_kwargs: None, upstream={}
         )
 
 
@@ -174,7 +254,7 @@ def test_slurm_submit_drops_code_snapshot_variables(
     monkeypatch.setattr(subprocess, 'run', fake_run)
     group = groups_of(study, machine)[0]
     job_id = SlurmLauncher(sleep=lambda _seconds: None).submit(
-        group=group, study_folder=tmp_path, record=lambda **_kwargs: None
+        group=group, study_folder=tmp_path, record=lambda **_kwargs: None, upstream={}
     )
     assert job_id == '77'
     env = seen['env']

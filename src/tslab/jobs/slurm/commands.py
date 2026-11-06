@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import time
+from types import MappingProxyType
 
 from tslab.jobs.slurm.memory import parse_slurm_memory
 from tslab.jobs.slurm.timing import parse_sacct_duration, parse_slurm_duration
@@ -40,6 +41,8 @@ QOS_LIMIT_MARKERS = ('QOSMaxSubmitJobPerUserLimit', 'Job violates accounting/QOS
 QOS_WAIT_CAP_SECONDS = 30 * 24 * 3600.0
 
 _LOGGER = logging.getLogger(__name__)
+_EMPTY_OPTIONS: Mapping[str, object] = MappingProxyType({})
+_SBATCH_OPTION_NAME = re.compile(r'[a-z][a-z0-9_-]*\Z')
 
 #: What squeue prints for job ids it no longer knows; the accounting database answers then.
 _UNKNOWN_JOB = 'Invalid job id specified'
@@ -134,6 +137,7 @@ def _query(
 def sbatch(
     *,
     script: Path,
+    options: Mapping[str, object] = _EMPTY_OPTIONS,
     sleep: Callable[[float], None] = time.sleep,
     now: Callable[[], float] = time.monotonic,
     environ: Mapping[str, str] | None = None,
@@ -142,6 +146,7 @@ def sbatch(
 
     Args:
         script: The ``.sbatch`` file to submit.
+        options: Extra long option names and values; ``True`` writes a flag, ``False`` omits it.
         sleep: The wait between retries; injected for the tests.
         now: The monotonic clock in seconds; injected for the tests.
         environ: The environment to clean and submit with; ``os.environ``
@@ -167,8 +172,9 @@ def sbatch(
                 f'check the limits with sacctmgr show qos:\n{output}'
             )
             raise SlurmError(message)
+        command = ['sbatch', '--parsable', *_sbatch_arguments(options=options), str(script)]
         completed = _run(
-            command=['sbatch', '--parsable', str(script)],
+            command=command,
             env=submission_environment(environ=environ if environ is not None else os.environ),
             timeout=min(SUBMIT_TIMEOUT_SECONDS, remaining),
         )
@@ -186,6 +192,20 @@ def sbatch(
         if wait > 0:
             _LOGGER.warning('sbatch hit %s; retrying in %g seconds', marker, wait)
             sleep(wait)
+
+
+def _sbatch_arguments(*, options: Mapping[str, object]) -> list[str]:
+    """Format option names and values as command-line arguments."""
+    arguments = []
+    for name, value in options.items():
+        if value is None or value is False:
+            continue
+        if _SBATCH_OPTION_NAME.fullmatch(name) is None:
+            message = f'{name!r} is not a valid sbatch option name'
+            raise ValueError(message)
+        option = f'--{name.replace("_", "-")}'
+        arguments.append(option if value is True else f'{option}={value}')
+    return arguments
 
 
 def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
