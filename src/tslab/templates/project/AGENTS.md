@@ -41,6 +41,7 @@ machines/
 src/{{package_name}}/
   classify.py                   script: train, encode, SVM probe; noisy-test robustness check
   forecast.py                   script: train, encode, ridge probe per horizon
+  probe.py                      script: load a trained checkpoint, encode, SVM probe
   models.py                     `Models`: the model choice shared by both scripts and the study
   augmentations.py              your augmentation recipes, offered on matching models
   stages.py                     your own stages (example: add_noise)
@@ -48,9 +49,10 @@ src/{{package_name}}/
     common/                      datasets, recipes and grids shared by studies
     example/study.py             classification and forecasting study
     quick/study.py               small classification canary study
+    chain/study.py              probe grid that runs after the classification grid (`After`)
   toy_data.py                   writes small synthetic datasets into data/
 tests/
-  test_smoke.py                 runs presets and one example run; dry-runs both studies
+  test_smoke.py                 runs presets and one example run; dry-runs the studies
 data/                           datasets (git-ignored)
 runs/                           run folders (git-ignored)
 ```

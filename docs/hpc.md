@@ -77,6 +77,15 @@ A queued job runs the code of the project folder when it starts; a
 [code snapshot](studies.md#code-snapshots) copies the code at submit time and
 makes the jobs import that copy.
 
+## Chained grids
+
+A chained grid (`After` in the study) is submitted with
+`--dependency=<type>:<job id>_<index>[:...]` and `#SBATCH --kill-on-invalid-dep=yes`.
+The types are `afterok` (condition `ok`), `afterany`, `afternotok` and `after`
+(with `+<minutes>` for a delay). SLURM forgets a job id after `MinJobAge`, so a
+dependency on an upstream run that is already `done` is left out at submit time.
+While the dependency holds, the job is `waiting` in `tslab study status`.
+
 ## SLURM commands
 
 After every submit on a SLURM machine, tslab writes `.study/slurm.sh` in the

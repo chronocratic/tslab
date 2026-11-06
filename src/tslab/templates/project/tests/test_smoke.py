@@ -43,7 +43,7 @@ FORECAST_NO_PRESET = (
 )
 
 
-@pytest.mark.parametrize('study_name', ['example', 'quick'])
+@pytest.mark.parametrize('study_name', ['example', 'quick', 'chain'])
 def test_study_names_dry_run(
     study_name: str, project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -140,3 +140,37 @@ def test_forecast(project: Path, args: tuple[str, ...]) -> None:
     assert snapshot is not None
     assert 'evaluate[h24]' in snapshot.instances
     assert {record.state for record in snapshot.instances.values()} == {tslab.InstanceState.DONE}
+
+
+def test_chain_study_runs_locally(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The probe grid runs after the classification grid and finds its checkpoint."""
+    root = Path(__file__).parents[1]
+    monkeypatch.setenv('UV_PROJECT', str(root))
+    machine = str(root / 'machines' / 'local.toml')
+    (project / 'tslab.toml').write_text(
+        (root / 'tslab.toml').read_text(encoding='utf-8'), encoding='utf-8'
+    )
+    extra = [
+        '--trainer.max-epochs',
+        '1',
+        '--trainer.min-epochs',
+        '0',
+        '--trainer.accelerator',
+        'cpu',
+        '--trainer.devices',
+        '1',
+        '--encoder.device',
+        'cpu',
+    ]
+    submit = ['study', 'submit', 'chain', '--machine', machine, '--only', 'head=small']
+    with pytest.raises(SystemExit) as raised:
+        tslab_main(args=[*submit, '--', *extra])
+    assert raised.value.code == 0
+    runs = project / 'runs' / 'chain'
+    relatives = (
+        'classification/ts2vec-archive-split/ToySpectra/seed_0',
+        'probe/ts2vec-archive-split/ToySpectra/seed_0/small',
+    )
+    for relative in relatives:
+        status = json.loads((runs / relative / 'status.json').read_text(encoding='utf-8'))
+        assert status['run_state'] == 'finished'
