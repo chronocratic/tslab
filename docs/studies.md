@@ -524,7 +524,7 @@ probe = Grid(
     config=ProbeConfig,
     axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'head': heads},
     after=(After(grid='pretrain'),),
-    run_settings={'checkpoint': '{after:pretrain}/train/default'},
+    run_settings={'checkpoint': '{after}/train/default'},
 )
 ```
 
@@ -549,6 +549,8 @@ probe = Grid(
 `{after:<grid>}` in a setting expands to the run folder of the matched upstream
 run, `<output_root>/<study>/<run path>`; a relative `output_root` stays
 relative to the project root the jobs run in. It needs exactly one matched run.
+A grid with a single `After` entry can write `{after}` for the same folder, so
+the upstream grid name is written once.
 
 On SLURM the dependency is native: the job is submitted with `--dependency`
 built from the job ids of the upstream tasks, and with `--kill-on-invalid-dep=yes`,
@@ -599,10 +601,16 @@ planning warns when `signal_seconds` of a chained grid is below 120 seconds, too
 check and requeue.
 
 Limits to know: a job whose next requeue would reach `MaxBatchRequeue` ends instead, so the
-follow-up resubmits it. Requeues SLURM makes on its own count toward that limit too; a job SLURM
-holds there stays pending, so the follow-up job, which waits for every job of the submission,
-waits with it. `status` shows such a run `interrupted` (held at MaxBatchRequeue); run `resubmit`
-by hand. `condition="failed"` works only with `chained_retry = "manual"` (see
+follow-up resubmits it.
+
+:::{warning}
+Requeues SLURM makes on its own (preemption, node failure) count toward `MaxBatchRequeue` too. A
+job SLURM holds at that limit stays pending, and the follow-up job, which waits for every job of
+the submission, waits with it. Nothing resubmits it: `status` shows the run `interrupted` (held
+at MaxBatchRequeue) with a warning, and you run `tslab study resubmit` by hand.
+:::
+
+`condition="failed"` works only with `chained_retry = "manual"` (see
 [Chaining grids](#chaining-grids)).
 
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index

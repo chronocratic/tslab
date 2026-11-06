@@ -74,6 +74,13 @@ def log_status(
             'or cap training with --trainer.max-training-time',
             limited,
         )
+    held = sum(1 for report in context.reports if JobFlag.REQUEUE_HELD in report.job_flags)
+    if held:
+        _LOGGER.warning(
+            '%d runs are held by the scheduler at its requeue limit and stay pending; '
+            'the follow-up waits for them: run tslab study resubmit by hand',
+            held,
+        )
 
 
 def _log_run_lines(

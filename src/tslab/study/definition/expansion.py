@@ -53,7 +53,7 @@ def _replace_variable(*, env: Mapping[str, str]) -> Callable[[re.Match[str]], st
 def expand_placeholders(*, text: str, values: Mapping[str, str]) -> str:
     """Every ``{name}`` in ``text`` replaced with ``values[name]``.
 
-    The names in ``PLACEHOLDERS`` and supplied ``after:<grid>`` names are
+    The names in ``PLACEHOLDERS`` and supplied ``after`` and ``after:<grid>`` names are
     accepted; any other ``{...}`` raises, so a typo in a study setting cannot
     hide in a path. ``{{`` and ``}}`` stand for a literal brace.
 
@@ -75,7 +75,8 @@ def _replace_placeholder(*, values: Mapping[str, str]) -> Callable[[re.Match[str
         name = match.group(1)
         if name is None:
             return match.group(0)[0]
-        if (name not in PLACEHOLDERS and not name.startswith('after:')) or name not in values:
+        known = name in PLACEHOLDERS or name == 'after' or name.startswith('after:')
+        if not known or name not in values:
             message = f'{name!r} is not a placeholder value for this run'
             raise ValueError(message)
         return values[name]

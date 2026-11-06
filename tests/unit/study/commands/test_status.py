@@ -327,3 +327,26 @@ def test_cli_parses_state_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
         )
     assert exit_info.value.code == 0
     assert seen[0].states == ('failed,missing', 'done')
+
+
+def test_requeue_held_run_warns_to_resubmit(
+    project: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    loaded = context(project=project, machine_file='cluster.toml')
+    report = dataclasses.replace(
+        loaded.reports[0],
+        state=StudyState.INTERRUPTED,
+        reason='held at MaxBatchRequeue',
+        job_flags=frozenset({JobFlag.REQUEUE_HELD}),
+    )
+    loaded = dataclasses.replace(loaded, reports=[report])
+
+    with caplog.at_level('INFO'):
+        log_status(context=loaded)
+
+    warnings = [record for record in caplog.records if record.levelname == 'WARNING']
+    assert len(warnings) == 1
+    assert normalized(warnings[0].getMessage()) == (
+        '1 runs are held by the scheduler at its requeue limit and stay pending; '
+        'the follow-up waits for them: run tslab study resubmit by hand'
+    )

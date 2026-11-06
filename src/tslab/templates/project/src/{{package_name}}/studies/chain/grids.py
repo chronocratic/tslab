@@ -31,6 +31,6 @@ def probe_grid(*, seeds: tuple[int, ...]) -> Grid:
             'head': {'small': {'max_train_samples': 100}, 'full': {'max_train_samples': 10_000}},
         },
         after=(After(grid='pretrain'),),
-        run_settings={'checkpoint': '{after:pretrain}/train/default'},
+        run_settings={'checkpoint': '{after}/train/default'},
         run_path='{grid}/{recipe}/{dataset}/seed_{seed}/{head}',
     )

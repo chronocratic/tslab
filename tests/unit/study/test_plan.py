@@ -299,7 +299,7 @@ class _ChainConfig:
     run_path: Path = Path('run')
 
 
-def _chained_study(*, fan_out: bool = False) -> Study:
+def _chained_study(*, fan_out: bool = False, checkpoint: str = '{after:pretrain}/train') -> Study:
     pretrain = Grid(
         short_name='pre',
         command=('python', '-m', 'pretrain'),
@@ -327,14 +327,17 @@ def _chained_study(*, fan_out: bool = False) -> Study:
         config=_ChainConfig,
         axes=probe_axes,
         after=(After(grid='pretrain', match=match),),
-        run_settings={'checkpoint': '{after:pretrain}/train'},
+        run_settings={'checkpoint': checkpoint},
         run_path=probe_path,
     )
     return Study(name='chain', grids={'pretrain': pretrain, 'probe': probe})
 
 
-def test_plan_jobs_expands_after_placeholder_for_each_matched_run(tmp_path: Path) -> None:
-    study = _chained_study()
+@pytest.mark.parametrize('checkpoint', ['{after:pretrain}/train', '{after}/train'])
+def test_plan_jobs_expands_after_placeholder_for_each_matched_run(
+    tmp_path: Path, checkpoint: str
+) -> None:
+    study = _chained_study(checkpoint=checkpoint)
     machine = _local(tmp_path)
     tasks = [
         task
@@ -365,6 +368,21 @@ def test_plan_jobs_reports_fan_out_after_placeholder_error(tmp_path: Path) -> No
 
     assert tasks[0].error == (
         "run probe/a/svm matches 4 runs of grid 'pretrain'; {after:pretrain} needs exactly one"
+    )
+
+
+def test_plan_jobs_reports_bare_after_placeholder_error_for_fan_out(tmp_path: Path) -> None:
+    study = _chained_study(fan_out=True, checkpoint='{after}/train')
+    machine = _local(tmp_path)
+    tasks = [
+        task
+        for group in _plan(study, machine)
+        for task in group.tasks
+        if task.resolved.run.grid == 'probe'
+    ]
+
+    assert tasks[0].error == (
+        "run probe/a/svm matches 4 runs of grid 'pretrain'; {after} needs exactly one"
     )
 
 

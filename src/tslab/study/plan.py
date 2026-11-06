@@ -528,6 +528,8 @@ def _after_placeholders(
         for grid_name, runs in upstream_by_grid.items()
         if len(runs) == 1
     }
+    if len(grid.after) == 1 and f'after:{grid.after[0].grid}' in values:
+        values['after'] = values[f'after:{grid.after[0].grid}']
     return values, upstream_by_grid
 
 
@@ -535,6 +537,8 @@ def _after_placeholder_error(
     *, error: str, run: StudyRun, upstream_by_grid: Mapping[str, tuple[StudyRun, ...]]
 ) -> str:
     """Name a missing or multi-run after placeholder as a planning problem."""
+    if error == "'after' is not a placeholder value for this run":
+        return _bare_after_error(run=run, upstream_by_grid=upstream_by_grid)
     return next(
         (
             f'run {run.run_path} matches {len(runs)} runs of grid {grid_name!r}; '
@@ -543,6 +547,19 @@ def _after_placeholder_error(
             if error == f"'after:{grid_name}' is not a placeholder value for this run"
         ),
         error,
+    )
+
+
+def _bare_after_error(
+    *, run: StudyRun, upstream_by_grid: Mapping[str, tuple[StudyRun, ...]]
+) -> str:
+    """Why ``{after}`` has no value: several upstream grids or several matched runs."""
+    if len(upstream_by_grid) != 1:
+        return f'run {run.run_path}: {{after}} needs exactly one after grid; use {{after:<grid>}}'
+    ((grid_name, runs),) = upstream_by_grid.items()
+    return (
+        f'run {run.run_path} matches {len(runs)} runs of grid {grid_name!r}; '
+        '{after} needs exactly one'
     )
 
 
