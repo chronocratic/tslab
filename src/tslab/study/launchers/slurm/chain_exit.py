@@ -1,17 +1,23 @@
 """Exit status for chained SLURM tasks after their run command completes."""
 
 from collections.abc import Sequence
+import dataclasses
+import logging
 from types import MappingProxyType
 
-from tslab.enums import JobPhase, StudyState
+from tslab.enums import ChainedRetry, JobPhase, StudyState
+from tslab.study.commands.resubmit import may_retry
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs
 from tslab.study.launchers.common.types import JobStates
+from tslab.study.launchers.slurm.requeue import requeue_task, restarted_attempt
 from tslab.study.paths import study_folder
 from tslab.study.records import JobRecord, read_jobs, TaskRecord
-from tslab.study.reporting.state import collect_states
+from tslab.study.reporting.state import collect_states, RunReport
 
 __all__ = ['chain_exit']
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def chain_exit(*, context: Context, job_file: int, index: int) -> int:
@@ -51,7 +57,27 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
             followup_live_job_ids=(),
         ),
     )
-    return 0 if reports[0].state is StudyState.DONE else 1
+    report = reports[0]
+    if report.state is StudyState.DONE:
+        return 0
+    if report.state is StudyState.INTERRUPTED and _requeued(
+        context=context, report=report, task_id=task_id
+    ):
+        return 0
+    return 1
+
+
+def _requeued(*, context: Context, report: RunReport, task_id: str) -> bool:
+    """Requeue the task in place when the mode and the retry rules allow it."""
+    if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
+        return False
+    counted = dataclasses.replace(report, attempt=restarted_attempt(attempt=report.attempt))
+    if not may_retry(report=counted, context=context):
+        return False
+    if not requeue_task(task_id=task_id):
+        return False
+    _LOGGER.info('requeued %s (attempt %d)', task_id, counted.attempt)
+    return True
 
 
 def _job_task_of(

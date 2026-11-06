@@ -9,7 +9,7 @@ import tyro
 from tslab.cli.common import resolve_request
 from tslab.cli.study.shared import _context_of
 from tslab.core.meta import hostname
-from tslab.study.commands.chain_exit import chain_exit
+from tslab.study.launchers.slurm.chain_exit import chain_exit
 
 __all__ = ['ChainExit']
 

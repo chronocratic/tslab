@@ -61,7 +61,11 @@ def _wait_section(*, tasks_file: Path) -> str:
     return f'{wait_for_file_line(path=tasks_file, seconds=60)}\n'
 
 
-def _array_section(*, tasks_file: Path, chain_check: Sequence[str] | None) -> str:
+def _array_section(
+    *, tasks_file: Path, chain_check: Sequence[str] | None, requeue: bool | str
+) -> str:
+    # why: a requeued task starts again with the same line, so the restart count adds to the attempt
+    attempt = '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))' if requeue else '${ATTEMPT}'
     section = _wait_section(tasks_file=tasks_file) + (
         'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" ' + shlex.quote(str(tasks_file)) + ')\n'
         'if [ -z "$TASK_LINE" ]; then\n'
@@ -70,7 +74,7 @@ def _array_section(*, tasks_file: Path, chain_check: Sequence[str] | None) -> st
         'fi\n'
         'ATTEMPT=${TASK_LINE%% *}\n'
         'TASK_LINE=${TASK_LINE#* }\n'
-        'echo "=== tslab attempt ${ATTEMPT} | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
+        'echo "=== tslab attempt ' + attempt + ' | job ${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID}'
         ' | $(hostname) | $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="\n'
     )
     if chain_check is None:
@@ -144,6 +148,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     dependency: str | None = None,
     begin: str | None = None,
     chain_check: Sequence[str] | None = None,
+    requeue: bool | str = False,
     code_snapshot: CodeSnapshot | None = None,
 ) -> str:
     """The full ``.sbatch`` script of one study job.
@@ -159,6 +164,8 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         dependency: A ``--dependency`` value, when given.
         begin: A ``--begin`` value, when given.
         chain_check: The run-state check after ``srun``; the array index is added.
+        requeue: ``False`` writes ``--no-requeue``; ``True`` writes ``--requeue``; the
+            string ``'expedite'`` writes ``--requeue=expedite``.
         code_snapshot: The code snapshot the job runs from; the script checks
             its ``src`` folder, exports its variables and puts it first on
             ``PYTHONPATH``. ``None`` runs the live code.
@@ -183,6 +190,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         dependency=dependency,
         begin=begin,
         chain_check=chain_check,
+        requeue=requeue,
     )
     lines = ['#!/bin/bash', *sbatch_directives(options=options)]
     lines += [
@@ -209,7 +217,9 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     if indices is None:
         lines.append(_single_section(tasks_file=tasks_file))
     else:
-        lines.append(_array_section(tasks_file=tasks_file, chain_check=chain_check))
+        lines.append(
+            _array_section(tasks_file=tasks_file, chain_check=chain_check, requeue=requeue)
+        )
     return '\n'.join(lines) + '\n'
 
 
@@ -222,6 +232,7 @@ def _job_options(  # noqa: PLR0913 # why: options depend on seven independent sc
     dependency: str | None,
     begin: str | None,
     chain_check: Sequence[str] | None,
+    requeue: bool | str,
 ) -> dict[str, object]:
     """The sbatch options shared by array groups and helper jobs."""
     options: dict[str, object] = {'job_name': job_name, 'partition': slurm.partition}
@@ -240,7 +251,11 @@ def _job_options(  # noqa: PLR0913 # why: options depend on seven independent sc
     if indices is not None:
         spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
         options['array'] = spec
-    options.update(output=log_pattern, open_mode='append', no_requeue=True)
+    options.update(output=log_pattern, open_mode='append')
+    if requeue:
+        options['requeue'] = requeue
+    else:
+        options['no_requeue'] = True
     if slurm.signal_seconds > 0:
         options['signal'] = f'USR2@{slurm.signal_seconds}'
     if dependency is not None:

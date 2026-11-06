@@ -235,6 +235,21 @@ def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
         raise SlurmError(message)
 
 
+def scontrol_requeue(*, task_id: str) -> None:
+    """Requeue one job or array task with ``scontrol requeue``.
+
+    Args:
+        task_id: The job id, or ``<array job id>_<task id>``.
+
+    Raises:
+        SlurmError: If ``scontrol`` exits non-zero.
+    """
+    completed = _run(command=['scontrol', 'requeue', task_id], timeout=SUBMIT_TIMEOUT_SECONDS)
+    if completed.returncode != 0:
+        message = f'scontrol requeue failed for {task_id}:\n{completed.stdout}{completed.stderr}'
+        raise SlurmError(message)
+
+
 def slurm_available() -> bool:
     """Return whether the scheduler commands this module calls exist on ``PATH``.
 

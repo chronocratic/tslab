@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from tslab.study.launchers.common.protocols import Backend
     from tslab.study.records import JobRecord, TaskRecord
 
-__all__ = ['resubmit', 'run_one']
+__all__ = ['may_retry', 'resubmit', 'run_one']
 
 # why: a selection error lists this many run paths before counting the rest
 _SELECTION_SHOWN = 20
@@ -452,10 +452,10 @@ def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[Ru
     An attempt that ended ``PREEMPTED`` or ``NODE_FAIL`` does not count toward the
     cap and needs no progress, until 20 of them follow one another.
     """
-    return [report for report in reports if _may_retry(report=report, context=context)]
+    return [report for report in reports if may_retry(report=report, context=context)]
 
 
-def _may_retry(*, report: RunReport, context: Context) -> bool:
+def may_retry(*, report: RunReport, context: Context) -> bool:
     """Whether one report is under the cap and one step further on; logs why not."""
     if JobFlag.NOT_COUNTED in report.job_flags:
         return _under_uncounted_limit(report=report)

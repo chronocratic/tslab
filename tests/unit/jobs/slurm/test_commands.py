@@ -17,6 +17,7 @@ from tslab.jobs.slurm import (
     query_partition,
     sbatch,
     scancel,
+    scontrol_requeue,
     SlurmError,
     SlurmJobUsage,
     SlurmNodeGroup,
@@ -579,3 +580,14 @@ def test_query_partition_raises_on_a_garbage_time(fake: FakeSlurm) -> None:
     fake.set_answers('sinfo', [{'exit': 0, 'stdout': 'abc|64|256000|(null)\n'}])
     with pytest.raises(SlurmError, match='time limit'):
         query_partition(partition='gpu')
+
+
+def test_scontrol_requeue_calls_scontrol(fake: FakeSlurm) -> None:
+    scontrol_requeue(task_id='1000_3')
+    assert fake.calls('scontrol') == [['requeue', '1000_3']]
+
+
+def test_scontrol_requeue_raises_on_failure(fake: FakeSlurm) -> None:
+    fake.set_answers('scontrol', [{'exit': 1, 'stderr': 'Access denied'}])
+    with pytest.raises(SlurmError, match='scontrol requeue failed for 1000_3'):
+        scontrol_requeue(task_id='1000_3')

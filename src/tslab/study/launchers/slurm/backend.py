@@ -9,12 +9,13 @@ from types import MappingProxyType
 from typing import cast, TextIO
 
 from tslab.core.status import utc_now_iso
-from tslab.enums import CheckStatus, JobFlag, JobPhase, LauncherKind, StudyState
+from tslab.enums import ChainedRetry, CheckStatus, JobFlag, JobPhase, LauncherKind, StudyState
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     format_slurm_duration,
     format_slurm_memory,
     INTERRUPTING_JOB_STATES,
+    query_cluster_config,
     query_job_reasons,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
@@ -229,7 +230,11 @@ class SlurmBackend:
         return launch(
             launcher=SlurmLauncher(sleep=sleep),
             record_type=SlurmJobRecord,
-            write_job_files=partial(write_job_files, chain_check=chain_check),
+            write_job_files=partial(
+                write_job_files,
+                chain_check=chain_check,
+                expedite=_expedite_allowed(context=context, groups=groups),
+            ),
             machine=context.machine,
             study=context.study,
             groups=groups,
@@ -383,6 +388,20 @@ class SlurmBackend:
         if check.status != CheckStatus.OK:
             return (check,)
         return (check, *cluster_checks(slurm=machine.slurm))
+
+
+def _expedite_allowed(*, context: Context, groups: Sequence[JobGroup]) -> bool:
+    """Whether the cluster lets chained requeues skip ``requeue_delay``."""
+    if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
+        return False
+    if not any(group.chained for group in groups):
+        return False
+    try:
+        config = query_cluster_config()
+    except SlurmError as error:
+        _LOGGER.warning('could not read the cluster config for expedited requeue: %s', error)
+        return False
+    return 'enable_expedited_requeue' in config.get('SlurmctldParameters', '')
 
 
 def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, ...] | None:

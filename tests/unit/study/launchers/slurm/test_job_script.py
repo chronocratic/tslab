@@ -241,6 +241,41 @@ def test_chained_script_checks_run_state_after_srun(tmp_path: Path) -> None:
     assert text.rstrip().endswith('exit "$CHECK_EXIT"')
 
 
+def _chained_text(*, requeue: bool | str) -> str:
+    return job_script(
+        job_name='train',
+        slurm=SlurmSettings(partition='compute', time='1:00:00'),
+        indices=(0, 1),
+        tasks_file=Path('/p/0.tasks'),
+        log_pattern=Path('/p/train_%a.out'),
+        project_root=Path('/p'),
+        env={},
+        chain_check=('chain-check',),
+        requeue=requeue,
+    )
+
+
+def test_requeue_mode_writes_requeue_not_no_requeue() -> None:
+    text = _chained_text(requeue=True)
+    assert '#SBATCH --requeue\n' in text
+    assert '--no-requeue' not in text
+
+
+def test_expedite_requeue_is_written_when_asked() -> None:
+    assert '#SBATCH --requeue=expedite' in _chained_text(requeue='expedite')
+
+
+def test_other_modes_keep_no_requeue() -> None:
+    text = _chained_text(requeue=False)
+    assert '#SBATCH --no-requeue' in text
+    assert '--requeue' not in text
+
+
+def test_requeue_header_adds_the_restart_count() -> None:
+    assert '${SLURM_RESTART_COUNT:-0}' in _chained_text(requeue=True)
+    assert 'SLURM_RESTART_COUNT' not in _chained_text(requeue=False)
+
+
 def test_chain_check_runs_after_srun_failure_and_preserves_its_exit_code(tmp_path: Path) -> None:
     tasks_file = tmp_path / '0.tasks'
     tasks_file.write_text('3 1 true\n')
