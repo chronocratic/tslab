@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
+from functools import partial
 import logging
 from pathlib import Path
 from types import MappingProxyType
@@ -221,10 +222,13 @@ class SlurmBackend:
         now: Callable[[], str],
     ) -> LaunchReport | None:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
+        chain_check = _chain_check(context=context, groups=groups)
+        if any(group.chained for group in groups) and chain_check is None:
+            return None
         return launch(
             launcher=SlurmLauncher(sleep=sleep),
             record_type=SlurmJobRecord,
-            write_job_files=write_job_files,
+            write_job_files=partial(write_job_files, chain_check=chain_check),
             machine=context.machine,
             study=context.study,
             groups=groups,
@@ -378,6 +382,24 @@ class SlurmBackend:
         if check.status != CheckStatus.OK:
             return (check,)
         return (check, *cluster_checks(slurm=machine.slurm))
+
+
+def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, ...] | None:
+    """The command prefix used to check each chained SLURM task after it runs."""
+    if not any(group.chained for group in groups):
+        return None
+    if not context.reference:
+        message = 'a study reference is required to submit chained SLURM jobs'
+        _LOGGER.error('%s', message)
+        return None
+    return (
+        *context.machine.tslab_command,
+        'study',
+        'chain-exit',
+        context.reference,
+        '--machine',
+        context.machine_path.as_posix(),
+    )
 
 
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:

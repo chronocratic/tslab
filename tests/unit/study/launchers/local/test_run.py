@@ -581,7 +581,7 @@ def test_local_two_launchers_never_share_a_gpu(
         ')\n'
         'LocalLauncher(project_root=root, env={}, local=LocalSettings(), gpu_ids=("0",), '
         'pid=123, host="test-host", now=lambda: "2026-01-02T03:04:05+00:00").submit(\n'
-        '    group=group, study_folder=root, record=lambda job_id: None\n'
+        '    group=group, study_folder=root, record=lambda job_id: None, upstream={}\n'
         ')\n'
     )
     procs = [

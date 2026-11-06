@@ -17,7 +17,7 @@ from tslab.cli.doctor import Doctor
 from tslab.cli.machine import MACHINE_COMMANDS
 from tslab.cli.new import New
 from tslab.cli.status import Status
-from tslab.cli.study import STUDY_COMMANDS
+from tslab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
 from tslab.cli.wandb_sync import WandbSync
 
 __all__ = ['Command']
@@ -105,6 +105,13 @@ _GROUPS: Mapping[str, _Group] = MappingProxyType(
 
 
 def _parse(*, argv: Sequence[str]) -> Command:
+    if len(argv) > 1 and argv[0] == _STUDY and argv[1] in _INTERNAL_STUDY_COMMANDS:
+        return _cli(
+            commands={**STUDY_COMMANDS, **_INTERNAL_STUDY_COMMANDS},
+            prog=f'tslab {_STUDY}',
+            args=argv[1:],
+            description='Internal command used by chained SLURM tasks.',
+        )
     group = _GROUPS.get(argv[0]) if argv else None
     if group is not None:
         return _cli(

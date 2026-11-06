@@ -1,8 +1,8 @@
 """Writing and submitting SLURM job files."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shlex
 import time
 from typing import cast
@@ -14,6 +14,7 @@ from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
 from tslab.study.launchers.common.protocols import RecordJob
 from tslab.study.launchers.common.types import LaunchError
+from tslab.study.launchers.slurm.dependency import dependency_text
 from tslab.study.launchers.slurm.job_script import job_script
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile, SlurmSettings
@@ -24,13 +25,14 @@ from tslab.study.records import append_job, JobKind
 __all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']
 
 
-def write_job_files(
+def write_job_files(  # noqa: PLR0913 # why: one argument per generated-file setting
     *,
     study_folder: Path,
     groups: Sequence[JobGroup],
     machine: MachineProfile,
     project_root: Path,
     start_delay_seconds: int | None = None,
+    chain_check: Sequence[str] | None = None,
 ) -> None:
     """The ``jobs/<n>.tasks`` and ``jobs/<n>.sbatch`` files of every group.
 
@@ -40,6 +42,7 @@ def write_job_files(
         machine: The machine the jobs run on; its ``[env]`` goes in the scripts.
         project_root: The directory the scripts ``cd`` into.
         start_delay_seconds: Seconds the jobs wait before they may start; written as a ``--begin``.
+        chain_check: The command prefix for checking each chained task after ``srun``.
     """
     begin = None if start_delay_seconds is None else f'now+{start_delay_seconds}'
     (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
@@ -53,6 +56,7 @@ def write_job_files(
         )
         if group.resources.max_tasks_per_job is None:
             continue
+        task_chain_check = _chain_check(group=group, command=chain_check)
         script = job_script(
             job_name=group.job_name,
             slurm=cast('SlurmSettings', group.resources),
@@ -63,6 +67,7 @@ def write_job_files(
             env=machine.env,
             begin=begin,
             code_snapshot=group.code_snapshot,
+            chain_check=task_chain_check,
         )
         atomic_write_text(path=study_folder / 'jobs' / f'{group.job_file}.sbatch', text=script)
 
@@ -80,6 +85,16 @@ def _log_pattern(*, group: JobGroup) -> Path:
     return first.log_file.with_name(f'{stem}_%a.out')
 
 
+def _chain_check(*, group: JobGroup, command: Sequence[str] | None) -> tuple[str, ...] | None:
+    """Append the job file to the command for a chained array group."""
+    if not group.chained:
+        return None
+    if command is None:
+        message = f'cannot write chained job file {group.job_file}: no chain-exit command'
+        raise ValueError(message)
+    return (*command, '--job-file', str(group.job_file))
+
+
 class SlurmLauncher:
     """One ``sbatch`` per group, paused between the limits of the cluster."""
 
@@ -91,20 +106,38 @@ class SlurmLauncher:
         """
         self._sleep = sleep
 
-    def submit(self, *, group: JobGroup, study_folder: Path, record: RecordJob) -> str:
+    def submit(
+        self,
+        *,
+        group: JobGroup,
+        study_folder: Path,
+        record: RecordJob,
+        upstream: Mapping[PurePosixPath, str],
+    ) -> str:
         """The id of the ``sbatch`` job of the group.
+
+        Args:
+            group: The planned group to submit.
+            study_folder: The folder holding its job script.
+            record: The callback that stores the returned job id.
+            upstream: Same-launch run paths already mapped to SLURM task ids.
+
+        Returns:
+            The submitted job id.
 
         Raises:
             LaunchError: If ``sbatch`` fails; nothing is recorded then.
         """
         try:
+            dependency = dependency_text(after=group.after, upstream=upstream)
             # why: a nested launch must not submit with the snapshot it itself runs from
             job_id = sbatch(
                 script=study_folder / 'jobs' / f'{group.job_file}.sbatch',
+                options={} if dependency is None else {'dependency': dependency},
                 sleep=self._sleep,
                 environ=without_code_snapshot(environ=os.environ),
             )
-        except SlurmError as error:
+        except (SlurmError, ValueError) as error:
             raise LaunchError(str(error)) from error
         record(job_id=job_id)
         if group.resources.max_tasks_per_job is not None:
