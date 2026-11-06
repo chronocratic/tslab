@@ -566,6 +566,32 @@ with dependencies on the new job ids. `cancel` of upstream runs also cancels
 the `waiting` runs behind them. `submit` and `resubmit` take `--ignore-after` to
 submit without dependencies.
 
+### Requeue mode
+
+With `[followup] chained_retry = "requeue"` (SLURM only), a chained job is submitted with
+`--requeue` instead of `--no-requeue`. The time limit signal still makes the run save
+`last.ckpt` and stop. The check after `srun` then applies the usual rules: the run is
+`interrupted`, it is under `max_attempts` and it made progress. If they hold, the job runs
+`scontrol requeue <array job id>_<task id>` on itself, so SLURM starts it again with the same
+job id and the downstream jobs keep waiting. Otherwise the job ends non-zero, the downstream
+jobs are cancelled by `--kill-on-invalid-dep=yes`, and the follow-up job recovers them.
+
+SLURM documents that `afterok` stays valid across a requeue, but this is implied by the
+documentation and not confirmed on a cluster. If a cluster drops the dependency, the downstream
+jobs end `dependency_failed` and the follow-up resubmits both grids, as with
+`chained_retry = "resubmit"`.
+
+The attempt number of a requeued task is the recorded attempt plus `SLURM_RESTART_COUNT`; the
+log header shows it. A job that reaches the `MaxBatchRequeue` limit of the cluster is held by
+SLURM; `status` shows it `interrupted` (held at MaxBatchRequeue) and `resubmit` cancels it and
+submits it again. `tslab doctor` warns when `max_attempts` exceeds `MaxBatchRequeue`, and
+planning warns when `signal_seconds` of a chained grid is below 120 seconds, too short to save,
+check and requeue.
+
+One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index
+of their upstream run when it is free, and wait with `aftercorr`: each downstream task starts
+after the upstream task with the same index.
+
 Retry has two settings. `retry` covers grids that are not chained and `chained_retry`
 covers chained grids; see [Automatic retry](#automatic-retry). The `requeue`
 mode keeps the job id of the upstream run, so downstream jobs keep waiting; see
