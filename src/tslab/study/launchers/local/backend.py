@@ -25,6 +25,7 @@ from tslab.study.launchers.common.types import (
     QueuedJob,
     Resources,
 )
+from tslab.study.launchers.local.after_filter import after_filter
 from tslab.study.launchers.local.foreground import foreground_script
 from tslab.study.launchers.local.pid_file import _check_free, hold_launch, LocalLaunchError
 from tslab.study.launchers.local.records import LocalJobRecord
@@ -388,4 +389,5 @@ def _launch_local_groups(  # noqa: PLR0913 # why: the shared launch adapter forw
         dry_run=dry_run,
         start_delay_seconds=start_delay_seconds,
         now=now,
+        before_group=after_filter(context=context),
     )
