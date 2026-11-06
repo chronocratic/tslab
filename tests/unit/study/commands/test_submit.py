@@ -24,7 +24,7 @@ from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit, submit_runs
 from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
+from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -312,6 +312,314 @@ def test_started_dependency_is_rejected_on_local_machine(
     assert code == 1
     assert "grid 'probe': condition 'started' needs SLURM" in caplog.text
     assert fake_backend.calls('launch') == []
+
+
+# why: the pretrain of the local chain study fails on purpose through the
+# environment, so one launch covers the done, failed and failed-instance cases.
+CHAIN_PRE_SCRIPT = '''
+"""The pretrain of the toy chained study."""
+
+from dataclasses import dataclass
+import os
+from pathlib import Path
+
+import tyro
+
+import tslab
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, RunState
+
+
+@dataclass(frozen=True, kw_only=True)
+class ChainPreConfig:
+    """The config of one pretrain run."""
+
+    dataset: str
+    data: Path
+    output_root: Path = Path('.')
+    run_path: Path = Path('run')
+
+
+def main() -> None:
+    config = tyro.cli(ChainPreConfig)
+    if os.environ.get('TOY_CHAIN_FAIL'):
+        with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+            raise RuntimeError('pretrain fails on purpose')
+    if os.environ.get('TOY_CHAIN_FAIL_INSTANCE'):
+        folder = config.output_root / config.run_path
+        folder.mkdir(parents=True, exist_ok=True)
+        write_status(
+            path=folder / 'status.json',
+            snapshot=RunStatusSnapshot(
+                run_state=RunState.FINISHED,
+                updated_at=utc_now_iso(),
+                instances={
+                    'train': InstanceRecord(
+                        state=InstanceState.FAILED, error='an instance fails on purpose'
+                    )
+                },
+            ),
+        )
+        return
+    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+        pass
+
+
+if __name__ == '__main__':
+    main()
+'''
+
+CHAIN_PROBE_SCRIPT = '''
+"""The probe of the toy chained study; needs the upstream run folder."""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import tyro
+
+import tslab
+
+
+@dataclass(frozen=True, kw_only=True)
+class ChainProbeConfig:
+    """The config of one probe run."""
+
+    dataset: str
+    data: Path
+    checkpoint: Path
+    output_root: Path = Path('.')
+    run_path: Path = Path('run')
+
+
+def main() -> None:
+    config = tyro.cli(ChainProbeConfig)
+    if not (config.checkpoint / 'status.json').is_file():
+        raise SystemExit(f'upstream run folder missing: {config.checkpoint}')
+    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+        pass
+
+
+if __name__ == '__main__':
+    main()
+'''
+
+CHAIN_OK_SCRIPT = '''
+"""An always-succeeding toy run, for the grid without a dependency."""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import tyro
+
+import tslab
+
+
+@dataclass(frozen=True, kw_only=True)
+class ChainOkConfig:
+    """The config of one independent run."""
+
+    dataset: str
+    data: Path
+    output_root: Path = Path('.')
+    run_path: Path = Path('run')
+
+
+def main() -> None:
+    config = tyro.cli(ChainOkConfig)
+    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+        pass
+
+
+if __name__ == '__main__':
+    main()
+'''
+
+CHAIN_STUDIES = '''
+"""The toy chained study: pretrain, probe and an independent grid."""
+
+import sys
+
+import toy_chain_ok
+import toy_chain_pre
+import toy_chain_probe
+from tslab.study import DEFAULT_RUN_SETTINGS, After, Grid, Study
+
+study = Study(
+    name='chain',
+    grids={
+        'pretrain': Grid(
+            short_name='pre',
+            command=(sys.executable, 'toy_chain_pre.py'),
+            config=toy_chain_pre.ChainPreConfig,
+            axes={'dataset': {'a': {'dataset': 'a'}, 'b': {'dataset': 'b'}}},
+            run_settings={**DEFAULT_RUN_SETTINGS, 'data': 'data'},
+        ),
+        'probe': Grid(
+            short_name='probe',
+            command=(sys.executable, 'toy_chain_probe.py'),
+            config=toy_chain_probe.ChainProbeConfig,
+            axes={'dataset': {'a': {'dataset': 'a'}, 'b': {'dataset': 'b'}}},
+            after=(After(grid='pretrain'),),
+            run_settings={
+                **DEFAULT_RUN_SETTINGS,
+                'data': 'data',
+                'checkpoint': '{after:pretrain}',
+            },
+        ),
+        'other': Grid(
+            short_name='oth',
+            command=(sys.executable, 'toy_chain_ok.py'),
+            config=toy_chain_ok.ChainOkConfig,
+            axes={'dataset': {'c': {'dataset': 'c'}}},
+            run_settings={**DEFAULT_RUN_SETTINGS, 'data': 'data'},
+        ),
+    },
+)
+'''
+
+
+def write_chain_project(*, project: Path) -> None:
+    """The toy project plus the chained toy study and its scripts."""
+    (project / 'toy_chain_pre.py').write_text(CHAIN_PRE_SCRIPT.lstrip('\n'))
+    (project / 'toy_chain_probe.py').write_text(CHAIN_PROBE_SCRIPT.lstrip('\n'))
+    (project / 'toy_chain_ok.py').write_text(CHAIN_OK_SCRIPT.lstrip('\n'))
+    (project / 'toy_chain_studies.py').write_text(CHAIN_STUDIES.lstrip('\n'))
+
+
+def chain_context(*, project: Path) -> Context:
+    """The context of the chained toy study on the local machine of the project."""
+    return load_context(
+        reference='toy_chain_studies:study',
+        machine_path=project / 'local.toml',
+        selection=Selection(),
+        project_root=Path.cwd(),
+        local_cpus=1,
+        environment=os.environ,
+    )
+
+
+def chain_jobs(*, project: Path) -> list[JobRecord]:
+    """The job records of the chained toy study."""
+    return read_jobs(path=project / 'runs' / 'chain' / '.study' / 'submissions.jsonl')
+
+
+def chain_states(*, project: Path) -> dict[str, StudyState]:
+    """The state of every run of the chained toy study, by run path."""
+    reports = chain_context(project=project).reports
+    return {report.run.run_path.as_posix(): report.state for report in reports}
+
+
+@pytest.mark.slow
+def test_local_chain_runs_probe_after_pretrain(project: Path) -> None:
+    write_chain_project(project=project)
+
+    code = submit(
+        context=chain_context(project=project),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
+    assert {task.run_path.as_posix() for task in tasks} == {
+        'pretrain/a',
+        'pretrain/b',
+        'probe/a',
+        'probe/b',
+        'other/c',
+    }
+    probe_a = next(task for task in tasks if task.run_path.as_posix() == 'probe/a')
+    # why: the placeholder of the upstream run is in the command; the probe
+    # refuses to run without the upstream status file
+    assert 'chain/pretrain/a' in ' '.join(probe_a.command)
+    assert chain_states(project=project) == {
+        'pretrain/a': StudyState.DONE,
+        'pretrain/b': StudyState.DONE,
+        'probe/a': StudyState.DONE,
+        'probe/b': StudyState.DONE,
+        'other/c': StudyState.DONE,
+    }
+
+
+@pytest.mark.slow
+def test_local_failed_upstream_skips_probe(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    write_chain_project(project=project)
+    monkeypatch.setenv('TOY_CHAIN_FAIL', '1')
+
+    code = submit(
+        context=chain_context(project=project),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
+    assert {task.run_path.as_posix() for task in tasks} == {'pretrain/a', 'pretrain/b', 'other/c'}
+    assert not (project / 'runs' / 'chain' / 'probe').exists()
+    assert chain_states(project=project) == {
+        'pretrain/a': StudyState.FAILED,
+        'pretrain/b': StudyState.FAILED,
+        'probe/a': StudyState.DEPENDENCY_FAILED,
+        'probe/b': StudyState.DEPENDENCY_FAILED,
+        'other/c': StudyState.DONE,
+    }
+
+
+@pytest.mark.slow
+def test_local_failed_instance_blocks_ok_probe(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_chain_project(project=project)
+    monkeypatch.setenv('TOY_CHAIN_FAIL_INSTANCE', '1')
+
+    code = submit(
+        context=chain_context(project=project),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
+    assert {task.run_path.as_posix() for task in tasks} == {'pretrain/a', 'pretrain/b', 'other/c'}
+    assert not (project / 'runs' / 'chain' / 'probe').exists()
+    assert chain_states(project=project) == {
+        'pretrain/a': StudyState.FAILED,
+        'pretrain/b': StudyState.FAILED,
+        'probe/a': StudyState.DEPENDENCY_FAILED,
+        'probe/b': StudyState.DEPENDENCY_FAILED,
+        'other/c': StudyState.DONE,
+    }
+
+
+@pytest.mark.slow
+def test_local_filter_keeps_unchained_groups(
+    project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write_chain_project(project=project)
+    monkeypatch.setenv('TOY_CHAIN_FAIL', '1')
+
+    code = submit(
+        context=chain_context(project=project),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
+    paths = {task.run_path.as_posix() for task in tasks}
+    assert 'other/c' in paths
+    assert not any(path.startswith('probe/') for path in paths)
+    states = chain_states(project=project)
+    assert states['other/c'] is StudyState.DONE
+    assert states['probe/a'] is StudyState.DEPENDENCY_FAILED
 
 
 def test_submit_runs_records_the_code_snapshot(project: Path, fake_backend: FakeBackend) -> None:

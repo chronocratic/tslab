@@ -27,6 +27,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     dry_run: bool,
     now: Callable[[], str],
     start_delay_seconds: int | None = None,
+    before_group: Callable[[JobGroup], JobGroup] | None = None,
 ) -> LaunchReport:
     """Write backend files, then submit groups one by one.
 
@@ -44,6 +45,8 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
         dry_run: Write files and stop without submitting.
         now: Return the current UTC ISO timestamp for each submitted group.
         start_delay_seconds: Seconds the jobs wait before they may start, when set.
+        before_group: Applied to each group before it is recorded and
+            submitted; a group left without tasks is skipped.
 
     Returns:
         What was submitted, what was not, and any error or stopping signal.
@@ -64,7 +67,12 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     upstream: dict[PurePosixPath, str] = {}
     error: str | None = None
     stopped_signal: int | None = None
-    for group in groups:
+    stopped_at = len(groups)
+    for position, planned in enumerate(groups):
+        group = before_group(planned) if before_group is not None else planned
+        if not group.tasks:
+            # why: the hook dropped the group's tasks, so nothing is recorded for it
+            continue
         tasks = tuple(
             TaskRecord(
                 index=task.index,
@@ -100,14 +108,16 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
             launcher.submit(group=group, study_folder=folder, record=record_job, upstream=upstream)
         except LaunchError as exc:
             error = str(exc)
+            stopped_at = position
             break
         except LaunchStopped as exc:
             # why: the record of this group is kept; resubmit continues the stopped runs
             stopped_signal = exc.signal_number
+            stopped_at = position + 1
             break
     return LaunchReport(
         submitted=tuple(records),
-        not_submitted=tuple(groups[len(records) :]),
+        not_submitted=tuple(groups[stopped_at:]),
         error=error,
         stopped_signal=stopped_signal,
     )

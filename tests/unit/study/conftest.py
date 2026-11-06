@@ -10,7 +10,14 @@ import pytest
 from tests.support.fake_backend import FakeBackend, install_fake_backend
 from tests.unit.study.project import write_toy_project
 
-_TOY_MODULES = ('toy_studies', 'toy_script')
+_TOY_MODULES = (
+    'toy_studies',
+    'toy_script',
+    'toy_chain_studies',
+    'toy_chain_pre',
+    'toy_chain_probe',
+    'toy_chain_ok',
+)
 
 
 @pytest.fixture(autouse=True)
