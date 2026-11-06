@@ -179,8 +179,8 @@ def check_machine(*, study: Study, machine: MachineProfile, warned: set[str] | N
 def _check_failed_condition(*, study: Study, machine: MachineProfile) -> None:
     """Refuse ``condition='failed'`` together with chained retries.
 
-    An upstream run that is retried later has already ended non-zero on SLURM, so
-    ``afternotok`` starts the downstream run, while a local launch waits for the retry.
+    An upstream run that is retried later has already ended non-zero, so a scheduler
+    starts the downstream run, while a local launch waits for the retry.
     """
     retry = machine.followup.chained_retry
     if retry is ChainedRetry.MANUAL:
@@ -190,8 +190,8 @@ def _check_failed_condition(*, study: Study, machine: MachineProfile) -> None:
             message = (
                 f"grid {name!r}: condition 'failed' cannot be used with [followup] "
                 f'chained_retry = "{retry.value}" in {machine.path}: an upstream run that is '
-                'retried later already counts as failed on SLURM; set chained_retry = "manual" '
-                "or use condition 'any'"
+                'retried later already counts as failed for the scheduler; set '
+                'chained_retry = "manual" or use condition \'any\''
             )
             raise ValueError(message)
 
