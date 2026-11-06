@@ -595,7 +595,10 @@ planning warns when `signal_seconds` of a chained grid is below 120 seconds, too
 check and requeue.
 
 Limits to know: a job whose next requeue would reach `MaxBatchRequeue` ends instead, so the
-follow-up resubmits it. With `condition="failed"`, an upstream run that is retried later is already
+follow-up resubmits it. Requeues SLURM makes on its own count toward that limit too; a job SLURM
+holds there stays pending, so the follow-up job, which waits for every job of the submission,
+waits with it. `status` shows such a run `interrupted` (held at MaxBatchRequeue); run `resubmit`
+by hand. With `condition="failed"`, an upstream run that is retried later is already
 "failed" for SLURM (`afternotok`), while a local launch keeps the downstream waiting for the retry.
 
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index

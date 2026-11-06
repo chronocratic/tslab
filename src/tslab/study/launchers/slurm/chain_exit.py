@@ -12,7 +12,7 @@ from tslab.study.commands.resubmit import may_retry
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs
 from tslab.study.launchers.common.types import JobStates
-from tslab.study.launchers.slurm.requeue import requeue_task, restarted_attempt
+from tslab.study.launchers.slurm.requeue import at_requeue_limit, requeue_task, restarted_attempt
 from tslab.study.paths import study_folder
 from tslab.study.records import append_job, JobRecord, read_jobs, take_progress, TaskRecord
 from tslab.study.reporting.state import collect_states, RunReport
@@ -103,6 +103,11 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
     )
     counted = dataclasses.replace(report, attempt=current.attempt, task=current)
     if not may_retry(report=counted, context=context):
+        return False
+    if at_requeue_limit():
+        _LOGGER.warning(
+            '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', report.job_id
+        )
         return False
     following = dataclasses.replace(
         current,

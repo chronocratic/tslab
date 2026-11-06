@@ -32,6 +32,8 @@ from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
 from tslab.study.context import Context, load_context, refresh_context, Selection, study_reports
 from tslab.study.launchers.common.types import LaunchError
+from tslab.study.launchers.slurm.chain_exit import chain_exit
+from tslab.study.records import JobRecord, read_jobs
 from tslab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
@@ -888,6 +890,85 @@ def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: F
     cancelled = cast('Context', cancel_call['context']).reports
     assert [r.run.run_path.as_posix() for r in cancelled] == ['g/small/1']
     assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)
+
+
+def _time_limited(*, project: Path, run_path: str) -> None:
+    """A run folder left at the time limit, with a checkpoint saved."""
+    folder = project / 'runs' / 'chain' / run_path
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={
+                'train': InstanceRecord(
+                    state=InstanceState.FAILED, error='JobTimeLimitSignal: time limit'
+                )
+            },
+        ),
+    )
+    (folder / 'last.ckpt').write_text('x')
+
+
+def test_chain_exit_at_max_batch_requeue_ends_the_job_and_the_followup_resubmits(
+    project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='chained_retry = "requeue"\n')
+    records = jobs_of_chain(project=project)
+    job = records[0]
+    task = next(task for task in job.tasks if task.run_path.as_posix() == 'pretrain/a')
+    _time_limited(project=project, run_path='pretrain/a')
+    requeue = importlib.import_module('tslab.study.launchers.slurm.requeue')
+    requeued: list[str] = []
+    monkeypatch.setattr(requeue, 'scontrol_requeue', lambda *, task_id: requeued.append(task_id))
+    monkeypatch.setattr(requeue, 'query_cluster_config', lambda: {'MaxBatchRequeue': '5'})
+    # why: four restarts so far; the next requeue would reach MaxBatchRequeue
+    monkeypatch.setenv('SLURM_RESTART_COUNT', '4')
+    in_job = chained_context(project=project, study=chained_study(), machine_file='cluster.toml')
+    assert chain_exit(context=in_job, job_file=job.job_file, index=task.index) == 1
+    assert requeued == []
+    assert jobs_of_chain(project=project) == records
+    monkeypatch.delenv('SLURM_RESTART_COUNT')
+    # the job ended non-zero; the follow-up runs resubmit --auto
+    after = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={f'{job.job_id}_{task.index}': JobPhase.FAILED},
+    )
+    report = next(r for r in after.reports if r.run.run_path.as_posix() == 'pretrain/a')
+    assert report.state is StudyState.INTERRUPTED
+    before = len(fake_backend.calls('launch'))
+    assert resubmit(context=after, auto=True, sleep=no_sleep) == 0
+    assert len(fake_backend.calls('launch')) == before + 1
+    assert 'pretrain/a' in _launched_runs(fake_backend=fake_backend)
+
+
+def test_auto_resubmit_cancels_and_resubmits_a_held_chained_job(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='chained_retry = "requeue"\n')
+    _time_limited(project=project, run_path='pretrain/a')
+    fake_backend.cancellable_answer = ['job-0_0']
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={'job-0_0': JobPhase.QUEUED, 'job-0_1': JobPhase.COMPLETED},
+        flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})},
+    )
+    report = next(r for r in ctx.reports if r.run.run_path.as_posix() == 'pretrain/a')
+    assert report.state is StudyState.INTERRUPTED
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+    (cancel_call,) = fake_backend.calls('cancel')
+    cancelled = cast('Context', cancel_call['context']).reports
+    assert 'pretrain/a' in [r.run.run_path.as_posix() for r in cancelled]
+    assert 'pretrain/a' in _launched_runs(fake_backend=fake_backend)
+
+
+def jobs_of_chain(*, project: Path) -> list[JobRecord]:
+    """The job records of the chained study."""
+    return read_jobs(path=project / 'runs' / 'chain' / '.study' / 'submissions.jsonl')
 
 
 def _cancelled_chain(
