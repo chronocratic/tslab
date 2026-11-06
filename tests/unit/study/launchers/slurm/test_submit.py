@@ -181,7 +181,8 @@ def test_backend_writes_chain_exit_check_for_chained_grid(
         ]
     )
     assert '#SBATCH --kill-on-invalid-dep=yes' in script
-    assert script.rstrip().endswith(f'exec {chain_command} --index ${{SLURM_ARRAY_TASK_ID}}')
+    assert f'{chain_command} --index ${{SLURM_ARRAY_TASK_ID}}' in script
+    assert script.rstrip().endswith('exit "$CHECK_EXIT"')
 
 
 def test_dry_run_writes_files_but_submits_nothing(

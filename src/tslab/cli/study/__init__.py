@@ -4,6 +4,8 @@ The argument dataclasses in the submodules hold only the flags of one command;
 the behavior lives in ``tslab.study.commands``, which the ``run`` methods call.
 """
 
+from types import MappingProxyType
+
 # why: the package door preserves command and helper imports while implementations live in siblings
 from tslab.cli.study.cancel import Cancel
 from tslab.cli.study.chain_exit import ChainExit as _ChainExit
@@ -30,6 +32,7 @@ from tslab.cli.study.shared import (
 from tslab.cli.study.slurm import Slurm
 from tslab.cli.study.status import Show, Status, Wait
 from tslab.cli.study.submit import Submit
+from tslab.study.command_names import CHAIN_EXIT_COMMAND
 
 __all__ = [
     'STUDY_COMMANDS',
@@ -64,4 +67,4 @@ STUDY_COMMANDS = {
     'run': RunOne,
 }
 
-_INTERNAL_STUDY_COMMANDS = {'chain-exit': _ChainExit}
+_INTERNAL_STUDY_COMMANDS = MappingProxyType({CHAIN_EXIT_COMMAND: _ChainExit})

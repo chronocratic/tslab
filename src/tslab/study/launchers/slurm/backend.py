@@ -22,6 +22,7 @@ from tslab.jobs.slurm import (
     slurm_available,
     SlurmError,
 )
+from tslab.study.command_names import CHAIN_EXIT_COMMAND
 from tslab.study.context import Context
 from tslab.study.definition import chained_grids, Study
 from tslab.study.doctor import DoctorCheck
@@ -395,7 +396,7 @@ def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, 
     return (
         *context.machine.tslab_command,
         'study',
-        'chain-exit',
+        CHAIN_EXIT_COMMAND,
         context.reference,
         '--machine',
         context.machine_path.as_posix(),

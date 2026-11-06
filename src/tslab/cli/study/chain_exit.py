@@ -43,8 +43,8 @@ class ChainExit:
             study=self.study, machine=self.machine, start=Path.cwd(), host=hostname()
         )
         context = _context_of(
-            study=cast('str', request.study),
-            machine=cast('str', request.machine),
+            study=cast('str', request.study),  # why: this command requires a study reference
+            machine=cast('str', request.machine),  # why: machine is a required CLI argument
             grid=(),
             only=(),
             read_only=True,
