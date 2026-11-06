@@ -888,3 +888,50 @@ def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: F
     cancelled = cast('Context', cancel_call['context']).reports
     assert [r.run.run_path.as_posix() for r in cancelled] == ['g/small/1']
     assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)
+
+
+def test_default_resubmit_pulls_in_cancelled_upstream_of_dependency_failed(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    flags = {
+        'job-0_0': frozenset({JobFlag.CANCELLED}),
+        'job-0_1': frozenset({JobFlag.CANCELLED}),
+        'job-1_0': frozenset({JobFlag.DEPENDENCY_NEVER}),
+        'job-1_1': frozenset({JobFlag.DEPENDENCY_NEVER}),
+    }
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={
+            'job-0_0': JobPhase.FAILED,
+            'job-0_1': JobPhase.FAILED,
+            'job-1_0': JobPhase.FAILED,
+            'job-1_1': JobPhase.FAILED,
+        },
+        flags=flags,
+        grids=('probe',),
+    )
+    assert resubmit(context=ctx, sleep=no_sleep) == 0
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert 'pretrain/a' in runs
+    assert any(run.startswith('probe/a/') for run in runs)
+
+
+def test_auto_resubmit_pulls_in_missing_downstream_of_selected_upstream(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={'job-0_0': JobPhase.INTERRUPTED, 'job-0_1': JobPhase.COMPLETED},
+        grids=('pretrain',),
+    )
+    folder = project / 'runs' / 'chain' / 'pretrain/a'
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'last.ckpt').write_text('x')
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert any(run.startswith('probe/a/') for run in runs)

@@ -588,6 +588,12 @@ submits it again. `tslab doctor` warns when `max_attempts` exceeds `MaxBatchRequ
 planning warns when `signal_seconds` of a chained grid is below 120 seconds, too short to save,
 check and requeue.
 
+Limits to know: requeues inside a job are not recorded as new attempts, so with `retry` or
+`chained_retry` follow-ups still active a run can see more than `max_attempts` attempts in
+total. A job whose next requeue would reach `MaxBatchRequeue` ends instead, so the follow-up
+resubmits it. With `condition="failed"`, an upstream run that is retried later is already
+"failed" for SLURM (`afternotok`), while a local launch keeps the downstream waiting for the retry.
+
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index
 of their upstream run when it is free, and wait with `aftercorr`: each downstream task starts
 after the upstream task with the same index.

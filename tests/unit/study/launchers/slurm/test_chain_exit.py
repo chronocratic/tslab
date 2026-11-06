@@ -242,3 +242,15 @@ def test_attempt_counts_restarts(monkeypatch: pytest.MonkeyPatch) -> None:
     assert restarted_attempt(attempt=1) == 3
     monkeypatch.delenv('SLURM_RESTART_COUNT')
     assert restarted_attempt(attempt=1) == 1
+
+
+def test_chain_exit_does_not_requeue_at_max_batch_requeue(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project, max_attempts=9)
+    _interrupted(ctx=ctx, progress=True)
+    monkeypatch.setenv('SLURM_RESTART_COUNT', '1')
+    monkeypatch.setattr(_REQUEUE_MODULE, 'query_cluster_config', lambda: {'MaxBatchRequeue': '2'})
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert requeued == []

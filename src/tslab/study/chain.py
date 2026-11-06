@@ -73,7 +73,7 @@ def after_verdict(
 def downstream_of(
     *, study: Study, run_paths: Collection[PurePosixPath], reports: Sequence[RunReport]
 ) -> list[RunReport]:
-    """The waiting and dependency-failed runs that depend on the given runs.
+    """The waiting, dependency-failed and missing runs that depend on the given runs.
 
     Args:
         study: The study containing the grids.
@@ -81,7 +81,7 @@ def downstream_of(
         reports: Reports of every run that may depend on them.
 
     Returns:
-        The ``WAITING`` and ``DEPENDENCY_FAILED`` reports with a given run among their
+        The ``WAITING``, ``DEPENDENCY_FAILED`` and ``MISSING`` reports with a given run among their
         upstream runs, transitively, in the order of ``reports``; the given runs
         themselves are left out.
     """
@@ -89,7 +89,7 @@ def downstream_of(
     candidates = [
         report
         for report in reports
-        if report.state in (StudyState.WAITING, StudyState.DEPENDENCY_FAILED)
+        if report.state in (StudyState.WAITING, StudyState.DEPENDENCY_FAILED, StudyState.MISSING)
         and report.run.run_path not in given
     ]
     found: set[PurePosixPath] = set()
