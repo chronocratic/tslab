@@ -81,6 +81,8 @@ runs/                           run folders (git-ignored)
 - **`machines/*.toml`** says where and how study runs execute (local or
   SLURM, output root, environment, SLURM limits, per-grid overrides). Its
   settings may contain only machine settings; put experiment settings on the study.
+  `retry` covers grids that are not chained; `chained_retry` covers chained
+  grids, and `requeue` is SLURM only.
 
 ## 3. Setup and everyday commands
 
