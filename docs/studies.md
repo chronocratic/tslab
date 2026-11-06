@@ -221,8 +221,9 @@ lines, with `false` removing a line), `node_local_tmp = true` (points
 `TMPDIR`, `WANDB_CACHE_DIR`, `WANDB_CONFIG_DIR` at node-local scratch),
 `submit_pause_seconds = 0.5`.
 
-`[followup]` keys and defaults: `auto_retry = false`, `max_attempts = 3`,
-`wandb_sync = false`, `time = "00:30:00"`.
+`[followup]` keys and defaults: `retry = "manual"`,
+`chained_retry = "manual"`, `max_attempts = 3`, `wandb_sync = false`,
+`time = "00:30:00"`.
 
 Rules:
 
@@ -310,10 +311,11 @@ that calls `tslab`. The optional `[local]` table sets how:
   its log: the elapsed time, the peak memory, the CPU time and the GPU id. A
   run without a limit shows `no limit`. A local machine has no time limit or
   memory request, so it prints no suggestion line.
-- **Automatic retry.** With `[followup] auto_retry = true`, the launch submits
-  the interrupted runs that made progress again when it ends, up to
-  `max_attempts` attempts each, in the same process. `wandb_sync` is for SLURM
-  machines.
+- **Automatic retry.** With `[followup] retry = "resubmit"`, the launch submits
+  interrupted runs that made progress again when it ends, up to `max_attempts`
+  attempts each, in the same process. This setting covers grids without
+  dependencies. Use `chained_retry` for chained grids; see
+  [Chaining grids](#chaining-grids).
 
 ## Training stop rules
 
@@ -510,7 +512,18 @@ the project; `--no-code-snapshot` turns it off for one submit.
 
 ## Automatic retry
 
-Off by default (`[followup] auto_retry = true` turns it on).
+`retry = "resubmit"` enables automatic retry for grids without dependencies.
+`retry` defaults to `"manual"`. Chained grids use `chained_retry`, which also
+defaults to `"manual"`; see [Chaining grids](#chaining-grids).
+
+`chained_retry` choices:
+
+- `manual` (default): an upstream time limit leaves downstream jobs
+  `dependency_failed`; run `resubmit` to submit both again.
+- `resubmit`: the follow-up resubmits the upstream run and its downstream runs
+  with dependencies on the new job ids.
+- `requeue`: the upstream job requeues with the same job id, so downstream jobs
+  keep waiting.
 
 After each submission, one follow-up job is queued with
 `--dependency=afterany:<all job ids of that submission>` and minimal

@@ -26,9 +26,9 @@ def _finish_launch(
 ) -> int:
     """The exit code of a launch, with its follow-ups queued when it was not stopped by a signal.
 
-    On a local machine with ``followup.auto_retry`` the interrupted runs that made progress
-    are submitted again, in this process; that call ends here too, so the chain runs until a
-    pass retries nothing.
+    On a local machine with ``followup.retry`` or ``followup.chained_retry``, interrupted runs
+    that made progress are submitted again in this process. The call ends here too, so the chain
+    runs until a pass retries nothing.
     """
     if code >= SIGNAL_EXIT_BASE:
         # why: the launch was stopped by a signal; resubmit continues it

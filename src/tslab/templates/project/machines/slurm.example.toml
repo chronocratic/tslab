@@ -37,7 +37,8 @@ submit_pause_seconds = 0.5
 # exclusive = true
 
 [followup] # the small helper jobs TSLab submits for a study
-auto_retry = false
+retry = "manual" # grids that are not chained: "manual" | "resubmit"
+chained_retry = "manual" # chained grids: "manual" | "resubmit" | "requeue"
 max_attempts = 3
 wandb_sync = false
 time = "00:30:00"

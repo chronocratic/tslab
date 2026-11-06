@@ -50,7 +50,7 @@ study = Study(
 def with_followups(*, project: Path) -> None:
     """The [followup] table, on top of the written cluster profile."""
     profile = project / 'cluster.toml'
-    text = profile.read_text() + '\n[followup]\nauto_retry = true\nwandb_sync = true\n'
+    text = profile.read_text() + '\n[followup]\nretry = "resubmit"\nwandb_sync = true\n'
     profile.write_text(text)
 
 
@@ -125,6 +125,23 @@ def test_submit_queues_followups_after_the_arrays(project: Path, fake: FakeSlurm
         project=project, job_file=wbsync.job_file, suffix='tasks'
     ).read_text()
     assert wbsync_tasks == f'0 1 uv run tslab wandb-sync {(project / "runs" / "s").as_posix()}\n'
+
+
+def test_chained_retry_alone_queues_the_retry_followup(project: Path, fake: FakeSlurm) -> None:
+    profile = project / 'cluster.toml'
+    profile.write_text(profile.read_text() + '\n[followup]\nchained_retry = "resubmit"\n')
+    code, records = queue_followups(
+        context=context(project=project, machine_file='cluster.toml'),
+        job_ids=['101'],
+        now=utc_now_iso,
+        sleep=no_sleep,
+    )
+
+    assert code == 0
+    assert len(records) == 1
+    record = records[0]
+    assert isinstance(record, SlurmJobRecord)
+    assert record.job_name == 's_retry'
 
 
 def test_submit_records_the_job_name_of_every_slurm_job(project: Path, fake: FakeSlurm) -> None:

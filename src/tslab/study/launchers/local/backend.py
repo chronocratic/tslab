@@ -36,6 +36,7 @@ from tslab.study.launchers.local.run import (
 )
 from tslab.study.launchers.local.states import _local_states
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
+from tslab.study.machine.profile import wants_retry_followup
 from tslab.study.paths import study_folder
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
@@ -286,7 +287,7 @@ class LocalBackend:
         sleep: Callable[[float], None],  # noqa: ARG002 # why: the Backend signature
     ) -> int:
         """The in-process auto-retry of the interrupted runs; 0 without it."""
-        if context.machine.followup.auto_retry and submitted:
+        if wants_retry_followup(followup=context.machine.followup) and submitted:
             return retry()
         return 0
 

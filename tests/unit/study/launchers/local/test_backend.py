@@ -22,7 +22,7 @@ from tests.unit.study.helpers import (
     write_launch,
 )
 from tslab.core.meta import hostname
-from tslab.enums import JobPhase, LocalTaskState
+from tslab.enums import JobPhase, LocalTaskState, Retry
 from tslab.jobs.local import GpuDiscovery
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.commands import submit
@@ -264,7 +264,7 @@ def test_cancellable_job_ids_is_empty() -> None:
     assert LocalBackend().cancellable_job_ids(reports=[]) == []
 
 
-def test_after_submit_does_not_retry_without_auto_retry(*, project: Path) -> None:
+def test_after_submit_does_not_retry_without_retry(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
 
     assert (
@@ -275,9 +275,9 @@ def test_after_submit_does_not_retry_without_auto_retry(*, project: Path) -> Non
     )
 
 
-def test_after_submit_retries_submitted_jobs_when_auto_retry_is_enabled(*, project: Path) -> None:
+def test_after_submit_retries_submitted_jobs_when_retry_is_enabled(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    machine = replace(ctx.machine, followup=FollowupSettings(auto_retry=True))
+    machine = replace(ctx.machine, followup=FollowupSettings(retry=Retry.RESUBMIT))
     record_local_job(project=project)
     retry_calls: list[bool] = []
 
@@ -298,7 +298,7 @@ def test_after_submit_retries_submitted_jobs_when_auto_retry_is_enabled(*, proje
 
 def test_after_submit_does_not_retry_empty_submission(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    machine = replace(ctx.machine, followup=FollowupSettings(auto_retry=True))
+    machine = replace(ctx.machine, followup=FollowupSettings(retry=Retry.RESUBMIT))
 
     assert (
         LocalBackend().after_submit(
