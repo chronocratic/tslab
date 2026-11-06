@@ -21,10 +21,12 @@ _LOGGER = logging.getLogger(__name__)
 _FIRST_GAP_SECONDS = 30
 _COUNT_ORDER = (
     StudyState.DONE,
+    StudyState.WAITING,
     StudyState.RUNNING,
     StudyState.QUEUED,
     StudyState.INTERRUPTED,
     StudyState.FAILED,
+    StudyState.DEPENDENCY_FAILED,
     StudyState.MISSING,
 )
 

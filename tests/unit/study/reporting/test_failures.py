@@ -101,8 +101,20 @@ def test_failures_default_states_skip_done_and_missing(
     _failed_context(project=project)
     finish_run(project=project, model='large', seed=1)
     ctx = context(project=project, machine_file='cluster.toml')
+    ctx = dataclasses.replace(
+        ctx,
+        reports=[
+            dataclasses.replace(report, state=StudyState.DEPENDENCY_FAILED)
+            if report.run.run_path == PurePosixPath('g/small/2')
+            else report
+            for report in ctx.reports
+        ],
+    )
     failures = collect_failures(context=ctx, states=(), lines=30)
-    assert [failure['state'] for failure in failures] == [StudyState.FAILED.value]
+    assert [failure['state'] for failure in failures] == [
+        StudyState.FAILED.value,
+        StudyState.DEPENDENCY_FAILED.value,
+    ]
 
 
 def test_collect_failures_uses_selected_backend_usage(
