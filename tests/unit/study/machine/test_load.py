@@ -1,6 +1,7 @@
 """``load_machine``: a machine profile, read from TOML strictly."""
 
 from collections.abc import Mapping
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,7 @@ def test_load_machine_uses_selected_backend_settings_loader(
 
     class LocalProfileBackend:
         TABLE = LauncherKind.LOCAL
-        FOLLOWUP_KEYS: frozenset[str] = frozenset({'auto_retry'})
+        FOLLOWUP_KEYS: frozenset[str] = frozenset({'retry', 'chained_retry'})
 
         def settings_from(self, *, table: Mapping[str, object], path: Path) -> LocalSettings:
             calls.append(table)
@@ -80,7 +81,7 @@ node_local_tmp = true
 submit_pause_seconds = 0.5
 
 [followup]
-auto_retry = false
+retry = "manual"
 max_attempts = 3
 wandb_sync = false
 time = "00:30:00"
@@ -126,6 +127,58 @@ def test_full_example_loads(cluster_toml: Path) -> None:
     }
     assert profile.overrides[2].settings == {'trainer.job_time_share': 0.9}
     assert profile.tslab_command == ('uv', 'run', 'tslab')
+
+
+def test_auto_retry_is_rejected_with_the_new_key(tmp_path: Path) -> None:
+    path = write(tmp_path, BASE_SLURM + '[slurm]\npartition = "p"\n[followup]\nauto_retry = true\n')
+    with pytest.raises(
+        MachineProfileError, match='auto_retry` was renamed: use `retry = "resubmit"` or `"manual"`'
+    ):
+        load_machine(path=path)
+
+
+def test_auto_retry_is_rejected_even_next_to_retry(tmp_path: Path) -> None:
+    path = write(
+        tmp_path,
+        BASE_SLURM
+        + '[slurm]\npartition = "p"\n[followup]\nauto_retry = false\nretry = "resubmit"\n',
+    )
+    with pytest.raises(MachineProfileError, match='auto_retry` was renamed'):
+        load_machine(path=path)
+
+
+@pytest.mark.parametrize(
+    ('text', 'retry', 'chained'),
+    [
+        ('', 'manual', 'manual'),
+        ('retry = "resubmit"\n', 'resubmit', 'manual'),
+        ('chained_retry = "requeue"\n', 'manual', 'requeue'),
+    ],
+)
+def test_followup_retry_settings(tmp_path: Path, text: str, retry: str, chained: str) -> None:
+    profile = load_machine(
+        path=write(tmp_path, BASE_SLURM + '[slurm]\npartition = "p"\n[followup]\n' + text)
+    )
+    assert asdict(profile.followup) == {
+        'retry': retry,
+        'chained_retry': chained,
+        'max_attempts': 3,
+        'wandb_sync': False,
+        'time': '00:30:00',
+    }
+
+
+@pytest.mark.parametrize('value', ['true', '"auto"'])
+def test_retry_value_names_the_choices(tmp_path: Path, value: str) -> None:
+    path = write(tmp_path, BASE_SLURM + f'[slurm]\npartition = "p"\n[followup]\nretry = {value}\n')
+    with pytest.raises(MachineProfileError, match=r'manual.*resubmit'):
+        load_machine(path=path)
+
+
+def test_local_profile_rejects_chained_requeue(tmp_path: Path) -> None:
+    path = write(tmp_path, LOCAL + '[followup]\nchained_retry = "requeue"\n')
+    with pytest.raises(MachineProfileError, match='chained_retry = "requeue" is SLURM only'):
+        load_machine(path=path)
 
 
 @pytest.mark.parametrize(
@@ -234,10 +287,7 @@ def _typo_profile(tmp_path: Path, text: str) -> Path:
     [
         ('[slurm]\npartition = "p"\ngpu = 1', "slurm.gpu: unknown key; did you mean 'gpus'?"),
         ('outptu_root = "x"', "outptu_root: unknown key; did you mean 'output_root'?"),
-        (
-            '[followup]\nauto_retries = true',
-            "followup.auto_retries: unknown key; did you mean 'auto_retry'?",
-        ),
+        ('[followup]\nretri = true', "followup.retri: unknown key; did you mean 'retry'?"),
         (
             '[[overrides]]\nmatch = { grid = "g" }\nslurm = { gpu = 1 }',
             "overrides[0].slurm.gpu: unknown key; did you mean 'gpus'?",

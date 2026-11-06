@@ -1,5 +1,6 @@
 """Enums shared by more than one package: the fixed sets of choices."""
 
+from tslab.enums.chained_retry import ChainedRetry
 from tslab.enums.check_status import CheckStatus
 from tslab.enums.instance_state import InstanceState
 from tslab.enums.job_flag import JobFlag
@@ -8,6 +9,7 @@ from tslab.enums.launcher_kind import LauncherKind
 from tslab.enums.local_task_state import LocalTaskState
 from tslab.enums.log_level import LogLevel
 from tslab.enums.output_format import OutputFormat
+from tslab.enums.retry import Retry
 from tslab.enums.run_state import RunState
 from tslab.enums.shown_run_state import ShownRunState
 from tslab.enums.split import Split
@@ -15,6 +17,7 @@ from tslab.enums.study_state import StudyState
 from tslab.enums.wandb_mode import WandbMode
 
 __all__ = [
+    'ChainedRetry',
     'CheckStatus',
     'InstanceState',
     'JobFlag',
@@ -23,6 +26,7 @@ __all__ = [
     'LocalTaskState',
     'LogLevel',
     'OutputFormat',
+    'Retry',
     'RunState',
     'ShownRunState',
     'Split',

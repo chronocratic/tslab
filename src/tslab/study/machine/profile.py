@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tslab.enums import LauncherKind
+from tslab.enums import ChainedRetry, LauncherKind, Retry
 from tslab.study.definition import SettingValue
 from tslab.study.machine.local import LocalSettings
 from tslab.study.machine.slurm import SlurmSettings
@@ -13,9 +13,18 @@ __all__ = ['FollowupSettings', 'MachineOverride', 'MachineProfile']
 
 @dataclass(frozen=True, kw_only=True)
 class FollowupSettings:
-    """The ``[followup]`` table: the small helper jobs of a study."""
+    """The ``[followup]`` table: the small helper jobs of a study.
 
-    auto_retry: bool = False
+    Attributes:
+        retry: Whether to resubmit grids without dependencies.
+        chained_retry: Whether to retry grids that use dependencies.
+        max_attempts: The maximum attempts for one run.
+        wandb_sync: Whether to queue a W&B synchronization job.
+        time: The time limit of follow-up jobs.
+    """
+
+    retry: Retry = Retry.MANUAL
+    chained_retry: ChainedRetry = ChainedRetry.MANUAL
     max_attempts: int = 3
     wandb_sync: bool = False
     time: str = '00:30:00'

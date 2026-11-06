@@ -7,7 +7,7 @@ import tomllib
 from typing import cast, Protocol
 
 from tslab.core.text import unknown_key_message
-from tslab.enums import LauncherKind
+from tslab.enums import ChainedRetry, LauncherKind
 from tslab.study.definition import expand_variables
 import tslab.study.machine.local as machine_local
 from tslab.study.machine.local import LocalSettings
@@ -112,6 +112,7 @@ def _machine_profile(
     env = expand_env(table=table, path=path, lenient=lenient_env, environment=environment)
     _reject_other_backend_tables(backend=backend, table=table, path=path)
     _reject_unsupported_followups(backend=backend, table=table, path=path)
+    _reject_renamed_auto_retry(table=table, path=path)
     backend_settings = backend.settings_from(table=table, path=path)
     slurm = backend_settings if isinstance(backend_settings, SlurmSettings) else None
     local = backend_settings if isinstance(backend_settings, LocalSettings) else None
@@ -122,6 +123,15 @@ def _machine_profile(
         path=path,
         required=False,
     )
+    if (
+        backend.TABLE is LauncherKind.LOCAL
+        and followup is not None
+        and followup.chained_retry is ChainedRetry.REQUEUE
+    ):
+        message = (
+            f'{path}: followup.chained_retry = "requeue" is SLURM only; use "manual" or "resubmit"'
+        )
+        raise MachineProfileError(message)
     overrides = tuple(
         _override_from_table(table=entry, location=f'overrides[{position}]', path=path)
         for position, entry in enumerate(_overrides_table(table=table, path=path))
@@ -210,6 +220,15 @@ def _reject_unsupported_followups(
             continue
         message = f'{path}: followup.{key} is {owner.TABLE.upper()} only; remove it'
         raise MachineProfileError(message)
+
+
+def _reject_renamed_auto_retry(*, table: Mapping[str, object], path: Path) -> None:
+    """Reject the removed profile key with its replacement."""
+    followup = table.get('followup')
+    if not isinstance(followup, dict) or 'auto_retry' not in followup:
+        return
+    message = f'{path}: followup.auto_retry` was renamed: use `retry = "resubmit"` or `"manual"`'
+    raise MachineProfileError(message)
 
 
 def _override_from_table(*, table: object, location: str, path: Path) -> MachineOverride:

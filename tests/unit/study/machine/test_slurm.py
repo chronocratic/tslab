@@ -20,7 +20,7 @@ def test_slurm_settings_from_normalizes_its_profile_table(tmp_path: Path) -> Non
         path=tmp_path / 'cluster.toml',
     )
 
-    assert ('slurm', frozenset({'auto_retry', 'wandb_sync', 'time'})) == (
+    assert ('slurm', frozenset({'retry', 'chained_retry', 'wandb_sync', 'time'})) == (
         slurm_machine.TABLE,
         slurm_machine.FOLLOWUP_KEYS,
     )
