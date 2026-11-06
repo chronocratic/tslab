@@ -365,6 +365,65 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     return states
 
 
+def query_job_reasons(*, job_ids: Sequence[str]) -> dict[str, str]:
+    """Return the pending or terminal reason of every task id of the given jobs.
+
+    Args:
+        job_ids: Array or single job ids; empty means no calls and ``{}``.
+
+    Returns:
+        ``{task id: reason}``; ``squeue`` wins over ``sacct`` and empty or
+        literal ``None`` reasons are omitted.
+
+    Raises:
+        SlurmError: If ``squeue`` or ``sacct`` exits non-zero, except that an
+            unknown job id from ``squeue`` is not an error.
+    """
+    if not job_ids:
+        return {}
+    ids = ','.join(job_ids)
+    squeue = _query(
+        command=['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%r'],
+        accept=_squeue_accepts,
+    )
+    if not _squeue_accepts(squeue):
+        message = f'squeue reasons failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
+        raise SlurmError(message)
+    reasons = _pipe_reason_lines(stdout=squeue.stdout)
+    sacct = _query(
+        command=[
+            'sacct',
+            '--jobs',
+            ids,
+            '--noheader',
+            '--parsable2',
+            '--allocations',
+            '--format=JobID,Reason',
+        ],
+        accept=_sacct_accepts,
+    )
+    if sacct.returncode != 0:
+        message = f'sacct reasons failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'
+        raise SlurmError(message)
+    for key, value in _pipe_reason_lines(stdout=sacct.stdout).items():
+        reasons.setdefault(key, value)
+    return reasons
+
+
+def _pipe_reason_lines(*, stdout: str) -> dict[str, str]:
+    """Parse task ids and their full reason text, expanding compressed arrays."""
+    reasons: dict[str, str] = {}
+    for line in stdout.splitlines():
+        key, separator, reason = line.partition('|')
+        key = key.strip()
+        reason = reason.strip()
+        if not key or not separator or reason in ('', 'None'):
+            continue
+        for expanded in _expand_array_key(key=key):
+            reasons[expanded] = reason
+    return reasons
+
+
 def query_cluster_config() -> dict[str, str]:
     """Read the cluster configuration with ``scontrol show config``.
 

@@ -14,6 +14,7 @@ from tslab.jobs.slurm import (
     format_slurm_duration,
     format_slurm_memory,
     INTERRUPTING_JOB_STATES,
+    query_job_reasons,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
     scancel,
@@ -21,7 +22,7 @@ from tslab.jobs.slurm import (
     SlurmError,
 )
 from tslab.study.context import Context
-from tslab.study.definition import Study
+from tslab.study.definition import chained_grids, Study
 from tslab.study.doctor import DoctorCheck
 from tslab.study.launchers.common.launch import launch
 from tslab.study.launchers.common.types import (
@@ -81,8 +82,33 @@ _FLAGS: Mapping[str, frozenset[JobFlag]] = MappingProxyType(
         'TIMEOUT': frozenset({JobFlag.TIME_LIMIT}),
         'PREEMPTED': frozenset({JobFlag.NOT_COUNTED}),
         'NODE_FAIL': frozenset({JobFlag.NOT_COUNTED}),
+        'CANCELLED': frozenset({JobFlag.CANCELLED}),
     }
 )
+
+_DEPENDENCY_REASON_FLAGS: Mapping[str, frozenset[JobFlag]] = MappingProxyType(
+    {
+        'Dependency': frozenset({JobFlag.DEPENDENCY_PENDING}),
+        'DependencyNeverSatisfied': frozenset({JobFlag.DEPENDENCY_NEVER}),
+    }
+)
+
+
+def _flags_of(
+    *, states: Mapping[str, str], reasons: Mapping[str, str]
+) -> dict[str, frozenset[JobFlag]]:
+    """Combine state and dependency-reason flags for each task."""
+    flags = {
+        task_id: flags
+        for task_id, state in states.items()
+        if (flags := _FLAGS.get(state)) is not None
+    }
+    for task_id, reason in reasons.items():
+        reason_flags = _DEPENDENCY_REASON_FLAGS.get(reason)
+        if reason_flags is None:
+            continue
+        flags[task_id] = flags.get(task_id, frozenset()) | reason_flags
+    return flags
 
 
 def _unknown_states() -> JobStates:
@@ -111,7 +137,7 @@ class SlurmBackend:
         self,
         *,
         machine: MachineProfile,  # noqa: ARG002 # why: the Backend signature
-        study: Study,  # noqa: ARG002 # why: the Backend signature
+        study: Study,
         jobs: Sequence[JobRecord],
         cache: Mapping[str, str],
     ) -> tuple[JobStates, Mapping[str, str]]:
@@ -120,9 +146,9 @@ class SlurmBackend:
             return _unknown_states(), cache
         try:
             followups = followup_job_ids(jobs=jobs)
-            states, new_cache = _query_states(
-                job_ids=slurm_task_ids(jobs=jobs) + followups, ended_states=cache
-            )
+            task_ids = slurm_task_ids(jobs=jobs)
+            states, new_cache = _query_states(job_ids=task_ids + followups, ended_states=cache)
+            reasons = query_job_reasons(job_ids=task_ids) if chained_grids(study=study) else {}
         except SlurmError as error:
             _LOGGER.warning('%s', error)
             return _unknown_states(), cache
@@ -144,9 +170,7 @@ class SlurmBackend:
                         if state.isupper()
                     }
                 ),
-                flags=MappingProxyType(
-                    {task_id: _FLAGS[state] for task_id, state in states.items() if state in _FLAGS}
-                ),
+                flags=MappingProxyType(_flags_of(states=states, reasons=reasons)),
                 followup_live_job_ids=live,
             ),
             new_cache,
