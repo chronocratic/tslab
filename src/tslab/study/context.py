@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.study.definition import (
@@ -31,6 +32,7 @@ __all__ = [
     'context_for',
     'expected_starts',
     'load_context',
+    'records_context',
     'refresh_context',
     'study_reports',
     'widen_context',
@@ -309,6 +311,50 @@ def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option i
         ended_states=ended_states,
         local_cpus=local_cpus,
         environment=environment,
+    )
+
+
+def records_context(
+    *, reference: str, machine_path: Path, project_root: Path, environment: Mapping[str, str]
+) -> Context:
+    """The study, machine and job records only: no runs, no scheduler query, no run folder read.
+
+    For a command that runs inside a job and reads one run itself, so its start-up time
+    does not grow with the study and the scheduler is not asked once per task.
+
+    Args:
+        reference: The ``module:attribute`` reference of the study.
+        machine_path: The machine profile file to load.
+        project_root: The folder the command was called from.
+        environment: The process environment used to load the machine profile.
+
+    Returns:
+        The context with ``jobs`` read and no runs, reports or job states.
+    """
+    # why: the launcher door imports Context, so this import must wait until calls
+    from tslab.study.launchers.common.types import JobStates  # noqa: PLC0415
+
+    study = load_study(reference=reference)
+    machine = load_machine(path=machine_path, lenient_env=True, environment=environment)
+    return Context(
+        study=study,
+        reference=reference,
+        machine=machine,
+        machine_path=machine_path,
+        project_root=project_root,
+        runs=[],
+        resolved={},
+        jobs=read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl'),
+        reports=[],
+        upstream_reports={},
+        job_states=JobStates(
+            known=False,
+            states=MappingProxyType({}),
+            phases=MappingProxyType({}),
+            reasons=MappingProxyType({}),
+            flags=MappingProxyType({}),
+            followup_live_job_ids=(),
+        ),
     )
 
 
