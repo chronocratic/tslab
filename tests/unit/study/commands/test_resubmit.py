@@ -30,7 +30,7 @@ from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
 from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
-from tslab.study.context import Context, load_context, refresh_context, Selection
+from tslab.study.context import Context, load_context, refresh_context, Selection, study_reports
 from tslab.study.launchers.common.types import LaunchError
 from tslab.study.reporting.state import RunReport
 
@@ -890,32 +890,51 @@ def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: F
     assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)
 
 
-def test_default_resubmit_pulls_in_cancelled_upstream_of_dependency_failed(
-    project: Path, fake_backend: FakeBackend
-) -> None:
+def _cancelled_chain(
+    *, project: Path, fake_backend: FakeBackend, grids: tuple[str, ...]
+) -> Context:
+    """The chain after ``study cancel``: pretrain/a cancelled while running, the rest queued."""
     _chain_submitted(project=project, fake_backend=fake_backend)
-    flags = {
-        'job-0_0': frozenset({JobFlag.CANCELLED}),
-        'job-0_1': frozenset({JobFlag.CANCELLED}),
-        'job-1_0': frozenset({JobFlag.DEPENDENCY_NEVER}),
-        'job-1_1': frozenset({JobFlag.DEPENDENCY_NEVER}),
-    }
-    ctx = _chain_states(
+    # why: the cancelled run left a stale running status in its folder
+    write_status(
+        path=project / 'runs' / 'chain' / 'pretrain' / 'a' / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.RUNNING)},
+        ),
+    )
+    task_ids = ('job-0_0', 'job-0_1', 'job-1_0', 'job-1_1', 'job-2_2', 'job-2_3')
+    return _chain_states(
         project=project,
         fake_backend=fake_backend,
-        phases={
-            'job-0_0': JobPhase.FAILED,
-            'job-0_1': JobPhase.FAILED,
-            'job-1_0': JobPhase.FAILED,
-            'job-1_1': JobPhase.FAILED,
-        },
-        flags=flags,
-        grids=('probe',),
+        phases=dict.fromkeys(task_ids, JobPhase.FAILED),
+        flags=dict.fromkeys(task_ids, frozenset({JobFlag.CANCELLED})),
+        grids=grids,
     )
+
+
+@pytest.mark.parametrize('grids', [(), ('probe',)])
+def test_default_resubmit_pulls_in_cancelled_upstream_of_dependency_failed(
+    project: Path, fake_backend: FakeBackend, grids: tuple[str, ...]
+) -> None:
+    ctx = _cancelled_chain(project=project, fake_backend=fake_backend, grids=grids)
+    states = {
+        report.run.run_path.as_posix(): report.state
+        for report in study_reports(context=ctx).values()
+    }
+    assert states['pretrain/a'] is StudyState.FAILED
+    assert {state for path, state in states.items() if path.startswith('probe/')} == {
+        StudyState.DEPENDENCY_FAILED
+    }
+    launches = len(fake_backend.calls('launch'))
     assert resubmit(context=ctx, sleep=no_sleep) == 0
+    assert len(fake_backend.calls('launch')) > launches
     runs = _launched_runs(fake_backend=fake_backend)
-    assert 'pretrain/a' in runs
-    assert any(run.startswith('probe/a/') for run in runs)
+    assert {'pretrain/a', 'pretrain/b'} <= set(runs)
+    assert {run for run in runs if run.startswith('probe/')} == {
+        path for path in states if path.startswith('probe/')
+    }
 
 
 def test_auto_resubmit_pulls_in_missing_downstream_of_selected_upstream(
