@@ -313,8 +313,8 @@ that calls `tslab`. The optional `[local]` table sets how:
   memory request, so it prints no suggestion line.
 - **Automatic retry.** With `[followup] retry = "resubmit"`, the launch submits
   interrupted runs that made progress again when it ends, up to `max_attempts`
-  attempts each, in the same process. This setting covers grids without
-  dependencies. Use `chained_retry` for chained grids; see
+  attempts each, in the same process. This setting covers grids that are not
+  chained. Use `chained_retry` for chained grids; see
   [Chaining grids](#chaining-grids).
 
 ## Training stop rules
@@ -512,7 +512,7 @@ the project; `--no-code-snapshot` turns it off for one submit.
 
 ## Automatic retry
 
-`retry = "resubmit"` enables automatic retry for grids without dependencies.
+`retry = "resubmit"` enables automatic retry for grids that are not chained.
 `retry` defaults to `"manual"`. Chained grids use `chained_retry`, which also
 defaults to `"manual"`; see [Chaining grids](#chaining-grids).
 
@@ -522,10 +522,10 @@ defaults to `"manual"`; see [Chaining grids](#chaining-grids).
   `dependency_failed`; run `resubmit` to submit both again.
 - `resubmit`: the follow-up resubmits the upstream run and its downstream runs
   with dependencies on the new job ids.
-- `requeue`: the upstream job requeues with the same job id, so downstream jobs
-  keep waiting.
+- `requeue` (SLURM only): the upstream job requeues with the same job id, so
+  downstream jobs keep waiting.
 
-After each submission, one follow-up job is queued with
+When a retry setting is enabled, one follow-up job is queued with
 `--dependency=afterany:<all job ids of that submission>` and minimal
 resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
 `<tslab_command> study resubmit <study> --machine <name> --auto`:

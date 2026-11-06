@@ -37,7 +37,7 @@ def wants_retry_followup(*, followup: FollowupSettings) -> bool:
         followup: The follow-up settings of the machine profile.
 
     Returns:
-        Whether automatic resubmission is enabled.
+        Whether any retry mode needs a follow-up job.
     """
     return followup.retry is not Retry.MANUAL or followup.chained_retry is not ChainedRetry.MANUAL
 

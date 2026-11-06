@@ -75,7 +75,8 @@ code. Slurm: copy `machines/slurm.example.toml` to
 finds it from this folder or any folder below. To use the name from any folder, run
 `uv run tslab machine add cluster machines/cluster.toml`. The full guide:
 the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
-TSLab docs.
+TSLab docs. The profile example uses `retry` for grids that are not chained
+and `chained_retry` for chained grids.
 
 Once runs are done, `notebooks/analysis.ipynb` reads the results, lists the runs that
 are missing and compares methods with a critical-difference diagram, paired tests and a

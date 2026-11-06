@@ -1,1 +1,1 @@
-`[followup] auto_retry` is replaced by `retry = "manual"` or `"resubmit"` for grids without dependencies. `chained_retry = "manual"`, `"resubmit"` or `"requeue"` controls chained grids. Profiles that still use `auto_retry` fail with a message naming the replacement.
+`[followup] auto_retry` is replaced by `retry = "manual"` or `"resubmit"` for grids that are not chained. `chained_retry = "manual"`, `"resubmit"` or `"requeue"` controls chained grids; `requeue` is SLURM only. Profiles that still use `auto_retry` fail with a message naming the replacement.
