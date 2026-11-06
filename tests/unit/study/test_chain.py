@@ -1,12 +1,13 @@
 """Condition verdicts for dependencies between study grids."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
 from tslab.enums import (
     AfterCondition,
     AfterVerdict,
+    ChainedRetry,
     InstanceState,
     JobPhase,
     RunState,
@@ -16,6 +17,8 @@ from tslab.enums import (
 from tslab.study import After, Grid, Study
 from tslab.study.chain import after_verdict, upstream_verdict
 from tslab.study.definition import expand_runs, StudyRun
+from tslab.study.machine.profile import FollowupSettings
+from tslab.study.records import ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import FolderFacts, RunReport
 
 
@@ -158,3 +161,32 @@ def test_failed_instance_in_finished_upstream_blocks_ok_downstream() -> None:
     }
 
     assert after_verdict(study=study, run=probe, reports=upstream_reports) is AfterVerdict.NEVER
+
+
+def test_uncounted_attempts_leave_retries_open() -> None:
+    study = _study()
+    runs = expand_runs(study=study)
+    probe = next(run for run in runs if run.grid == 'probe')
+    followup = FollowupSettings(chained_retry=ChainedRetry.REQUEUE, max_attempts=3)
+
+    def interrupted(*, run: StudyRun) -> RunReport:
+        # why: attempt 3 after two requeues by the scheduler counts as one attempt
+        task = TaskRecord(
+            index=0,
+            grid=run.grid,
+            run_path=run.run_path,
+            command=(),
+            extra_args=(),
+            resources={},
+            attempt=3,
+            progress=ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None),
+            uncounted_attempts=2,
+        )
+        return replace(_report(run=run, state=StudyState.INTERRUPTED, attempt=3), task=task)
+
+    upstream = {run.run_path: interrupted(run=run) for run in runs if run.grid == 'pretrain'}
+
+    assert (
+        after_verdict(study=study, run=probe, reports=upstream, followup=followup)
+        is AfterVerdict.OPEN
+    )

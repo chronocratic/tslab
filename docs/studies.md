@@ -582,16 +582,18 @@ jobs end `dependency_failed` and the follow-up resubmits both grids, as with
 `chained_retry = "resubmit"`.
 
 The attempt number of a requeued task is the recorded attempt plus `SLURM_RESTART_COUNT`; the
-log header shows it. A job that reaches the `MaxBatchRequeue` limit of the cluster is held by
+log header shows it. Before each requeue the check appends a record of the task to
+`submissions.jsonl` with the next attempt and a fresh progress snapshot, so `status`, the
+progress rule and the follow-up count requeues like resubmits: `max_attempts` covers both, and
+a requeued run must make progress again before the next requeue. Restarts SLURM makes on its
+own (preemption, node failure) carry no record and do not count toward `max_attempts`. A job that reaches the `MaxBatchRequeue` limit of the cluster is held by
 SLURM; `status` shows it `interrupted` (held at MaxBatchRequeue) and `resubmit` cancels it and
 submits it again. `tslab doctor` warns when `max_attempts` exceeds `MaxBatchRequeue`, and
 planning warns when `signal_seconds` of a chained grid is below 120 seconds, too short to save,
 check and requeue.
 
-Limits to know: requeues inside a job are not recorded as new attempts, so with `retry` or
-`chained_retry` follow-ups still active a run can see more than `max_attempts` attempts in
-total. A job whose next requeue would reach `MaxBatchRequeue` ends instead, so the follow-up
-resubmits it. With `condition="failed"`, an upstream run that is retried later is already
+Limits to know: a job whose next requeue would reach `MaxBatchRequeue` ends instead, so the
+follow-up resubmits it. With `condition="failed"`, an upstream run that is retried later is already
 "failed" for SLURM (`afternotok`), while a local launch keeps the downstream waiting for the retry.
 
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index
