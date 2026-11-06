@@ -2,7 +2,8 @@
 
 from tslab.study import Study
 
-from {{package_name}}.studies.common import classification_grid, probe_grid
+from {{package_name}}.studies.chain.grids import probe_grid
+from {{package_name}}.studies.common import classification_grid
 
 study = Study(
     name='chain',
