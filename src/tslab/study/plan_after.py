@@ -14,7 +14,7 @@ from tslab.enums import (
     StudyState,
 )
 from tslab.study.chain import after_verdict, upstream_verdict
-from tslab.study.definition import grid_order, upstream_runs
+from tslab.study.definition import grid_order, match_axes, upstream_runs
 from tslab.study.records import latest_tasks
 
 if TYPE_CHECKING:
@@ -23,10 +23,11 @@ if TYPE_CHECKING:
 
     from tslab.study.definition import After, Study, StudyRun
     from tslab.study.machine.profile import FollowupSettings
+    from tslab.study.plan import JobGroup
     from tslab.study.records import JobRecord, TaskRecord
     from tslab.study.reporting.state import RunReport
 
-__all__ = ['AfterTarget', 'local_after_problems', 'order_runs', 'plan_targets']
+__all__ = ['AfterTarget', 'local_after_problems', 'merge_corr_groups', 'order_runs', 'plan_targets']
 
 _LIVE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
 
@@ -41,6 +42,10 @@ class AfterTarget:
         satisfy: Whether all targets or any target must meet the condition.
         job_tasks: Existing upstream task ids in ``<job id>_<index>`` form.
         run_paths: Upstream runs submitted in the same launch.
+        corr_ok: The run pairs one to one with a single upstream run, so a group of such
+            runs may wait with ``aftercorr`` when the array indices line up.
+        corr: The target waits for the matching task of one upstream array; ``job_tasks``
+            holds the array job id, or ``run_paths`` one run of the upstream array.
     """
 
     condition: AfterCondition
@@ -48,6 +53,8 @@ class AfterTarget:
     satisfy: Satisfy
     job_tasks: tuple[str, ...]
     run_paths: tuple[PurePosixPath, ...]
+    corr_ok: bool = False
+    corr: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -164,7 +171,26 @@ def _run_targets(*, state: _TargetState, run: StudyRun) -> tuple[tuple[AfterTarg
     entries = [_entry_target(state=state, run=run, after=after) for after in grid.after]
     if any(is_blocked for _, is_blocked in entries):
         return (), True
-    return tuple(target for target, _ in entries if target is not None), False
+    found = tuple(target for target, _ in entries if target is not None)
+    return _mark_corr_candidate(state=state, run=run, targets=found), False
+
+
+def _mark_corr_candidate(
+    *, state: _TargetState, run: StudyRun, targets: tuple[AfterTarget, ...]
+) -> tuple[AfterTarget, ...]:
+    """Flag the target of a run that pairs one to one with one upstream run."""
+    grid = state.study.grids[run.grid]
+    if len(grid.after) != 1 or len(targets) != 1:
+        return targets
+    (after,) = grid.after
+    (target,) = targets
+    paired = set(match_axes(study=state.study, grid_name=run.grid, after=after))
+    single = len(upstream_runs(study=state.study, run=run, after=after)) == 1
+    one_id = len(target.job_tasks) + len(target.run_paths) == 1
+    plain = after.condition is AfterCondition.OK and after.satisfy is Satisfy.ALL
+    if single and one_id and plain and set(grid.axes) <= paired:
+        return (replace(target, corr_ok=True),)
+    return targets
 
 
 def _reports_for_launch(
@@ -263,3 +289,85 @@ def _retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool
     return (
         followup.chained_retry is not ChainedRetry.MANUAL and report.attempt < followup.max_attempts
     )
+
+
+def merge_corr_groups(
+    *, groups: Sequence[JobGroup], indices: Mapping[PurePosixPath, int]
+) -> list[JobGroup]:
+    """Merge one-to-one downstream groups into arrays that wait with ``aftercorr``.
+
+    A group qualifies when its only target is a one-to-one candidate and every task
+    has the array index of its upstream run. Qualifying groups of one grid, job name,
+    resources and code snapshot that wait on the same upstream array become one group.
+
+    Args:
+        groups: The planned groups, numbered from the first job file.
+        indices: The run path to array index of the launch.
+
+    Returns:
+        The groups with the merged ones in the place of the first, renumbered in order.
+    """
+    owner = {
+        task.resolved.run.run_path: position
+        for position, group in enumerate(groups)
+        for task in group.tasks
+    }
+    merged: dict[tuple[object, ...], int] = {}
+    result: list[JobGroup] = []
+    for group in groups:
+        key = _corr_key(group=group, owner=owner, indices=indices)
+        if key is None:
+            result.append(group)
+        elif key in merged:
+            position = merged[key]
+            tasks = (*result[position].tasks, *group.tasks)
+            result[position] = replace(
+                result[position], tasks=tuple(sorted(tasks, key=lambda task: task.index))
+            )
+        else:
+            merged[key] = len(result)
+            result.append(
+                replace(group, after=(_corr_target(group=group, groups=groups, owner=owner),))
+            )
+    first = groups[0].job_file if groups else 0
+    return [replace(group, job_file=first + position) for position, group in enumerate(result)]
+
+
+def _upstream_ref(
+    *, target: AfterTarget, owner: Mapping[PurePosixPath, int], indices: Mapping[PurePosixPath, int]
+) -> tuple[object, int] | None:
+    """The upstream array and the index of the upstream task a target waits for."""
+    if target.job_tasks:
+        array_id, _, index = target.job_tasks[0].rpartition('_')
+        return ('job', array_id), int(index)
+    path = target.run_paths[0]
+    if path not in owner or path not in indices:
+        return None
+    return ('group', owner[path]), indices[path]
+
+
+def _corr_key(
+    *, group: JobGroup, owner: Mapping[PurePosixPath, int], indices: Mapping[PurePosixPath, int]
+) -> tuple[object, ...] | None:
+    """The merge key of a group that can wait with ``aftercorr``; ``None`` if it cannot."""
+    if len(group.after) != 1 or not group.after[0].corr_ok or group.after[0].corr:
+        return None
+    reference = _upstream_ref(target=group.after[0], owner=owner, indices=indices)
+    if reference is None:
+        return None
+    array, upstream_index = reference
+    if any(task.index != upstream_index for task in group.tasks):
+        return None
+    return (group.grid, group.job_name, group.resources, group.code_snapshot, array)
+
+
+def _corr_target(
+    *, group: JobGroup, groups: Sequence[JobGroup], owner: Mapping[PurePosixPath, int]
+) -> AfterTarget:
+    """The ``aftercorr`` target that replaces the one-to-one target of a group."""
+    (target,) = group.after
+    if target.job_tasks:
+        array_id = target.job_tasks[0].rpartition('_')[0]
+        return replace(target, job_tasks=(array_id,), run_paths=(), corr=True)
+    upstream = groups[owner[target.run_paths[0]]]
+    return replace(target, run_paths=(upstream.tasks[0].resolved.run.run_path,), corr=True)

@@ -11,9 +11,10 @@ from tslab.core.status import utc_now_iso
 from tslab.enums import AfterCondition, JobPhase, LauncherKind, Satisfy, StudyState
 from tslab.study import After, Grid, Study
 from tslab.study.definition import expand_runs, StudyRun
+from tslab.study.launchers.slurm.dependency import dependency_text
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile
-from tslab.study.plan import JobGroup, plan_jobs, ResolvedRun
+from tslab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
 from tslab.study.plan_after import AfterTarget, order_runs, plan_targets
 from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import FolderFacts, RunReport
@@ -97,6 +98,7 @@ def _plan_groups(
     runs: Sequence[StudyRun],
     after: Mapping[PurePosixPath, tuple[AfterTarget, ...]],
     tmp_path: Path,
+    indices: Mapping[PurePosixPath, int] | None = None,
 ) -> list[JobGroup]:
     machine = MachineProfile(
         path=tmp_path / 'machine.toml', launcher=LauncherKind.LOCAL, output_root=tmp_path / 'runs'
@@ -108,7 +110,7 @@ def _plan_groups(
         study=study,
         machine=machine,
         resolved=resolved,
-        indices={run.run_path: position for position, run in enumerate(runs)},
+        indices=indices or {run.run_path: position for position, run in enumerate(runs)},
         extra_args={},
         attempts={},
         first_job_file=1,
@@ -268,3 +270,160 @@ def test_plan_marks_upstream_and_downstream_groups_chained(tmp_path: Path) -> No
     groups = _plan_groups(study=study, runs=runs, after={}, tmp_path=tmp_path)
 
     assert {group.grid for group in groups if group.chained} == {'pretrain', 'probe'}
+
+
+# ---- aftercorr -----------------------------------------------------------------
+
+
+def _one_to_one_study() -> Study:
+    upstream = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=_ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}},
+        run_path='{grid}/{dataset}',
+    )
+    downstream = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=_ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}},
+        run_path='{grid}/{dataset}',
+        after=(After(grid='pretrain'),),
+    )
+    return Study(name='chain', grids={'pretrain': upstream, 'probe': downstream})
+
+
+def _by_path(*, study: Study) -> dict[str, StudyRun]:
+    return {run.run_path.as_posix(): run for run in expand_runs(study=study)}
+
+
+def test_one_to_one_downstream_takes_upstream_index() -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    jobs = [_job_record(job_id='41', runs=[runs['pretrain/a']], first_index=5)]
+    indices = assign_indices(study=study, runs=list(runs.values()), jobs=jobs)
+    assert indices[PurePosixPath('pretrain/a')] == 5
+    assert indices[PurePosixPath('probe/a')] == 5
+    assert indices[PurePosixPath('probe/b')] == indices[PurePosixPath('pretrain/b')]
+
+
+def test_fan_out_axis_keeps_existing_index_rule() -> None:
+    study = _study()
+    runs = _by_path(study=study)
+    jobs = [_job_record(job_id='41', runs=[runs['pretrain/a']], first_index=5)]
+    indices = assign_indices(study=study, runs=list(runs.values()), jobs=jobs)
+    probes = [indices[path] for path in indices if path.parts[0] == 'probe']
+    assert sorted(probes) == [0, 1, 2, 3]
+
+
+def test_taken_index_falls_back_to_existing_rule() -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    jobs = [
+        _job_record(job_id='41', runs=[runs['pretrain/a']], first_index=5),
+        _job_record(job_id='42', runs=[runs['probe/b']], first_index=5),
+    ]
+    indices = assign_indices(study=study, runs=[runs['pretrain/a'], runs['probe/a']], jobs=jobs)
+    assert indices[PurePosixPath('probe/a')] == 6
+
+
+def test_resubmit_keeps_recorded_indices() -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    jobs = [
+        _job_record(job_id='41', runs=[runs['pretrain/a']], first_index=5),
+        _job_record(job_id='42', runs=[runs['probe/a']], first_index=2),
+    ]
+    indices = assign_indices(study=study, runs=[runs['probe/a']], jobs=jobs)
+    assert indices[PurePosixPath('probe/a')] == 2
+
+
+def test_corr_candidate_flag_only_for_one_to_one() -> None:
+    for study, expected in ((_one_to_one_study(), True), (_study(), False)):
+        runs = _by_path(study=study)
+        downstream = next(run for run in runs.values() if run.grid == 'probe')
+        upstream = runs[f'pretrain/{downstream.values["dataset"]}']
+        targets, _ = plan_targets(
+            study=study,
+            runs=[downstream],
+            reports={upstream.run_path: _report(run=upstream, state=StudyState.RUNNING)},
+            submitting=frozenset(),
+            jobs=[_job_record(job_id='41', runs=[upstream])],
+        )
+        assert targets[downstream.run_path][0].corr_ok is expected
+
+
+def test_aligned_groups_merge_into_one_aftercorr_array(tmp_path: Path) -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    upstream_runs = [runs['pretrain/a'], runs['pretrain/b']]
+    downstream_runs = [runs['probe/a'], runs['probe/b']]
+    jobs = [_job_record(job_id='52', runs=upstream_runs)]
+    reports = {run.run_path: _report(run=run, state=StudyState.RUNNING) for run in upstream_runs}
+    targets, _ = plan_targets(
+        study=study, runs=downstream_runs, reports=reports, submitting=frozenset(), jobs=jobs
+    )
+    groups = _plan_groups(study=study, runs=downstream_runs, after=targets, tmp_path=tmp_path)
+    assert len(groups) == 1
+    (target,) = groups[0].after
+    assert (target.corr, target.job_tasks) == (True, ('52',))
+    assert dependency_text(after=groups[0].after, upstream={}) == 'aftercorr:52'
+
+
+def test_misaligned_group_keeps_split_form(tmp_path: Path) -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    upstream_runs = [runs['pretrain/a'], runs['pretrain/b']]
+    downstream_runs = [runs['probe/a'], runs['probe/b']]
+    jobs = [_job_record(job_id='52', runs=upstream_runs)]
+    reports = {run.run_path: _report(run=run, state=StudyState.RUNNING) for run in upstream_runs}
+    targets, _ = plan_targets(
+        study=study, runs=downstream_runs, reports=reports, submitting=frozenset(), jobs=jobs
+    )
+    # indices that do not match the upstream ones (0 and 1): probe/a 1, probe/b 0
+    machine = MachineProfile(
+        path=tmp_path / 'machine.toml', launcher=LauncherKind.LOCAL, output_root=tmp_path / 'runs'
+    )
+    groups = plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=[
+            ResolvedRun(run=run, settings=run.settings, resources=FakeResources())
+            for run in downstream_runs
+        ],
+        indices={PurePosixPath('probe/a'): 1, PurePosixPath('probe/b'): 0},
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+        environment={},
+        after=targets,
+    )
+    assert len(groups) == 2
+    assert not any(target.corr for group in groups for target in group.after)
+
+
+def test_same_launch_aligned_groups_resolve_to_the_array_id(tmp_path: Path) -> None:
+    study = _one_to_one_study()
+    runs = _by_path(study=study)
+    selected = [runs['pretrain/a'], runs['pretrain/b'], runs['probe/a'], runs['probe/b']]
+    reports = {
+        run.run_path: _report(run=run, state=StudyState.MISSING)
+        for run in selected
+        if run.grid == 'pretrain'
+    }
+    targets, _ = plan_targets(
+        study=study,
+        runs=selected,
+        reports=reports,
+        submitting=frozenset(run.run_path for run in selected),
+        jobs=(),
+    )
+    aligned = {run.run_path: int(run.values['dataset'] == 'b') for run in selected}
+    groups = _plan_groups(
+        study=study, runs=selected, after=targets, tmp_path=tmp_path, indices=aligned
+    )
+    probe_groups = [group for group in groups if group.grid == 'probe']
+    assert len(probe_groups) == 1
+    upstream = {run.run_path: f'77_{position}' for position, run in enumerate(selected[:2])}
+    assert dependency_text(after=probe_groups[0].after, upstream=upstream) == 'aftercorr:77'

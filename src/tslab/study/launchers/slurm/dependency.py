@@ -49,6 +49,9 @@ def _entry_text(*, target: AfterTarget, upstream: Mapping[PurePosixPath, str]) -
     ids = (*target.job_tasks, *(upstream[path] for path in target.run_paths if path in upstream))
     if not ids:
         return None
+    if target.corr:
+        # why: aftercorr names the upstream array; each task waits for the task with its index
+        return f'aftercorr:{ids[0].partition("_")[0]}'
     dependency = _DEPENDENCIES[target.condition]
     delay = (
         f'+{target.delay_minutes}'
