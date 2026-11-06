@@ -86,6 +86,15 @@ The types are `afterok` (condition `ok`), `afterany`, `afternotok` and `after`
 dependency on an upstream run that is already `done` is left out at submit time.
 While the dependency holds, the job is `waiting` in `tslab study status`.
 
+### Requeue and cluster limits
+
+`chained_retry = "requeue"` writes `#SBATCH --requeue` (or `--requeue=expedite` when
+`scontrol show config` lists `enable_expedited_requeue` in `SlurmctldParameters`; otherwise a
+requeued job waits `requeue_delay`, 120 s by default). `MaxBatchRequeue` (default 5) limits
+requeues; SLURM holds a job that reaches it with the reason `JobHoldMaxRequeue`. Pending
+downstream jobs earn priority age only when `PriorityFlags` has `ACCRUE_ALWAYS`. `tslab doctor`
+reports all three. One-to-one chains use `--dependency=aftercorr:<array job id>`.
+
 ## SLURM commands
 
 After every submit on a SLURM machine, tslab writes `.study/slurm.sh` in the
