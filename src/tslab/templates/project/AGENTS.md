@@ -49,7 +49,7 @@ src/{{package_name}}/
     common/                      datasets, recipes and grids shared by studies
     example/study.py             classification and forecasting study
     quick/study.py               small classification canary study
-    chain/study.py              probe grid that runs after the classification grid (`After`)
+    chain/study.py              probe grid that runs after the pretrain grid (`After`)
   toy_data.py                   writes small synthetic datasets into data/
 tests/
   test_smoke.py                 runs presets and one example run; dry-runs the studies
