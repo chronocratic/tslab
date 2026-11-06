@@ -5,7 +5,7 @@ from datetime import timedelta
 import logging
 import shutil
 
-from tslab.enums import CheckStatus
+from tslab.enums import ChainedRetry, CheckStatus
 from tslab.jobs.slurm import (
     format_slurm_duration,
     gres_gpus,
@@ -17,6 +17,7 @@ from tslab.jobs.slurm import (
 )
 from tslab.study.doctor import DoctorCheck
 from tslab.study.machine import SlurmSettings
+from tslab.study.machine.profile import FollowupSettings
 
 __all__ = ['cluster_checks', 'slurm_check']
 
@@ -37,7 +38,9 @@ def slurm_check() -> DoctorCheck:
     return DoctorCheck(name='slurm', status=CheckStatus.OK, message='SLURM commands found')
 
 
-def cluster_checks(*, slurm: SlurmSettings | None) -> tuple[DoctorCheck, ...]:
+def cluster_checks(
+    *, slurm: SlurmSettings | None, followup: FollowupSettings | None = None
+) -> tuple[DoctorCheck, ...]:
     """Check the SLURM settings of a profile against the cluster.
 
     The checks read the cluster with ``scontrol`` and ``sinfo``. A missing or
@@ -46,10 +49,12 @@ def cluster_checks(*, slurm: SlurmSettings | None) -> tuple[DoctorCheck, ...]:
     Args:
         slurm: The base ``[slurm]`` table of the profile; ``None`` when the
             profile has no SLURM table, which skips the checks with a warning.
+        followup: The follow-up settings; the requeue limit is checked against
+            ``max_attempts`` when ``chained_retry`` is ``requeue``.
 
     Returns:
-        The ``slurm-array`` and ``slurm-partition`` checks, or one warning
-        when the profile has no ``[slurm]`` table.
+        The ``slurm-array``, ``slurm-partition`` and chaining checks, or one
+        warning when the profile has no ``[slurm]`` table.
     """
     if slurm is None:
         return (
@@ -63,6 +68,23 @@ def cluster_checks(*, slurm: SlurmSettings | None) -> tuple[DoctorCheck, ...]:
     return (
         _array_check(settings=slurm, config=config),
         _partition_check(settings=slurm, config=config),
+        _max_batch_requeue_check(followup=followup, config=config),
+        _flag_check(
+            name='slurm-accrue-always',
+            config=config,
+            key='PriorityFlags',
+            flag='ACCRUE_ALWAYS',
+            ok='pending downstream jobs earn priority age (ACCRUE_ALWAYS)',
+            warn='pending downstream jobs earn no priority age on this cluster',
+        ),
+        _flag_check(
+            name='slurm-expedited-requeue',
+            config=config,
+            key='SlurmctldParameters',
+            flag='enable_expedited_requeue',
+            ok='requeued chained jobs can skip requeue_delay (enable_expedited_requeue)',
+            warn='enable_expedited_requeue is not set; a requeued job waits requeue_delay',
+        ),
     )
 
 
@@ -98,6 +120,40 @@ def _array_check(*, settings: SlurmSettings, config: Mapping[str, str] | None) -
         f'MaxArraySize {max_size} allows {allowed}'
     )
     return DoctorCheck(name='slurm-array', status=CheckStatus.OK, message=message)
+
+
+def _max_batch_requeue_check(
+    *, followup: FollowupSettings | None, config: Mapping[str, str] | None
+) -> DoctorCheck:
+    """The slurm-max-batch-requeue check: ``max_attempts`` against ``MaxBatchRequeue``."""
+    name = 'slurm-max-batch-requeue'
+    limit = None if config is None else _int_or_none(text=config.get('MaxBatchRequeue', ''))
+    if limit is None:
+        message = 'scontrol reports no MaxBatchRequeue; the requeue limit is not checked'
+        return DoctorCheck(name=name, status=CheckStatus.WARN, message=message)
+    if (
+        followup is not None
+        and followup.chained_retry is ChainedRetry.REQUEUE
+        and followup.max_attempts > limit
+    ):
+        message = (
+            f'max_attempts {followup.max_attempts} is above MaxBatchRequeue {limit}: '
+            'SLURM holds a requeued job at the limit'
+        )
+        return DoctorCheck(name=name, status=CheckStatus.WARN, message=message)
+    return DoctorCheck(name=name, status=CheckStatus.OK, message=f'MaxBatchRequeue is {limit}')
+
+
+def _flag_check(  # noqa: PLR0913 # why: one message per outcome of a config flag check
+    *, name: str, config: Mapping[str, str] | None, key: str, flag: str, ok: str, warn: str
+) -> DoctorCheck:
+    """A check that a cluster config list holds one flag."""
+    if config is None:
+        message = f'scontrol did not answer; {key} is not checked'
+        return DoctorCheck(name=name, status=CheckStatus.WARN, message=message)
+    if flag in config.get(key, ''):
+        return DoctorCheck(name=name, status=CheckStatus.OK, message=ok)
+    return DoctorCheck(name=name, status=CheckStatus.WARN, message=warn)
 
 
 def _int_or_none(*, text: str) -> int | None:

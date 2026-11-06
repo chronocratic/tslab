@@ -18,3 +18,5 @@ class JobFlag(StrEnum):
     DEPENDENCY_PENDING = 'dependency_pending'
     #: The job was cancelled because its dependency can never be met.
     DEPENDENCY_NEVER = 'dependency_never'
+    #: SLURM holds the job because it reached MaxBatchRequeue.
+    REQUEUE_HELD = 'requeue_held'

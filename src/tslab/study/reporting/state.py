@@ -108,7 +108,11 @@ def _reason(*, folder: FolderFacts, job_reason: str | None) -> str | None:
 
 
 def study_state(
-    *, job_reason: str | None, job_phase: 'JobPhase', folder: FolderFacts
+    *,
+    job_reason: str | None,
+    job_phase: 'JobPhase',
+    folder: FolderFacts,
+    job_flags: frozenset[JobFlag] = frozenset(),
 ) -> tuple[StudyState, str | None]:
     """The state of one run, from its folder and the phase of its latest job.
 
@@ -117,13 +121,20 @@ def study_state(
             run, or ``None`` when the run was never submitted or it gives none.
         job_phase: The backend phase of the latest task id of the run.
         folder: The facts of the run folder.
+        job_flags: What the backend says the job state means; a queued job held at
+            the requeue limit is interrupted.
 
     Returns:
         The state and a one-line reason, in the order of spec §7.
     """
     snapshot = folder.snapshot
     if job_phase is JobPhase.QUEUED:
-        return StudyState.QUEUED, None
+        held = JobFlag.REQUEUE_HELD in job_flags
+        return (
+            (StudyState.INTERRUPTED, 'held at MaxBatchRequeue')
+            if held
+            else (StudyState.QUEUED, None)
+        )
     live = folder.lock_live and job_phase is JobPhase.UNKNOWN
     if job_phase is JobPhase.RUNNING or live:
         return StudyState.RUNNING, None
@@ -288,7 +299,9 @@ def collect_states(
     reports: list[RunReport] = []
     for run, job_id, job_state, job_reason, job_flags, job_phase, task in entries:
         folder = folders[run.run_path]
-        state, reason = study_state(job_reason=job_reason, job_phase=job_phase, folder=folder)
+        state, reason = study_state(
+            job_reason=job_reason, job_phase=job_phase, folder=folder, job_flags=job_flags
+        )
         reports.append(
             RunReport(
                 run=run,
