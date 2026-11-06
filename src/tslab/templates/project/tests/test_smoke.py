@@ -143,7 +143,7 @@ def test_forecast(project: Path, args: tuple[str, ...]) -> None:
 
 
 def test_chain_study_runs_locally(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The probe grid runs after the classification grid and finds its checkpoint."""
+    """The probe grid runs after the pretrain grid and finds its checkpoint."""
     root = Path(__file__).parents[1]
     monkeypatch.setenv('UV_PROJECT', str(root))
     machine = str(root / 'machines' / 'local.toml')
@@ -168,7 +168,7 @@ def test_chain_study_runs_locally(project: Path, monkeypatch: pytest.MonkeyPatch
     assert raised.value.code == 0
     runs = project / 'runs' / 'chain'
     relatives = (
-        'classification/ts2vec-archive-split/ToySpectra/seed_0',
+        'pretrain/ts2vec-archive-split/ToySpectra/seed_0',
         'probe/ts2vec-archive-split/ToySpectra/seed_0/small',
     )
     for relative in relatives:

@@ -523,8 +523,8 @@ probe = Grid(
     command=('uv', 'run', 'python', '-m', 'my_paper.probe'),
     config=ProbeConfig,
     axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'head': heads},
-    after=(After(grid='classification'),),
-    run_settings={'checkpoint': '{after:classification}/train/default'},
+    after=(After(grid='pretrain'),),
+    run_settings={'checkpoint': '{after:pretrain}/train/default'},
 )
 ```
 
@@ -571,7 +571,7 @@ covers chained grids; see [Automatic retry](#automatic-retry). The `requeue`
 mode keeps the job id of the upstream run, so downstream jobs keep waiting; see
 [HPC and SLURM](hpc.md).
 
-The project template ships the `chain` study: the `classification` grid trains and
+The project template ships the `chain` study: the `pretrain` grid trains and
 the `probe` grid loads the checkpoint and scores an SVM probe.
 
 ## Automatic retry

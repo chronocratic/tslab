@@ -56,9 +56,9 @@ def forecasting_grid(*, seeds: tuple[int, ...]) -> Grid:
 
 
 def probe_grid(*, seeds: tuple[int, ...]) -> Grid:
-    """Build the probe grid that runs after the classification grid of the study.
+    """Build the probe grid that runs after the pretrain grid of the study.
 
-    Each probe run waits for the classification run with the same recipe, dataset
+    Each probe run waits for the pretrain run with the same recipe, dataset
     and seed, and loads the checkpoint that run saved.
 
     Args:
@@ -77,7 +77,7 @@ def probe_grid(*, seeds: tuple[int, ...]) -> Grid:
             'seed': setting_axis(path='seed', values=seeds),
             'head': {'small': {'max_train_samples': 100}, 'full': {'max_train_samples': 10_000}},
         },
-        after=(After(grid='classification'),),
-        run_settings={'checkpoint': '{after:classification}/train/default'},
+        after=(After(grid='pretrain'),),
+        run_settings={'checkpoint': '{after:pretrain}/train/default'},
         run_path='{grid}/{recipe}/{dataset}/seed_{seed}/{head}',
     )
