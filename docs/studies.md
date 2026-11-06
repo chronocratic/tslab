@@ -510,6 +510,70 @@ the project; `--no-code-snapshot` turns it off for one submit.
 - **`--dry-run`** runs every check and computes the hash, copies nothing, and
   the job files name the folder the real submit would use.
 
+## Chaining grids
+
+A grid can run after other grids of its study. Give it `after`, a tuple of `After`
+entries:
+
+```python
+from tslab.study import After, Grid
+
+probe = Grid(
+    short_name='probe',
+    command=('uv', 'run', 'python', '-m', 'my_paper.probe'),
+    config=ProbeConfig,
+    axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'head': heads},
+    after=(After(grid='classification'),),
+    run_settings={'checkpoint': '{after:classification}/train/default'},
+)
+```
+
+`After` fields:
+
+- `grid`: the upstream grid of the same study. A cycle, an unknown grid or a grid
+  that names itself stops the study at load.
+- `match`: the axes whose values must be equal in both grids. By default the axes
+  both grids have. `match=()` makes every run of the grid wait for every upstream
+  run.
+- `condition`: when the upstream run lets the downstream run start. `ok` (default,
+  the run is `done`), `any` (the run ended in any way), `failed` (the run failed)
+  and `started` (the run began, SLURM only; `delay_minutes` adds a wait).
+- `satisfy`: `all` (default) needs every matched upstream run, `any` needs one. `any`
+  works with a single `After` entry only, because SLURM allows one separator per
+  job.
+
+`{after:<grid>}` in a setting expands to the run folder of the matched upstream
+run, `<output_root>/<study>/<run path>`; a relative `output_root` stays
+relative to the project root the jobs run in. It needs exactly one matched run.
+
+On SLURM the dependency is native: the job is submitted with `--dependency`
+built from the job ids of the upstream tasks, and with `--kill-on-invalid-dep=yes`,
+so SLURM ends it when the condition can never be met. A chained job also checks the
+state of its own run after `srun`, so a failed instance in an otherwise finished
+run counts as failure. Upstream runs that are already `done` give no dependency.
+On a local machine the groups run in dependency order, and a run whose condition
+is not met is skipped.
+
+Two states belong to chained runs:
+
+- `waiting`: the job is queued behind an upstream job.
+- `dependency_failed`: the run never started because an upstream condition can
+  not be met, or the upstream job was cancelled.
+
+`resubmit` takes `dependency_failed` runs by default. Resubmitting an upstream run
+also cancels and resubmits the `waiting` and `dependency_failed` runs behind it,
+with dependencies on the new job ids. `cancel` of upstream runs also cancels
+the `waiting` runs behind them. `submit` and `resubmit` take `--ignore-after` to
+submit without dependencies.
+
+Retry has two settings. `retry` covers grids that are not chained and `chained_retry`
+covers chained grids; see [Automatic retry](#automatic-retry). The `requeue`
+mode keeps the job id of the upstream run, so downstream jobs keep waiting; see
+[HPC and SLURM](hpc.md).
+
+The project template ships the `chain` study: the `classification` grid trains and
+the `probe` grid loads the checkpoint and scores an SVM probe.
+
 ## Automatic retry
 
 `retry = "resubmit"` enables automatic retry for grids that are not chained.
@@ -530,7 +594,8 @@ When a retry setting is enabled, one follow-up job is queued with
 resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
 `<tslab_command> study resubmit <study> --machine <name> --auto`:
 
-- `--auto` resubmits **only `interrupted` runs**, never `failed` or
+- `--auto` resubmits **only `interrupted` runs** (and, for chained grids, the
+  `dependency_failed` runs behind them), never `failed` or
   `missing` (startup failures and code errors, including out-of-memory, stay
   manual);
 - a run is not retried once its attempt number reaches `max_attempts`
