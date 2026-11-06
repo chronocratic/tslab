@@ -13,6 +13,7 @@ from tslab.study.definition import expand_runs, Study
 from tslab.study.launchers.common.types import LaunchReport, QueuedJob, Resources, SIGNAL_EXIT_BASE
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
+from tslab.study.reporting.chain import waits_for
 from tslab.study.reporting.state import RunReport
 
 __all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']
@@ -57,7 +58,7 @@ def log_status(
     ]
     # why: a study that never ran has thousands of missing runs; the table already counts them
     if listed and not all(report.state is StudyState.MISSING for report in context.reports):
-        _log_run_lines(reports=listed, starts=starts)
+        _log_run_lines(context=context, reports=listed, starts=starts)
     limited = sum(
         1
         for report in context.reports
@@ -75,7 +76,12 @@ def log_status(
         )
 
 
-def _log_run_lines(*, reports: Sequence[RunReport], starts: Mapping[str, QueuedJob] | None) -> None:
+def _log_run_lines(
+    *,
+    reports: Sequence[RunReport],
+    starts: Mapping[str, QueuedJob] | None,
+    context: Context | None = None,
+) -> None:
     """Log one line per listed run, the first few of them, then how many are hidden."""
     lines = [
         ' '.join(
@@ -85,6 +91,7 @@ def _log_run_lines(*, reports: Sequence[RunReport], starts: Mapping[str, QueuedJ
                 report.state.value,
                 None if report.job_id is None else f'job {report.job_id}',
                 report.reason,
+                _waits_for_suffix(context=context, report=report),
                 _start_suffix(report=report, starts=starts),
             )
             if part is not None and part != ''
@@ -96,6 +103,14 @@ def _log_run_lines(*, reports: Sequence[RunReport], starts: Mapping[str, QueuedJ
     hidden = len(lines) - _PROBLEMS_SHOWN
     if hidden > 0:
         _LOGGER.info('  … and %d more; narrow with --states, --grid or --only', hidden)
+
+
+def _waits_for_suffix(*, context: Context | None, report: RunReport) -> str | None:
+    """The upstream paths of a chained run that has not started or finished."""
+    if context is None:
+        return None
+    paths = waits_for(context=context, report=report)
+    return None if not paths else f'waits for {", ".join(paths)}'
 
 
 def log_show(*, study: Study) -> None:

@@ -1,7 +1,8 @@
 """``tslab study status``: the state table and the lines of the runs not done."""
 
 import dataclasses
-from pathlib import Path
+import os
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 import pytest
@@ -10,9 +11,11 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, finish_run, submit_study
 from tslab.cli import main
 from tslab.cli.study import Status
-from tslab.enums import JobFlag, JobPhase, StudyState
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.study.commands import parse_states, status
-from tslab.study.context import Context, expected_starts
+from tslab.study.context import Context, context_for, expected_starts, Selection
+from tslab.study.definition import After, Grid, Study
 from tslab.study.launchers.common.types import QueuedJob
 from tslab.study.reporting.documents import status_document
 from tslab.study.reporting.report import log_status
@@ -32,9 +35,12 @@ def test_status_counts_and_lines(
     with caplog.at_level('INFO'):
         assert status(context=context(project=project, machine_file='cluster.toml')) == 0
     text = normalized(caplog.text)
-    assert 'grid queued running done interrupted failed missing total' in text
-    assert 'g 1 0 1 0 0 2 4' in text
-    assert 'all 1 0 1 0 0 2 4' in text
+    assert (
+        'grid queued waiting running done interrupted failed dependency_failed missing total'
+        in text
+    )
+    assert 'g 1 0 0 1 0 0 0 2 4' in text
+    assert 'all 1 0 0 1 0 0 0 2 4' in text
     assert 'g/small/1 queued job job-0_0' in text
     assert 'g/small/2 missing job job-0_1' in text
     assert 'g/large/2 missing job job-0_3' in text
@@ -57,7 +63,7 @@ def test_state_filter_hides_other_lines(
     assert 'g/small/2 missing job job-0_1' in text
     assert 'g/large/2 missing job job-0_3' in text
     # why: the filter hides lines, not counts; the table stays complete
-    assert 'g 1 0 1 0 0 2 4' in text
+    assert 'g 1 0 0 1 0 0 0 2 4' in text
 
 
 def test_a_study_that_never_ran_gets_no_run_lines(
@@ -66,7 +72,7 @@ def test_a_study_that_never_ran_gets_no_run_lines(
     with caplog.at_level('INFO'):
         status(context=context(project=project, machine_file='cluster.toml'))
     text = normalized(caplog.text)
-    assert 'g 0 0 0 0 0 4 4' in text
+    assert 'g 0 0 0 0 0 0 0 4 4' in text
     assert 'g/small/1' not in text
 
 
@@ -226,6 +232,70 @@ def test_parse_states_splits_commas() -> None:
         StudyState.MISSING,
         StudyState.DONE,
     )
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _ChainStatusConfig:
+    output_root: Path = Path('runs')
+    run_path: Path = Path('run')
+
+
+def _chained_study() -> Study:
+    pretrain = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=_ChainStatusConfig,
+        axes={'dataset': {'a': {}}},
+        run_path='{grid}/{dataset}',
+    )
+    probe = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=_ChainStatusConfig,
+        axes={'dataset': {'a': {}}},
+        after=(After(grid='pretrain'),),
+        run_path='{grid}/{dataset}',
+    )
+    return Study(name='chain', grids={'pretrain': pretrain, 'probe': probe})
+
+
+def test_status_selecting_downstream_uses_upstream_report(
+    project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
+) -> None:
+    upstream_path = PurePosixPath('pretrain/a')
+    upstream_folder = project / 'runs' / 'chain' / upstream_path
+    upstream_folder.mkdir(parents=True)
+    write_status(
+        path=upstream_folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FINISHED,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.FAILED)},
+        ),
+    )
+    ctx = context_for(
+        study=_chained_study(),
+        machine_path=project / 'cluster.toml',
+        selection=Selection(grids=('probe',)),
+        project_root=project,
+        local_cpus=1,
+        environment=os.environ,
+    )
+
+    assert len(ctx.reports) == 1
+    assert ctx.reports[0].state is StudyState.DEPENDENCY_FAILED
+    assert ctx.upstream_reports[upstream_path].state is StudyState.FAILED
+
+    waiting = dataclasses.replace(ctx.reports[0], state=StudyState.WAITING)
+    upstream = dataclasses.replace(
+        ctx.upstream_reports[upstream_path], state=StudyState.QUEUED, job_id='job-9_0'
+    )
+    ctx = dataclasses.replace(ctx, reports=[waiting], upstream_reports={upstream_path: upstream})
+    entry = status_document(context=ctx, exit_code=0)['runs']
+    assert cast('list[dict[str, object]]', entry)[0]['waits_for'] == ['pretrain/a']
+    with caplog.at_level('INFO'):
+        status(context=ctx)
+    assert 'waits for pretrain/a' in normalized(caplog.text)
 
 
 def test_parse_states_rejects_unknown_names() -> None:

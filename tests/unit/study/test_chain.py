@@ -1,0 +1,160 @@
+"""Condition verdicts for dependencies between study grids."""
+
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+
+from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
+from tslab.enums import (
+    AfterCondition,
+    AfterVerdict,
+    InstanceState,
+    JobPhase,
+    RunState,
+    Satisfy,
+    StudyState,
+)
+from tslab.study import After, Grid, Study
+from tslab.study.chain import after_verdict, upstream_verdict
+from tslab.study.definition import expand_runs, StudyRun
+from tslab.study.reporting.state import FolderFacts, RunReport
+
+
+@dataclass(frozen=True, kw_only=True)
+class _ChainConfig:
+    output_root: Path = Path('runs')
+    run_path: Path = Path('run')
+
+
+def _study(*, satisfy: Satisfy = Satisfy.ALL) -> Study:
+    upstream = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=_ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}},
+        run_path='{grid}/{dataset}',
+    )
+    downstream = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=_ChainConfig,
+        axes={'dataset': {'all': {}}},
+        after=(After(grid='pretrain', match=(), satisfy=satisfy),),
+        run_path='{grid}/{dataset}',
+    )
+    return Study(name='chain', grids={'pretrain': upstream, 'probe': downstream})
+
+
+def _report(
+    *, run: StudyRun, state: StudyState, folder: FolderFacts | None = None, attempt: int = 1
+) -> RunReport:
+    return RunReport(
+        run=run,
+        state=state,
+        reason=None,
+        job_id=None,
+        job_state=None,
+        job_phase=JobPhase.UNKNOWN,
+        attempt=attempt,
+        task=None,
+        folder=folder or FolderFacts(snapshot=None, read_error=None, lock_live=False),
+    )
+
+
+def test_upstream_verdict_table() -> None:
+    cases = (
+        (AfterCondition.OK, StudyState.DONE, False, AfterVerdict.MET),
+        (AfterCondition.OK, StudyState.FAILED, False, AfterVerdict.NEVER),
+        (AfterCondition.OK, StudyState.INTERRUPTED, True, AfterVerdict.OPEN),
+        (AfterCondition.OK, StudyState.INTERRUPTED, False, AfterVerdict.NEVER),
+        (AfterCondition.ANY, StudyState.FAILED, False, AfterVerdict.MET),
+        (AfterCondition.FAILED, StudyState.DONE, False, AfterVerdict.NEVER),
+        (AfterCondition.FAILED, StudyState.DEPENDENCY_FAILED, False, AfterVerdict.MET),
+        (AfterCondition.STARTED, StudyState.RUNNING, False, AfterVerdict.MET),
+        (AfterCondition.STARTED, StudyState.DEPENDENCY_FAILED, False, AfterVerdict.NEVER),
+        (AfterCondition.OK, StudyState.QUEUED, False, AfterVerdict.OPEN),
+    )
+
+    assert [
+        upstream_verdict(condition=condition, state=state, retry_left=retry_left)
+        for condition, state, retry_left, _ in cases
+    ] == [expected for _, _, _, expected in cases]
+
+
+def test_satisfy_any_needs_one_met() -> None:
+    study = _study(satisfy=Satisfy.ANY)
+    runs = expand_runs(study=study)
+    probe = next(run for run in runs if run.grid == 'probe')
+    upstream = {
+        run.run_path: _report(
+            run=run,
+            state=(
+                StudyState.DONE
+                if run.run_path == PurePosixPath('pretrain/a')
+                else StudyState.FAILED
+            ),
+        )
+        for run in runs
+        if run.grid == 'pretrain'
+    }
+
+    assert after_verdict(study=study, run=probe, reports=upstream) is AfterVerdict.MET
+    assert (
+        after_verdict(
+            study=study,
+            run=probe,
+            reports={
+                path: _report(run=report.run, state=StudyState.FAILED)
+                for path, report in upstream.items()
+            },
+        )
+        is AfterVerdict.NEVER
+    )
+
+
+def test_satisfy_all_is_never_when_one_upstream_fails() -> None:
+    study = _study()
+    runs = expand_runs(study=study)
+    probe = next(run for run in runs if run.grid == 'probe')
+    upstream = {
+        run.run_path: _report(
+            run=run,
+            state=(
+                StudyState.DONE
+                if run.run_path == PurePosixPath('pretrain/a')
+                else StudyState.FAILED
+            ),
+        )
+        for run in runs
+        if run.grid == 'pretrain'
+    }
+
+    assert after_verdict(study=study, run=probe, reports=upstream) is AfterVerdict.NEVER
+
+
+def test_failed_instance_in_finished_upstream_blocks_ok_downstream() -> None:
+    study = _study()
+    runs = expand_runs(study=study)
+    probe = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+    finished_with_failure = _report(
+        run=upstream,
+        state=StudyState.FAILED,
+        folder=FolderFacts(
+            snapshot=RunStatusSnapshot(
+                run_state=RunState.FINISHED,
+                updated_at=utc_now_iso(),
+                instances={'train': InstanceRecord(state=InstanceState.FAILED)},
+            ),
+            read_error=None,
+            lock_live=False,
+        ),
+    )
+    upstream_reports = {
+        upstream.run_path: finished_with_failure,
+        PurePosixPath('pretrain/b'): _report(
+            run=next(run for run in runs if run.run_path == PurePosixPath('pretrain/b')),
+            state=StudyState.DONE,
+        ),
+    }
+
+    assert after_verdict(study=study, run=probe, reports=upstream_reports) is AfterVerdict.NEVER

@@ -13,7 +13,7 @@ from tslab.study.reporting.state import RunReport
 __all__ = ['LIVE_STATES']
 
 #: The states of a run that is queued or running; submit and resubmit leave them alone.
-LIVE_STATES = (StudyState.QUEUED, StudyState.RUNNING)
+LIVE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
 
 
 def _finish_launch(

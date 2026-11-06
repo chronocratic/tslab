@@ -12,6 +12,7 @@ from tslab.study.definition.settings import SettingValue
 from tslab.study.launchers.common.types import LaunchReport, QueuedJob
 from tslab.study.plan import JobGroup
 from tslab.study.records import JobRecord
+from tslab.study.reporting.chain import waits_for
 from tslab.study.reporting.outcome import counts_live
 from tslab.study.reporting.report import resources_of
 from tslab.study.reporting.state import RunReport
@@ -62,6 +63,7 @@ def run_entry(
         'job_state': report.job_state,
         'attempt': report.attempt,
         'directory': (context.study_directory / report.run.run_path).resolve().as_posix(),
+        'waits_for': list(waits_for(context=context, report=report)),
     }
     if starts is not None:
         job = starts.get(report.job_id) if report.job_id is not None else None

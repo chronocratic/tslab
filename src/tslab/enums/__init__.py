@@ -1,6 +1,7 @@
 """Enums shared by more than one package: the fixed sets of choices."""
 
 from tslab.enums.after_condition import AfterCondition
+from tslab.enums.after_verdict import AfterVerdict
 from tslab.enums.chained_retry import ChainedRetry
 from tslab.enums.check_status import CheckStatus
 from tslab.enums.instance_state import InstanceState
@@ -20,6 +21,7 @@ from tslab.enums.wandb_mode import WandbMode
 
 __all__ = [
     'AfterCondition',
+    'AfterVerdict',
     'ChainedRetry',
     'CheckStatus',
     'InstanceState',

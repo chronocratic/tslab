@@ -41,9 +41,14 @@ def states_exit_code(*, states: Iterable[StudyState], live: bool) -> int:
         The code matching the highest-priority state.
     """
     state_set = set(states)
-    if StudyState.FAILED in state_set:
+    if StudyState.FAILED in state_set or StudyState.DEPENDENCY_FAILED in state_set:
         return EXIT_FAILED
-    if live or StudyState.QUEUED in state_set or StudyState.RUNNING in state_set:
+    if (
+        live
+        or StudyState.QUEUED in state_set
+        or StudyState.WAITING in state_set
+        or StudyState.RUNNING in state_set
+    ):
         return EXIT_LIVE
     if StudyState.INTERRUPTED in state_set or StudyState.MISSING in state_set:
         return EXIT_RETRY
@@ -60,7 +65,7 @@ def counts_live(*, report: RunReport, context: Context) -> bool:
     Returns:
         Whether the run is queued, running, being submitted, or awaiting retry.
     """
-    if report.state in (StudyState.QUEUED, StudyState.RUNNING):
+    if report.state in (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING):
         return True
     if (
         report.task is not None

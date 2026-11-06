@@ -56,12 +56,14 @@ def test_run_entry_contains_absolute_directory_and_run_values(
         'job_state',
         'attempt',
         'directory',
+        'waits_for',
     }
     assert (
         entry['directory']
         == (ctx.study_directory / ctx.reports[0].run.run_path).resolve().as_posix()
     )
     assert entry['values'] == dict(ctx.reports[0].run.values)
+    assert entry['waits_for'] == []
 
 
 def test_status_document_has_the_pending_fields(project: Path, fake_backend: FakeBackend) -> None:

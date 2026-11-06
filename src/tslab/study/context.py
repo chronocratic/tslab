@@ -6,11 +6,20 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from tslab.study.definition import expand_runs, load_study, select_runs, Study, StudyRun
+from tslab.study.definition import (
+    chained_grids,
+    expand_runs,
+    load_study,
+    select_runs,
+    Study,
+    StudyRun,
+    upstream_runs,
+)
 from tslab.study.machine import load_machine, MachineProfile
 from tslab.study.paths import log_file_of, study_folder
 from tslab.study.plan import check_machine, resolve_runs, ResolvedRun
 from tslab.study.records import JobRecord, read_jobs, submission_in_progress
+from tslab.study.reporting.chain import apply_chain_states
 from tslab.study.reporting.state import collect_states, RunReport
 
 if TYPE_CHECKING:
@@ -53,6 +62,7 @@ class Context:
         resolved: The selected runs with the machine applied, by run path.
         jobs: The job records of the study, in submission order.
         reports: The state of every selected run.
+        upstream_reports: The reports used to decide dependencies of selected runs.
         job_states: The raw states and phases reported by the machine backend.
         submission_in_progress: Whether another process is submitting runs.
         followup_live: Whether a SLURM follow-up job is queued or running.
@@ -68,6 +78,7 @@ class Context:
     resolved: dict[PurePosixPath, ResolvedRun]
     jobs: list[JobRecord]
     reports: list[RunReport]
+    upstream_reports: Mapping[PurePosixPath, RunReport]
     job_states: 'JobStates'
     submission_in_progress: bool = False
 
@@ -157,9 +168,8 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     # One set per command, so a dead override warns once, not once per check.
     warned: set[str] = set()
     check_machine(study=study, machine=machine, warned=warned)
-    runs = select_runs(
-        study=study, runs=expand_runs(study=study), grids=selection.grids, only=selection.only
-    )
+    all_runs = expand_runs(study=study)
+    runs = select_runs(study=study, runs=all_runs, grids=selection.grids, only=selection.only)
     resolved = resolve_runs(
         study=study, machine=machine, runs=runs, warned=warned, local_cpus=local_cpus
     )
@@ -174,11 +184,24 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     if ended_states is not None:
         # why: study wait owns this cache across repeated context loads
         ended_states.update(new_cache)
-    reports = collect_states(
+    upstream_paths = _upstream_paths(study=study, runs=runs)
+    state_paths = upstream_paths | {run.run_path for run in runs}
+    state_runs = [run for run in all_runs if run.run_path in state_paths]
+    state_reports = collect_states(
         study_directory=machine.output_root / study.name,
-        runs=runs,
+        runs=state_runs,
         jobs=jobs,
         job_states=job_states,
+    )
+    reports_by_path = {report.run.run_path: report for report in state_reports}
+    upstream_reports = {
+        path: reports_by_path[path] for path in upstream_paths if path in reports_by_path
+    }
+    reports = apply_chain_states(
+        study=study,
+        reports=[reports_by_path[run.run_path] for run in runs],
+        upstream=upstream_reports,
+        followup=machine.followup,
     )
     return Context(
         study=study,
@@ -190,6 +213,7 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         resolved={item.run.run_path: item for item in resolved},
         jobs=jobs,
         reports=reports,
+        upstream_reports=upstream_reports,
         job_states=job_states,
         submission_in_progress=submission_in_progress(
             study_folder=study_folder(machine=machine, study=study)
@@ -215,10 +239,30 @@ def refresh_context(*, context: Context) -> Context:
     job_states, _ = backend_for(machine=context.machine).job_states(
         machine=context.machine, study=context.study, jobs=jobs, cache={}
     )
-    reports = collect_states(
-        study_directory=context.study_directory, runs=context.runs, jobs=jobs, job_states=job_states
+    all_runs = expand_runs(study=context.study)
+    upstream_paths = _upstream_paths(study=context.study, runs=context.runs)
+    state_paths = upstream_paths | {run.run_path for run in context.runs}
+    state_runs = [run for run in all_runs if run.run_path in state_paths]
+    state_reports = collect_states(
+        study_directory=context.study_directory, runs=state_runs, jobs=jobs, job_states=job_states
     )
-    return dataclasses.replace(context, jobs=jobs, job_states=job_states, reports=reports)
+    reports_by_path = {report.run.run_path: report for report in state_reports}
+    upstream_reports = {
+        path: reports_by_path[path] for path in upstream_paths if path in reports_by_path
+    }
+    reports = apply_chain_states(
+        study=context.study,
+        reports=[reports_by_path[run.run_path] for run in context.runs],
+        upstream=upstream_reports,
+        followup=context.machine.followup,
+    )
+    return dataclasses.replace(
+        context,
+        jobs=jobs,
+        job_states=job_states,
+        reports=reports,
+        upstream_reports=upstream_reports,
+    )
 
 
 def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
@@ -264,3 +308,15 @@ def load_context(  # noqa: PLR0913 # why: keyword-only public API; each option i
         local_cpus=local_cpus,
         environment=environment,
     )
+
+
+def _upstream_paths(*, study: Study, runs: list[StudyRun]) -> set[PurePosixPath]:
+    """The unique upstream paths needed by selected chained runs."""
+    if not chained_grids(study=study):
+        return set()
+    return {
+        upstream.run_path
+        for run in runs
+        for after in study.grids[run.grid].after
+        for upstream in upstream_runs(study=study, run=run, after=after)
+    }

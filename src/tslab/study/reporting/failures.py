@@ -17,7 +17,7 @@ from tslab.study.reporting.state import RunReport
 __all__ = ['collect_failures', 'failure_hint', 'log_failures']
 
 _LOGGER = logging.getLogger(__name__)
-_DEFAULT_STATES = (StudyState.FAILED, StudyState.INTERRUPTED)
+_DEFAULT_STATES = (StudyState.FAILED, StudyState.DEPENDENCY_FAILED, StudyState.INTERRUPTED)
 
 
 def collect_failures(
