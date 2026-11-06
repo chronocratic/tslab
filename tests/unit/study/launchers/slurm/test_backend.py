@@ -8,6 +8,7 @@ import logging
 import math
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -37,7 +38,9 @@ from tslab.study.paths import study_folder
 from tslab.study.records import append_job, JobKind
 
 if TYPE_CHECKING:
-    from collections.abc import MutableMapping
+    from collections.abc import MutableMapping, Sequence
+
+    from tslab.study.plan import JobGroup
 
 
 def _context(*, project: Path, fake: FakeSlurm) -> Context:
@@ -672,3 +675,27 @@ def test_after_stopped_submit_writes_the_slurm_file_for_queued_jobs(
     append_job(path=folder / 'submissions.jsonl', record=record)
     SlurmBackend().after_stopped_submit(context=ctx, submitted=(record,))
     assert (folder / 'slurm.sh').exists()
+
+
+@pytest.mark.parametrize(
+    ('config', 'expected'),
+    [
+        ({'SlurmctldParameters': 'enable_expedited_requeue,foo'}, True),
+        ({'SlurmctldParameters': 'foo'}, False),
+        ({}, False),
+    ],
+)
+def test_expedite_only_when_cluster_allows(
+    *,
+    project: Path,
+    fake: FakeSlurm,
+    monkeypatch: pytest.MonkeyPatch,
+    config: dict[str, str],
+    expected: bool,
+) -> None:
+    cluster = project / 'cluster.toml'
+    cluster.write_text(cluster.read_text() + '\n[followup]\nchained_retry = "requeue"\n')
+    ctx = _context(project=project, fake=fake)
+    groups = cast('Sequence[JobGroup]', [SimpleNamespace(chained=True)])
+    monkeypatch.setattr(slurm_backend, 'query_cluster_config', lambda: config)
+    assert slurm_backend._expedite_allowed(context=ctx, groups=groups) is expected  # noqa: SLF001

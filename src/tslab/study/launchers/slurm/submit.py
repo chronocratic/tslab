@@ -9,7 +9,7 @@ from typing import cast
 from uuid import uuid4
 
 from tslab.core.files import atomic_write_text
-from tslab.enums import LauncherKind
+from tslab.enums import ChainedRetry, LauncherKind
 from tslab.jobs.slurm import sbatch, SlurmError
 from tslab.study.code_snapshot import without_code_snapshot
 from tslab.study.launchers.common.protocols import RecordJob
@@ -33,6 +33,7 @@ def write_job_files(  # noqa: PLR0913 # why: one argument per generated-file set
     project_root: Path,
     start_delay_seconds: int | None = None,
     chain_check: Sequence[str] | None = None,
+    expedite: bool = False,
 ) -> None:
     """The ``jobs/<n>.tasks`` and ``jobs/<n>.sbatch`` files of every group.
 
@@ -43,6 +44,7 @@ def write_job_files(  # noqa: PLR0913 # why: one argument per generated-file set
         project_root: The directory the scripts ``cd`` into.
         start_delay_seconds: Seconds the jobs wait before they may start; written as a ``--begin``.
         chain_check: The command prefix for checking each chained task after ``srun``.
+        expedite: Write ``--requeue=expedite`` for requeued chained groups; the cluster allows it.
     """
     begin = None if start_delay_seconds is None else f'now+{start_delay_seconds}'
     (study_folder / 'jobs').mkdir(parents=True, exist_ok=True)
@@ -68,8 +70,18 @@ def write_job_files(  # noqa: PLR0913 # why: one argument per generated-file set
             begin=begin,
             code_snapshot=group.code_snapshot,
             chain_check=task_chain_check,
+            requeue=_requeue_of(
+                machine=machine, chained=task_chain_check is not None, expedite=expedite
+            ),
         )
         atomic_write_text(path=study_folder / 'jobs' / f'{group.job_file}.sbatch', text=script)
+
+
+def _requeue_of(*, machine: MachineProfile, chained: bool, expedite: bool) -> bool | str:
+    """The ``requeue`` choice of a group: only chained groups of ``chained_retry = "requeue"``."""
+    if not chained or machine.followup.chained_retry is not ChainedRetry.REQUEUE:
+        return False
+    return 'expedite' if expedite else True
 
 
 def _log_pattern(*, group: JobGroup) -> Path:

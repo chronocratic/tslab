@@ -11,14 +11,19 @@ from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.enums import InstanceState, LauncherKind, RunState
-from tslab.study.commands.chain_exit import chain_exit
+from tslab.jobs.slurm import SlurmError
+from tslab.study.context import Context
 from tslab.study.definition import StudyRun
+from tslab.study.launchers.slurm.chain_exit import chain_exit
 from tslab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.study.launchers.slurm.requeue import restarted_attempt
 from tslab.study.paths import study_folder
 from tslab.study.records import append_job, JobKind, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import FolderFacts
 
 _STATE_MODULE = import_module('tslab.study.reporting.state')
+_CHAIN_EXIT_MODULE = import_module('tslab.study.launchers.slurm.chain_exit')
+_REQUEUE_MODULE = import_module('tslab.study.launchers.slurm.requeue')
 
 
 def _job_record(*, run: StudyRun, job_file: int, index: int) -> SlurmJobRecord:
@@ -133,3 +138,107 @@ def test_chain_exit_waits_for_status_to_reach_shared_storage(
 
     assert chain_exit(context=ctx, job_file=3, index=17) == 0
     assert reads >= 2
+
+
+# ---- chained_retry = "requeue" --------------------------------------------------
+
+
+def _requeue_context(*, project: Path, max_attempts: int = 3) -> Context:
+    cluster = project / 'cluster.toml'
+    cluster.write_text(
+        cluster.read_text()
+        + f'\n[followup]\nchained_retry = "requeue"\nmax_attempts = {max_attempts}\n'
+    )
+    ctx = context(project=project, machine_file='cluster.toml')
+    run = ctx.runs[0]
+    job = _job_record(run=run, job_file=3, index=17)
+    return replace(ctx, jobs=[job])
+
+
+def _interrupted(*, ctx: Context, progress: bool) -> None:
+    run = ctx.runs[0]
+    folder = ctx.study_directory / run.run_path
+    write_status(
+        path=folder / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={
+                'train': InstanceRecord(
+                    state=InstanceState.DONE if progress else InstanceState.RUNNING
+                )
+            },
+        ),
+    )
+
+
+@pytest.fixture
+def requeued(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    calls: list[str] = []
+    monkeypatch.setattr(
+        _REQUEUE_MODULE, 'scontrol_requeue', lambda *, task_id: calls.append(task_id)
+    )
+    return calls
+
+
+def test_chain_exit_requeues_interrupted_run_with_progress(
+    project: Path, fake_backend: FakeBackend, requeued: list[str]
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 0
+    assert requeued == ['41_17']
+
+
+def test_chain_exit_does_not_requeue_without_progress(
+    project: Path, fake_backend: FakeBackend, requeued: list[str]
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=False)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert requeued == []
+
+
+def test_chain_exit_does_not_requeue_at_max_attempts(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project, max_attempts=3)
+    _interrupted(ctx=ctx, progress=True)
+    monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert requeued == []
+
+
+def test_chain_exit_returns_1_when_scontrol_fails(
+    project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+
+    def fail(*, task_id: str) -> None:
+        raise SlurmError(task_id)
+
+    monkeypatch.setattr(_REQUEUE_MODULE, 'scontrol_requeue', fail)
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+
+
+def test_chain_exit_does_not_requeue_in_other_modes(
+    project: Path, fake_backend: FakeBackend, requeued: list[str]
+) -> None:
+    del fake_backend
+    ctx = context(project=project, machine_file='cluster.toml')
+    ctx = replace(ctx, jobs=[_job_record(run=ctx.runs[0], job_file=3, index=17)])
+    _interrupted(ctx=ctx, progress=True)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert requeued == []
+
+
+def test_attempt_counts_restarts(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
+    assert restarted_attempt(attempt=1) == 3
+    monkeypatch.delenv('SLURM_RESTART_COUNT')
+    assert restarted_attempt(attempt=1) == 1
