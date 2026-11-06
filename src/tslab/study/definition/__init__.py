@@ -6,6 +6,14 @@ The package holds the ``Study`` and ``StudyRun`` types and their expansion
 and the typed dotted settings they are built from (``settings``).
 """
 
+from tslab.study.definition.after import (
+    After,
+    after_problems,
+    chained_grids,
+    grid_order,
+    match_axes,
+    upstream_runs,
+)
 from tslab.study.definition.definition import (
     DEFAULT_RUN_SETTINGS,
     expand_runs,
@@ -50,6 +58,7 @@ __all__ = [
     'RESERVED_AXIS_NAMES',
     'RETRY_JOB',
     'WANDB_SYNC_JOB',
+    'After',
     'Grid',
     'Match',
     'Override',
@@ -57,6 +66,8 @@ __all__ = [
     'Settings',
     'Study',
     'StudyRun',
+    'after_problems',
+    'chained_grids',
     'check_paths',
     'expand_placeholders',
     'expand_runs',
@@ -65,7 +76,9 @@ __all__ = [
     'field_annotation',
     'followup_job_name',
     'from_presets',
+    'grid_order',
     'load_study',
+    'match_axes',
     'match_problems',
     'matching_in_order',
     'merge_overrides',
@@ -76,4 +89,5 @@ __all__ = [
     'setting_axis',
     'settings_to_args',
     'study_job_names',
+    'upstream_runs',
 ]
