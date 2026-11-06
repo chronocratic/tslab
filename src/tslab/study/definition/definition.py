@@ -20,6 +20,7 @@ from tslab.study.definition.expansion import PLACEHOLDERS
 from tslab.study.definition.settings import check_paths, Settings, SettingValue
 
 if TYPE_CHECKING:
+    from tslab.study.definition.after import After
     from tslab.study.reporting.result_table import ResultRow
 
 __all__ = [
@@ -156,6 +157,7 @@ class Grid:
         run_path: The run path as a template of ``{grid}``, ``{short_name}``
             and axis names; ``None`` is the grid then the axis values in axis
             order.
+        after: Upstream grids that each run must wait for.
     """
 
     short_name: str
@@ -167,6 +169,7 @@ class Grid:
     run_settings: Settings = DEFAULT_RUN_SETTINGS
     job_name: str = '{study}_{short_name}'
     run_path: str | None = None
+    after: tuple['After', ...] = ()
 
     @property
     def job_name_axes(self) -> tuple[str, ...]:
@@ -282,6 +285,7 @@ class Grid:
     def _check_shapes(self) -> None:
         """Type-check the containers; the usual slip is a missing trailing comma."""
         self._check_axis_shapes()
+        self._check_after_shapes()
         if isinstance(self.exclude, Mapping):
             message = 'grid exclude must be a tuple of matches; trailing comma: exclude=({...},)?'
             raise TypeError(message)
@@ -311,6 +315,21 @@ class Grid:
             raise TypeError(message)
         for axis_name, values in self.axes.items():
             _check_axis_values(axis_name=axis_name, values=values)
+
+    def _check_after_shapes(self) -> None:
+        """Type-check the dependency tuple; the usual slip is a missing trailing comma."""
+        from tslab.study.definition.after import After  # noqa: PLC0415 # why: breaks the import cycle
+
+        if isinstance(self.after, After):
+            message = 'grid after must be a tuple of After; trailing comma: after=(After(...),)?'
+            raise TypeError(message)
+        if not isinstance(self.after, tuple):
+            message = f'grid after must be a tuple of After, got {_kind(value=self.after)}'
+            raise TypeError(message)
+        for after in self.after:
+            if not isinstance(after, After):
+                message = f'each grid after must be an After, got {_kind(value=after)}'
+                raise TypeError(message)
 
 
 def _check_axis_values(*, axis_name: str, values: object) -> None:
@@ -384,6 +403,12 @@ class Study:
         self._check_settings()
         self._check_job_names()
         self._check_run_paths()
+        from tslab.study.definition.after import after_problems  # noqa: PLC0415 # why: breaks the import cycle
+
+        problems = after_problems(study=self)
+        if problems:
+            message = '; '.join(problems)
+            raise ValueError(message)
 
     def _check_settings(self) -> None:
         """Check that study paths exist and do not duplicate axes or run settings."""
