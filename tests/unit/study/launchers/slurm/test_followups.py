@@ -47,6 +47,12 @@ study = Study(
 '''
 
 
+def enable_retry(*, project: Path) -> None:
+    """Let the automatic retry resubmit the runs that are not chained."""
+    profile = project / 'cluster.toml'
+    profile.write_text(profile.read_text() + '\n[followup]\nretry = "resubmit"\n')
+
+
 def with_followups(*, project: Path) -> None:
     """The [followup] table, on top of the written cluster profile."""
     profile = project / 'cluster.toml'
@@ -158,6 +164,7 @@ def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(
     project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
+    enable_retry(project=project)
     # a: one more done instance than its snapshot
     folder_a = project / 'runs' / 's' / 'g/small/1'
     folder_a.mkdir(parents=True)
@@ -203,12 +210,13 @@ def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(
             context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
         )
     assert code == 0
-    retried = jobs_of(project=project)[-1]
+    retried = [job for job in jobs_of(project=project) if job.tasks][-1]
     assert [t.run_path.as_posix() for t in retried.tasks] == ['g/small/1', 'g/small/2']
     assert all(t.attempt == 2 for t in retried.tasks)
     assert 'stuck: g/small/3 (attempt 1, no progress)' in caplog.text
     assert 'gave up: g/large/2 after 3 attempts' in caplog.text
-    assert len(fake.calls('sbatch')) == 2
+    # the retried array and its own retry follow-up
+    assert len(fake.calls('sbatch')) == 3
 
 
 def _write_progress(project: Path) -> None:
@@ -234,6 +242,7 @@ def _resubmit_large_2(  # noqa: PLR0913 # why: keyword-only test helper, one arg
     with_progress: bool,
 ) -> list[TaskRecord]:
     submit_study(project=project)
+    enable_retry(project=project)
     if with_progress:
         _write_progress(project)
     bump_attempts(project=project, run_path='g/large/2', index=4, up_to=up_to, uncounted=uncounted)
@@ -243,7 +252,7 @@ def _resubmit_large_2(  # noqa: PLR0913 # why: keyword-only test helper, one arg
         context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
     )
     assert code == 0
-    last = jobs_of(project=project)[-1]
+    last = [job for job in jobs_of(project=project) if job.tasks][-1]
     return [t for t in last.tasks if t.attempt > up_to]
 
 
