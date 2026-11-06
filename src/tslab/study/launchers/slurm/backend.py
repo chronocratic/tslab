@@ -303,7 +303,7 @@ class SlurmBackend:
         return [
             report.job_id
             for report in reports
-            if report.state in (StudyState.QUEUED, StudyState.RUNNING) and report.job_id is not None
+            if report.state in _CANCELLABLE_STATES and report.job_id is not None
         ]
 
     def detach(
@@ -403,11 +403,14 @@ def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, 
     )
 
 
+_CANCELLABLE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
+
+
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:
     live = [
         report
         for report in reports
-        if report.state in (StudyState.QUEUED, StudyState.RUNNING) and report.job_id is not None
+        if report.state in _CANCELLABLE_STATES and report.job_id is not None
     ]
     if signal is None:
         return live

@@ -1,6 +1,7 @@
 """Helpers shared by the study command tests: contexts, submissions, run folders."""
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import subprocess
@@ -9,9 +10,10 @@ from types import MappingProxyType
 
 from tslab.core.files import atomic_write_json
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState
+from tslab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, LauncherKind, RunState
+from tslab.study import After, Grid, Study
 from tslab.study.commands import submit
-from tslab.study.context import Context, load_context, Selection
+from tslab.study.context import Context, context_for, load_context, Selection
 from tslab.study.launchers.common.types import JobStates
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.launchers.tables import JOB_RECORDS
@@ -25,6 +27,8 @@ from tslab.study.records import (
 )
 
 __all__ = [
+    'chained_context',
+    'chained_study',
     'context',
     'finish_run',
     'finished_pid',
@@ -193,3 +197,41 @@ def finished_pid() -> int:
     child = subprocess.Popen([sys.executable, '-c', 'pass'])  # why: fixed command
     child.wait()
     return child.pid
+
+
+def chained_study(*, condition: AfterCondition = AfterCondition.OK) -> Study:
+    """A chain whose definition inserts downstream grid before its upstream."""
+
+    @dataclass(frozen=True, kw_only=True)
+    class ChainConfig:
+        seed: int = 0
+        output_root: Path = Path('runs')
+        run_path: Path = Path('run')
+
+    pretrain = Grid(
+        short_name='pre',
+        command=('python', '-m', 'pretrain'),
+        config=ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}},
+    )
+    probe = Grid(
+        short_name='probe',
+        command=('python', '-m', 'probe'),
+        config=ChainConfig,
+        axes={'dataset': {'a': {}, 'b': {}}, 'head': {'svm': {}, 'knn': {}}},
+        after=(After(grid='pretrain', condition=condition),),
+    )
+    return Study(name='chain', grids={'probe': probe, 'pretrain': pretrain})
+
+
+def chained_context(
+    *, project: Path, study: Study, grids: tuple[str, ...] = (), machine_file: str = 'local.toml'
+) -> Context:
+    return context_for(
+        study=study,
+        machine_path=project / machine_file,
+        selection=Selection(grids=grids),
+        project_root=project,
+        local_cpus=1,
+        environment=os.environ,
+    )

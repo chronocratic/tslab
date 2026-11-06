@@ -1,6 +1,7 @@
 """The resubmit and run-one commands: retry interrupted runs, run one in the foreground."""
 
 from collections.abc import Callable, Mapping, Sequence
+import dataclasses
 import logging
 import os
 from pathlib import Path, PurePosixPath
@@ -11,13 +12,16 @@ from typing import TextIO, TYPE_CHECKING
 from tslab.core.lock import read_lock_owner
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
-from tslab.enums import JobFlag, JobPhase, StudyState
+from tslab.enums import AfterVerdict, ChainedRetry, JobFlag, JobPhase, Retry, StudyState
+from tslab.study.chain import after_verdict, downstream_of
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
 from tslab.study.commands.submit import submit_runs
 from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
-from tslab.study.context import Context
+from tslab.study.context import Context, study_reports, widen_context
+from tslab.study.definition import chained_grids, StudyRun
 from tslab.study.launchers.common.types import OnLaunch
 from tslab.study.launchers.tables import backend_for
+from tslab.study.machine.profile import FollowupSettings
 from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
 from tslab.study.records import latest_tasks, take_progress
 from tslab.study.reporting.report import log_problems
@@ -45,7 +49,11 @@ _LOGGER = logging.getLogger(__name__)
 def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below
     *,
     context: Context,
-    states: tuple[StudyState, ...] = (StudyState.INTERRUPTED, StudyState.MISSING),
+    states: tuple[StudyState, ...] = (
+        StudyState.INTERRUPTED,
+        StudyState.MISSING,
+        StudyState.DEPENDENCY_FAILED,
+    ),
     cancel_live: bool = False,
     dry_run: bool = False,
     extra_args: tuple[str, ...] | None = None,
@@ -73,7 +81,9 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
 
     Args:
         context: The context to resubmit from.
-        states: The states to resubmit; interrupted and missing by default.
+        states: The states to resubmit; interrupted, missing and dependency failed
+            by default. Waiting runs that depend on a selected run come along, and
+            their jobs are cancelled first.
         cancel_live: Cancel the live runs of the selection first.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The pass-through arguments; taken from the last
@@ -81,7 +91,10 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         auto: The mode of the follow-up job: only interrupted runs that made
             progress since their last attempt, up to
             ``followup.max_attempts`` of the machine; the rest are logged and left alone,
-            and ``cancel_live`` is ignored.
+            and ``cancel_live`` is ignored. Runs of grids that are not chained need
+            ``retry = "resubmit"``, runs of chained grids ``chained_retry`` other than
+            ``"manual"``; dependency failed runs of chained grids are taken when their
+            upstream runs are met or resubmitted in the same call.
         new_code_snapshot: The snapshot every selected run switches to,
             replacing the recorded one; ``None`` keeps the recorded one.
         drop_code_snapshot: Run the live code, even when the runs recorded a
@@ -100,22 +113,25 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         CodeSnapshotError: When a reused snapshot folder has no ``src/``
             left; the message names the folder and the way out.
     """
+    if not states:
+        states = (StudyState.INTERRUPTED, StudyState.MISSING, StudyState.DEPENDENCY_FAILED)
     if auto:
         # why: auto is the path of the follow-up job: it retries interrupted runs
         # with progress only, and never touches the live ones
-        states = (StudyState.INTERRUPTED,)
+        states = (StudyState.INTERRUPTED, StudyState.DEPENDENCY_FAILED)
         cancel_live = False
-    if not states:
-        states = (StudyState.INTERRUPTED, StudyState.MISSING)
     selected = [
         report
         for report in context.reports
         if report.state in states and report.state not in LIVE_STATES
     ]
     if auto:
-        selected = _with_progress(reports=selected, context=context)
+        selected = _auto_selection(reports=selected, context=context)
     live = _live_reports(reports=context.reports, cancel_live=cancel_live)
     selected += live
+    context, selected, waiting = _with_downstream(context=context, selected=selected)
+    live += waiting
+    selected += waiting
     if not selected:
         _LOGGER.info('nothing to resubmit')
         return 0
@@ -154,6 +170,73 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     return _finish_launch(
         code=code, submitted=submitted, context=context, sleep=sleep, task_stream=task_stream
     )
+
+
+def _auto_selection(*, reports: Sequence[RunReport], context: Context) -> list[RunReport]:
+    """The reports the follow-up job may take, by the retry mode of their grid."""
+    followup = context.machine.followup
+    chained = chained_grids(study=context.study)
+    interrupted = [
+        report
+        for report in reports
+        if report.state is StudyState.INTERRUPTED
+        and _retry_allowed(grid=report.run.grid, chained=chained, followup=followup)
+    ]
+    taken = _with_progress(reports=interrupted, context=context)
+    if not chained or followup.chained_retry is ChainedRetry.MANUAL:
+        return taken
+    everything = study_reports(context=context)
+    # why: a dependency failed run is taken when its upstream is met; one whose upstream
+    # is resubmitted in this call comes along as downstream of it
+    taken += [
+        report
+        for report in reports
+        if report.state is StudyState.DEPENDENCY_FAILED
+        and report.run.grid in chained
+        and after_verdict(
+            study=context.study, run=report.run, reports=everything, followup=followup
+        )
+        is AfterVerdict.MET
+    ]
+    return taken
+
+
+def _verdict_met(
+    *, context: Context, run: StudyRun, reports: Mapping[PurePosixPath, RunReport]
+) -> bool:
+    verdict = after_verdict(
+        study=context.study, run=run, reports=reports, followup=context.machine.followup
+    )
+    return verdict is AfterVerdict.MET
+
+
+def _retry_allowed(*, grid: str, chained: frozenset[str], followup: FollowupSettings) -> bool:
+    """Whether the retry mode of the grid lets the follow-up resubmit its runs."""
+    if grid in chained:
+        return followup.chained_retry is not ChainedRetry.MANUAL
+    return followup.retry is Retry.RESUBMIT
+
+
+def _with_downstream(
+    *, context: Context, selected: list[RunReport]
+) -> tuple[Context, list[RunReport], list[RunReport]]:
+    """Add the waiting and dependency failed runs that hang on the selected ones.
+
+    Returns:
+        The context widened to hold them, the selection with the dependency failed
+        ones added, and the waiting ones, whose jobs the caller cancels.
+    """
+    if not chained_grids(study=context.study):
+        return context, selected, []
+    everything = study_reports(context=context)
+    chosen = {report.run.run_path for report in selected}
+    extra = downstream_of(study=context.study, run_paths=chosen, reports=list(everything.values()))
+    if not extra:
+        return context, selected, []
+    context = widen_context(context=context, reports=extra)
+    waiting = [report for report in extra if report.state in LIVE_STATES]
+    failed = [report for report in extra if report.state not in LIVE_STATES]
+    return context, [*selected, *failed], waiting
 
 
 def _code_snapshots_of(
@@ -250,7 +333,13 @@ def _before_resubmit(
         _LOGGER.info('would cancel %s', ', '.join(cancellable))
 
     def before_launch() -> int:
-        code = backend.cancel(context=context, dry_run=False, signal=None)[0] if cancellable else 0
+        code = (
+            backend.cancel(
+                context=dataclasses.replace(context, reports=list(live)), dry_run=False, signal=None
+            )[0]
+            if cancellable
+            else 0
+        )
         if code != 0:
             return code
         _remove_ended_locks(

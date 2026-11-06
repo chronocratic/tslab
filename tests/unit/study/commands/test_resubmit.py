@@ -11,6 +11,8 @@ import pytest
 
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import (
+    chained_context,
+    chained_study,
     context,
     finish_run,
     jobs_of,
@@ -24,7 +26,7 @@ from tests.unit.study.helpers import (
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, JobPhase, RunState, StudyState
+from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
 from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
@@ -51,6 +53,12 @@ def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
         ),
     )
     (folder / '.lock').write_text(json.dumps({'pid': 99999, 'host': 'otherhost'}))
+
+
+def enable_retry(*, project: Path, text: str = 'retry = "resubmit"\n') -> None:
+    """Add a ``[followup]`` table with the given settings to the SLURM profile."""
+    cluster = project / 'cluster.toml'
+    cluster.write_text(cluster.read_text() + '\n[followup]\n' + text)
 
 
 def test_default_states_are_interrupted_and_missing(
@@ -290,6 +298,7 @@ def test_auto_resubmit_retries_paused_run_with_progress(
     )
     (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
     fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
+    enable_retry(project=project)
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'),
         auto=True,
@@ -667,6 +676,7 @@ def test_auto_resubmit_reuses_recorded_code_snapshot(
     )
     (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
     fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
+    enable_retry(project=project)
     code = resubmit(
         context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
     )
@@ -675,3 +685,191 @@ def test_auto_resubmit_reuses_recorded_code_snapshot(
     assert [task.run_path.as_posix() for task in latest.tasks] == ['g/small/1']
     assert latest.code_snapshot is not None
     assert latest.code_snapshot.folder == snapshot.folder
+
+
+# ---- chained grids -------------------------------------------------------------
+
+
+def _chain_submitted(*, project: Path, fake_backend: FakeBackend) -> Context:
+    """The chained study submitted once on the SLURM profile: job-0 pretrain, job-1/2 probe."""
+    ctx = chained_context(project=project, study=chained_study(), machine_file='cluster.toml')
+    assert (
+        submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep) == 0
+    )
+    assert [
+        cast('Sequence[JobGroup]', call['groups'])[0].grid for call in fake_backend.calls('launch')
+    ] == ['pretrain']
+    return ctx
+
+
+def _chain_states(
+    *,
+    project: Path,
+    fake_backend: FakeBackend,
+    phases: dict[str, JobPhase],
+    flags: dict[str, frozenset[JobFlag]] | None = None,
+    grids: tuple[str, ...] = (),
+) -> Context:
+    fake_backend.set_states(phases=phases, flags=flags or {})
+    return chained_context(
+        project=project, study=chained_study(), machine_file='cluster.toml', grids=grids
+    )
+
+
+def _launched_runs(*, fake_backend: FakeBackend) -> list[str]:
+    (call,) = fake_backend.calls('launch')[-1:]
+    return [
+        task.resolved.run.run_path.as_posix()
+        for group in cast('Sequence[JobGroup]', call['groups'])
+        for task in group.tasks
+    ]
+
+
+def test_default_resubmit_takes_dependency_failed(project: Path, fake_backend: FakeBackend) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={
+            'job-0_0': JobPhase.INTERRUPTED,
+            'job-0_1': JobPhase.INTERRUPTED,
+            'job-1_0': JobPhase.FAILED,
+            'job-1_1': JobPhase.FAILED,
+        },
+        flags={
+            'job-1_0': frozenset({JobFlag.DEPENDENCY_NEVER}),
+            'job-1_1': frozenset({JobFlag.DEPENDENCY_NEVER}),
+        },
+    )
+    assert {r.state for r in ctx.reports if r.run.grid == 'probe'} >= {StudyState.DEPENDENCY_FAILED}
+    assert resubmit(context=ctx, sleep=no_sleep) == 0
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert 'pretrain/a' in runs
+    assert any(run.startswith('probe/a/') for run in runs)
+
+
+def test_resubmit_upstream_pulls_in_waiting_downstream(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={
+            'job-0_0': JobPhase.INTERRUPTED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-1_0': JobPhase.QUEUED,
+            'job-1_1': JobPhase.QUEUED,
+            'job-2_2': JobPhase.QUEUED,
+            'job-2_3': JobPhase.QUEUED,
+        },
+        flags={
+            task: frozenset({JobFlag.DEPENDENCY_PENDING})
+            for task in ('job-1_0', 'job-1_1', 'job-2_2', 'job-2_3')
+        },
+        grids=('pretrain',),
+    )
+    fake_backend.cancellable_answer = ['job-1']
+    assert resubmit(context=ctx, sleep=no_sleep) == 0
+    (cancel_call,) = fake_backend.calls('cancel')
+    cancelled = cast('Context', cancel_call['context']).reports
+    assert {r.run.grid for r in cancelled} == {'probe'}
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert 'pretrain/a' in runs
+    assert any(run.startswith('probe/a/') for run in runs)
+
+
+def test_auto_ignores_chained_runs_when_chained_retry_manual(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='retry = "resubmit"\n')
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={'job-0_0': JobPhase.INTERRUPTED, 'job-0_1': JobPhase.INTERRUPTED},
+    )
+    (project / 'runs' / 'chain' / 'pretrain/a').mkdir(parents=True, exist_ok=True)
+    (project / 'runs' / 'chain' / 'pretrain/a' / 'last.ckpt').write_text('x')
+    before = len(fake_backend.calls('launch'))
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+    assert len(fake_backend.calls('launch')) == before
+
+
+def test_auto_ignores_unchained_runs_when_retry_manual(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    submit_study(project=project)
+    write_run_status(
+        project=project,
+        model='small',
+        seed=1,
+        run_state=RunState.FAILED,
+        instance=InstanceState.FAILED,
+        error='TrainingPaused: job time share reached',
+    )
+    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    before = len(fake_backend.calls('launch'))
+    assert (
+        resubmit(
+            context=context(project=project, machine_file='cluster.toml'), auto=True, sleep=no_sleep
+        )
+        == 0
+    )
+    assert len(fake_backend.calls('launch')) == before
+
+
+def test_auto_resubmits_time_limited_upstream_and_its_probe(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={
+            'job-0_0': JobPhase.INTERRUPTED,
+            'job-0_1': JobPhase.COMPLETED,
+            'job-1_0': JobPhase.QUEUED,
+            'job-1_1': JobPhase.QUEUED,
+        },
+        flags={
+            'job-1_0': frozenset({JobFlag.DEPENDENCY_PENDING}),
+            'job-1_1': frozenset({JobFlag.DEPENDENCY_PENDING}),
+        },
+        grids=('pretrain',),
+    )
+    folder = project / 'runs' / 'chain' / 'pretrain/a'
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / 'last.ckpt').write_text('x')
+    fake_backend.cancellable_answer = ['job-1']
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert 'pretrain/a' in runs
+    assert any(run.startswith('probe/a/') for run in runs)
+
+
+def test_auto_does_not_resubmit_probe_of_failed_upstream(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    _chain_submitted(project=project, fake_backend=fake_backend)
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    ctx = _chain_states(
+        project=project,
+        fake_backend=fake_backend,
+        phases={
+            'job-0_0': JobPhase.FAILED,
+            'job-0_1': JobPhase.FAILED,
+            'job-1_0': JobPhase.FAILED,
+            'job-1_1': JobPhase.FAILED,
+        },
+        flags={
+            'job-1_0': frozenset({JobFlag.DEPENDENCY_NEVER}),
+            'job-1_1': frozenset({JobFlag.DEPENDENCY_NEVER}),
+        },
+    )
+    before = len(fake_backend.calls('launch'))
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+    assert len(fake_backend.calls('launch')) == before
