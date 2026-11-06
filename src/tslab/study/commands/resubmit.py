@@ -264,14 +264,11 @@ def _with_cancelled_upstream(
     chosen = {report.run.run_path: report for report in selected}
     pending = [report for report in selected if report.state is StudyState.DEPENDENCY_FAILED]
     while pending:
-        report = pending.pop()
-        for after in context.study.grids[report.run.grid].after:
-            for upstream in upstream_runs(study=context.study, run=report.run, after=after):
-                found = everything.get(upstream.run_path)
-                if found is None or upstream.run_path in chosen or not _cancelled(report=found):
-                    continue
-                chosen[upstream.run_path] = found
-                pending.append(found)
+        found = _cancelled_upstream(
+            context=context, report=pending.pop(), everything=everything, chosen=chosen
+        )
+        chosen.update({report.run.run_path: report for report in found})
+        pending += found
     given = {report.run.run_path for report in selected}
     extra = [report for path, report in chosen.items() if path not in given]
     if not extra:
@@ -279,6 +276,27 @@ def _with_cancelled_upstream(
     for report in extra:
         _LOGGER.info('also resubmitting %s: it was cancelled', report.run.run_path)
     return widen_context(context=context, reports=extra), [*selected, *extra]
+
+
+def _cancelled_upstream(
+    *,
+    context: Context,
+    report: RunReport,
+    everything: Mapping[PurePosixPath, RunReport],
+    chosen: Mapping[PurePosixPath, RunReport],
+) -> list[RunReport]:
+    """The cancelled upstream runs of one report that are not chosen yet."""
+    paths = dict.fromkeys(
+        upstream.run_path
+        for after in context.study.grids[report.run.grid].after
+        for upstream in upstream_runs(study=context.study, run=report.run, after=after)
+        if upstream.run_path not in chosen
+    )
+    return [
+        everything[path]
+        for path in paths
+        if path in everything and _cancelled(report=everything[path])
+    ]
 
 
 def _cancelled(*, report: RunReport) -> bool:
