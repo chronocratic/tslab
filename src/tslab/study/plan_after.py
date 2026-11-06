@@ -286,9 +286,9 @@ def _retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool
     """Whether configured chained retries leave another attempt for a report."""
     if followup is None:
         return False
-    return (
-        followup.chained_retry is not ChainedRetry.MANUAL and report.attempt < followup.max_attempts
-    )
+    # why: attempts that ended preempted or node failed do not count, as in the follow-up
+    counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
+    return followup.chained_retry is not ChainedRetry.MANUAL and counted < followup.max_attempts
 
 
 def merge_corr_groups(
