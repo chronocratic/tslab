@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from tslab.lightning.resume import choose_resume_checkpoint, resume_candidates
+from tslab.ml.lightning.resume import choose_resume_checkpoint, resume_candidates
 
 MONITOR = 'val_loss_epoch'
 

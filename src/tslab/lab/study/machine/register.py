@@ -8,8 +8,8 @@ import re
 import tomllib
 from typing import cast
 
-from tslab.core.files import atomic_write_text
-from tslab.study.machine.tables import MachineProfileError
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.study.machine.tables import MachineProfileError
 
 __all__ = [
     'MachineLocation',

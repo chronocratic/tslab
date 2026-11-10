@@ -16,9 +16,9 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
 )
 
-from tslab.core.run import JobTimeLimitSignal, Run
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.exceptions import TrainingPaused
+from tslab.lab.core.run import JobTimeLimitSignal, Run
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.exceptions import TrainingPaused
 
 __all__ = [
     'AccumulatingTimerCallback',

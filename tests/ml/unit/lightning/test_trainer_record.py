@@ -9,12 +9,12 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from tslab.core.files import read_json_object
-from tslab.core.run import Run
-from tslab.interfaces import Batch
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.exceptions import TrainingPaused
-from tslab.lightning.trainer import LightningTrainer
+from tslab.lab.core.files import read_json_object
+from tslab.lab.core.run import Run
+from tslab.ml.interfaces import Batch
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.exceptions import TrainingPaused
+from tslab.ml.lightning.trainer import LightningTrainer
 
 
 class _ToyData:

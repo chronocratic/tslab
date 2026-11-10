@@ -6,14 +6,14 @@ import subprocess
 import pytest
 import torch
 
-from tslab.core.meta import (
+from tslab.lab.core.meta import (
     collect_code_snapshot,
     collect_git_state,
     collect_hardware,
     collect_versions,
     package_version,
 )
-from tslab.core.run import Run
+from tslab.lab.core.run import Run
 
 
 @dataclass(frozen=True, kw_only=True)

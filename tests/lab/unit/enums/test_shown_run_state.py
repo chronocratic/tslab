@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.enums import RunState, ShownRunState
+from tslab.lab.enums import RunState, ShownRunState
 
 
 def test_every_run_state_has_a_shown_state_with_the_same_text() -> None:

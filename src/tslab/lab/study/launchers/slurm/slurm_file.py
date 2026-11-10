@@ -4,23 +4,23 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import shlex
 
-from tslab.core.files import atomic_write_text
-from tslab.jobs.slurm import (
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.jobs.slurm import (
     CommandValues,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
     SLURM_COMMANDS,
     SlurmCommand,
 )
-from tslab.study.definition import (
+from tslab.lab.study.definition import (
     followup_job_name,
     RETRY_JOB,
     Study,
     study_job_names,
     WANDB_SYNC_JOB,
 )
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.records import read_jobs
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.records import read_jobs
 
 __all__ = ['SLURM_FILE', 'command_values', 'slurm_file_text', 'write_slurm_file']
 

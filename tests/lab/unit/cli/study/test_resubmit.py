@@ -6,12 +6,12 @@ import shutil
 
 import pytest
 
+from tests.lab.unit.cli.study.helpers import git_project
+from tests.lab.unit.study.helpers import jobs_of
 from tests.support.fake_backend import FakeBackend
-from tests.unit.cli.study.helpers import git_project
-from tests.unit.study.helpers import jobs_of
-from tslab.cli import main
-from tslab.cli.study import Resubmit
-from tslab.enums import JobPhase
+from tslab.lab.cli import main
+from tslab.lab.cli.study import Resubmit
+from tslab.lab.enums import JobPhase
 
 
 def run_main(*args: str) -> int:

@@ -13,12 +13,12 @@ from typing import Annotated, Any, cast, Protocol, Union
 
 import tyro
 
-from tslab.cli.doctor import Doctor
-from tslab.cli.machine import MACHINE_COMMANDS
-from tslab.cli.new import New
-from tslab.cli.status import Status
-from tslab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
-from tslab.cli.wandb_sync import WandbSync
+from tslab.lab.cli.doctor import Doctor
+from tslab.lab.cli.machine import MACHINE_COMMANDS
+from tslab.lab.cli.new import New
+from tslab.lab.cli.status import Status
+from tslab.lab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
+from tslab.ml.cli.wandb_sync import WandbSync
 
 __all__ = ['Command']
 

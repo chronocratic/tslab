@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 
 import pytest
-import tslab
-from tslab.adapters.chronocratic.models import ChronocraticEncoder
-from tslab.cli import main as tslab_main
-from tslab.core.status import read_status
-from tslab.lightning import LightningTrainerConfig
+import tslab.lab
+from tslab.lab.cli import main as tslab_main
+from tslab.lab.core.status import read_status
+import tslab.ml
+from tslab.ml.lightning import LightningTrainerConfig
+import tslab.ts
+from tslab.ts.adapters.chronocratic.models import ChronocraticEncoder
 
 from {{package_name}} import classify, forecast, toy_data
 
@@ -70,14 +72,14 @@ def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 @pytest.mark.parametrize('args', [*([name] for name in classify.PRESETS), CLASSIFY_NO_PRESET])
 def test_classify(project: Path, args: tuple[str, ...]) -> None:
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=classify.ClassifyConfig, presets=classify.PRESETS, args=list(args)
     )
     classify.main(config=dataclasses.replace(config, trainer=ONE_BATCH, encoder=ENCODER))
     snapshot = read_status(path=project / 'runs' / config.run_path / 'status.json')
     assert snapshot is not None
     states = {record.state for record in snapshot.instances.values()}
-    assert states == {tslab.InstanceState.DONE}
+    assert states == {tslab.lab.InstanceState.DONE}
 
 
 def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,7 +131,7 @@ def test_example_study_runs_one_run_locally(project: Path, monkeypatch: pytest.M
 
 @pytest.mark.parametrize('args', [*([name] for name in forecast.PRESETS), FORECAST_NO_PRESET])
 def test_forecast(project: Path, args: tuple[str, ...]) -> None:
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=forecast.ForecastConfig, presets=forecast.PRESETS, args=list(args)
     )
     small = dataclasses.replace(
@@ -139,7 +141,9 @@ def test_forecast(project: Path, args: tuple[str, ...]) -> None:
     snapshot = read_status(path=project / 'runs' / config.run_path / 'status.json')
     assert snapshot is not None
     assert 'evaluate[h24]' in snapshot.instances
-    assert {record.state for record in snapshot.instances.values()} == {tslab.InstanceState.DONE}
+    assert {record.state for record in snapshot.instances.values()} == {
+        tslab.lab.InstanceState.DONE
+    }
 
 
 def test_chain_study_runs_locally(project: Path, monkeypatch: pytest.MonkeyPatch) -> None:

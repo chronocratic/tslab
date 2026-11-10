@@ -1,6 +1,6 @@
 """Preset axes without experiment settings owned by each study."""
 
-from tslab.study import from_presets, SettingValue
+from tslab.lab.study import from_presets, SettingValue
 
 from {{package_name}} import classify, forecast
 

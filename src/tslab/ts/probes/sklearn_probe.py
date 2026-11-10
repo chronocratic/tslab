@@ -10,8 +10,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer
 import torch
 
-from tslab.enums import Split
-from tslab.interfaces import Probe
+from tslab.ml.split import Split
+from tslab.ts.interfaces import Probe
 
 __all__ = [
     'PROTOCOL_RANDOM_STATE',

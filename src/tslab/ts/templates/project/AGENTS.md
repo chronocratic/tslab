@@ -9,12 +9,12 @@ For agent-driven study runs, follow the [TSLab skill](.agents/skills/tslab/SKILL
 
 ## 1. What TSLab gives you
 
-- **Run:** `with tslab.Run(config=..., root=..., relative_path=...) as run:`
+- **Run:** `with tslab.lab.Run(config=..., root=..., relative_path=...) as run:`
   owns one folder, locks it, seeds Python, NumPy and torch, writes
   `config.yaml`, `meta.json` and `status.json`, and starts the trackers.
-- **Stage:** a cached, resumable step. Ready ones are `tslab.stages.train`,
-  `tslab.stages.encode` and `tslab.stages.evaluate`; your own are functions
-  decorated with `@tslab.stage`. A script calls stages like ordinary
+- **Stage:** a cached, resumable step. Ready ones are `tslab.ml.stages.train`,
+  `tslab.ts.stages.encode` and `tslab.ts.stages.evaluate`; your own are functions
+  decorated with `@tslab.lab.stage`. A script calls stages like ordinary
   functions, in any order, in loops and conditions.
 - **Instance:** one call of a stage in a run. A stage called several times in
   one run gets a `name` per call (`evaluate[h24]`, `add_noise[std-0.5]`).
@@ -22,9 +22,9 @@ For agent-driven study runs, follow the [TSLab skill](.agents/skills/tslab/SKILL
   settings passed in and the fingerprints of the input artifacts. A matching
   fingerprint loads the saved result instead of computing it. Anything else
   recomputes the instance and everything after it.
-- **Artifact:** what a stage returns, saved atomically: `tslab.Json`,
-  `tslab.Metrics` (also sent to the trackers), `tslab.Tensors` (safetensors),
-  `tslab.Checkpoint`.
+- **Artifact:** what a stage returns, saved atomically: `tslab.lab.Json`,
+  `tslab.lab.Metrics` (also sent to the trackers), `tslab.lab.Tensors` (safetensors),
+  `tslab.lab.Checkpoint`.
 
 Running the same command again is always safe: finished work is loaded,
 interrupted training resumes from its last checkpoint, failed and skipped
@@ -68,9 +68,9 @@ training class before reporting accuracy.
   1. a config: one frozen dataclass whose fields are the command-line flags
      (`--trainer.max-epochs`, `model:ts2vec`, `data:ucr`);
   2. `PRESETS`: named, complete configs for one run by hand;
-  3. `main(*, config)`: opens a `tslab.Run` and calls the stages.
+  3. `main(*, config)`: opens a `tslab.lab.Run` and calls the stages.
 
-  `tslab.parse_config(config_class=..., presets=PRESETS)` turns the command
+  `tslab.lab.parse_config(config_class=..., presets=PRESETS)` turns the command
   line into a config.
 - **`models.py`** builds `Models` with `chronocratic_model_choice(...)`: every
   model of chronocratic-models becomes a subcommand (`model:ts2vec`,
@@ -81,8 +81,8 @@ training class before reporting accuracy.
   builds a chronocratic augmentation producer. The return annotation decides
   which models offer the recipe (`ViewPair`: TSTCC, MHCCL, SimCLR, CoST;
   `AlignedPair`: TS2Vec; `SingleView`: AutoTCL).
-- **`stages.py`** holds your own `@tslab.stage` functions.
-- **`studies/<name>/study.py`** defines one `tslab.study.Study` as `study` per package;
+- **`stages.py`** holds your own `@tslab.lab.stage` functions.
+- **`studies/<name>/study.py`** defines one `tslab.lab.study.Study` as `study` per package;
   `studies/common/` holds shared datasets, recipes and grid builders.
 - **`machines/*.toml`** says where and how study runs execute (local or
   SLURM, output root, environment, SLURM limits, per-grid overrides). Its
@@ -140,7 +140,7 @@ A run folder looks like this:
 
 ```
 runs/<run path>/
-  config.yaml        the parsed config; tslab.load_config reloads it
+  config.yaml        the parsed config; tslab.lab.load_config reloads it
   meta.json          versions, git commit, host, config hashes
   status.json        state of every instance (done, failed, skipped, ...)
   logs/run.log       everything logged during the run
@@ -152,7 +152,7 @@ runs/<run path>/
 
 A run killed by a time limit shows as `interrupted`; the same command resumes it.
 
-`notebooks/analysis.ipynb` analyses a study with `tslab.analysis`: results, missing runs,
+`notebooks/analysis.ipynb` analyses a study with `tslab.lab.analysis`: results, missing runs,
 a critical-difference diagram, paired tests and a numbers file. Its comparison runs on
 data marked "SYNTHETIC DATA" until the swap line in the notebook is applied. Output lands
 in `notebooks/analysis/` (`stats/`, `tables/`, `coverage/`, `plots/<category>/<format>/`,
@@ -174,7 +174,7 @@ Build the model and dataset parts with `model_settings(choice=Models, name='ts2v
 and `data_settings(name='ucr', dataset_folder_path=Path(...), target_column_name='target')`;
 the settings classes behind `model:*` and `data:*` are generated and cannot be
 imported. A preset is complete: every field has a value. Put
-`tslab.REQUIRED` on a field that differs per machine (a dataset path); the
+`tslab.lab.REQUIRED` on a field that differs per machine (a dataset path); the
 command line or the study must then supply it.
 
 ### Add a setting to an experiment
@@ -182,21 +182,21 @@ command line or the study must then supply it.
 Add a field to the config dataclass with a default and an `Attributes:` line
 in the docstring; use it in `main`. Settings that cannot change a result
 (device, workers, logging intervals) are typed
-`Annotated[..., tslab.NotFingerprinted]` so they do not invalidate cached results.
+`Annotated[..., tslab.lab.NotFingerprinted]` so they do not invalidate cached results.
 
 ### Add a stage
 
 In `stages.py`:
 
 ```python
-@tslab.stage(name='my_step', output=tslab.Tensors, version=1)
+@tslab.lab.stage(name='my_step', output=tslab.lab.Tensors, version=1)
 def my_step(
     *,
-    run: tslab.Run,
-    name: tslab.InstanceName | None = None,  # only if one run calls it several times
-    representations: tslab.Tensors,  # artifacts are inputs
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,  # only if one run calls it several times
+    representations: tslab.lab.Tensors,  # artifacts are inputs
     strength: float,  # everything else is a fingerprinted setting
-) -> tslab.Tensors: ...
+) -> tslab.lab.Tensors: ...
 ```
 
 Then call it from `main` like a function:
@@ -209,7 +209,7 @@ Then call it from `main` like a function:
   hidden inside another object is not seen as an input.
 - An artifact you build by hand has no fingerprint and cannot be passed to a
   stage: compute it in a stage, or wrap a file with
-  `tslab.Tensors.external(path=...)` (or another artifact class).
+  `tslab.lab.Tensors.external(path=...)` (or another artifact class).
 - `in_place=True` lets a long stage write into its folder while running and
   resume from what it wrote.
 - Within one stage no instance name may be a prefix of another.
@@ -233,9 +233,9 @@ built-in one.
 ### Use your own model, data, probe or trainer
 
 Implement the TSLab interface and pass the object where the chronocratic one
-is passed now: `tslab.interfaces.DataSource`, `Encoder`, `DownstreamModel` or
+is passed now: `tslab.ml.interfaces.DataSource`, `Encoder`, `DownstreamModel` or
 `Probe`, `Trainer`; see the "Extending TSLab" page of the docs. Ready ones:
-`tslab.probes.SVMProbe`, `tslab.probes.RidgeProbe`, `tslab.lightning.LightningTrainer`.
+`tslab.ts.probes.SVMProbe`, `tslab.ts.probes.RidgeProbe`, `tslab.ml.lightning.LightningTrainer`.
 
 ### Use real data
 
@@ -354,5 +354,5 @@ The project uses the same tooling as TSLab: ruff with every rule on, ty, pytest.
   `--run.*` flags.
 - Do not change what a stage computes without bumping its `version`.
 - Do not run two processes on the same run folder; the second one fails with
-  `tslab.RunLockedError`.
+  `tslab.lab.RunLockedError`.
 - Do not commit `data/`, `runs/` or cluster secrets.

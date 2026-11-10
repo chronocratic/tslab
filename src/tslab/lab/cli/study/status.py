@@ -6,16 +6,16 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, resolve_request, UsageError, watch
-from tslab.cli.study.shared import _context_of, _states_of, _status_hints, _usage_errors
-from tslab.core.meta import hostname
-from tslab.study.commands import status
-from tslab.study.context import Context, expected_starts
-from tslab.study.definition import load_study
-from tslab.study.reporting.documents import show_document, status_document
-from tslab.study.reporting.outcome import EXIT_TIMEOUT, study_exit_code
-from tslab.study.reporting.report import log_show
-from tslab.study.reporting.wait import wait_for_study
+from tslab.lab.cli.common import print_json, resolve_request, UsageError, watch
+from tslab.lab.cli.study.shared import _context_of, _states_of, _status_hints, _usage_errors
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.commands import status
+from tslab.lab.study.context import Context, expected_starts
+from tslab.lab.study.definition import load_study
+from tslab.lab.study.reporting.documents import show_document, status_document
+from tslab.lab.study.reporting.outcome import EXIT_TIMEOUT, study_exit_code
+from tslab.lab.study.reporting.report import log_show
+from tslab.lab.study.reporting.wait import wait_for_study
 
 __all__ = ['Show', 'Status', 'Wait']
 
@@ -185,7 +185,7 @@ class Wait:
         )
         if self.json:
             document = status_document(context=context, exit_code=code)
-            document['schema'] = 'tslab.study-wait/1'
+            document['schema'] = 'tslab.lab.study-wait/1'
             document['waited_seconds'] = waited
             document['timed_out'] = code == EXIT_TIMEOUT
             print_json(document=document)

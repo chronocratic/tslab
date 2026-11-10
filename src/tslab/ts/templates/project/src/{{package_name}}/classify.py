@@ -11,21 +11,23 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from chronocratic.datasets import ClassificationSplitMode
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+import tslab.lab
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+from tslab.ml.tracking import build_trackers, TrackingOptions
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
     data_settings,
 )
-from tslab.adapters.chronocratic.models import (
+from tslab.ts.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     model_settings,
 )
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.probes import SVMProbe
-from tslab.tracking import build_trackers, TrackingOptions
+from tslab.ts.probes import SVMProbe
 
 from {{package_name}}.models import Models
 from {{package_name}}.stages import add_noise
@@ -55,7 +57,7 @@ class ClassifyConfig:
     encoder: ChronocraticEncoder = field(default_factory=ChronocraticEncoder)
     noise_levels: tuple[float, ...] = (0.1, 0.5)
     tracking: TrackingOptions = field(default_factory=TrackingOptions)
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
     run_path: Path = Path('classification')
     output_root: Path = Path('runs')
     seed: int = 0
@@ -98,7 +100,7 @@ def main(*, config: ClassifyConfig) -> None:
         TypeError: If ``config.data`` is not a classification dataset.
     """
     trackers = build_trackers(options=config.tracking)
-    with tslab.Run(
+    with tslab.lab.Run(
         config=config, root=config.output_root, relative_path=config.run_path, trackers=trackers
     ) as run:
         data = build_chronocratic_data_source(config=config.data)
@@ -107,8 +109,8 @@ def main(*, config: ClassifyConfig) -> None:
             raise TypeError(message)
         model = build_chronocratic_model(config=config.model, data_info=data.info)
         trainer = LightningTrainer(config=config.trainer)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-        representations = tslab.stages.encode(
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
+        representations = tslab.ts.stages.encode(
             run=run,
             trainer=trainer,
             model=model,
@@ -116,13 +118,15 @@ def main(*, config: ClassifyConfig) -> None:
             data=data,
             encoder=config.encoder,
         )
-        tslab.stages.evaluate(run=run, representations=representations, downstream_model=SVMProbe())
+        tslab.ts.stages.evaluate(
+            run=run, representations=representations, downstream_model=SVMProbe()
+        )
         for std in config.noise_levels:
             noisy = add_noise(run=run, name=f'std-{std}', representations=representations, std=std)
-            tslab.stages.evaluate(
+            tslab.ts.stages.evaluate(
                 run=run, name=f'noise-std-{std}', representations=noisy, downstream_model=SVMProbe()
             )
 
 
 if __name__ == '__main__':
-    main(config=tslab.parse_config(config_class=ClassifyConfig, presets=PRESETS))
+    main(config=tslab.lab.parse_config(config_class=ClassifyConfig, presets=PRESETS))

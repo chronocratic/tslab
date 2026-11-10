@@ -12,8 +12,8 @@ import subprocess
 import time
 from types import MappingProxyType
 
-from tslab.jobs.slurm.memory import parse_slurm_memory
-from tslab.jobs.slurm.timing import parse_sacct_duration, parse_slurm_duration
+from tslab.lab.jobs.slurm.memory import parse_slurm_memory
+from tslab.lab.jobs.slurm.timing import parse_sacct_duration, parse_slurm_duration
 
 __all__ = [
     'QOS_LIMIT_MARKERS',

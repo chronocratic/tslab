@@ -5,17 +5,19 @@ import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import tslab
-from tslab.core.tracker import Tracker
+import tslab.lab
+from tslab.lab.core.tracker import Tracker
 
 
 @dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
 @contextlib.contextmanager
-def run_in(*, root: Path, trackers: tuple[Tracker, ...] = ()) -> Generator[tslab.Run]:
-    with tslab.Run(config=Config(), root=root, relative_path=Path('r'), trackers=trackers) as run:
+def run_in(*, root: Path, trackers: tuple[Tracker, ...] = ()) -> Generator[tslab.lab.Run]:
+    with tslab.lab.Run(
+        config=Config(), root=root, relative_path=Path('r'), trackers=trackers
+    ) as run:
         yield run

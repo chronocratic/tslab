@@ -4,16 +4,17 @@ from pathlib import Path
 import signal
 from typing import override
 
-from integration_helpers import run_in
-from lightning_toy import FAST, ToyData, ToyRegressor
 import pytest
 import torch
 
-import tslab
-from tslab.core.status import read_status
-from tslab.enums import RunState
-from tslab.lightning import LightningTrainer
-from tslab.stages import train as train_stage
+from tests.ml.integration.lightning_toy import FAST, ToyData, ToyRegressor
+from tests.support.integration_helpers import run_in
+import tslab.lab
+from tslab.lab.core.status import read_status
+from tslab.lab.enums import RunState
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer
+from tslab.ml.stages import train as train_stage
 
 
 class _SignalledRegressor(ToyRegressor):
@@ -46,7 +47,7 @@ def _run_signalled(*, root: Path, min_epochs: int = 0) -> None:
 
 @pytest.mark.slow
 def test_usr2_during_fit_saves_last_and_resumes(tmp_path: Path) -> None:
-    with pytest.raises(tslab.JobTimeLimitSignal):
+    with pytest.raises(tslab.lab.JobTimeLimitSignal):
         _run_signalled(root=tmp_path)
     checkpoint = tmp_path / 'r' / 'train' / 'default' / 'last.ckpt'
     assert checkpoint.is_file()
@@ -64,6 +65,6 @@ def test_usr2_during_fit_saves_last_and_resumes(tmp_path: Path) -> None:
 
 @pytest.mark.slow
 def test_usr2_with_min_epochs_still_stops(tmp_path: Path) -> None:
-    with pytest.raises(tslab.JobTimeLimitSignal):
+    with pytest.raises(tslab.lab.JobTimeLimitSignal):
         _run_signalled(root=tmp_path, min_epochs=50)
     assert (tmp_path / 'r' / 'train' / 'default' / 'last.ckpt').is_file()

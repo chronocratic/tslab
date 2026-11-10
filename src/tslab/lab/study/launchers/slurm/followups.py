@@ -7,14 +7,14 @@ from pathlib import Path
 import shlex
 import time
 
-from tslab.jobs.slurm import SlurmError
-from tslab.study.context import Context
-from tslab.study.definition import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
-from tslab.study.launchers.slurm.submit import submit_helper_job
-from tslab.study.machine import SlurmSettings
-from tslab.study.machine.profile import wants_retry_followup
-from tslab.study.paths import study_folder
-from tslab.study.records import JobRecord, submission_lock
+from tslab.lab.jobs.slurm import SlurmError
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
+from tslab.lab.study.launchers.slurm.submit import submit_helper_job
+from tslab.lab.study.machine import SlurmSettings
+from tslab.lab.study.machine.profile import wants_retry_followup
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import JobRecord, submission_lock
 
 __all__ = ['queue_followups']
 

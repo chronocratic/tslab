@@ -1,8 +1,8 @@
 """Local helpers for job processes."""
 
-from tslab.jobs.local.background import start_detached, start_keep_awake, stop_keep_awake
-from tslab.jobs.local.environment import without_scheduler_variables
-from tslab.jobs.local.gpus import (
+from tslab.lab.jobs.local.background import start_detached, start_keep_awake, stop_keep_awake
+from tslab.lab.jobs.local.environment import without_scheduler_variables
+from tslab.lab.jobs.local.gpus import (
     busy_gpus,
     gpu_lock_folder,
     GpuDiscovery,
@@ -12,8 +12,8 @@ from tslab.jobs.local.gpus import (
     try_lease_gpu,
     visible_gpus,
 )
-from tslab.jobs.local.output import tail_lines, TaskInfo, TaskOutput
-from tslab.jobs.local.pool import (
+from tslab.lab.jobs.local.output import tail_lines, TaskInfo, TaskOutput
+from tslab.lab.jobs.local.pool import (
     OnEnd,
     OnEvent,
     OnLine,
@@ -23,7 +23,7 @@ from tslab.jobs.local.pool import (
     PoolCommand,
     run_commands,
 )
-from tslab.jobs.local.process import (
+from tslab.lab.jobs.local.process import (
     boot_id,
     process_alive,
     ProcessResult,
@@ -31,8 +31,8 @@ from tslab.jobs.local.process import (
     stop_on_signals,
     StopRequest,
 )
-from tslab.jobs.local.shell import export_lines
-from tslab.jobs.local.watchdog import Watchdog
+from tslab.lab.jobs.local.shell import export_lines
+from tslab.lab.jobs.local.watchdog import Watchdog
 
 __all__ = [
     'MPS_GPU',

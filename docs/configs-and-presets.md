@@ -5,11 +5,11 @@
 Every field becomes a command-line flag through
 [tyro](https://brentyi.github.io/tyro/): `--trainer.max-epochs 50`,
 `--run-path ts2vec/Coffee/seed_0`. Union fields become subcommands:
-`model:ts2vec`, `data:ucr`. `tslab.parse_config` reads the command line, and
+`model:ts2vec`, `data:ucr`. `tslab.lab.parse_config` reads the command line, and
 `Run` writes the result to `config.yaml`.
 
 ```python
-config = tslab.parse_config(config_class=ClassifyConfig, presets=PRESETS)
+config = tslab.lab.parse_config(config_class=ClassifyConfig, presets=PRESETS)
 ```
 
 Flags may come before or after a subcommand: `model:ts2vec --seed 3` and
@@ -47,8 +47,8 @@ Completeness is deliberate:
 cannot be imported). A real recipe sets several model and trainer values:
 
 ```python
-from tslab.adapters.chronocratic.models import model_settings
-from tslab.adapters.chronocratic.datasets import data_settings
+from tslab.ts.adapters.chronocratic.models import model_settings
+from tslab.ts.adapters.chronocratic.datasets import data_settings
 
 PRESETS = {
     'ts2vec-paper': (
@@ -67,9 +67,9 @@ PRESETS = {
 Keyword values go straight into the chosen member; fields not given keep
 their defaults.
 
-### `tslab.REQUIRED`
+### `tslab.lab.REQUIRED`
 
-A preset may put `tslab.REQUIRED` on a field its author cannot or does not
+A preset may put `tslab.lab.REQUIRED` on a field its author cannot or does not
 want to know — a dataset path that lives in a different folder on each
 machine. The marker is **optional**; presets without it are unaffected.
 
@@ -134,8 +134,10 @@ A full guide to studies is on the [Studies and HPC](studies.md) page.
 ## Reproducing a run
 
 ```python
-config = tslab.load_config(config_class=ClassifyConfig, path=Path('runs/.../config.yaml'))
-config = tslab.parse_config(config_class=ClassifyConfig, default=config)  # flags change it further
+config = tslab.lab.load_config(config_class=ClassifyConfig, path=Path('runs/.../config.yaml'))
+config = tslab.lab.parse_config(
+    config_class=ClassifyConfig, default=config
+)  # flags change it further
 ```
 
 A run reproduced from its `config.yaml` has the same fingerprints, so it loads

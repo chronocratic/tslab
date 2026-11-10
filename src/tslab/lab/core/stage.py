@@ -20,33 +20,33 @@ import traceback
 from typing import Any, cast, ClassVar, get_type_hints, override
 import uuid
 
-from tslab.core.artifact import (
+from tslab.lab.core.artifact import (
     Artifact,
     ArtifactIdentity,
     bind_identity,
     UnavailableArtifact,
     UnavailableReason,
 )
-from tslab.core.files import atomic_write_json, atomic_write_text, replace_directory
-from tslab.core.fingerprint import (
+from tslab.lab.core.files import atomic_write_json, atomic_write_text, replace_directory
+from tslab.lab.core.fingerprint import (
     canonicalize,
     compute_fingerprint,
     FINGERPRINT_FORMAT_VERSION,
     is_not_fingerprinted,
 )
-from tslab.core.meta.instance import (
+from tslab.lab.core.meta.instance import (
     can_resume,
     identity_from_meta,
     instance_meta_document,
     stale_reason,
 )
-from tslab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
-from tslab.core.ranks import is_writer_process, RankAgreement
-from tslab.core.run import JobTimeLimitSignal, Run
-from tslab.core.status import format_instance_id, InstanceRecord, StatusFileError, utc_now_iso
-from tslab.core.text import describe_error
-from tslab.enums import InstanceState
-from tslab.jobs.slurm import task_count
+from tslab.lab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
+from tslab.lab.core.ranks import is_writer_process, RankAgreement
+from tslab.lab.core.run import JobTimeLimitSignal, Run
+from tslab.lab.core.status import format_instance_id, InstanceRecord, StatusFileError, utc_now_iso
+from tslab.lab.core.text import describe_error
+from tslab.lab.enums import InstanceState
+from tslab.lab.jobs.slurm import task_count
 
 __all__ = ['FunctionStage', 'Stage', 'stage']
 
@@ -142,7 +142,7 @@ class Stage[Out: Artifact](ABC):
     def _invoke(self, *, arguments: dict[str, object]) -> Artifact:
         run = arguments.get('run')
         if not isinstance(run, Run):
-            message = f'stage {self.name!r} must be called with run=<tslab.Run>'
+            message = f'stage {self.name!r} must be called with run=<tslab.lab.Run>'
             raise TypeError(message)
         if not is_writer_process() and not self.all_ranks:
             _LOGGER.info(
@@ -591,7 +591,7 @@ class FunctionStage[**P, Out: Artifact](Stage[Out]):
         if 'name' in kwargs and not self._accepts_name:
             message = (
                 f'stage {self.name!r} is single-instance; to allow name=, add a parameter '
-                f'`name: tslab.InstanceName | None = None` to {self._qualname}'
+                f'`name: tslab.lab.InstanceName | None = None` to {self._qualname}'
             )
             raise TypeError(message)
         # A failed, skipped or dry-run instance returns the UnavailableArtifact sentinel
@@ -622,14 +622,14 @@ def stage[**P, Out: Artifact](
     """Turn a function into a ``Stage``.
 
     The function must take keyword-only parameters, including ``run``. To call
-    the stage several times in one run, add ``name: tslab.InstanceName | None = None``;
+    the stage several times in one run, add ``name: tslab.lab.InstanceName | None = None``;
     without it the stage is single-instance.
 
     Example::
 
-        @tslab.stage(name='transform', output=tslab.Tensors)
-        def transform(*, run: tslab.Run, name: tslab.InstanceName | None = None,
-                   representations: tslab.Tensors, epsilon: float) -> tslab.Tensors:
+        @tslab.lab.stage(name='transform', output=tslab.lab.Tensors)
+        def transform(*, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None,
+                   representations: tslab.lab.Tensors, epsilon: float) -> tslab.lab.Tensors:
             ...
 
     Args:

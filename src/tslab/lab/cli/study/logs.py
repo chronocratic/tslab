@@ -10,13 +10,13 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import resolve_request
-from tslab.cli.study.shared import _context_of
-from tslab.core.meta import hostname
-from tslab.core.paths import LOGS_DIRECTORY
-from tslab.study.context import Context
-from tslab.study.launchers.local.pid_file import LAUNCH_LOGS
-from tslab.study.paths import study_folder
+from tslab.lab.cli.common import resolve_request
+from tslab.lab.cli.study.shared import _context_of
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.paths import LOGS_DIRECTORY
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.local.pid_file import LAUNCH_LOGS
+from tslab.lab.study.paths import study_folder
 
 __all__ = ['Logs']
 

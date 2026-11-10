@@ -2,34 +2,36 @@
 
 ## Core
 
-The names below are importable from `tslab` (including `tslab.REQUIRED`, the
-optional marker for preset values the preset cannot know). `ModelAsEncoder` is
-defined in `stages` and listed under Ready stages; `RunStatus` and `Tracker`
+The names below are importable from `tslab.lab` (including `tslab.lab.REQUIRED`, the
+optional marker for preset values the preset cannot know). `RunStatus` and `Tracker`
 are defined in `core` and documented here.
 
 ```{eval-rst}
-.. automodule:: tslab
+.. automodule:: tslab.lab
    :members:
    :imported-members:
-   :exclude-members: ModelAsEncoder
 ```
 
 ## Enums
 
 The fixed sets of choices that more than one package uses. `InstanceState`,
-`LogLevel`, `RunState` and `WandbMode` are also importable from `tslab` and documented under Core.
+`LogLevel` and `RunState` are also importable from `tslab.lab` and documented under Core.
 
 ```{eval-rst}
-.. automodule:: tslab.enums
+.. automodule:: tslab.lab.enums
    :members:
    :imported-members:
-   :exclude-members: InstanceState, LogLevel, RunState, WandbMode
+   :exclude-members: InstanceState, LogLevel, RunState
 ```
 
 ## Interfaces
 
 ```{eval-rst}
-.. automodule:: tslab.interfaces
+.. automodule:: tslab.ml.interfaces
+   :members:
+   :imported-members:
+
+.. automodule:: tslab.ts.interfaces
    :members:
    :imported-members:
 ```
@@ -37,26 +39,30 @@ The fixed sets of choices that more than one package uses. `InstanceState`,
 ## Ready stages
 
 ```{eval-rst}
-.. automodule:: tslab.stages
+.. automodule:: tslab.ml.stages
+   :members:
+   :imported-members:
+
+.. automodule:: tslab.ts.stages
    :members:
    :imported-members:
 ```
 
 ## Studies
 
-The study layer; user study modules import only from `tslab.study`, and that
+The study layer; user study modules import only from `tslab.lab.study`, and that
 import never pulls in heavy code. The commands (`submit`, `status`,
 `resubmit`, `results`) are the `tslab study` CLI; see
 [Studies and HPC](studies.md).
 
 ```{eval-rst}
-.. autoclass:: tslab.study.Study
-.. autoclass:: tslab.study.Grid
-.. autoclass:: tslab.study.Override
-.. autoclass:: tslab.study.StudyRun
-.. autofunction:: tslab.study.setting_axis
-.. autofunction:: tslab.study.from_presets
-.. autodata:: tslab.study.DEFAULT_RUN_SETTINGS
+.. autoclass:: tslab.lab.study.Study
+.. autoclass:: tslab.lab.study.Grid
+.. autoclass:: tslab.lab.study.Override
+.. autoclass:: tslab.lab.study.StudyRun
+.. autofunction:: tslab.lab.study.setting_axis
+.. autofunction:: tslab.lab.study.from_presets
+.. autodata:: tslab.lab.study.DEFAULT_RUN_SETTINGS
 ```
 
 ## SLURM job helpers
@@ -65,7 +71,7 @@ This provisional API may move to its own package; the names stay. These general
 helpers have no TSLab dependency.
 
 ```{eval-rst}
-.. automodule:: tslab.jobs.slurm
+.. automodule:: tslab.lab.jobs.slurm
    :members:
    :imported-members:
 ```
@@ -87,7 +93,7 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## Time series
 
 ```{eval-rst}
-.. automodule:: tslab.tasks
+.. automodule:: tslab.ts.tasks
    :members:
    :imported-members:
 ```
@@ -95,7 +101,7 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## Probes
 
 ```{eval-rst}
-.. automodule:: tslab.probes
+.. automodule:: tslab.ts.probes
    :members:
    :imported-members:
 ```
@@ -103,7 +109,7 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## Lightning
 
 ```{eval-rst}
-.. automodule:: tslab.lightning
+.. automodule:: tslab.ml.lightning
    :members:
    :imported-members:
 ```
@@ -111,7 +117,7 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## Tracking
 
 ```{eval-rst}
-.. automodule:: tslab.tracking
+.. automodule:: tslab.ml.tracking
    :members:
    :imported-members:
 ```
@@ -119,7 +125,7 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## Analysis
 
 ```{eval-rst}
-.. automodule:: tslab.analysis
+.. automodule:: tslab.lab.analysis
    :members:
    :imported-members:
 ```
@@ -127,11 +133,11 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
 ## chronocratic adapters
 
 ```{eval-rst}
-.. automodule:: tslab.adapters.chronocratic.models
+.. automodule:: tslab.ts.adapters.chronocratic.models
    :members:
    :imported-members:
 
-.. automodule:: tslab.adapters.chronocratic.datasets
+.. automodule:: tslab.ts.adapters.chronocratic.datasets
    :members:
    :imported-members:
 ```

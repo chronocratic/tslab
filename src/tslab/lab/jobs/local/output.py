@@ -10,7 +10,7 @@ import threading
 from typing import TextIO
 import uuid
 
-from tslab.jobs.local.process import ProcessResult
+from tslab.lab.jobs.local.process import ProcessResult
 
 __all__ = ['TaskInfo', 'TaskOutput', 'tail_lines']
 

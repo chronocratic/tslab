@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
-from tslab.cli.common.errors import UsageError
-from tslab.study.project import (
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.study.project import (
     expand_study,
     load_project_settings,
     machine_for_host,

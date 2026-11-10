@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.jobs.slurm import (
+from tslab.lab.jobs.slurm import (
     array_spec,
     check_script_text,
     export_lines,

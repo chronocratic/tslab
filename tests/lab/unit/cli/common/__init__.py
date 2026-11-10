@@ -1,1 +1,1 @@
-"""Unit tests for the ``tslab.cli.common`` package."""
+"""Unit tests for the ``tslab.lab.cli.common`` package."""

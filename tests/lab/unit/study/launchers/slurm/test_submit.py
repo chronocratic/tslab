@@ -8,23 +8,23 @@ import sys
 
 import pytest
 
+from tests.lab.unit.study.configs import grid
+from tests.lab.unit.study.helpers import context, jobs_of, no_sleep
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
-from tests.unit.study.configs import grid
-from tests.unit.study.helpers import context, jobs_of, no_sleep
-from tslab.enums import AfterCondition, LauncherKind, Satisfy
-from tslab.study import Study
-from tslab.study.commands import submit
-from tslab.study.definition import expand_runs
-from tslab.study.launchers.common.launch import launch as _launch
-from tslab.study.launchers.common.types import LaunchError, LaunchReport
-from tslab.study.launchers.slurm.backend import SlurmBackend
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.paths import study_folder
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
-from tslab.study.plan_after import AfterTarget
-from tslab.study.records import read_jobs
+from tslab.lab.enums import AfterCondition, LauncherKind, Satisfy
+from tslab.lab.study import Study
+from tslab.lab.study.commands import submit
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.launchers.common.launch import launch as _launch
+from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport
+from tslab.lab.study.launchers.slurm.backend import SlurmBackend
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
+from tslab.lab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
+from tslab.lab.study.plan_after import AfterTarget
+from tslab.lab.study.records import read_jobs
 
 
 @pytest.fixture

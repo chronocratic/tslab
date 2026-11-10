@@ -3,8 +3,8 @@
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
 
-from tslab.jobs.slurm import format_slurm_memory
-from tslab.study.launchers.common.types import JobUsage, Resources
+from tslab.lab.jobs.slurm import format_slurm_memory
+from tslab.lab.study.launchers.common.types import JobUsage, Resources
 
 __all__ = ['state_hint']
 

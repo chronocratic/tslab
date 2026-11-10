@@ -37,7 +37,7 @@ from typing import (
 
 import tyro
 
-from tslab.core.config import ConfigFileError
+from tslab.lab.core.config import ConfigFileError
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance

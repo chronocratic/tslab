@@ -4,15 +4,15 @@ from typing import Annotated
 
 import pytest
 
-from tslab.core.fingerprint import is_not_fingerprinted, NotFingerprinted
-from tslab.core.markers import (
+from tslab.lab.core.fingerprint import is_not_fingerprinted, NotFingerprinted
+from tslab.lab.core.markers import (
     HardwareSetting,
     is_hardware_setting,
     is_machine_setting,
     MachineSetting,
 )
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.tracking import TrackingOptions
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.tracking import TrackingOptions
 
 
 def test_machine_marker_and_subclass() -> None:
@@ -45,8 +45,8 @@ def test_marked_fields() -> None:
 
 @pytest.mark.chronocratic
 def test_chronocratic_hardware_fields() -> None:
-    from tslab.adapters.chronocratic.datasets import data_settings  # noqa: PLC0415 # why: optional extra
-    from tslab.adapters.chronocratic.models import ChronocraticEncoder  # noqa: PLC0415 # why: optional extra
+    from tslab.ts.adapters.chronocratic.datasets import data_settings  # noqa: PLC0415 # why: optional extra
+    from tslab.ts.adapters.chronocratic.models import ChronocraticEncoder  # noqa: PLC0415 # why: optional extra
 
     encoder = typing.get_type_hints(ChronocraticEncoder, include_extras=True)
     assert is_hardware_setting(annotation=encoder['device'])

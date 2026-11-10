@@ -7,8 +7,8 @@ import time
 
 import pytest
 
-from tslab.core.lock import acquire_lock, is_run_active, release_lock, RunLockedError
-from tslab.core.run import Run, RunOptions
+from tslab.lab.core.lock import acquire_lock, is_run_active, release_lock, RunLockedError
+from tslab.lab.core.run import Run, RunOptions
 
 
 @dataclass(frozen=True, kw_only=True)

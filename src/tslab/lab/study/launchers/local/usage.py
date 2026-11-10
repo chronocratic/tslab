@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 
-from tslab.core.files import read_json_object
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import JobUsage
+from tslab.lab.core.files import read_json_object
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import JobUsage
 
 __all__ = ['usage']
 

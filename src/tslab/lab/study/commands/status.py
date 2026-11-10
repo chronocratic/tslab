@@ -2,10 +2,10 @@
 
 from collections.abc import Mapping, Sequence
 
-from tslab.enums import StudyState
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import QueuedJob
-from tslab.study.reporting.report import log_status
+from tslab.lab.enums import StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import QueuedJob
+from tslab.lab.study.reporting.report import log_status
 
 __all__ = ['parse_states', 'status']
 

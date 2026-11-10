@@ -6,10 +6,10 @@ from pathlib import Path
 import re
 from typing import cast
 
-from tslab.core.codec import decode_dataclass
-from tslab.core.config import ConfigFileError
-from tslab.core.text import unknown_key_message
-from tslab.study.definition import expand_variables, SettingValue
+from tslab.lab.core.codec import decode_dataclass
+from tslab.lab.core.config import ConfigFileError
+from tslab.lab.core.text import unknown_key_message
+from tslab.lab.study.definition import expand_variables, SettingValue
 
 __all__ = [
     'MachineProfileError',

@@ -6,17 +6,17 @@ import sys
 import pandas as pd
 import pytest
 
-from tests.unit.study.project import write_toy_project
-from tslab.analysis.results import (
+from tests.lab.unit.study.project import write_toy_project
+from tslab.lab.analysis.results import (
     against_baseline,
     AnalysisMetric,
     load_results,
     method_matrix,
     missing_runs,
 )
-from tslab.analysis.stats import Direction
-from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
-from tslab.study.definition import load_study
+from tslab.lab.analysis.stats import Direction
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+from tslab.lab.study.definition import load_study
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -57,7 +57,7 @@ def test_load_results_runs_from_project_root(
         seen['cwd'], seen['machine'] = Path.cwd(), machine
         return [{'grid': 'g', 'instance': None}]
 
-    monkeypatch.setattr('tslab.study.reporting.result_table.study_results', fake)
+    monkeypatch.setattr('tslab.lab.study.reporting.result_table.study_results', fake)
     (tmp_path / 'proj').mkdir()
     monkeypatch.chdir(tmp_path)
     frame = load_results(
@@ -78,7 +78,7 @@ def test_load_results_restores_cwd_on_error(
         message = 'boom'
         raise RuntimeError(message)
 
-    monkeypatch.setattr('tslab.study.reporting.result_table.study_results', fake)
+    monkeypatch.setattr('tslab.lab.study.reporting.result_table.study_results', fake)
     (tmp_path / 'proj').mkdir()
     monkeypatch.chdir(tmp_path)
     with pytest.raises(RuntimeError, match='boom'):

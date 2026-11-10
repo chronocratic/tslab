@@ -25,7 +25,7 @@ import chronocratic.models
 from chronocratic.models.augmentation import AugmentationProducer
 import tyro
 
-from tslab.adapters.chronocratic.generated import make_settings_class, unknown_settings
+from tslab.ts.adapters.chronocratic.generated import make_settings_class, unknown_settings
 
 __all__ = [
     'DEFAULT_AUGMENTATION',

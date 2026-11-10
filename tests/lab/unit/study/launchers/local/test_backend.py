@@ -12,7 +12,7 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finished_pid,
     jobs_of,
@@ -21,25 +21,25 @@ from tests.unit.study.helpers import (
     study_directory,
     write_launch,
 )
-from tslab.core.meta import hostname
-from tslab.enums import JobPhase, LocalTaskState, Retry
-from tslab.jobs.local import GpuDiscovery
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.commands import submit
-from tslab.study.commands.submit import submit_runs
-from tslab.study.definition import StudyRun
-from tslab.study.launchers.common.types import LaunchError, LaunchReport, Resources
-import tslab.study.launchers.local.backend as local_backend
-from tslab.study.launchers.local.backend import (
+from tslab.lab.core.meta import hostname
+from tslab.lab.enums import JobPhase, LocalTaskState, Retry
+from tslab.lab.jobs.local import GpuDiscovery
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.commands import submit
+from tslab.lab.study.commands.submit import submit_runs
+from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, Resources
+import tslab.lab.study.launchers.local.backend as local_backend
+from tslab.lab.study.launchers.local.backend import (
     _auto_gpu_count,
     _phase_of,
     LocalBackend,
     LocalResources,
 )
-from tslab.study.launchers.local.run import LocalLauncher
-from tslab.study.launchers.local.states import _is_local_job_id
-from tslab.study.machine import FollowupSettings, LocalSettings
-from tslab.study.plan import JobGroup, plan_jobs, PlannedTask, ResolvedRun
+from tslab.lab.study.launchers.local.run import LocalLauncher
+from tslab.lab.study.launchers.local.states import _is_local_job_id
+from tslab.lab.study.machine import FollowupSettings, LocalSettings
+from tslab.lab.study.plan import JobGroup, plan_jobs, PlannedTask, ResolvedRun
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping
@@ -186,7 +186,7 @@ def test_cpus_per_run_auto_without_nvidia_smi_uses_max_parallel(
         monkeypatch.setenv('PATH', str(tmp_path / 'no-binaries'))
         monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
         # why: no nvidia-smi and no Apple GPU, so the auto profile sees no GPU
-        monkeypatch.setattr('tslab.jobs.local.gpus.platform.system', lambda: 'Linux')
+        monkeypatch.setattr('tslab.lab.jobs.local.gpus.platform.system', lambda: 'Linux')
         resources = _local_resources(
             project=project,
             local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=2),
@@ -303,7 +303,9 @@ def test_after_submit_does_not_retry_empty_submission(*, project: Path) -> None:
 
 def test_detach_delegates_to_pid_file(*, project: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    monkeypatch.setattr('tslab.study.launchers.local.pid_file.detach_launch', lambda **_kwargs: 7)
+    monkeypatch.setattr(
+        'tslab.lab.study.launchers.local.pid_file.detach_launch', lambda **_kwargs: 7
+    )
 
     assert (
         LocalBackend().detach(context=ctx, arguments=('--study',), wait_command='tslab status') == 7
@@ -315,7 +317,7 @@ def test_usage_delegates_with_gpu_ids(*, project: Path, monkeypatch: pytest.Monk
     usage = {'local-1-1_0': object()}
     gpu_ids = {'local-1-1_0': '0'}
     monkeypatch.setattr(
-        'tslab.study.launchers.local.usage.usage', lambda **_kwargs: (usage, gpu_ids)
+        'tslab.lab.study.launchers.local.usage.usage', lambda **_kwargs: (usage, gpu_ids)
     )
 
     returned_usage, returned_gpu_ids = LocalBackend().usage(context=ctx)
@@ -395,7 +397,9 @@ def test_cancel_delegates_to_local_cancel(
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
     result = (0, ['local-1-1'])
-    monkeypatch.setattr('tslab.study.launchers.local.cancel.cancel_local', lambda **_kwargs: result)
+    monkeypatch.setattr(
+        'tslab.lab.study.launchers.local.cancel.cancel_local', lambda **_kwargs: result
+    )
 
     assert LocalBackend().cancel(context=ctx, dry_run=True, signal=None) is result
 

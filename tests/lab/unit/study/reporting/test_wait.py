@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, submit_study
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import context, submit_study
-from tslab.cli import main
-from tslab.enums import JobPhase, StudyState
-from tslab.study.context import Context
-from tslab.study.reporting.outcome import EXIT_TIMEOUT
-from tslab.study.reporting.wait import wait_for_study
+from tslab.lab.cli import main
+from tslab.lab.enums import JobPhase, StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.reporting.outcome import EXIT_TIMEOUT
+from tslab.lab.study.reporting.wait import wait_for_study
 
 
 def _with_states(
@@ -156,7 +156,7 @@ def test_wait_keeps_going_through_unknown_states_and_warns_once(
     )
     prepared = iter([unknown, unknown, unknown, done])
     elapsed = [0.0]
-    with caplog.at_level(logging.WARNING, logger='tslab.study.reporting.wait'):
+    with caplog.at_level(logging.WARNING, logger='tslab.lab.study.reporting.wait'):
         code, _, _ = wait_for_study(
             load=prepared.__next__,
             interval=10,
@@ -200,7 +200,7 @@ def test_wait_logs_only_when_counts_change(project: Path, caplog: pytest.LogCapt
     done = _with_states(context=base, states=(StudyState.DONE,) * len(base.reports))
     prepared = iter([running, running, done])
     elapsed = [0.0]
-    with caplog.at_level(logging.INFO, logger='tslab.study.reporting.wait'):
+    with caplog.at_level(logging.INFO, logger='tslab.lab.study.reporting.wait'):
         wait_for_study(
             load=prepared.__next__,
             interval=10,
@@ -209,7 +209,7 @@ def test_wait_logs_only_when_counts_change(project: Path, caplog: pytest.LogCapt
             sleep=lambda seconds: elapsed.__setitem__(0, elapsed[0] + seconds),
             clock=lambda: elapsed[0],
         )
-    logger = 'tslab.study.reporting.wait'
+    logger = 'tslab.lab.study.reporting.wait'
     lines = [record.getMessage() for record in caplog.records if record.name == logger]
     assert len(lines) == 2
     assert 'running 4' in lines[0]
@@ -300,7 +300,7 @@ def test_wait_json_reports_timeout(
         )
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 124
-    assert document['schema'] == 'tslab.study-wait/1'
+    assert document['schema'] == 'tslab.lab.study-wait/1'
     assert document['exit_code'] == 124
     assert document['timed_out'] is True
 

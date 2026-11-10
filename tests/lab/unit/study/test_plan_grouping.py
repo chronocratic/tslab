@@ -5,17 +5,17 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
-from tests.unit.study.configs import grid, PRESETS
-from tslab.core.status import utc_now_iso
-from tslab.enums import LauncherKind
-from tslab.study import from_presets, Study, StudyRun
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.definition import expand_runs, setting_axis
-from tslab.study.launchers.tables import JOB_RECORDS
-from tslab.study.machine import MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.paths import next_job_file
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, validate_jobs
-from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
+from tests.lab.unit.study.configs import grid, PRESETS
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study import from_presets, Study, StudyRun
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.definition import expand_runs, setting_axis
+from tslab.lab.study.launchers.tables import JOB_RECORDS
+from tslab.lab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.lab.study.paths import next_job_file
+from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, validate_jobs
+from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 
 @pytest.fixture

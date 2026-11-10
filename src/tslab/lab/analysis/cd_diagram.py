@@ -17,8 +17,8 @@ from matplotlib.font_manager import FontProperties
 import pandas as pd
 import scipy.stats
 
-from tslab.analysis.report import Caption
-from tslab.analysis.stats import (
+from tslab.lab.analysis.report import Caption
+from tslab.lab.analysis.stats import (
     average_ranks,
     DEFAULT_ALPHA,
     Direction,

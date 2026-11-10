@@ -7,7 +7,7 @@ adapters are independent: either can be used without the other.
 ## Models
 
 ```python
-from tslab.adapters.chronocratic.models import (
+from tslab.ts.adapters.chronocratic.models import (
     ChronocraticEncoder,
     build_chronocratic_model,
     chronocratic_model_choice,
@@ -65,7 +65,7 @@ each series once for all horizons.
 ## Datasets
 
 ```python
-from tslab.adapters.chronocratic.datasets import (
+from tslab.ts.adapters.chronocratic.datasets import (
     ChronocraticDataChoice,
     build_chronocratic_data_source,
     data_settings,

@@ -6,9 +6,9 @@ from typing import cast
 
 import pytest
 
-from tslab.adapters.chronocratic.datasets import ucr_datasets, uea_datasets
-from tslab.adapters.chronocratic.datasets.settings import ChronocraticDataChoice
-from tslab.study import check_paths, Settings
+from tslab.lab.study import check_paths, Settings
+from tslab.ts.adapters.chronocratic.datasets import ucr_datasets, uea_datasets
+from tslab.ts.adapters.chronocratic.datasets.settings import ChronocraticDataChoice
 
 pytestmark = pytest.mark.chronocratic
 

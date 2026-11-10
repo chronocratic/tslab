@@ -8,8 +8,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast, TextIO
 
-from tslab.core.status import utc_now_iso
-from tslab.enums import (
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import (
     AfterCondition,
     ChainedRetry,
     CheckStatus,
@@ -18,7 +18,7 @@ from tslab.enums import (
     LauncherKind,
     StudyState,
 )
-from tslab.jobs.slurm import (
+from tslab.lab.jobs.slurm import (
     FAILING_JOB_STATES,
     format_slurm_duration,
     format_slurm_memory,
@@ -32,12 +32,12 @@ from tslab.jobs.slurm import (
     slurm_available,
     SlurmError,
 )
-from tslab.study.command_names import CHAIN_EXIT_COMMAND
-from tslab.study.context import Context
-from tslab.study.definition import chained_grids, Study
-from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers.common.launch import launch
-from tslab.study.launchers.common.types import (
+from tslab.lab.study.command_names import CHAIN_EXIT_COMMAND
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import chained_grids, Study
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.launchers.common.launch import launch
+from tslab.lab.study.launchers.common.types import (
     JobStates,
     JobUsage,
     LaunchError,
@@ -45,25 +45,30 @@ from tslab.study.launchers.common.types import (
     QueuedJob,
     Resources,
 )
-from tslab.study.launchers.slurm.doctor import cluster_checks, slurm_check
-from tslab.study.launchers.slurm.hints import state_hint
-from tslab.study.launchers.slurm.job_script import foreground_script
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.study.launchers.slurm.slurm_file import write_slurm_file
-from tslab.study.launchers.slurm.states import (
+from tslab.lab.study.launchers.slurm.doctor import cluster_checks, slurm_check
+from tslab.lab.study.launchers.slurm.hints import state_hint
+from tslab.lab.study.launchers.slurm.job_script import foreground_script
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
+from tslab.lab.study.launchers.slurm.slurm_file import write_slurm_file
+from tslab.lab.study.launchers.slurm.states import (
     _query_states,
     expected_starts,
     followup_job_ids,
     slurm_task_ids,
 )
-from tslab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
-from tslab.study.machine import MachineOverride, MachineProfile, MachineProfileError, SlurmSettings
-from tslab.study.machine.slurm import slurm_for
-from tslab.study.paths import study_folder
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord, submission_lock
-from tslab.study.reporting.state import RunReport
+from tslab.lab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
+from tslab.lab.study.machine import (
+    MachineOverride,
+    MachineProfile,
+    MachineProfileError,
+    SlurmSettings,
+)
+from tslab.lab.study.machine.slurm import slurm_for
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord, submission_lock
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['SlurmBackend']
 
@@ -288,7 +293,7 @@ class SlurmBackend:
         """The exit code of the queued follow-up jobs; 0 without one."""
         # why: the followups module reads the launch module, which reads the backends
         # door, so a module-level import would cycle
-        from tslab.study.launchers.slurm.followups import queue_followups  # noqa: PLC0415
+        from tslab.lab.study.launchers.slurm.followups import queue_followups  # noqa: PLC0415
 
         code, _ = queue_followups(
             context=context,
@@ -392,7 +397,7 @@ class SlurmBackend:
         self, *, context: Context, reports: Sequence[RunReport]
     ) -> Mapping[str, JobUsage]:
         """The accounting usage of the failed and interrupted runs; no numbers on a failure."""
-        from tslab.study.launchers.slurm.usage import failure_usage  # noqa: PLC0415
+        from tslab.lab.study.launchers.slurm.usage import failure_usage  # noqa: PLC0415
 
         return failure_usage(context=context, reports=reports)
 
@@ -403,7 +408,7 @@ class SlurmBackend:
             LaunchError: If the accounting query fails; the message is the
                 scheduler error.
         """
-        from tslab.study.launchers.slurm.usage import usage  # noqa: PLC0415
+        from tslab.lab.study.launchers.slurm.usage import usage  # noqa: PLC0415
 
         no_gpus: dict[str, str | None] = {}
         try:

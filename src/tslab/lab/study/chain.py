@@ -7,16 +7,16 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Protocol, TYPE_CHECKING
 
-from tslab.enums import AfterCondition, AfterVerdict, ChainedRetry, Satisfy, StudyState
-from tslab.study.definition import upstream_runs
+from tslab.lab.enums import AfterCondition, AfterVerdict, ChainedRetry, Satisfy, StudyState
+from tslab.lab.study.definition import upstream_runs
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
     from pathlib import PurePosixPath
 
-    from tslab.study.definition import After, Study, StudyRun
-    from tslab.study.machine.profile import FollowupSettings
-    from tslab.study.reporting.state import RunReport
+    from tslab.lab.study.definition import After, Study, StudyRun
+    from tslab.lab.study.machine.profile import FollowupSettings
+    from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['after_verdict', 'downstream_of', 'retry_left', 'upstream_verdict']
 

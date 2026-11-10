@@ -6,15 +6,15 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
+from tests.lab.unit.cli.study.helpers import toy_project
+from tests.lab.unit.study.helpers import submit_study
 from tests.support.fake_backend import FakeBackend
-from tests.unit.cli.study.helpers import toy_project
-from tests.unit.study.helpers import submit_study
-from tslab.cli import main
-from tslab.cli.study import Resubmit, Results, Submit
-from tslab.enums import JobPhase
+from tslab.lab.cli import main
+from tslab.lab.cli.study import Resubmit, Results, Submit
+from tslab.lab.enums import JobPhase
 
 if TYPE_CHECKING:
-    from tslab.study.context import Context
+    from tslab.lab.study.context import Context
 
 
 def run_main(*args: str) -> int:

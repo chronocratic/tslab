@@ -2,7 +2,7 @@
 
 Configs are plain frozen dataclasses. This module writes them as plain YAML
 and reads them back. The strict, typed conversion between the dataclass and
-plain data lives in ``tslab.core.codec``: decoding only ever constructs types
+plain data lives in ``tslab.lab.core.codec``: decoding only ever constructs types
 reachable from the annotations of the config class (safe, unlike pickle or
 the full loader of PyYAML), and unknown keys, wrong value types and unknown
 union members raise ``ConfigFileError`` naming the exact field, so a typo in
@@ -26,9 +26,9 @@ from typing import Annotated, Any, Union
 import tyro
 import yaml
 
-from tslab.core.files import atomic_write_text
-from tslab.core.paths import require_path
-from tslab.core.text import qualified_name
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.core.paths import require_path
+from tslab.lab.core.text import qualified_name
 
 __all__ = [
     'CONFIG_FORMAT_VERSION',
@@ -70,7 +70,7 @@ def config_to_yaml(*, config: object) -> str:
     """
     # why: core.codec imports ConfigFileError from this module at module level,
     # so a module-level import back would cycle
-    from tslab.core.codec import config_to_data  # noqa: PLC0415
+    from tslab.lab.core.codec import config_to_data  # noqa: PLC0415
 
     document = {
         'format_version': CONFIG_FORMAT_VERSION,
@@ -95,7 +95,7 @@ def config_from_yaml[C](*, config_class: type[C], text: str) -> C:
     """
     # why: core.codec imports ConfigFileError from this module at module level,
     # so a module-level import back would cycle
-    from tslab.core.codec import decode_dataclass  # noqa: PLC0415
+    from tslab.lab.core.codec import decode_dataclass  # noqa: PLC0415
 
     document = yaml.safe_load(text)
     if not isinstance(document, dict) or document.get('format_version') != CONFIG_FORMAT_VERSION:
@@ -130,8 +130,10 @@ def load_config[C](*, config_class: type[C], path: Path) -> C:
 
     Example::
 
-        config = tslab.load_config(config_class=ExperimentConfig, path=Path('runs/a/config.yaml'))
-        config = tslab.parse_config(
+        config = tslab.lab.load_config(
+            config_class=ExperimentConfig, path=Path('runs/a/config.yaml')
+        )
+        config = tslab.lab.parse_config(
             config_class=ExperimentConfig, default=config, args=['--seed', '3']
         )
 

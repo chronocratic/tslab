@@ -10,7 +10,7 @@ import types
 
 import pytest
 
-from tslab.jobs.local import (
+from tslab.lab.jobs.local import (
     busy_gpus,
     gpu_lock_folder,
     GpuDiscovery,

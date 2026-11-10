@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from tslab.jobs.local.watchdog import _apply_line, main, Watchdog
+from tslab.lab.jobs.local.watchdog import _apply_line, main, Watchdog
 
 
 def _group_leader() -> subprocess.Popen[bytes]:

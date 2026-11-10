@@ -10,24 +10,24 @@ import subprocess
 
 import pytest
 
+from tests.lab.unit.study.configs import grid
+from tests.lab.unit.study.helpers import context, jobs_of, no_sleep, study_directory, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.configs import grid
-from tests.unit.study.helpers import context, jobs_of, no_sleep, study_directory, submit_study
-from tslab.core.status import utc_now_iso
-from tslab.enums import LauncherKind
-from tslab.jobs.slurm import CommandValues, SLURM_COMMANDS
-from tslab.study import Study
-from tslab.study.commands import submit
-from tslab.study.launchers.slurm import backend as slurm_backend
-from tslab.study.launchers.slurm.backend import SlurmBackend
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.slurm_file import (
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import LauncherKind
+from tslab.lab.jobs.slurm import CommandValues, SLURM_COMMANDS
+from tslab.lab.study import Study
+from tslab.lab.study.commands import submit
+from tslab.lab.study.launchers.slurm import backend as slurm_backend
+from tslab.lab.study.launchers.slurm.backend import SlurmBackend
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.slurm_file import (
     command_values,
     SLURM_FILE,
     slurm_file_text,
     write_slurm_file,
 )
-from tslab.study.records import append_job, JobKind, submission_in_progress
+from tslab.lab.study.records import append_job, JobKind, submission_in_progress
 
 STUDY = Study(name='aug', grids={'a': grid(short_name='a', job_name='{short_name}_{seed}')})
 VALUES = CommandValues(job_ids=('1000', '1001'), width=8, start='2026-11-01')
@@ -176,7 +176,7 @@ def test_submit_writes_catalogue_while_holding_submission_lock(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(
-        'tslab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (0, ())
+        'tslab.lab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (0, ())
     )
 
     def check_lock(*, study: Study, study_folder: Path) -> Path:

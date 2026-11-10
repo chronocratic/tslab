@@ -8,8 +8,8 @@ import subprocess
 
 import pytest
 
-import tslab.study.code_snapshot as code_snapshot_module
-from tslab.study.code_snapshot import (
+import tslab.lab.study.code_snapshot as code_snapshot_module
+from tslab.lab.study.code_snapshot import (
     CODE_SNAPSHOTS_FOLDER,
     CodeSnapshot,
     CodeSnapshotError,
@@ -268,7 +268,7 @@ def test_code_snapshot_variables() -> None:
 
 @pytest.mark.slow
 def test_uv_run_imports_the_code_snapshot(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = Path(__file__).resolve().parents[4]
     taken = take_code_snapshot(
         project_root=repo_root,
         output_root=tmp_path / 'out',

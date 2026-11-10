@@ -1,6 +1,6 @@
 """Metadata written next to runs and instances: the ``meta.json`` files."""
 
-from tslab.core.meta.instance import (
+from tslab.lab.core.meta.instance import (
     can_resume,
     describe_external_inputs,
     describe_inputs,
@@ -10,7 +10,7 @@ from tslab.core.meta.instance import (
     read_instance_meta,
     stale_reason,
 )
-from tslab.core.meta.run import (
+from tslab.lab.core.meta.run import (
     CODE_SNAPSHOT_VARIABLE,
     CODE_SNAPSHOT_VARIABLES,
     collect_code_snapshot,

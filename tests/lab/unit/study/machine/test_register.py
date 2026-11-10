@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study.machine import (
+from tslab.lab.study.machine import (
     MachineProfileError,
     read_register,
     register_file,

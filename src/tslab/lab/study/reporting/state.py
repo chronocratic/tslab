@@ -6,16 +6,16 @@ from pathlib import Path, PurePosixPath
 import time
 from typing import TYPE_CHECKING
 
-from tslab.core.lock import is_run_active
-from tslab.core.paths import STATUS_FILE
-from tslab.core.status import read_status, RunStatusSnapshot
-from tslab.core.text import first_line
-from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
-from tslab.study.definition import StudyRun
-from tslab.study.records import JobRecord, latest_tasks, TaskRecord
+from tslab.lab.core.lock import is_run_active
+from tslab.lab.core.paths import STATUS_FILE
+from tslab.lab.core.status import read_status, RunStatusSnapshot
+from tslab.lab.core.text import first_line
+from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
+from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.launchers.common.types import JobStates
+    from tslab.lab.study.launchers.common.types import JobStates
 
 __all__ = ['FolderFacts', 'RunReport', 'collect_states', 'read_folder', 'study_state']
 

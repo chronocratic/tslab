@@ -8,24 +8,24 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finish_run,
     study_directory,
     submit_study,
     write_run_status,
 )
-from tslab.cli import main
-from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState, StudyState
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import JobUsage
-from tslab.study.launchers.tables import backend_for
-from tslab.study.paths import instance_directory
-from tslab.study.reporting.failures import collect_failures, failure_hint, log_failures
-from tslab.study.reporting.state import RunReport
+from tests.support.fake_backend import FakeBackend
+from tslab.lab.cli import main
+from tslab.lab.core.paths import ERROR_FILE, LOGS_DIRECTORY
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, RunState, StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import JobUsage
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.paths import instance_directory
+from tslab.lab.study.reporting.failures import collect_failures, failure_hint, log_failures
+from tslab.lab.study.reporting.state import RunReport
 
 
 def _failed_context(project: Path) -> Context:
@@ -89,7 +89,7 @@ def test_failures_names_missing_files(
     failure = failures[0]
     assert failure['log_tail'] is None
     assert failure['run_log_tail'] is None
-    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.reporting.failures'):
         log_failures(failures=failures)
     assert f'{failure["log_file"]}: missing' in caplog.text
     assert f'{failure["run_log"]}: missing' in caplog.text
@@ -146,7 +146,7 @@ def test_failure_entry_shows_the_exit_code(
     failures = collect_failures(context=ctx, states=(), lines=30)
     (failure,) = failures
     assert failure['exit_code'] == '0:9'
-    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.reporting.failures'):
         log_failures(failures=failures)
     assert 'exit 0:9' in caplog.text
 
@@ -171,7 +171,7 @@ def test_failures_json_shape(
         main(args=['study', 'failures', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
-    assert document['schema'] == 'tslab.study-failures/1'
+    assert document['schema'] == 'tslab.lab.study-failures/1'
     assert len(document['runs']) == 1
 
 
@@ -271,6 +271,6 @@ def test_failures_log_has_hint(
     )
     ctx = context(project=project, machine_file='cluster.toml')
     failures = collect_failures(context=ctx, states=(), lines=30)
-    with caplog.at_level('INFO', logger='tslab.study.reporting.failures'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.reporting.failures'):
         log_failures(failures=failures)
     assert 'hint: training used its share of the job (job_time_share)' in caplog.text

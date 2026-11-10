@@ -14,8 +14,7 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     chained_context,
     chained_study,
     context,
@@ -23,20 +22,21 @@ from tests.unit.study.helpers import (
     no_sleep,
     study_directory,
 )
-from tslab.core.status import utc_now_iso
-from tslab.enums import AfterCondition, JobPhase, StudyState
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.commands import submit, submit_runs
-from tslab.study.context import Context, load_context, Selection
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
+from tests.support.fake_backend import FakeBackend
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import AfterCondition, JobPhase, StudyState
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.commands import submit, submit_runs
+from tslab.lab.study.context import Context, load_context, Selection
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from tslab.study.plan import JobGroup
+    from tslab.lab.study.plan import JobGroup
 
-_SUBMIT_MODULE = import_module('tslab.study.commands.submit')
+_SUBMIT_MODULE = import_module('tslab.lab.study.commands.submit')
 
 # why: the small model has no ``depth`` field, so a study that sets
 # ``model.depth`` for it does not load; the parse-bad study leaves the
@@ -45,7 +45,7 @@ LOAD_BAD_STUDIES = """
 import sys
 
 import toy_script
-from tslab.study import Grid, Study
+from tslab.lab.study import Grid, Study
 
 study = Study(
     name='s',
@@ -70,7 +70,7 @@ PARSE_BAD_STUDIES = """
 import sys
 
 import toy_script
-from tslab.study import Grid, Study
+from tslab.lab.study import Grid, Study
 
 study = Study(
     name='s',
@@ -99,14 +99,14 @@ import time
 
 import tyro
 
-import tslab
+import tslab.lab
 
 import toy_script
 
 
 def main() -> None:
     config = tyro.cli(toy_script.ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
-    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         time.sleep(10)
 
 
@@ -120,7 +120,7 @@ KEEP_OPEN_STUDIES = '''
 import sys
 
 import toy_script
-from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 
 study = Study(
     name='s',
@@ -292,9 +292,9 @@ from pathlib import Path
 
 import tyro
 
-import tslab
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState
+import tslab.lab
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, RunState
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -310,7 +310,7 @@ class ChainPreConfig:
 def main() -> None:
     config = tyro.cli(ChainPreConfig)
     if os.environ.get('TOY_CHAIN_FAIL'):
-        with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+        with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
             raise RuntimeError('pretrain fails on purpose')
     folder = config.output_root / config.run_path
     if os.environ.get('TOY_CHAIN_TIME_LIMIT'):
@@ -348,7 +348,7 @@ def main() -> None:
             ),
         )
         return
-    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         pass
 
 
@@ -364,7 +364,7 @@ from pathlib import Path
 
 import tyro
 
-import tslab
+import tslab.lab
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -382,7 +382,7 @@ def main() -> None:
     config = tyro.cli(ChainProbeConfig)
     if not (config.checkpoint / 'status.json').is_file():
         raise SystemExit(f'upstream run folder missing: {config.checkpoint}')
-    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         pass
 
 
@@ -398,7 +398,7 @@ from pathlib import Path
 
 import tyro
 
-import tslab
+import tslab.lab
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -413,7 +413,7 @@ class ChainOkConfig:
 
 def main() -> None:
     config = tyro.cli(ChainOkConfig)
-    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         pass
 
 
@@ -429,7 +429,7 @@ import sys
 import toy_chain_ok
 import toy_chain_pre
 import toy_chain_probe
-from tslab.study import DEFAULT_RUN_SETTINGS, After, Grid, Study
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, After, Grid, Study
 
 study = Study(
     name='chain',

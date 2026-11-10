@@ -19,20 +19,20 @@ from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
-from tslab.core.artifact import Checkpoint
-from tslab.core.files import atomic_write_json
-from tslab.core.paths import require_path
-from tslab.core.run import JobTimeLimitSignal, Run
-from tslab.interfaces.data import DataSource
-from tslab.interfaces.trainer import Trainer
-from tslab.jobs.slurm import parse_slurm_duration, task_count
-from tslab.lightning.callbacks import _SignalStop, build_callbacks
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.data import LightningDataSource
-from tslab.lightning.ranks import agree
-from tslab.lightning.resume import choose_resume_checkpoint
-from tslab.lightning.slurm import job_training_deadline
-from tslab.tracking.lightning_bridge import lightning_loggers
+from tslab.lab.core.artifact import Checkpoint
+from tslab.lab.core.files import atomic_write_json
+from tslab.lab.core.paths import require_path
+from tslab.lab.core.run import JobTimeLimitSignal, Run
+from tslab.lab.jobs.slurm import parse_slurm_duration, task_count
+from tslab.ml.interfaces.data import DataSource
+from tslab.ml.interfaces.trainer import Trainer
+from tslab.ml.lightning.callbacks import _SignalStop, build_callbacks
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.data import LightningDataSource
+from tslab.ml.lightning.ranks import agree
+from tslab.ml.lightning.resume import choose_resume_checkpoint
+from tslab.ml.lightning.slurm import job_training_deadline
+from tslab.ml.tracking.lightning_bridge import lightning_loggers
 
 __all__ = ['LightningTrainer']
 

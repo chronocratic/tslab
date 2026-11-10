@@ -4,7 +4,7 @@ The ``tslab`` commands are thin; this holds what they all print and how they
 report a bad command line. Import from the door, not the submodules.
 """
 
-from tslab.cli.common.console import (
+from tslab.lab.cli.common.console import (
     configure_logging,
     CONSOLE,
     ConsoleHandler,
@@ -12,14 +12,14 @@ from tslab.cli.common.console import (
     use_stderr,
     watch,
 )
-from tslab.cli.common.errors import UsageError
-from tslab.cli.common.output import (
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import (
     error_document,
     has_printed_document,
     print_json,
     reset_document_state,
 )
-from tslab.cli.common.project import Request, resolve_request
+from tslab.lab.cli.common.project import Request, resolve_request
 
 __all__ = [
     'CONSOLE',

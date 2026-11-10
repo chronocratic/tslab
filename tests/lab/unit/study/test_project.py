@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.study.project import (
+from tslab.lab.study.project import (
     expand_study,
     find_studies,
     load_project_settings,

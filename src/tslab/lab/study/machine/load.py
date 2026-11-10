@@ -6,15 +6,15 @@ from pathlib import Path
 import tomllib
 from typing import cast, Protocol
 
-from tslab.core.text import unknown_key_message
-from tslab.enums import ChainedRetry, LauncherKind
-from tslab.study.definition import expand_variables
-import tslab.study.machine.local as machine_local
-from tslab.study.machine.local import LocalSettings
-from tslab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
-import tslab.study.machine.slurm as machine_slurm
-from tslab.study.machine.slurm import slurm_overrides, SlurmSettings
-from tslab.study.machine.tables import (
+from tslab.lab.core.text import unknown_key_message
+from tslab.lab.enums import ChainedRetry, LauncherKind
+from tslab.lab.study.definition import expand_variables
+import tslab.lab.study.machine.local as machine_local
+from tslab.lab.study.machine.local import LocalSettings
+from tslab.lab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
+import tslab.lab.study.machine.slurm as machine_slurm
+from tslab.lab.study.machine.slurm import slurm_overrides, SlurmSettings
+from tslab.lab.study.machine.tables import (
     check_keys,
     expand_env,
     from_table,

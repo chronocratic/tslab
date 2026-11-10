@@ -6,11 +6,11 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Study
-from tslab.study.definition import expand_runs
-from tslab.study.machine import load_machine, MachineProfile, SlurmSettings
-from tslab.study.plan import resolve_runs
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Study
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.machine import load_machine, MachineProfile, SlurmSettings
+from tslab.lab.study.plan import resolve_runs
 
 BASE_TOML = (
     'launcher = "slurm"\noutput_root = "runs"\n[slurm]\npartition = "p"\ntime = "1-00:00:00"\n'
@@ -93,7 +93,7 @@ def test_unknown_names_in_machine_overrides_warn(
         '[[overrides]]\nmatch = { recipe = ["cost-paper", "old-recipe"] }\nslurm = { gpus = 1 }\n'
         '[[overrides]]\nmatch = { variant = "ETTh1" }\nslurm = { gpus = 2 }\n',
     )
-    with caplog.at_level(logging.WARNING, logger='tslab.study'):
+    with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         resolved = resolve_runs(
             study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
         )

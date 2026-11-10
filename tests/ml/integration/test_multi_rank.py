@@ -5,9 +5,9 @@ import sys
 
 import pytest
 
-from tslab.core.artifact import Json
-from tslab.core.status import read_status
-from tslab.enums import InstanceState
+from tslab.lab.core.artifact import Json
+from tslab.lab.core.status import read_status
+from tslab.lab.enums import InstanceState
 
 SCRIPT = Path(__file__).parent / 'multi_rank_script.py'
 
@@ -18,6 +18,7 @@ def run_two_ranks(*, run_root: Path, logs_root: Path) -> tuple[list[int], list[s
     log_paths = [logs_root / f'rank-{rank}.log' for rank in range(2)]
     shared_environment = {
         **os.environ,
+        'PYTHONPATH': str(Path(__file__).parents[3]),
         'SLURM_JOB_ID': '4242',
         'SLURM_JOB_NAME': 'tslab-test',
         'SLURM_NTASKS': '2',

@@ -8,12 +8,12 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import resolve_request
-from tslab.cli.study.shared import _context_of
-from tslab.core.meta import hostname
-from tslab.jobs.slurm import run_slurm_command, slurm_command, SLURM_COMMANDS
-from tslab.study.launchers.slurm.slurm_file import command_values
-from tslab.study.paths import study_folder
+from tslab.lab.cli.common import resolve_request
+from tslab.lab.cli.study.shared import _context_of
+from tslab.lab.core.meta import hostname
+from tslab.lab.jobs.slurm import run_slurm_command, slurm_command, SLURM_COMMANDS
+from tslab.lab.study.launchers.slurm.slurm_file import command_values
+from tslab.lab.study.paths import study_folder
 
 __all__ = ['Slurm']
 

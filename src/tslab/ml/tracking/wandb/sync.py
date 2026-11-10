@@ -3,11 +3,11 @@
 Long HPC runs often finish their work but show "crashed" on W&B, because the
 final exit record never reached the server. ``wandb sync`` replays the local transaction log,
 which repairs the state **only if** that log recorded a clean exit. The
-``tslab wandb-sync`` command (``tslab.cli.wandb_sync``) finds such runs,
+``tslab wandb-sync`` command (``tslab.ml.cli.wandb_sync``) finds such runs,
 resyncs them, and verifies the result. It never claims a repair it did not
 observe.
 
-Exit codes are read with ``tslab.tracking.wandb.log``, because wandb 0.30
+Exit codes are read with ``tslab.ml.tracking.wandb.log``, because wandb 0.30
 removed ``wandb.sdk.internal.datastore``; a check built on it silently does
 nothing.
 
@@ -35,7 +35,7 @@ import sys
 import time
 from typing import TYPE_CHECKING
 
-from tslab.tracking.wandb.log import read_exit_codes, read_run_coordinates
+from tslab.ml.tracking.wandb.log import read_exit_codes, read_run_coordinates
 
 if TYPE_CHECKING:
     from wandb.apis.public import Api, Run

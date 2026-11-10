@@ -4,15 +4,16 @@ from pathlib import Path
 import pytest
 import torch
 
-from tests.unit.stage_fakes import run_in
-from tests.unit.stages.helpers import encoded
-import tslab
-from tslab.probes import SVMProbe
+from tests.ts.unit.stage_fakes import run_in
+from tests.ts.unit.stages.helpers import encoded
+import tslab.lab
+import tslab.ts
+from tslab.ts.probes import SVMProbe
 
 
 def test_evaluate_fits_the_probe_and_logs_its_metrics(tmp_path: Path) -> None:
     with run_in(root=tmp_path) as run:
-        metrics = tslab.stages.evaluate(
+        metrics = tslab.ts.stages.evaluate(
             run=run, representations=encoded(run=run), downstream_model=SVMProbe(n_jobs=1)
         )
     assert metrics.values['accuracy'] == 1.0
@@ -31,7 +32,7 @@ class Agreement:
 
 def test_evaluate_uses_the_given_metrics(tmp_path: Path) -> None:
     with run_in(root=tmp_path) as run:
-        metrics = tslab.stages.evaluate(
+        metrics = tslab.ts.stages.evaluate(
             run=run,
             name='custom',
             representations=encoded(run=run),
@@ -41,14 +42,14 @@ def test_evaluate_uses_the_given_metrics(tmp_path: Path) -> None:
     assert metrics.values == {'agreement': 1.0}
 
 
-@tslab.stage(name='partial', output=tslab.Tensors)
-def partial(*, run: tslab.Run) -> tslab.Tensors:
+@tslab.lab.stage(name='partial', output=tslab.lab.Tensors)
+def partial(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
     del run
-    return tslab.Tensors(tensors={'train_representations': torch.zeros(2, 2)})
+    return tslab.lab.Tensors(tensors={'train_representations': torch.zeros(2, 2)})
 
 
 def test_evaluate_names_missing_keys(tmp_path: Path) -> None:
     with pytest.raises(KeyError, match='train_targets'), run_in(root=tmp_path) as run:
-        tslab.stages.evaluate(
+        tslab.ts.stages.evaluate(
             run=run, representations=partial(run=run), downstream_model=SVMProbe(n_jobs=1)
         )

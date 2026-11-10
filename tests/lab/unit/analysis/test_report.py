@@ -5,7 +5,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 import pytest
 
-from tslab.analysis.report import Block, Caption, show
+from tslab.lab.analysis.report import Block, Caption, show
 
 
 def fake_ipython(*, monkeypatch: pytest.MonkeyPatch) -> list[object]:

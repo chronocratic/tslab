@@ -2,9 +2,9 @@
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Override, Study
-from tslab.study.definition import match_problems, run_matches
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Override, Study
+from tslab.lab.study.definition import match_problems, run_matches
 
 
 def test_run_matches_lists_and_grid_key() -> None:

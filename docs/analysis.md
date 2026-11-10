@@ -1,6 +1,6 @@
 # Analyse study results
 
-`tslab.analysis` turns the results of a study into tests, a critical-difference diagram, a
+`tslab.lab.analysis` turns the results of a study into tests, a critical-difference diagram, a
 numbers file for a paper and an organised folder of tables and figures. It needs the
 `analysis` extra:
 
@@ -17,7 +17,7 @@ never save: the caller passes tables and figures to an output tree.
 from pathlib import Path
 import os
 
-from tslab.analysis import load_results
+from tslab.lab.analysis import load_results
 
 results = load_results(
     study=example,
@@ -44,7 +44,7 @@ One run has several metric rows: the template evaluates once on clean data and o
 noise level, under the same metric names. Pick the `instance` first, then build the matrix:
 
 ```python
-from tslab.analysis import cd_diagram, method_matrix, pairwise_wilcoxon
+from tslab.lab.analysis import cd_diagram, method_matrix, pairwise_wilcoxon
 
 scores = results[results['instance'] == 'evaluate[default]']
 matrix = method_matrix(
@@ -65,7 +65,7 @@ the methods do not differ. Pass `reverse=True` to put rank 1 on the right, and a
 ## Save into the output tree
 
 ```python
-from tslab.analysis import AnalysisOutput, FigureFormat, OutputFolder
+from tslab.lab.analysis import AnalysisOutput, FigureFormat, OutputFolder
 
 output = AnalysisOutput(root=Path('analysis'), formats=(FigureFormat.PDF, FigureFormat.PNG))
 output.save_figure(figure=diagram.figure, category='critical_difference', name='cd_accuracy')
@@ -94,7 +94,7 @@ file types for one figure; use `paper_style()` around the plotting code for one 
 ```python
 from datetime import datetime, UTC
 
-from tslab.analysis import NumberKind, number_key, numbers_frame, write_numbers
+from tslab.lab.analysis import NumberKind, number_key, numbers_frame, write_numbers
 
 numbers = numbers_frame(
     records=[(number_key(parts=['friedman', 'accuracy', 'p']), 1.2e-5, NumberKind.P)]

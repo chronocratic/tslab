@@ -6,10 +6,10 @@ from typing import Any, override
 from lightning.pytorch.loggers import Logger
 import pytest
 
-from tslab.core.tracker import RunStatus, Tracker
-from tslab.tracking import mlflow_tracker
-from tslab.tracking.lightning_bridge import lightning_loggers, LightningLoggerTracker
-from tslab.tracking.mlflow_tracker import MLflowTracker
+from tslab.lab.core.tracker import RunStatus, Tracker
+from tslab.ml.tracking import mlflow_tracker
+from tslab.ml.tracking.lightning_bridge import lightning_loggers, LightningLoggerTracker
+from tslab.ml.tracking.mlflow_tracker import MLflowTracker
 
 
 class UnreachableError(ConnectionError):

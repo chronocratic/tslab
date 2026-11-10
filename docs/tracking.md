@@ -2,8 +2,8 @@
 
 A CSV tracker is always on: metrics land in `trackers/csv/version_<n>/` of
 the run folder, one `version` per execution. Others are opt-in through
-`tslab.tracking.TrackingOptions` (`--tracking.*` flags) and
-`tslab.tracking.build_trackers(options=...)`:
+`tslab.ml.tracking.TrackingOptions` (`--tracking.*` flags) and
+`tslab.ml.tracking.build_trackers(options=...)`:
 
 | Tracker | Install | Flags |
 |---|---|---|

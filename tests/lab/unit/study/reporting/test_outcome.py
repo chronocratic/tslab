@@ -4,8 +4,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finish_run,
     jobs_of,
@@ -13,11 +12,12 @@ from tests.unit.study.helpers import (
     submit_study,
     write_run_status,
 )
-from tslab.core.status import utc_now_iso
-from tslab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
-from tslab.study.launchers.tables import backend_for, JOB_RECORDS
-from tslab.study.records import append_job, JobKind, JobRecord, submission_in_progress
-from tslab.study.reporting.outcome import (
+from tests.support.fake_backend import FakeBackend
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
+from tslab.lab.study.launchers.tables import backend_for, JOB_RECORDS
+from tslab.lab.study.records import append_job, JobKind, JobRecord, submission_in_progress
+from tslab.lab.study.reporting.outcome import (
     EXIT_DONE,
     EXIT_LIVE,
     EXIT_RETRY,

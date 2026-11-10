@@ -13,11 +13,11 @@ import threading
 import time
 from typing import cast
 
-from tslab.core.files import atomic_write_json, read_json_object
-from tslab.core.meta import hostname
-from tslab.enums import LocalTaskState
-from tslab.jobs.local import boot_id, process_alive, start_detached, tail_lines
-from tslab.study.launchers.common.types import OnTaskState
+from tslab.lab.core.files import atomic_write_json, read_json_object
+from tslab.lab.core.meta import hostname
+from tslab.lab.enums import LocalTaskState
+from tslab.lab.jobs.local import boot_id, process_alive, start_detached, tail_lines
+from tslab.lab.study.launchers.common.types import OnTaskState
 
 __all__ = [
     'DETACHED_VARIABLE',

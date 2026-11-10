@@ -6,11 +6,11 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import resolve_request, use_stderr
-from tslab.cli.study.shared import _context_of, _warn_no_runs
-from tslab.core.meta import hostname
-from tslab.study.commands import results
-from tslab.study.commands.results import ResultsFormat
+from tslab.lab.cli.common import resolve_request, use_stderr
+from tslab.lab.cli.study.shared import _context_of, _warn_no_runs
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.commands import results
+from tslab.lab.study.commands.results import ResultsFormat
 
 __all__ = ['Results']
 

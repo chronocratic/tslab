@@ -9,12 +9,12 @@ from typing import cast
 
 import pytest
 
+from tests.lab.unit.study.helpers import submit_study
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import submit_study
-from tslab.cli import main
-from tslab.enums import JobPhase
-from tslab.study.commands import run_one
-from tslab.study.context import Context, load_context, Selection
+from tslab.lab.cli import main
+from tslab.lab.enums import JobPhase
+from tslab.lab.study.commands import run_one
+from tslab.lab.study.context import Context, load_context, Selection
 
 
 def _one_run_context(*, project: Path, machine_file: str, only: tuple[str, ...]) -> Context:
@@ -93,7 +93,7 @@ def test_run_one_refuses_live_run(
         project=project, machine_file='cluster.toml', only=('model=small', 'seed=1')
     )
     calls, process = _process()
-    with caplog.at_level('ERROR', logger='tslab.study.commands'):
+    with caplog.at_level('ERROR', logger='tslab.lab.study.commands'):
         assert run_one(context=ctx, extra_args=None, run_process=process) == 1
     assert calls == []
     assert 'g/small/1 is running (job job-0_0); wait for it or cancel it first' in caplog.text
@@ -111,7 +111,7 @@ def test_run_one_cli_lists_more_than_one_run(
     project: Path, fake_backend: FakeBackend, caplog: pytest.LogCaptureFixture
 ) -> None:
     submit_study(project=project)
-    with caplog.at_level('ERROR', logger='tslab.cli'), pytest.raises(SystemExit) as raised:
+    with caplog.at_level('ERROR', logger='tslab.lab.cli'), pytest.raises(SystemExit) as raised:
         main(args=['study', 'run', 'toy_studies:study', '--machine', 'cluster.toml'])
     assert raised.value.code == 2
     text = caplog.text

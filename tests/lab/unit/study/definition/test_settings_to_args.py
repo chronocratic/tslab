@@ -5,7 +5,7 @@ from typing import cast
 
 import pytest
 
-from tests.unit.study.configs import (
+from tests.lab.unit.study.configs import (
     ClassifyConfig,
     CoSTSettings,
     Crop,
@@ -16,9 +16,9 @@ from tests.unit.study.configs import (
     TS2VecSettings,
     UCRSettings,
 )
-import tslab
-from tslab.core.codec import union_choices
-from tslab.study.definition import Settings, settings_to_args
+import tslab.lab
+from tslab.lab.core.codec import union_choices
+from tslab.lab.study.definition import Settings, settings_to_args
 
 
 def test_union_choices_reads_subcommand_names() -> None:
@@ -116,7 +116,7 @@ def test_round_trip_through_parse_config() -> None:
         'noise_levels': (),
         'seed': 42,
     }
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=ClassifyConfig,
         args=settings_to_args(config_class=ClassifyConfig, settings=settings),
     )
@@ -129,7 +129,7 @@ def test_round_trip_through_parse_config() -> None:
 
 def test_default_member_fields_work_when_the_choice_is_not_in_the_settings() -> None:
     # model.augmentation walks the default member Jitter when model is unset.
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=ClassifyConfig,
         args=settings_to_args(
             config_class=ClassifyConfig,
@@ -155,7 +155,7 @@ def test_round_trip_with_presets_and_no_preset() -> None:
             settings={'model': 'cost', 'data': 'uea', 'data.dataset_folder_path': 'x'},
         ),
     ]
-    config = tslab.parse_config(config_class=ClassifyConfig, presets=PRESETS, args=args)
+    config = tslab.lab.parse_config(config_class=ClassifyConfig, presets=PRESETS, args=args)
     assert config.model == CoSTSettings()
 
 

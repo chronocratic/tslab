@@ -4,11 +4,11 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.cli.study.shared import _usage_errors
-from tslab.core.meta import hostname
-from tslab.study.definition import load_study
-from tslab.study.project import expand_study, find_studies
+from tslab.lab.cli.common import print_json, resolve_request, UsageError
+from tslab.lab.cli.study.shared import _usage_errors
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.definition import load_study
+from tslab.lab.study.project import expand_study, find_studies
 
 __all__ = ['List']
 
@@ -23,7 +23,7 @@ class List:
         tslab study list
 
     Attributes:
-        json: Print a JSON document with schema tslab.study-list/1.
+        json: Print a JSON document with schema tslab.lab.study-list/1.
     """
 
     json: bool = False
@@ -46,7 +46,7 @@ class List:
                 study = load_study(reference=reference)
             studies.append({'short_name': short_name, 'name': study.name})
         if self.json:
-            print_json(document={'schema': 'tslab.study-list/1', 'studies': studies})
+            print_json(document={'schema': 'tslab.lab.study-list/1', 'studies': studies})
             return 0
         for study in studies:
             _LOGGER.info('%s  %s', study['short_name'], study['name'])

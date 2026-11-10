@@ -1,4 +1,4 @@
-"""The ``tslab wandb-sync`` command; the resync logic lives in ``tslab.tracking.wandb.sync``."""
+"""The ``tslab wandb-sync`` command; the resync logic lives in ``tslab.ml.tracking.wandb.sync``."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -10,8 +10,8 @@ from typing import Annotated
 
 import tyro
 
-from tslab.core.paths import require_path
-from tslab.tracking.wandb.sync import (
+from tslab.lab.core.paths import require_path
+from tslab.ml.tracking.wandb.sync import (
     _resync_verified,
     _ServerQuery,
     Action,

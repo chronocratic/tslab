@@ -1,7 +1,7 @@
 """``check_paths``: which setting paths exist on no reading of the config."""
 
-from tests.unit.study.configs import ClassifyConfig
-from tslab.study import check_paths
+from tests.lab.unit.study.configs import ClassifyConfig
+from tslab.lab.study import check_paths
 
 
 def test_paths_accepted_in_any_member_when_unchosen() -> None:

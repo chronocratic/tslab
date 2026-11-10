@@ -8,10 +8,10 @@ from pathlib import Path
 import re
 from typing import cast, TYPE_CHECKING
 
-from tslab.enums import LauncherKind
-from tslab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
-from tslab.study.definition import matching_in_order
-from tslab.study.machine.tables import (
+from tslab.lab.enums import LauncherKind
+from tslab.lab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
+from tslab.lab.study.definition import matching_in_order
+from tslab.lab.study.machine.tables import (
     check_keys,
     check_range,
     decode,
@@ -20,7 +20,7 @@ from tslab.study.machine.tables import (
 )
 
 if TYPE_CHECKING:
-    from tslab.study.machine.profile import MachineOverride
+    from tslab.lab.study.machine.profile import MachineOverride
 
 __all__ = [
     'FOLLOWUP_KEYS',

@@ -1,7 +1,7 @@
 import pytest
 
-from tests.unit.probes.helpers import ridge_data
-from tslab.probes import RidgeProbe
+from tests.ts.unit.probes.helpers import ridge_data
+from tslab.ts.probes import RidgeProbe
 
 
 @pytest.mark.parametrize(('val_is_zero', 'alpha'), [(True, 1000), (False, 0.1)])

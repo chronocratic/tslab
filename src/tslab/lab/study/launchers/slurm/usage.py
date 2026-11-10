@@ -3,10 +3,10 @@
 from collections.abc import Mapping, Sequence
 import logging
 
-from tslab.jobs.slurm import query_job_usage, SlurmError, SlurmJobUsage
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import JobUsage
-from tslab.study.reporting.state import RunReport
+from tslab.lab.jobs.slurm import query_job_usage, SlurmError, SlurmJobUsage
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import JobUsage
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['failure_usage', 'usage']
 

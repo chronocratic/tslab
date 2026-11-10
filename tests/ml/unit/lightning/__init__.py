@@ -1,1 +1,1 @@
-"""Unit tests for the ``tslab.lightning`` package."""
+"""Unit tests for the ``tslab.ml.lightning`` package."""

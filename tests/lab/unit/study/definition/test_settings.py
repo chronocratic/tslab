@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from tests.unit.study.configs import ClassifyConfig, Models, PRESETS, TS2VecSettings
-import tslab
-from tslab.study import check_paths, from_presets, settings_to_args
+from tests.lab.unit.study.configs import ClassifyConfig, Models, PRESETS, TS2VecSettings
+import tslab.lab
+from tslab.lab.study import check_paths, from_presets, settings_to_args
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -27,7 +27,7 @@ def test_preset_value_equal_to_class_default_is_kept_over_instance_default() -> 
     settings = from_presets(presets=presets, names=('p',), without=())['p']
     assert settings == {'trainer.max_epochs': 10}
     args = settings_to_args(config_class=_Config, settings=settings)
-    assert tslab.parse_config(config_class=_Config, args=args).trainer.max_epochs == 10
+    assert tslab.lab.parse_config(config_class=_Config, args=args).trainer.max_epochs == 10
 
 
 def test_preset_equal_to_the_default_instance_adds_nothing() -> None:

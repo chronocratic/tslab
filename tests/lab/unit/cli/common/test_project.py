@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from tslab.cli.common import resolve_request
-from tslab.cli.common.errors import UsageError
-from tslab.study.project import PROJECT_FILE
+from tslab.lab.cli.common import resolve_request
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.study.project import PROJECT_FILE
 
 
 def _tslab_toml(*, tmp_path: Path, text: str) -> None:

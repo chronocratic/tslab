@@ -6,15 +6,20 @@ import logging
 from pathlib import PurePosixPath
 import shlex
 
-from tslab.core.text import format_index_ranges, log_table
-from tslab.enums import JobFlag, StudyState
-from tslab.study.context import Context
-from tslab.study.definition import expand_runs, Study
-from tslab.study.launchers.common.types import LaunchReport, QueuedJob, Resources, SIGNAL_EXIT_BASE
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
-from tslab.study.reporting.chain import waits_for
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.text import format_index_ranges, log_table
+from tslab.lab.enums import JobFlag, StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import expand_runs, Study
+from tslab.lab.study.launchers.common.types import (
+    LaunchReport,
+    QueuedJob,
+    Resources,
+    SIGNAL_EXIT_BASE,
+)
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.chain import waits_for
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['log_launch', 'log_problems', 'log_show', 'log_status', 'resources_of']
 

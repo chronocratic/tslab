@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 from typing import cast
 
-from tslab.study.definition.settings import SettingValue
+from tslab.lab.study.definition.settings import SettingValue
 
 __all__ = ['PLACEHOLDERS', 'expand_placeholders', 'expand_setting', 'expand_variables']
 

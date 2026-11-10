@@ -1,12 +1,12 @@
 """Reading local task states from the pid file and job records."""
 
-from tslab.core.meta import hostname
-from tslab.enums import LocalTaskState
-from tslab.study.definition import Study
-from tslab.study.launchers.local.pid_file import local_job_states
-from tslab.study.machine import MachineProfile
-from tslab.study.paths import study_folder
-from tslab.study.records import JobRecord, latest_tasks
+from tslab.lab.core.meta import hostname
+from tslab.lab.enums import LocalTaskState
+from tslab.lab.study.definition import Study
+from tslab.lab.study.launchers.local.pid_file import local_job_states
+from tslab.lab.study.machine import MachineProfile
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import JobRecord, latest_tasks
 
 __all__ = ['_is_local_job_id', '_local_states']
 

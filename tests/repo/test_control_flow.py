@@ -13,7 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'src' / 'tslab'
-TEMPLATE = SOURCE / 'templates'
+TEMPLATE = SOURCE / 'ts' / 'templates'
 BASELINE = Path(__file__).with_name('control_flow_baseline.json')
 KINDS = ('nested_if', 'deep_functions', 'kind_switches')
 

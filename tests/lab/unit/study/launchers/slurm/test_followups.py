@@ -7,15 +7,15 @@ import sys
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, jobs_of, no_sleep, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, jobs_of, no_sleep, submit_study
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, LauncherKind, RunState
-from tslab.study.commands import resubmit, submit
-from tslab.study.launchers.slurm.followups import queue_followups
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.machine import resolve_machine, write_register
-from tslab.study.records import append_job, JobKind, ProgressSnapshot, TaskRecord
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, LauncherKind, RunState
+from tslab.lab.study.commands import resubmit, submit
+from tslab.lab.study.launchers.slurm.followups import queue_followups
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.machine import resolve_machine, write_register
+from tslab.lab.study.records import append_job, JobKind, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six
 STUDIES = '''
@@ -24,7 +24,7 @@ STUDIES = '''
 import sys
 
 import toy_script
-from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 
 study = Study(
     name='s',

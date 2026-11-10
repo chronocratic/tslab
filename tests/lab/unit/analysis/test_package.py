@@ -1,4 +1,4 @@
-import tslab.analysis
+import tslab.lab.analysis
 
 EXPECTED = {
     'AnalysisMetric',
@@ -50,5 +50,5 @@ EXPECTED = {
 
 
 def test_door_lists_the_public_api() -> None:
-    assert set(tslab.analysis.__all__) == EXPECTED
-    assert all(hasattr(tslab.analysis, name) for name in tslab.analysis.__all__)
+    assert set(tslab.lab.analysis.__all__) == EXPECTED
+    assert all(hasattr(tslab.lab.analysis, name) for name in tslab.lab.analysis.__all__)

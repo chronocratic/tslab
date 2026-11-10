@@ -7,21 +7,21 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from tslab.enums import AfterVerdict, JobPhase
-from tslab.study.chain import after_verdict
-from tslab.study.definition import upstream_runs
-from tslab.study.launchers.common.types import JobStates
-from tslab.study.paths import study_folder
-from tslab.study.records import latest_tasks, read_jobs
-from tslab.study.reporting.state import collect_states
+from tslab.lab.enums import AfterVerdict, JobPhase
+from tslab.lab.study.chain import after_verdict
+from tslab.lab.study.definition import upstream_runs
+from tslab.lab.study.launchers.common.types import JobStates
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import latest_tasks, read_jobs
+from tslab.lab.study.reporting.state import collect_states
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from tslab.study.context import Context
-    from tslab.study.definition import Study, StudyRun
-    from tslab.study.plan import JobGroup
-    from tslab.study.records import JobRecord
+    from tslab.lab.study.context import Context
+    from tslab.lab.study.definition import Study, StudyRun
+    from tslab.lab.study.plan import JobGroup
+    from tslab.lab.study.records import JobRecord
 
 __all__ = ['after_filter']
 

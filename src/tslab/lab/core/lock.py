@@ -16,9 +16,9 @@ import threading
 import time
 import uuid
 
-from tslab.core.meta import hostname
-from tslab.core.paths import LOCK_FILE
-from tslab.jobs.local import process_alive
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.paths import LOCK_FILE
+from tslab.lab.jobs.local import process_alive
 
 __all__ = [
     'Heartbeat',

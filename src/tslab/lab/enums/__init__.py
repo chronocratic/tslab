@@ -1,23 +1,21 @@
 """Enums shared by more than one package: the fixed sets of choices."""
 
-from tslab.enums.after_condition import AfterCondition
-from tslab.enums.after_verdict import AfterVerdict
-from tslab.enums.chained_retry import ChainedRetry
-from tslab.enums.check_status import CheckStatus
-from tslab.enums.instance_state import InstanceState
-from tslab.enums.job_flag import JobFlag
-from tslab.enums.job_phase import JobPhase
-from tslab.enums.launcher_kind import LauncherKind
-from tslab.enums.local_task_state import LocalTaskState
-from tslab.enums.log_level import LogLevel
-from tslab.enums.output_format import OutputFormat
-from tslab.enums.retry import Retry
-from tslab.enums.run_state import RunState
-from tslab.enums.satisfy import Satisfy
-from tslab.enums.shown_run_state import ShownRunState
-from tslab.enums.split import Split
-from tslab.enums.study_state import StudyState
-from tslab.enums.wandb_mode import WandbMode
+from tslab.lab.enums.after_condition import AfterCondition
+from tslab.lab.enums.after_verdict import AfterVerdict
+from tslab.lab.enums.chained_retry import ChainedRetry
+from tslab.lab.enums.check_status import CheckStatus
+from tslab.lab.enums.instance_state import InstanceState
+from tslab.lab.enums.job_flag import JobFlag
+from tslab.lab.enums.job_phase import JobPhase
+from tslab.lab.enums.launcher_kind import LauncherKind
+from tslab.lab.enums.local_task_state import LocalTaskState
+from tslab.lab.enums.log_level import LogLevel
+from tslab.lab.enums.output_format import OutputFormat
+from tslab.lab.enums.retry import Retry
+from tslab.lab.enums.run_state import RunState
+from tslab.lab.enums.satisfy import Satisfy
+from tslab.lab.enums.shown_run_state import ShownRunState
+from tslab.lab.enums.study_state import StudyState
 
 __all__ = [
     'AfterCondition',
@@ -35,7 +33,5 @@ __all__ = [
     'RunState',
     'Satisfy',
     'ShownRunState',
-    'Split',
     'StudyState',
-    'WandbMode',
 ]

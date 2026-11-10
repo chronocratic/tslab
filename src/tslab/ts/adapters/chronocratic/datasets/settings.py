@@ -14,9 +14,9 @@ import chronocratic.datasets
 from lightning import LightningDataModule
 import tyro
 
-from tslab.adapters.chronocratic.generated import make_settings_class, unknown_settings
-from tslab.core.fingerprint import NotFingerprinted
-from tslab.core.markers import HardwareSetting
+from tslab.lab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.markers import HardwareSetting
+from tslab.ts.adapters.chronocratic.generated import make_settings_class, unknown_settings
 
 __all__ = [
     'DATAMODULES',

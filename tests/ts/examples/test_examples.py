@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-EXAMPLES = Path(__file__).parents[2] / 'examples'
+EXAMPLES = Path(__file__).parents[3] / 'examples'
 
 
 def run_example(*args: str, example: str, cwd: Path) -> subprocess.CompletedProcess[str]:

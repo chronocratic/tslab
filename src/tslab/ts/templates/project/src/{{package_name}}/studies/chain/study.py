@@ -1,6 +1,6 @@
 """A chained study: the probe grid runs after the pretrain grid has trained."""
 
-from tslab.study import Study
+from tslab.lab.study import Study
 
 from {{package_name}}.studies.chain.grids import probe_grid
 from {{package_name}}.studies.common import classification_grid

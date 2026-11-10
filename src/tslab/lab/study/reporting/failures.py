@@ -3,16 +3,16 @@
 from collections.abc import Mapping, Sequence
 import logging
 
-from tslab.core.paths import ERROR_FILE, LOGS_DIRECTORY
-from tslab.enums import InstanceState, StudyState
-from tslab.jobs.local import tail_lines
-from tslab.study.context import Context
-from tslab.study.launchers.common.protocols import Backend
-from tslab.study.launchers.common.types import JobUsage, Resources
-from tslab.study.launchers.tables import backend_for
-from tslab.study.paths import instance_directory
-from tslab.study.reporting.documents import run_entry
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.paths import ERROR_FILE, LOGS_DIRECTORY
+from tslab.lab.enums import InstanceState, StudyState
+from tslab.lab.jobs.local import tail_lines
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.protocols import Backend
+from tslab.lab.study.launchers.common.types import JobUsage, Resources
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.paths import instance_directory
+from tslab.lab.study.reporting.documents import run_entry
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['collect_failures', 'failure_hint', 'log_failures']
 

@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from tslab.jobs.local import PoolCommand, process_alive, ProcessResult, run_commands
-from tslab.jobs.local.pool import _environment_of, _GpuLeaseGate
+from tslab.lab.jobs.local import PoolCommand, process_alive, ProcessResult, run_commands
+from tslab.lab.jobs.local.pool import _environment_of, _GpuLeaseGate
 
 _LOCK_CHILD = (
     'import fcntl, os, sys, time\n'

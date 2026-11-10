@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.core.meta import hostname
-from tslab.core.status import (
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.status import (
     format_instance_id,
     InstanceRecord,
     parse_instance_id,
@@ -15,7 +15,7 @@ from tslab.core.status import (
     StatusFileError,
     write_status,
 )
-from tslab.enums import InstanceState, RunState
+from tslab.lab.enums import InstanceState, RunState
 
 
 def test_round_trip(tmp_path: Path) -> None:

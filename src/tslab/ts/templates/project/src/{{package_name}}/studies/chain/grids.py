@@ -1,6 +1,6 @@
 """The probe grid of the chain study."""
 
-from tslab.study import After, Grid, setting_axis
+from tslab.lab.study import After, Grid, setting_axis
 
 from {{package_name}} import probe
 from {{package_name}}.studies.common import classification_recipes, TOY_UCR

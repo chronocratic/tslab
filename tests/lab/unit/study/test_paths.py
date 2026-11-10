@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tslab.study.paths import next_job_file
+from tslab.lab.study.paths import next_job_file
 
 
 def test_next_job_file_is_one_past_the_largest_number(tmp_path: Path) -> None:

@@ -1,6 +1,6 @@
 """SLURM helpers: submitting jobs and reading their states and timing."""
 
-from tslab.jobs.slurm.catalogue import (
+from tslab.lab.jobs.slurm.catalogue import (
     command_lines,
     CommandOutput,
     CommandValues,
@@ -11,7 +11,7 @@ from tslab.jobs.slurm.catalogue import (
     SLURM_COMMANDS,
     SlurmCommand,
 )
-from tslab.jobs.slurm.commands import (
+from tslab.lab.jobs.slurm.commands import (
     gres_gpus,
     QOS_LIMIT_MARKERS,
     query_cluster_config,
@@ -31,9 +31,9 @@ from tslab.jobs.slurm.commands import (
     SlurmQueueEntry,
     submission_environment,
 )
-from tslab.jobs.slurm.environment import task_count
-from tslab.jobs.slurm.memory import format_slurm_memory, parse_slurm_memory
-from tslab.jobs.slurm.script import (
+from tslab.lab.jobs.slurm.environment import task_count
+from tslab.lab.jobs.slurm.memory import format_slurm_memory, parse_slurm_memory
+from tslab.lab.jobs.slurm.script import (
     array_spec,
     check_script_text,
     export_lines,
@@ -42,7 +42,7 @@ from tslab.jobs.slurm.script import (
     srun_command,
     wait_for_file_line,
 )
-from tslab.jobs.slurm.states import (
+from tslab.lab.jobs.slurm.states import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
     job_ended,
@@ -51,7 +51,7 @@ from tslab.jobs.slurm.states import (
     RUNNING_JOB_STATES,
     STUCK_PENDING_REASONS,
 )
-from tslab.jobs.slurm.timing import (
+from tslab.lab.jobs.slurm.timing import (
     format_slurm_duration,
     parse_sacct_duration,
     parse_slurm_duration,

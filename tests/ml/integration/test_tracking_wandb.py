@@ -7,12 +7,12 @@ from pathlib import Path
 from lightning.pytorch.loggers import CSVLogger, WandbLogger
 import pytest
 
-from tslab.core.run import Run
-from tslab.core.tracker import RunStatus
-from tslab.enums import WandbMode
-from tslab.tracking.wandb import tracker as wandb_tracker_module
-from tslab.tracking.wandb.log import read_exit_codes, read_records
-from tslab.tracking.wandb.tracker import WandbTracker
+from tslab.lab.core.run import Run
+from tslab.lab.core.tracker import RunStatus
+from tslab.ml.tracking.wandb import tracker as wandb_tracker_module
+from tslab.ml.tracking.wandb.log import read_exit_codes, read_records
+from tslab.ml.tracking.wandb.tracker import WandbTracker
+from tslab.ml.tracking.wandb_mode import WandbMode
 
 
 @dataclass(frozen=True, kw_only=True)

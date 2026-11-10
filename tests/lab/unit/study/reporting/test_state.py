@@ -5,20 +5,20 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
-from tests.unit.study.helpers import make_job_states
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState, StudyState
-from tslab.jobs.slurm import (
+from tests.lab.unit.study.helpers import make_job_states
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, JobFlag, JobPhase, LauncherKind, RunState, StudyState
+from tslab.lab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
 )
-from tslab.study import StudyRun
-from tslab.study.launchers.slurm.states import slurm_task_ids
-from tslab.study.launchers.tables import JOB_RECORDS
-from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
-from tslab.study.reporting.state import (
+from tslab.lab.study import StudyRun
+from tslab.lab.study.launchers.slurm.states import slurm_task_ids
+from tslab.lab.study.launchers.tables import JOB_RECORDS
+from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
+from tslab.lab.study.reporting.state import (
     _grace_wait,
     collect_states,
     FolderFacts,

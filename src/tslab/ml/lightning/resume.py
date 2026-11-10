@@ -20,7 +20,7 @@ import re
 from lightning.pytorch.utilities.exceptions import MisconfigurationException
 import torch
 
-from tslab.lightning.callbacks import file_safe_name
+from tslab.ml.lightning.callbacks import file_safe_name
 
 __all__ = ['CHECKPOINT_LOAD_ERRORS', 'choose_resume_checkpoint', 'resume_candidates']
 

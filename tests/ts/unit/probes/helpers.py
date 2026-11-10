@@ -2,7 +2,7 @@
 
 import torch
 
-from tslab.probes import SVMProbe
+from tslab.ts.probes import SVMProbe
 
 __all__ = ['blobs', 'fitted_svm', 'ridge_data']
 

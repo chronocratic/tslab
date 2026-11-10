@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import pytest
 import yaml
 
-from tslab.core.config import (
+from tslab.lab.core.config import (
     config_from_yaml,
     config_to_yaml,
     ConfigFileError,
@@ -16,7 +16,7 @@ from tslab.core.config import (
     parse_config,
     save_config,
 )
-from tslab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.fingerprint import NotFingerprinted
 
 
 class Mode(StrEnum):
@@ -44,7 +44,7 @@ class TSTCCLike:  # the same fields as TS2VecLike on purpose: the union member m
 
 
 @dataclass(frozen=True, kw_only=True)
-class RunOptions:  # a stand-in with the shapes of tslab.RunOptions (a tuple and a Literal)
+class RunOptions:  # a stand-in with the shapes of tslab.lab.RunOptions (a tuple and a Literal)
     force_all: bool = False
     rerun: tuple[str, ...] = ()
     log_level: Literal['DEBUG', 'INFO'] = 'INFO'

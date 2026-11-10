@@ -13,15 +13,15 @@ from typing import override
 
 import pytest
 
-import tslab
-from tslab.core.codec import decode_dataclass
-from tslab.core.config import ConfigFileError
-from tslab.core.lock import RunLockedError
-from tslab.core.meta import hostname
-from tslab.core.run import Run, RunOptions
-from tslab.core.status import InstanceRecord
-from tslab.core.tracker import LocalTracker, RunStatus, Tracker
-from tslab.enums import InstanceState, LogLevel
+import tslab.lab
+from tslab.lab.core.codec import decode_dataclass
+from tslab.lab.core.config import ConfigFileError
+from tslab.lab.core.lock import RunLockedError
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.run import Run, RunOptions
+from tslab.lab.core.status import InstanceRecord
+from tslab.lab.core.tracker import LocalTracker, RunStatus, Tracker
+from tslab.lab.enums import InstanceState, LogLevel
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -239,7 +239,7 @@ def test_lock_without_heartbeat_from_other_host_is_replaced(
 
 
 def test_heartbeat_refreshes_the_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr('tslab.core.lock._HEARTBEAT_SECONDS', 0.01)
+    monkeypatch.setattr('tslab.lab.core.lock._HEARTBEAT_SECONDS', 0.01)
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         lock = tmp_path / 'a' / '.lock'
         _age_file(path=lock, seconds=500)
@@ -286,7 +286,7 @@ def test_run_leaves_a_lock_taken_over_by_another_process(tmp_path: Path) -> None
 def test_heartbeat_does_not_touch_a_foreign_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.core.lock._HEARTBEAT_SECONDS', 0.01)
+    monkeypatch.setattr('tslab.lab.core.lock._HEARTBEAT_SECONDS', 0.01)
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         lock = tmp_path / 'a' / '.lock'
         lock.write_text(json.dumps({'pid': 1, 'host': 'node123', 'nonce': 'x'}), encoding='utf-8')
@@ -335,7 +335,7 @@ def test_sigterm_ends_the_run_as_crashed(tmp_path: Path) -> None:
 def test_usr2_on_a_non_zero_rank_only_logs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
     monkeypatch.setenv('SLURM_PROCID', '1')
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
         signal.raise_signal(signal.SIGUSR2)
@@ -345,7 +345,7 @@ def test_usr2_on_a_non_zero_rank_only_logs(
 
 
 def test_usr2_handler_is_restored_after_the_run(tmp_path: Path) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
     before = signal.getsignal(signal.SIGUSR2)
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         pass

@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.helpers import make_job_states, no_sleep
-import tslab
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState
-from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
-from tslab.study.commands import submit
-from tslab.study.context import load_context, Selection
-from tslab.study.definition import expand_runs, load_study
-from tslab.study.reporting.result_table import (
+from tests.lab.unit.study.helpers import make_job_states, no_sleep
+import tslab.lab
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, RunState
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+from tslab.lab.study.commands import submit
+from tslab.lab.study.context import load_context, Selection
+from tslab.lab.study.definition import expand_runs, load_study
+from tslab.lab.study.reporting.result_table import (
     collect_results,
     format_results_csv,
     write_results_csv,
 )
-from tslab.study.reporting.state import collect_states, RunReport
+from tslab.lab.study.reporting.state import collect_states, RunReport
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -31,14 +31,16 @@ class TinyConfig:
     run_path: Path = Path('run')
 
 
-@tslab.stage(name='train', output=tslab.Json)
-def train(*, run: tslab.Run, name: tslab.InstanceName | None = None) -> tslab.Json:
-    return tslab.Json(data={'value': 1})
+@tslab.lab.stage(name='train', output=tslab.lab.Json)
+def train(*, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None) -> tslab.lab.Json:
+    return tslab.lab.Json(data={'value': 1})
 
 
-@tslab.stage(name='evaluate', output=tslab.Metrics)
-def evaluate(*, run: tslab.Run, name: tslab.InstanceName | None = None) -> tslab.Metrics:
-    return tslab.Metrics(data={'accuracy': 0.9, 'f1': 0.8})
+@tslab.lab.stage(name='evaluate', output=tslab.lab.Metrics)
+def evaluate(
+    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None
+) -> tslab.lab.Metrics:
+    return tslab.lab.Metrics(data={'accuracy': 0.9, 'f1': 0.8})
 
 
 def study() -> Study:
@@ -61,7 +63,7 @@ def study() -> Study:
 
 def make_run(*, root: Path, run_path: str, with_metrics: bool) -> None:
     """One real run folder, with a train stage and, optionally, an evaluate one."""
-    with tslab.Run(
+    with tslab.lab.Run(
         config=TinyConfig(seed=int(run_path.rsplit('/', 1)[-1])),
         root=root,
         relative_path=Path(run_path),

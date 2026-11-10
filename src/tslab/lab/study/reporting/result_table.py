@@ -11,17 +11,17 @@ import io
 import json
 from pathlib import Path
 
-from tslab.core.artifact import Metrics
-from tslab.core.files import atomic_write_text
-from tslab.core.paths import META_FILE
-from tslab.core.status import InstanceRecord
-from tslab.core.text import first_line
-from tslab.enums import InstanceState
-from tslab.study.context import context_for, Selection
-from tslab.study.definition import Study
-from tslab.study.launchers.cpus import available_cpus
-from tslab.study.paths import instance_directory
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.artifact import Metrics
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.core.paths import META_FILE
+from tslab.lab.core.status import InstanceRecord
+from tslab.lab.core.text import first_line
+from tslab.lab.enums import InstanceState
+from tslab.lab.study.context import context_for, Selection
+from tslab.lab.study.definition import Study
+from tslab.lab.study.launchers.cpus import available_cpus
+from tslab.lab.study.paths import instance_directory
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = [
     'ERROR_COLUMN',

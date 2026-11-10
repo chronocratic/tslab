@@ -10,14 +10,14 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
-from tslab.core.meta import hostname
-from tslab.enums import JobPhase, LauncherKind, LocalTaskState
-from tslab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, visible_gpus
-from tslab.study.context import Context
-from tslab.study.definition import Study
-from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers.common.launch import launch
-from tslab.study.launchers.common.types import (
+from tslab.lab.core.meta import hostname
+from tslab.lab.enums import JobPhase, LauncherKind, LocalTaskState
+from tslab.lab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, visible_gpus
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import Study
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.launchers.common.launch import launch
+from tslab.lab.study.launchers.common.types import (
     JobStates,
     JobUsage,
     LaunchReport,
@@ -25,23 +25,23 @@ from tslab.study.launchers.common.types import (
     QueuedJob,
     Resources,
 )
-from tslab.study.launchers.local.after_filter import after_filter
-from tslab.study.launchers.local.foreground import foreground_script
-from tslab.study.launchers.local.pid_file import _check_free, hold_launch, LocalLaunchError
-from tslab.study.launchers.local.records import LocalJobRecord
-from tslab.study.launchers.local.run import (
+from tslab.lab.study.launchers.local.after_filter import after_filter
+from tslab.lab.study.launchers.local.foreground import foreground_script
+from tslab.lab.study.launchers.local.pid_file import _check_free, hold_launch, LocalLaunchError
+from tslab.lab.study.launchers.local.records import LocalJobRecord
+from tslab.lab.study.launchers.local.run import (
     local_job_id,
     LocalLauncher,
     resolve_local_gpus,
     write_job_files,
 )
-from tslab.study.launchers.local.states import _local_states
-from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile
-from tslab.study.machine.profile import wants_retry_followup
-from tslab.study.paths import study_folder
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport
+from tslab.lab.study.launchers.local.states import _local_states
+from tslab.lab.study.machine import LocalSettings, MachineOverride, MachineProfile
+from tslab.lab.study.machine.profile import wants_retry_followup
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['LocalBackend', 'LocalResources']
 
@@ -304,7 +304,7 @@ class LocalBackend:
         self, *, context: Context, dry_run: bool, signal: str | None
     ) -> tuple[int, list[str]]:
         """Stop the live local launch; the exit code and the stopped pid."""
-        from tslab.study.launchers.local.cancel import cancel_local  # noqa: PLC0415
+        from tslab.lab.study.launchers.local.cancel import cancel_local  # noqa: PLC0415
 
         return cancel_local(context=context, dry_run=dry_run, signal=signal)
 
@@ -320,7 +320,7 @@ class LocalBackend:
         """Start the launch in the background and wait until it holds the pid file."""
         # why: the local pid-file module reads the backends door for OnTaskState, so a
         # module-level import would cycle
-        from tslab.study.launchers.local.pid_file import detach_launch  # noqa: PLC0415
+        from tslab.lab.study.launchers.local.pid_file import detach_launch  # noqa: PLC0415
 
         return detach_launch(
             study_folder=study_folder(machine=context.machine, study=context.study),
@@ -341,7 +341,7 @@ class LocalBackend:
 
     def usage(self, *, context: Context) -> tuple[Mapping[str, JobUsage], Mapping[str, str | None]]:
         """The usage of every local run from its usage file, with the GPU ids."""
-        from tslab.study.launchers.local.usage import usage  # noqa: PLC0415
+        from tslab.lab.study.launchers.local.usage import usage  # noqa: PLC0415
 
         return usage(context=context)
 

@@ -8,8 +8,8 @@ from typing import Annotated, override
 import pytest
 import torch
 
-import tslab
-from tslab.core.status import read_status
+import tslab.lab
+from tslab.lab.core.status import read_status
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -20,18 +20,18 @@ class Config:
 calls: list[str] = []
 
 
-def open_run(tmp_path: Path) -> tslab.Run:
-    return tslab.Run(
-        config=Config(), root=tmp_path, relative_path=Path('r'), options=tslab.RunOptions()
+def open_run(tmp_path: Path) -> tslab.lab.Run:
+    return tslab.lab.Run(
+        config=Config(), root=tmp_path, relative_path=Path('r'), options=tslab.lab.RunOptions()
     )
 
 
-@tslab.stage(name='count', output=tslab.Json)
+@tslab.lab.stage(name='count', output=tslab.lab.Json)
 def count(
-    *, run: tslab.Run, value: int, workers: Annotated[int, tslab.NotFingerprinted] = 0
-) -> tslab.Json:
+    *, run: tslab.lab.Run, value: int, workers: Annotated[int, tslab.lab.NotFingerprinted] = 0
+) -> tslab.lab.Json:
     calls.append(f'count {value} {workers}')
-    return tslab.Json(data={'value': value})
+    return tslab.lab.Json(data={'value': value})
 
 
 def test_not_fingerprinted_argument_does_not_trigger_rerun(tmp_path: Path) -> None:
@@ -44,15 +44,15 @@ def test_not_fingerprinted_argument_does_not_trigger_rerun(tmp_path: Path) -> No
 
 
 def test_version_bump_reruns(tmp_path: Path) -> None:
-    @tslab.stage(name='versioned', output=tslab.Json, version=1)
-    def first(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='versioned', output=tslab.lab.Json, version=1)
+    def first(*, run: tslab.lab.Run) -> tslab.lab.Json:
         calls.append('v1')
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
-    @tslab.stage(name='versioned', output=tslab.Json, version=2)
-    def second(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='versioned', output=tslab.lab.Json, version=2)
+    def second(*, run: tslab.lab.Run) -> tslab.lab.Json:
         calls.append('v2')
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
     calls.clear()
     with open_run(tmp_path) as run:
@@ -63,9 +63,9 @@ def test_version_bump_reruns(tmp_path: Path) -> None:
 
 
 def test_unfingerprintable_argument_names_the_argument(tmp_path: Path) -> None:
-    @tslab.stage(name='bad', output=tslab.Json)
-    def bad(*, run: tslab.Run, model: torch.nn.Module) -> tslab.Json:
-        return tslab.Json(data={})
+    @tslab.lab.stage(name='bad', output=tslab.lab.Json)
+    def bad(*, run: tslab.lab.Run, model: torch.nn.Module) -> tslab.lab.Json:
+        return tslab.lab.Json(data={})
 
     with (
         open_run(tmp_path) as run,
@@ -75,13 +75,13 @@ def test_unfingerprintable_argument_names_the_argument(tmp_path: Path) -> None:
 
 
 def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
-    @tslab.stage(name='wrong', output=tslab.Tensors)
-    def wrong(*, run: tslab.Run) -> tslab.Tensors:
-        return tslab.Json(data={})  # ty: ignore[invalid-return-type]
+    @tslab.lab.stage(name='wrong', output=tslab.lab.Tensors)
+    def wrong(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
+        return tslab.lab.Json(data={})  # ty: ignore[invalid-return-type]
 
     with open_run(tmp_path) as run:
         result = wrong(run=run)
-    assert not tslab.is_available(artifact=result)
+    assert not tslab.lab.is_available(artifact=result)
     status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
     assert (
         status['instances']['wrong[default]']['error']
@@ -92,14 +92,14 @@ def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
 def test_decorator_requires_keyword_only_and_run() -> None:
     # why: the parameter exists only to be rejected
     with pytest.raises(TypeError, match='keyword-only'):
-        tslab.stage(name='positional', output=tslab.Json)(
-            lambda run: tslab.Json(data={})  # noqa: ARG005
+        tslab.lab.stage(name='positional', output=tslab.lab.Json)(
+            lambda run: tslab.lab.Json(data={})  # noqa: ARG005
         )
     with pytest.raises(TypeError, match='must take a run parameter'):
 
-        @tslab.stage(name='norun', output=tslab.Json)
-        def no_run(*, value: int) -> tslab.Json:
-            return tslab.Json(data={})
+        @tslab.lab.stage(name='norun', output=tslab.lab.Json)
+        def no_run(*, value: int) -> tslab.lab.Json:
+            return tslab.lab.Json(data={})
 
 
 def test_corrupt_cached_result_is_recomputed(
@@ -113,7 +113,7 @@ def test_corrupt_cached_result_is_recomputed(
         result = count(run=run, value=2)
     assert calls == ['count 2 0', 'count 2 0']
     assert 'cannot load count[default]' in caplog.text
-    assert isinstance(result, tslab.Json)
+    assert isinstance(result, tslab.lab.Json)
 
 
 def test_corrupt_instance_meta_is_recomputed(tmp_path: Path) -> None:
@@ -124,29 +124,29 @@ def test_corrupt_instance_meta_is_recomputed(tmp_path: Path) -> None:
     with open_run(tmp_path) as run:
         result = count(run=run, value=2)
     assert calls == ['count 2 0', 'count 2 0']
-    assert isinstance(result, tslab.Json)
+    assert isinstance(result, tslab.lab.Json)
     (tmp_path / 'r' / 'count' / 'default' / 'meta.json').write_bytes(b'\xff\xfe\x00\x01')
     with open_run(tmp_path) as run:
         result = count(run=run, value=2)
     assert calls == ['count 2 0', 'count 2 0', 'count 2 0']
-    assert isinstance(result, tslab.Json)
+    assert isinstance(result, tslab.lab.Json)
 
 
 def test_external_input_is_recorded_and_content_sensitive(tmp_path: Path) -> None:
-    @tslab.stage(name='use', output=tslab.Json)
-    def use(*, run: tslab.Run, thresholds: tslab.Json) -> tslab.Json:
+    @tslab.lab.stage(name='use', output=tslab.lab.Json)
+    def use(*, run: tslab.lab.Run, thresholds: tslab.lab.Json) -> tslab.lab.Json:
         calls.append('use')
-        return tslab.Json(data=thresholds.data)
+        return tslab.lab.Json(data=thresholds.data)
 
     source = tmp_path / 'thresholds.json'
     source.write_text('{"t": 1}', encoding='utf-8')
     calls.clear()
     for _ in range(2):
         with open_run(tmp_path) as run:
-            use(run=run, thresholds=tslab.Json.external(path=source))
+            use(run=run, thresholds=tslab.lab.Json.external(path=source))
     source.write_text('{"t": 2}', encoding='utf-8')
     with open_run(tmp_path) as run:
-        use(run=run, thresholds=tslab.Json.external(path=source))
+        use(run=run, thresholds=tslab.lab.Json.external(path=source))
     assert calls == ['use', 'use']
     meta = json.loads(
         (tmp_path / 'r' / 'use' / 'default' / 'meta.json').read_text(encoding='utf-8')
@@ -155,16 +155,16 @@ def test_external_input_is_recorded_and_content_sensitive(tmp_path: Path) -> Non
     assert meta['inputs'] == {}
 
 
-class Doubler(tslab.Stage[tslab.Json]):
+class Doubler(tslab.lab.Stage[tslab.lab.Json]):
     name = 'double'
-    output_type = tslab.Json
+    output_type = tslab.lab.Json
 
     @override
     def execute(  # ty: ignore[invalid-method-override]
-        self, *, run: tslab.Run, value: int
-    ) -> tslab.Json:
+        self, *, run: tslab.lab.Run, value: int
+    ) -> tslab.lab.Json:
         calls.append('double')
-        return tslab.Json(data={'value': 2 * value})
+        return tslab.lab.Json(data={'value': 2 * value})
 
 
 def test_class_based_stage(tmp_path: Path) -> None:
@@ -173,7 +173,7 @@ def test_class_based_stage(tmp_path: Path) -> None:
         with open_run(tmp_path) as run:
             result = Doubler()(run=run, value=3)
     assert calls == ['double']
-    assert isinstance(result, tslab.Json)
+    assert isinstance(result, tslab.lab.Json)
     assert result.data == {'value': 6}
 
 
@@ -184,17 +184,17 @@ class SimulatedTimeLimitError(RuntimeError):
 def test_in_place_stage_resumes_and_restarts_on_fingerprint_change(tmp_path: Path) -> None:
     seen: list[list[str]] = []
 
-    @tslab.stage(name='fit', output=tslab.Json, in_place=True)
+    @tslab.lab.stage(name='fit', output=tslab.lab.Json, in_place=True)
     def fit(
-        *, run: tslab.Run, epochs: int, crash: Annotated[bool, tslab.NotFingerprinted]
-    ) -> tslab.Json:
+        *, run: tslab.lab.Run, epochs: int, crash: Annotated[bool, tslab.lab.NotFingerprinted]
+    ) -> tslab.lab.Json:
         directory = run.instance_directory(stage_name='fit', instance_name=None)
         seen.append(sorted(item.name for item in directory.iterdir()))
         (directory / 'last.ckpt').write_text(str(epochs), encoding='utf-8')
         if crash:
             message = 'time limit'
             raise SimulatedTimeLimitError(message)
-        return tslab.Json(data={'epochs': epochs})
+        return tslab.lab.Json(data={'epochs': epochs})
 
     with open_run(tmp_path) as run:
         fit(run=run, epochs=1, crash=True)
@@ -213,31 +213,31 @@ def test_in_place_stage_resumes_and_restarts_on_fingerprint_change(tmp_path: Pat
     ]
 
 
-def run_with_options(tmp_path: Path, **options: object) -> tslab.Run:
-    return tslab.Run(
+def run_with_options(tmp_path: Path, **options: object) -> tslab.lab.Run:
+    return tslab.lab.Run(
         config=Config(),
         root=tmp_path,
         relative_path=Path('r'),
-        options=tslab.RunOptions(**options),  # ty: ignore[invalid-argument-type]
+        options=tslab.lab.RunOptions(**options),  # ty: ignore[invalid-argument-type]
     )
 
 
 def test_failed_rerun_keeps_the_previous_good_result(tmp_path: Path) -> None:
     fail = False
 
-    @tslab.stage(name='flaky', output=tslab.Json)
-    def flaky(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='flaky', output=tslab.lab.Json)
+    def flaky(*, run: tslab.lab.Run) -> tslab.lab.Json:
         if fail:
             message = 'transient out of memory'
             raise MemoryError(message)
-        return tslab.Json(data={'ok': True})
+        return tslab.lab.Json(data={'ok': True})
 
     with open_run(tmp_path) as run:
         flaky(run=run)
     fail = True
     with run_with_options(tmp_path, rerun=('flaky[default]',)) as run:
         result = flaky(run=run)
-    assert not tslab.is_available(artifact=result)
+    assert not tslab.lab.is_available(artifact=result)
     folder = tmp_path / 'r' / 'flaky' / 'default'
     assert json.loads((folder / 'data.json').read_text(encoding='utf-8')) == {'ok': True}
     assert 'MemoryError' in (folder / 'error.txt').read_text(encoding='utf-8')
@@ -245,29 +245,29 @@ def test_failed_rerun_keeps_the_previous_good_result(tmp_path: Path) -> None:
     fail = False
     with open_run(tmp_path) as run:
         again = flaky(run=run)
-    assert isinstance(again, tslab.Json)
+    assert isinstance(again, tslab.lab.Json)
     assert not (folder / 'error.txt').exists()
 
 
 def test_rerun_from_applies_after_a_skipped_stage(tmp_path: Path) -> None:
     executed: list[str] = []
 
-    @tslab.stage(name='first', output=tslab.Json)
-    def first(*, run: tslab.Run, fail: bool) -> tslab.Json:
+    @tslab.lab.stage(name='first', output=tslab.lab.Json)
+    def first(*, run: tslab.lab.Run, fail: bool) -> tslab.lab.Json:
         if fail:
             message = 'boom'
             raise RuntimeError(message)
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
-    @tslab.stage(name='second', output=tslab.Json)
-    def second(*, run: tslab.Run, upstream: tslab.Json) -> tslab.Json:
+    @tslab.lab.stage(name='second', output=tslab.lab.Json)
+    def second(*, run: tslab.lab.Run, upstream: tslab.lab.Json) -> tslab.lab.Json:
         executed.append('second')
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
-    @tslab.stage(name='third', output=tslab.Json)
-    def third(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='third', output=tslab.lab.Json)
+    def third(*, run: tslab.lab.Run) -> tslab.lab.Json:
         executed.append('third')
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
     with open_run(tmp_path) as run:
         second(run=run, upstream=first(run=run, fail=False))
@@ -285,7 +285,7 @@ def test_unwritable_work_directory_is_a_stage_failure(tmp_path: Path) -> None:
     with run:
         (tmp_path / 'r' / 'count').write_text('a file where the stage folder must go', 'utf-8')
         result = count(run=run, value=1)
-    assert not tslab.is_available(artifact=result)
+    assert not tslab.lab.is_available(artifact=result)
     status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
     assert status['instances']['count[default]']['state'] == 'failed'
 
@@ -307,65 +307,65 @@ def test_dry_run_survives_unreadable_meta(tmp_path: Path) -> None:
     meta_path.write_text('{broken', encoding='utf-8')
     with run_with_options(tmp_path, dry_run=True) as run:
         placeholder = count(run=run, value=1)
-    assert not tslab.is_available(artifact=placeholder)
+    assert not tslab.lab.is_available(artifact=placeholder)
 
 
 def test_concrete_stage_class_must_define_name_and_output_type() -> None:
     with pytest.raises(TypeError, match='must define name and output_type'):
 
-        class Nameless(tslab.Stage[tslab.Json]):
+        class Nameless(tslab.lab.Stage[tslab.lab.Json]):
             @override
-            def execute(self, **arguments: object) -> tslab.Json:
-                return tslab.Json(data={})
+            def execute(self, **arguments: object) -> tslab.lab.Json:
+                return tslab.lab.Json(data={})
 
     with pytest.raises(TypeError, match='must define output_type'):
 
-        class Typeless(tslab.Stage[tslab.Json]):
+        class Typeless(tslab.lab.Stage[tslab.lab.Json]):
             name = 'typeless'
 
             @override
-            def execute(self, **arguments: object) -> tslab.Json:
-                return tslab.Json(data={})
+            def execute(self, **arguments: object) -> tslab.lab.Json:
+                return tslab.lab.Json(data={})
 
 
 def test_var_positional_is_reported_by_name() -> None:
     with pytest.raises(TypeError, match=r"positional: \['args'\]"):
-        tslab.stage(name='varargs', output=tslab.Json)(
-            lambda *args, run: tslab.Json(data={})  # noqa: ARG005
+        tslab.lab.stage(name='varargs', output=tslab.lab.Json)(
+            lambda *args, run: tslab.lab.Json(data={})  # noqa: ARG005
         )
 
 
 def test_usr2_in_a_stage_fails_it_as_signalled_and_exits(tmp_path: Path) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
 
-    @tslab.stage(name='slow', output=tslab.Json)
-    def slow(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='slow', output=tslab.lab.Json)
+    def slow(*, run: tslab.lab.Run) -> tslab.lab.Json:
         os.kill(os.getpid(), signal.SIGUSR2)
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
-    with pytest.raises(tslab.JobTimeLimitSignal), open_run(tmp_path) as run:
+    with pytest.raises(tslab.lab.JobTimeLimitSignal), open_run(tmp_path) as run:
         slow(run=run)
     status = read_status(path=tmp_path / 'r' / 'status.json')
     assert status is not None
-    assert status.instances['slow[default]'].state is tslab.InstanceState.FAILED
+    assert status.instances['slow[default]'].state is tslab.lab.InstanceState.FAILED
     assert (status.instances['slow[default]'].error or '').startswith('JobTimeLimitSignal:')
-    assert status.run_state is tslab.RunState.CRASHED
+    assert status.run_state is tslab.lab.RunState.CRASHED
     assert 'JobTimeLimitSignal' in (tmp_path / 'r' / 'slow' / 'default' / 'error.txt').read_text()
 
 
 def test_usr2_between_stages_fails_the_next_stage_as_signalled(tmp_path: Path) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
 
-    @tslab.stage(name='first', output=tslab.Json)
-    def first(*, run: tslab.Run) -> tslab.Json:
-        return tslab.Json(data={})
+    @tslab.lab.stage(name='first', output=tslab.lab.Json)
+    def first(*, run: tslab.lab.Run) -> tslab.lab.Json:
+        return tslab.lab.Json(data={})
 
-    @tslab.stage(name='second', output=tslab.Json)
-    def second(*, run: tslab.Run) -> tslab.Json:
-        return tslab.Json(data={})
+    @tslab.lab.stage(name='second', output=tslab.lab.Json)
+    def second(*, run: tslab.lab.Run) -> tslab.lab.Json:
+        return tslab.lab.Json(data={})
 
     with (  # noqa: PT012 # why: the signal must arrive between two stage calls
-        pytest.raises(tslab.JobTimeLimitSignal),
+        pytest.raises(tslab.lab.JobTimeLimitSignal),
         open_run(tmp_path) as run,
     ):
         first(run=run)
@@ -373,7 +373,7 @@ def test_usr2_between_stages_fails_the_next_stage_as_signalled(tmp_path: Path) -
         second(run=run)
     status = read_status(path=tmp_path / 'r' / 'status.json')
     assert status is not None
-    assert status.instances['first[default]'].state is tslab.InstanceState.DONE
+    assert status.instances['first[default]'].state is tslab.lab.InstanceState.DONE
     assert (status.instances['second[default]'].error or '').startswith('JobTimeLimitSignal:')
 
 
@@ -382,21 +382,21 @@ def test_signal_before_preparation_does_not_resume_checkpoint_from_another_finge
 ) -> None:
     observed: list[tuple[int, bool]] = []
 
-    @tslab.stage(name='fit', output=tslab.Json, in_place=True)
-    def fit(*, run: tslab.Run, settings: int, crash: bool) -> tslab.Json:
+    @tslab.lab.stage(name='fit', output=tslab.lab.Json, in_place=True)
+    def fit(*, run: tslab.lab.Run, settings: int, crash: bool) -> tslab.lab.Json:
         directory = run.instance_directory(stage_name='fit', instance_name=None)
         observed.append((settings, (directory / 'last.ckpt').exists()))
         (directory / 'last.ckpt').write_text(str(settings), encoding='utf-8')
         if crash:
             message = 'interrupted'
             raise RuntimeError(message)
-        return tslab.Json(data={'settings': settings})
+        return tslab.lab.Json(data={'settings': settings})
 
     with open_run(tmp_path) as run:
         fit(run=run, settings=1, crash=True)
     with open_run(tmp_path) as run:
         os.kill(os.getpid(), signal.SIGUSR2)
-        with pytest.raises(tslab.JobTimeLimitSignal):
+        with pytest.raises(tslab.lab.JobTimeLimitSignal):
             fit(run=run, settings=2, crash=False)
     with open_run(tmp_path) as run:
         fit(run=run, settings=2, crash=False)
@@ -407,18 +407,18 @@ def test_signal_before_preparation_does_not_resume_checkpoint_from_another_finge
 def test_signal_before_forced_preparation_does_not_resume_old_checkpoint(tmp_path: Path) -> None:
     observed: list[bool] = []
 
-    @tslab.stage(name='fit', output=tslab.Json, in_place=True)
-    def fit(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='fit', output=tslab.lab.Json, in_place=True)
+    def fit(*, run: tslab.lab.Run) -> tslab.lab.Json:
         directory = run.instance_directory(stage_name='fit', instance_name=None)
         observed.append((directory / 'last.ckpt').exists())
         (directory / 'last.ckpt').write_text('checkpoint', encoding='utf-8')
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
     with open_run(tmp_path) as run:
         fit(run=run)
     with run_with_options(tmp_path, force_all=True) as run:
         os.kill(os.getpid(), signal.SIGUSR2)
-        with pytest.raises(tslab.JobTimeLimitSignal):
+        with pytest.raises(tslab.lab.JobTimeLimitSignal):
             fit(run=run)
     with open_run(tmp_path) as run:
         fit(run=run)
@@ -427,27 +427,27 @@ def test_signal_before_forced_preparation_does_not_resume_old_checkpoint(tmp_pat
 
 
 def test_usr2_after_the_last_stage_finishes_the_run(tmp_path: Path) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
     with open_run(tmp_path):
         os.kill(os.getpid(), signal.SIGUSR2)
     status = read_status(path=tmp_path / 'r' / 'status.json')
     assert status is not None
-    assert status.run_state is tslab.RunState.FINISHED
+    assert status.run_state is tslab.lab.RunState.FINISHED
 
 
 def test_sigterm_after_usr2_is_ignored(tmp_path: Path) -> None:
-    assert hasattr(tslab, 'JobTimeLimitSignal')
+    assert hasattr(tslab.lab, 'JobTimeLimitSignal')
 
-    @tslab.stage(name='slow', output=tslab.Json)
-    def slow(*, run: tslab.Run) -> tslab.Json:
+    @tslab.lab.stage(name='slow', output=tslab.lab.Json)
+    def slow(*, run: tslab.lab.Run) -> tslab.lab.Json:
         try:
             os.kill(os.getpid(), signal.SIGUSR2)
-        except tslab.JobTimeLimitSignal:
+        except tslab.lab.JobTimeLimitSignal:
             os.kill(os.getpid(), signal.SIGTERM)
             raise
-        return tslab.Json(data={})
+        return tslab.lab.Json(data={})
 
-    with pytest.raises(tslab.JobTimeLimitSignal), open_run(tmp_path) as run:
+    with pytest.raises(tslab.lab.JobTimeLimitSignal), open_run(tmp_path) as run:
         slow(run=run)
     status = read_status(path=tmp_path / 'r' / 'status.json')
     assert status is not None
@@ -469,9 +469,9 @@ def test_non_zero_rank_runs_an_all_ranks_stage(
 ) -> None:
     monkeypatch.setenv('SLURM_PROCID', '1')
 
-    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
-    def everywhere(*, run: tslab.Run) -> tslab.Json:
-        return tslab.Json(data={'executed': True})
+    @tslab.lab.stage(name='everywhere', output=tslab.lab.Json, all_ranks=True)
+    def everywhere(*, run: tslab.lab.Run) -> tslab.lab.Json:
+        return tslab.lab.Json(data={'executed': True})
 
     with open_run(tmp_path) as run:
         result = everywhere(run=run)
@@ -494,11 +494,11 @@ def test_all_ranks_stage_after_a_single_rank_stage_fails_in_a_multi_rank_job(
 ) -> None:
     monkeypatch.setenv('SLURM_NTASKS', '2')
 
-    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
+    @tslab.lab.stage(name='everywhere', output=tslab.lab.Json, all_ranks=True)
     def everywhere(
-        *, run: tslab.Run, agreement: Annotated[FakeAgreement, tslab.NotFingerprinted]
-    ) -> tslab.Json:
-        return tslab.Json(data={})
+        *, run: tslab.lab.Run, agreement: Annotated[FakeAgreement, tslab.lab.NotFingerprinted]
+    ) -> tslab.lab.Json:
+        return tslab.lab.Json(data={})
 
     with open_run(tmp_path) as run:
         count(run=run, value=2)
@@ -509,12 +509,12 @@ def test_all_ranks_stage_after_a_single_rank_stage_fails_in_a_multi_rank_job(
 def test_all_ranks_stage_follows_the_agreed_cache_decision(tmp_path: Path) -> None:
     executed: list[int] = []
 
-    @tslab.stage(name='everywhere', output=tslab.Json, all_ranks=True)
+    @tslab.lab.stage(name='everywhere', output=tslab.lab.Json, all_ranks=True)
     def everywhere(
-        *, run: tslab.Run, agreement: Annotated[FakeAgreement, tslab.NotFingerprinted]
-    ) -> tslab.Json:
+        *, run: tslab.lab.Run, agreement: Annotated[FakeAgreement, tslab.lab.NotFingerprinted]
+    ) -> tslab.lab.Json:
         executed.append(1)
-        return tslab.Json(data={'value': len(executed)})
+        return tslab.lab.Json(data={'value': len(executed)})
 
     first_agreement = FakeAgreement()
     with open_run(tmp_path) as run:

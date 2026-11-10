@@ -3,7 +3,7 @@
 import os
 import sys
 
-from tslab.study.launchers.local.resources import usable_cpus
+from tslab.lab.study.launchers.local.resources import usable_cpus
 
 __all__ = ['available_cpus']
 

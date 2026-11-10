@@ -4,11 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from typing import Any, override, Self, TYPE_CHECKING
 
-from tslab.enums import LauncherKind
-from tslab.study.records import JobRecord, TaskRecord
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.records import JobRecord, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.plan import JobGroup
+    from tslab.lab.study.plan import JobGroup
 
 __all__ = ['SlurmJobRecord']
 

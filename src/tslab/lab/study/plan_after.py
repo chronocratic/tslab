@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from tslab.enums import (
+from tslab.lab.enums import (
     AfterCondition,
     AfterVerdict,
     ChainedRetry,
@@ -14,19 +14,19 @@ from tslab.enums import (
     Satisfy,
     StudyState,
 )
-from tslab.study.chain import after_verdict, retry_left, upstream_verdict
-from tslab.study.definition import grid_order, match_axes, upstream_runs
-from tslab.study.records import latest_tasks
+from tslab.lab.study.chain import after_verdict, retry_left, upstream_verdict
+from tslab.lab.study.definition import grid_order, match_axes, upstream_runs
+from tslab.lab.study.records import latest_tasks
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import PurePosixPath
 
-    from tslab.study.definition import After, Study, StudyRun
-    from tslab.study.machine.profile import FollowupSettings
-    from tslab.study.plan import JobGroup
-    from tslab.study.records import JobRecord, TaskRecord
-    from tslab.study.reporting.state import RunReport
+    from tslab.lab.study.definition import After, Study, StudyRun
+    from tslab.lab.study.machine.profile import FollowupSettings
+    from tslab.lab.study.plan import JobGroup
+    from tslab.lab.study.records import JobRecord, TaskRecord
+    from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['AfterTarget', 'local_after_problems', 'merge_corr_groups', 'order_runs', 'plan_targets']
 

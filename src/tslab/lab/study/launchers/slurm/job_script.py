@@ -5,7 +5,7 @@ from pathlib import Path
 import shlex
 from types import MappingProxyType
 
-from tslab.jobs.slurm import (
+from tslab.lab.jobs.slurm import (
     array_spec,
     check_script_text,
     export_lines,
@@ -14,9 +14,9 @@ from tslab.jobs.slurm import (
     srun_command,
     wait_for_file_line,
 )
-from tslab.study.code_snapshot import CodeSnapshot, SRC_FOLDER
-from tslab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.study.machine import SlurmSettings
+from tslab.lab.study.code_snapshot import CodeSnapshot, SRC_FOLDER
+from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
+from tslab.lab.study.machine import SlurmSettings
 
 __all__ = ['foreground_script', 'job_script']
 

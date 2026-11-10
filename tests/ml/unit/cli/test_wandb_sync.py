@@ -10,10 +10,10 @@ import zlib
 import pytest
 from wandb.proto import wandb_internal_pb2
 
-from tslab.cli import main
-from tslab.cli.wandb_sync import WandbSync
-from tslab.tracking.wandb import sync
-from tslab.tracking.wandb.sync import LocalRun
+from tslab.lab.cli import main
+from tslab.ml.cli.wandb_sync import WandbSync
+from tslab.ml.tracking.wandb import sync
+from tslab.ml.tracking.wandb.sync import LocalRun
 
 FILESTREAM_LOG = 'POST https://api.wandb.ai/files/team/proj/abc123/file_stream 200\n'
 
@@ -27,7 +27,7 @@ def make_run(*, root: Path, name: str = 'run-20261015_120000-abc123', log: str =
 
 
 def write_transaction_log(*, path: Path, entity: str, project: str, run_id: str) -> None:
-    """Write a minimal ``.wandb`` log with one run record (format: tslab.tracking.wandb.log)."""
+    """Write a minimal ``.wandb`` log with one run record (format: tslab.ml.tracking.wandb.log)."""
     # why: protobuf class is invisible to type checkers
     record = getattr(wandb_internal_pb2, 'Record')()  # noqa: B009
     record.run.entity = entity

@@ -4,14 +4,14 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, submit_study
-from tslab.core.status import utc_now_iso
-from tslab.enums import LauncherKind
-from tslab.study.launchers.common.types import QueuedJob
-from tslab.study.launchers.slurm import states
-from tslab.study.launchers.tables import JOB_RECORDS
-from tslab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.launchers.common.types import QueuedJob
+from tslab.lab.study.launchers.slurm import states
+from tslab.lab.study.launchers.tables import JOB_RECORDS
+from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord
 
 
 def _job_record(
@@ -156,7 +156,7 @@ def test_expected_starts_logs_and_gives_none_when_squeue_fails(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
+    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers(
         'squeue',
@@ -169,7 +169,7 @@ def test_expected_starts_logs_and_gives_none_when_squeue_fails(
         'sacct', [{'exit': 0, 'stdout': '1000_1|COMPLETED\n1000_2|COMPLETED\n1000_3|COMPLETED\n'}]
     )
     ctx = context(project=project, machine_file='cluster.toml')
-    with caplog.at_level('WARNING', logger='tslab.study.launchers.slurm.states'):
+    with caplog.at_level('WARNING', logger='tslab.lab.study.launchers.slurm.states'):
         starts = states.expected_starts(context=ctx)
     assert starts is None
     assert 'squeue' in caplog.text

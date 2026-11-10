@@ -12,9 +12,9 @@ import sys
 
 import pytest
 
-from tslab.cli.new import create_project
+from tslab.lab.cli.new import create_project
 
-REPOSITORY = Path(__file__).parents[2]
+REPOSITORY = Path(__file__).parents[3]
 RELEASED_TSLAB = '>=0.1.0a1,<0.2"]'
 
 

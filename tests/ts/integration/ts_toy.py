@@ -8,9 +8,9 @@ from lightning import LightningModule
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from tslab.enums import Split
-from tslab.interfaces import Batch
-from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.ml.interfaces import Batch
+from tslab.ml.split import Split
+from tslab.ts.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
 class ToyVectorModel(LightningModule):

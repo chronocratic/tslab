@@ -3,8 +3,8 @@
 import os
 from pathlib import Path
 
-from tslab.study.machine.load import load_machine
-from tslab.study.machine.profile import MachineProfile
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.profile import MachineProfile
 
 __all__ = ['BASE_SLURM', 'LOCAL', 'SLURM_TABLE', 'load_profile', 'write']
 

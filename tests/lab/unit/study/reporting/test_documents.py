@@ -7,8 +7,7 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finish_run,
     jobs_of,
@@ -16,15 +15,16 @@ from tests.unit.study.helpers import (
     submit_study,
     write_run_status,
 )
-from tslab.cli import main
-from tslab.core.status import utc_now_iso
-from tslab.core.text import TextTable
-from tslab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
-from tslab.study.definition import expand_runs, load_study
-from tslab.study.launchers.common.types import QueuedJob
-from tslab.study.launchers.tables import JOB_RECORDS
-from tslab.study.records import append_job, JobKind
-from tslab.study.reporting.documents import run_entry, show_document, status_document
+from tests.support.fake_backend import FakeBackend
+from tslab.lab.cli import main
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.core.text import TextTable
+from tslab.lab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
+from tslab.lab.study.definition import expand_runs, load_study
+from tslab.lab.study.launchers.common.types import QueuedJob
+from tslab.lab.study.launchers.tables import JOB_RECORDS
+from tslab.lab.study.records import append_job, JobKind
+from tslab.lab.study.reporting.documents import run_entry, show_document, status_document
 
 
 def test_status_document_counts_every_state(project: Path, fake_backend: FakeBackend) -> None:
@@ -135,7 +135,7 @@ def test_show_document_lists_axes_and_counts(project: Path) -> None:
     study = load_study(reference='toy_studies:study')
     document = show_document(study=study)
     grids = cast('list[dict[str, object]]', document['grids'])
-    assert document['schema'] == 'tslab.study-show/1'
+    assert document['schema'] == 'tslab.lab.study-show/1'
     assert grids[0]['axes'] == {'model': ['small', 'large'], 'seed': ['1', '2']}
     assert grids[0]['runs'] == len(expand_runs(study=study))
     assert document['total_runs'] == len(expand_runs(study=study))
@@ -160,4 +160,4 @@ def test_show_cli_prints_json(project: Path, capsys: pytest.CaptureFixture[str])
     with pytest.raises(SystemExit) as raised:
         main(args=['study', 'show', 'toy_studies:study', '--json'])
     assert raised.value.code == 0
-    assert json.loads(capsys.readouterr().out)['schema'] == 'tslab.study-show/1'
+    assert json.loads(capsys.readouterr().out)['schema'] == 'tslab.lab.study-show/1'

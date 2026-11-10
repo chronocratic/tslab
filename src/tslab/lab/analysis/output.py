@@ -26,8 +26,8 @@ import re
 from matplotlib.figure import Figure
 import pandas as pd
 
-from tslab.core.files import atomic_write_bytes, atomic_write_text
-from tslab.core.paths import require_path
+from tslab.lab.core.files import atomic_write_bytes, atomic_write_text
+from tslab.lab.core.paths import require_path
 
 __all__ = [
     'DEFAULT_DPI',

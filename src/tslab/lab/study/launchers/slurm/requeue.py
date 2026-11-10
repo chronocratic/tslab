@@ -2,7 +2,7 @@
 
 import logging
 
-from tslab.jobs.slurm import scontrol_requeue, SlurmError
+from tslab.lab.jobs.slurm import scontrol_requeue, SlurmError
 
 __all__ = ['at_requeue_limit', 'requeue_task', 'restarted_attempt']
 

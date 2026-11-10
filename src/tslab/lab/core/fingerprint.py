@@ -26,7 +26,7 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from tslab.core.text import qualified_name
+from tslab.lab.core.text import qualified_name
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance

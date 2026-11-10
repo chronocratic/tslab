@@ -10,9 +10,9 @@ import sys
 import threading
 from typing import TextIO
 
-from tslab.core.files import atomic_write_text
-from tslab.enums import LocalTaskState
-from tslab.jobs.local import (
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.enums import LocalTaskState
+from tslab.lab.jobs.local import (
     busy_gpus,
     gpu_lock_folder,
     GpuDiscovery,
@@ -25,13 +25,13 @@ from tslab.jobs.local import (
     Watchdog,
     without_scheduler_variables,
 )
-from tslab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
-from tslab.study.launchers.common.protocols import RecordJob
-from tslab.study.launchers.common.types import LaunchError, LaunchStopped, OnTaskState
-from tslab.study.launchers.local.pid_file import DETACHED_VARIABLE
-from tslab.study.machine import LocalSettings, MachineProfile, timeout_seconds
-from tslab.study.paths import usage_file
-from tslab.study.plan import JobGroup, PlannedTask
+from tslab.lab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
+from tslab.lab.study.launchers.common.protocols import RecordJob
+from tslab.lab.study.launchers.common.types import LaunchError, LaunchStopped, OnTaskState
+from tslab.lab.study.launchers.local.pid_file import DETACHED_VARIABLE
+from tslab.lab.study.machine import LocalSettings, MachineProfile, timeout_seconds
+from tslab.lab.study.paths import usage_file
+from tslab.lab.study.plan import JobGroup, PlannedTask
 
 __all__ = ['LocalLauncher', 'local_job_id', 'resolve_local_gpus', 'write_job_files']
 

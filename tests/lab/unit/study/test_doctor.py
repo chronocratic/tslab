@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_backend import FakeBackend
-from tslab.enums import CheckStatus
-import tslab.study.doctor as doctor_module
-from tslab.study.doctor import DoctorCheck, run_checks
+from tslab.lab.enums import CheckStatus
+import tslab.lab.study.doctor as doctor_module
+from tslab.lab.study.doctor import DoctorCheck, run_checks
 
 
 def test_doctor_ok_on_local_toy_profile(project: Path) -> None:

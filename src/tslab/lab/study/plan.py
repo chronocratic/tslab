@@ -12,10 +12,10 @@ from pathlib import Path, PurePosixPath
 import pickle
 from typing import TYPE_CHECKING
 
-import tslab
-from tslab.enums import AfterCondition, Satisfy
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.definition import (
+import tslab.lab
+from tslab.lab.enums import AfterCondition, Satisfy
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.definition import (
     chained_grids,
     check_paths,
     expand_runs,
@@ -32,15 +32,15 @@ from tslab.study.definition import (
     StudyRun,
     upstream_runs,
 )
-from tslab.study.definition.settings import non_machine_paths
-from tslab.study.machine import MachineOverride, MachineProfile
-from tslab.study.paths import log_file_of, study_folder
-from tslab.study.plan_after import merge_corr_groups
-from tslab.study.records import JobRecord, latest_tasks, TaskRecord
+from tslab.lab.study.definition.settings import non_machine_paths
+from tslab.lab.study.machine import MachineOverride, MachineProfile
+from tslab.lab.study.paths import log_file_of, study_folder
+from tslab.lab.study.plan_after import merge_corr_groups
+from tslab.lab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:
-    from tslab.study.launchers.common.types import Resources
-    from tslab.study.plan_after import AfterTarget
+    from tslab.lab.study.launchers.common.types import Resources
+    from tslab.lab.study.plan_after import AfterTarget
 
 __all__ = [
     'JobGroup',
@@ -121,7 +121,7 @@ def resolve_runs(
     """
     check_machine(study=study, machine=machine, warned=warned)
     # why: the launcher door imports JobGroup from this module
-    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
+    from tslab.lab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     backend = backend_for(machine=machine)
     return [
@@ -337,7 +337,7 @@ def validate_arguments(*, config_class: type, arguments: Sequence[str]) -> str |
     buffer = StringIO()
     try:
         with redirect_stdout(buffer), redirect_stderr(buffer):
-            tslab.parse_config(config_class=config_class, args=list(arguments))
+            tslab.lab.parse_config(config_class=config_class, args=list(arguments))
     except SystemExit:
         return buffer.getvalue()
     except (ValueError, TypeError) as error:

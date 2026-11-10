@@ -8,8 +8,8 @@ fields, so one axis can hold both, ``ucr_datasets(...) | uea_datasets(...)``.
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from tslab.core.paths import require_path
-from tslab.study.definition import SettingValue
+from tslab.lab.core.paths import require_path
+from tslab.lab.study.definition import SettingValue
 
 __all__ = ['ucr_datasets', 'uea_datasets']
 

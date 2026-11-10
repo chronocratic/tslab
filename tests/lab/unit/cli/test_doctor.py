@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from tslab.cli import main
-from tslab.core.meta import hostname
-from tslab.study.project import PROJECT_FILE
+from tslab.lab.cli import main
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.project import PROJECT_FILE
 
 
 def _write_profile(*, tmp_path: Path) -> Path:

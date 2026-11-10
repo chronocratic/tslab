@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from tslab.cli import main
-from tslab.cli.new import create_project
-from tslab.study.project import load_project_settings
+from tslab.lab.cli import main
+from tslab.lab.cli.new import create_project
+from tslab.lab.study.project import load_project_settings
 
 
 def files_below(*, directory: Path) -> set[str]:

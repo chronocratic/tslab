@@ -13,35 +13,35 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
-from tslab.cli import main
-from tslab.enums import AfterCondition, CheckStatus, JobFlag, JobPhase, LauncherKind
-from tslab.jobs.slurm import (
+from tslab.lab.cli import main
+from tslab.lab.enums import AfterCondition, CheckStatus, JobFlag, JobPhase, LauncherKind
+from tslab.lab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
 )
-from tslab.study import After, Study
-from tslab.study.commands import cancel, resubmit, run_one
-from tslab.study.context import Context, context_for, load_context, Selection
-from tslab.study.definition import load_study
-from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers.common.types import JobUsage, LaunchError, LaunchReport
-import tslab.study.launchers.slurm.backend as slurm_backend
-from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.study.launchers.slurm.states import slurm_task_ids
-from tslab.study.machine import MachineOverride, MachineProfileError
-from tslab.study.paths import study_folder
-from tslab.study.records import append_job, JobKind
+from tslab.lab.study import After, Study
+from tslab.lab.study.commands import cancel, resubmit, run_one
+from tslab.lab.study.context import Context, context_for, load_context, Selection
+from tslab.lab.study.definition import load_study
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.launchers.common.types import JobUsage, LaunchError, LaunchReport
+import tslab.lab.study.launchers.slurm.backend as slurm_backend
+from tslab.lab.study.launchers.slurm.backend import _phase_of, SlurmBackend
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
+from tslab.lab.study.launchers.slurm.states import slurm_task_ids
+from tslab.lab.study.machine import MachineOverride, MachineProfileError
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import append_job, JobKind
 
 if TYPE_CHECKING:
     from collections.abc import MutableMapping, Sequence
 
-    from tslab.study.plan import JobGroup
+    from tslab.lab.study.plan import JobGroup
 
 
 def _context(*, project: Path, fake: FakeSlurm) -> Context:
@@ -236,7 +236,7 @@ def test_job_states_returns_unknown_when_scheduler_is_unavailable(
 def test_job_states_returns_unknown_after_scheduler_error(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
+    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     ctx = _context(project=project, fake=fake)
     fake.set_answers('squeue', [{'exit': 1, 'stderr': 'squeue: cannot access scheduler'}])
@@ -382,7 +382,7 @@ def test_after_submit_delegates_to_followup_queue(
 ) -> None:
     ctx = _context(project=project, fake=fake)
     monkeypatch.setattr(
-        'tslab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (7, ())
+        'tslab.lab.study.launchers.slurm.followups.queue_followups', lambda **_kwargs: (7, ())
     )
 
     assert (
@@ -405,7 +405,7 @@ def test_usage_delegates_and_has_no_gpu_ids(
 ) -> None:
     ctx = _context(project=project, fake=fake)
     usage: dict[str, JobUsage] = {}
-    monkeypatch.setattr('tslab.study.launchers.slurm.usage.usage', lambda **_kwargs: usage)
+    monkeypatch.setattr('tslab.lab.study.launchers.slurm.usage.usage', lambda **_kwargs: usage)
 
     returned_usage, gpu_ids = SlurmBackend().usage(context=ctx)
 
@@ -418,7 +418,9 @@ def test_failure_usage_delegates_to_failures(
 ) -> None:
     ctx = _context(project=project, fake=fake)
     usage: dict[str, JobUsage] = {}
-    monkeypatch.setattr('tslab.study.launchers.slurm.usage.failure_usage', lambda **_kwargs: usage)
+    monkeypatch.setattr(
+        'tslab.lab.study.launchers.slurm.usage.failure_usage', lambda **_kwargs: usage
+    )
 
     assert SlurmBackend().failure_usage(context=ctx, reports=()) is usage
 
@@ -478,7 +480,7 @@ def test_cancel_signal_skips_queued_runs_with_a_log(
     project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
 ) -> None:
     ctx = _context_with_live_runs(project=project, fake=fake)
-    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm.backend'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.launchers.slurm.backend'):
         cancel(context=ctx, dry_run=False, signal='USR2')
     assert 'skipped queued runs: 1000_1' in caplog.text
 
@@ -549,7 +551,7 @@ def test_cancel_json_shape(
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
     assert document == {
-        'schema': 'tslab.study-cancel/1',
+        'schema': 'tslab.lab.study-cancel/1',
         'cancelled': ['1000_0', '1000_1'],
         'dry_run': True,
         'signal': None,
@@ -590,7 +592,7 @@ def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlur
 def test_failed_query_leaves_the_cache_unchanged(
     project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
+    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers('sacct', [{'exit': 1, 'stderr': 'down'}])
     ended: dict[str, str] = {}
@@ -659,7 +661,7 @@ def test_run_one_says_one_process_for_multi_gpu_jobs(
         project=project, machine_file='gpus.toml', only=('model=small', 'seed=1')
     )
     calls, process = _process()
-    with caplog.at_level('INFO', logger='tslab.study.launchers.slurm'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.launchers.slurm'):
         run_one(context=ctx, extra_args=None, run_process=process)
     assert 'study run starts one process; the job would start 2' in caplog.text
     assert len(calls) == 1

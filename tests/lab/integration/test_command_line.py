@@ -5,9 +5,8 @@ from pathlib import Path
 import subprocess
 import sys
 
-from toy_pipeline import main, read_calls, ToyConfig
-
-import tslab
+from tests.lab.integration.toy_pipeline import main, read_calls, ToyConfig
+import tslab.lab
 
 SCRIPT = Path(__file__).with_name('toy_pipeline.py')
 
@@ -59,7 +58,7 @@ def test_saved_config_reproduces_the_run(tmp_path: Path) -> None:
             'instances'
         ].items()
     }
-    reloaded = tslab.load_config(config_class=ToyConfig, path=tmp_path / 'toy' / 'config.yaml')
+    reloaded = tslab.lab.load_config(config_class=ToyConfig, path=tmp_path / 'toy' / 'config.yaml')
     assert reloaded == original
     main(config=reloaded)
     assert len(read_calls(root=tmp_path)) == 3
@@ -71,8 +70,8 @@ def test_saved_config_reproduces_the_run(tmp_path: Path) -> None:
 
 def test_saved_config_with_overrides(tmp_path: Path) -> None:
     main(config=ToyConfig(root=tmp_path, relative_path=Path('toy')))
-    loaded = tslab.load_config(config_class=ToyConfig, path=tmp_path / 'toy' / 'config.yaml')
-    changed = tslab.parse_config(config_class=ToyConfig, default=loaded, args=['--seed', '1'])
+    loaded = tslab.lab.load_config(config_class=ToyConfig, path=tmp_path / 'toy' / 'config.yaml')
+    changed = tslab.lab.parse_config(config_class=ToyConfig, default=loaded, args=['--seed', '1'])
     assert changed.seed == 1
     assert changed.scales == loaded.scales
 
@@ -82,11 +81,11 @@ def test_presets_select_and_override() -> None:
         'small': ('Two scales on four values', ToyConfig(size=4)),
         'large': ('Many scales on many values', ToyConfig(size=1000, scales=(1.0, 2.0, 3.0))),
     }
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=ToyConfig, presets=presets, args=['large', '--seed', '9']
     )
     assert config == ToyConfig(size=1000, scales=(1.0, 2.0, 3.0), seed=9)
-    free = tslab.parse_config(
+    free = tslab.lab.parse_config(
         config_class=ToyConfig, presets=presets, args=['no-preset', '--size', '3']
     )
     assert free == ToyConfig(size=3)

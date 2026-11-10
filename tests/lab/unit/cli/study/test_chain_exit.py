@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
+from tests.lab.unit.cli.study.helpers import toy_project
 from tests.support.fake_backend import FakeBackend
-from tests.unit.cli.study.helpers import toy_project
-from tslab.cli import main
-from tslab.study.context import Context
+from tslab.lab.cli import main
+from tslab.lab.study.context import Context
 
-_CLI_MODULE = import_module('tslab.cli.study.chain_exit')
+_CLI_MODULE = import_module('tslab.lab.cli.study.chain_exit')
 
 
 def _run_main(*args: str) -> int:

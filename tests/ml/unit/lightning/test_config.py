@@ -8,11 +8,11 @@ from lightning.pytorch.callbacks import Callback, ModelCheckpoint, Timer
 import pytest
 import torch
 
-from tslab.core.config import config_from_yaml, config_to_yaml
-from tslab.core.fingerprint import canonicalize, compute_fingerprint
-from tslab.core.run import Run
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.trainer import LightningTrainer
+from tslab.lab.core.config import config_from_yaml, config_to_yaml
+from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.lab.core.run import Run
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.trainer import LightningTrainer
 
 
 def fingerprint(*, config: LightningTrainerConfig) -> str:

@@ -23,25 +23,25 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'src' / 'tslab'
-TEMPLATE = SOURCE / 'templates'
-UNIT = ROOT / 'tests' / 'unit'
+TEMPLATE = SOURCE / 'ts' / 'templates'
+UNIT = ROOT / 'tests' / 'lab' / 'unit'
 BASELINE = Path(__file__).with_name('backend_baseline.json')
 KINDS = ('name_comparisons', 'none_checks', 'module_imports_both', 'test_imports_both')
 #: The backend names, known only to the backend tables and the profile type.
 BACKEND_NAMES = ('slurm', 'local')
 #: The only modules that may import both a SLURM module and a local one.
 IMPORTS_BOTH_ALLOWED = (
-    'src/tslab/study/launchers/tables.py',
-    'src/tslab/study/machine/__init__.py',
-    'src/tslab/study/machine/profile.py',
-    'src/tslab/study/machine/load.py',
+    'src/tslab/lab/study/launchers/tables.py',
+    'src/tslab/lab/study/machine/__init__.py',
+    'src/tslab/lab/study/machine/profile.py',
+    'src/tslab/lab/study/machine/load.py',
 )
 #: ``.slurm is None`` and friends are allowed where a profile or a backend
 #: knows about its own settings.
 NONE_CHECK_EXEMPT = (
-    SOURCE / 'study' / 'machine',
-    SOURCE / 'study' / 'launchers' / 'slurm',
-    SOURCE / 'study' / 'launchers' / 'local',
+    SOURCE / 'lab' / 'study' / 'machine',
+    SOURCE / 'lab' / 'study' / 'launchers' / 'slurm',
+    SOURCE / 'lab' / 'study' / 'launchers' / 'local',
 )
 
 
@@ -151,9 +151,9 @@ def _imported_modules(*, tree: ast.Module, path: Path) -> frozenset[str]:
 def _imports_a_side(*, modules: frozenset[str], name: str) -> bool:
     """Whether the imports touch a SLURM or a local module of ``name``."""
     prefixes = (
-        f'tslab.jobs.{name}',
-        f'tslab.study.launchers.{name}',
-        f'tslab.study.machine.{name}',
+        f'tslab.lab.jobs.{name}',
+        f'tslab.lab.study.launchers.{name}',
+        f'tslab.lab.study.machine.{name}',
     )
     return any(
         module == prefix or module.startswith(f'{prefix}.')
@@ -247,23 +247,23 @@ def test_match_cases_count_each_backend_name() -> None:
 
 
 def test_by_name_import_of_both_backends_counts() -> None:
-    """``from tslab.jobs import slurm, local`` imports both backends."""
-    tree = ast.parse('from tslab.jobs import slurm, local')
-    assert _imports_both_backends(tree=tree, path=SOURCE / 'study' / 'commands.py') == 1
+    """``from tslab.lab.jobs import slurm, local`` imports both backends."""
+    tree = ast.parse('from tslab.lab.jobs import slurm, local')
+    assert _imports_both_backends(tree=tree, path=SOURCE / 'lab' / 'study' / 'commands.py') == 1
 
 
 def test_relative_import_of_both_backends_counts(
     *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / 'src' / 'tslab'
-    module = source / 'study' / 'relative_imports.py'
+    module = source / 'lab' / 'study' / 'relative_imports.py'
     module.parent.mkdir(parents=True)
     module.write_text('from .launchers import slurm, local\n', encoding='utf-8')
     monkeypatch.setattr(sys.modules[__name__], 'ROOT', tmp_path)
     monkeypatch.setattr(sys.modules[__name__], 'SOURCE', source)
 
     assert _scan(kind='module_imports_both', files=[module]) == {
-        'src/tslab/study/relative_imports.py': 1
+        'src/tslab/lab/study/relative_imports.py': 1
     }
 
 
@@ -303,7 +303,7 @@ def test_no_module_imports_both_backends() -> None:
     files = [
         path
         for path in _source_files()
-        if not path.is_relative_to(SOURCE / 'jobs')
+        if not path.is_relative_to(SOURCE / 'lab' / 'jobs')
         and path.relative_to(ROOT).as_posix() not in IMPORTS_BOTH_ALLOWED
     ]
     counts = _scan(kind='module_imports_both', files=files)
@@ -331,16 +331,16 @@ def test_no_test_imports_both_backends() -> None:
 
 
 NEUTRAL_EXEMPT = (
-    SOURCE / 'study' / 'launchers' / 'slurm',
-    SOURCE / 'study' / 'launchers' / 'local',
-    SOURCE / 'study' / 'machine' / '__init__.py',
-    SOURCE / 'study' / 'machine' / 'profile.py',
-    SOURCE / 'study' / 'machine' / 'load.py',
-    SOURCE / 'study' / 'machine' / 'slurm.py',
-    SOURCE / 'study' / 'slurm.py',
+    SOURCE / 'lab' / 'study' / 'launchers' / 'slurm',
+    SOURCE / 'lab' / 'study' / 'launchers' / 'local',
+    SOURCE / 'lab' / 'study' / 'machine' / '__init__.py',
+    SOURCE / 'lab' / 'study' / 'machine' / 'profile.py',
+    SOURCE / 'lab' / 'study' / 'machine' / 'load.py',
+    SOURCE / 'lab' / 'study' / 'machine' / 'slurm.py',
+    SOURCE / 'lab' / 'study' / 'slurm.py',
 )
 SLURM_TYPES = frozenset(('SlurmSettings', 'SlurmError', 'SlurmJobUsage'))
-SLURM_MODULES = ('tslab.jobs.slurm', 'tslab.study.launchers.slurm')
+SLURM_MODULES = ('tslab.lab.jobs.slurm', 'tslab.lab.study.launchers.slurm')
 
 
 def _slurm_leaks(*, tree: ast.Module, path: Path) -> list[str]:
@@ -365,14 +365,16 @@ def test_neutral_study_code_names_no_slurm_type() -> None:
     """Backend-neutral study code imports no SLURM module and names no SLURM type."""
     problems = []
     for path in _source_files():
-        if not path.is_relative_to(SOURCE / 'study'):
+        if not path.is_relative_to(SOURCE / 'lab' / 'study'):
             continue
         if any(path == exempt or path.is_relative_to(exempt) for exempt in NEUTRAL_EXEMPT):
             continue
         leaks = _slurm_leaks(tree=_parse(path=path), path=path)
-        if path == SOURCE / 'study' / 'launchers' / 'tables.py':
+        if path == SOURCE / 'lab' / 'study' / 'launchers' / 'tables.py':
             # why: the BACKENDS and JOB_RECORDS tables name both backends
-            leaks = [leak for leak in leaks if not leak.startswith('tslab.study.launchers.slurm')]
+            leaks = [
+                leak for leak in leaks if not leak.startswith('tslab.lab.study.launchers.slurm')
+            ]
         if leaks:
             problems.append(f'{path.relative_to(ROOT).as_posix()}: {sorted(set(leaks))}')
     assert problems == []
@@ -410,7 +412,7 @@ def test_neutral_study_code_has_no_slurm_state_words() -> None:
     """Backend-neutral study code spells no SLURM state and says no ``SLURM`` in a string."""
     problems = []
     for path in _source_files():
-        if not path.is_relative_to(SOURCE / 'study'):
+        if not path.is_relative_to(SOURCE / 'lab' / 'study'):
             continue
         if any(path == exempt or path.is_relative_to(exempt) for exempt in NEUTRAL_EXEMPT):
             continue

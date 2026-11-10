@@ -20,20 +20,20 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.common import print_json, UsageError, watch
-from tslab.core.paths import STATUS_FILE
-from tslab.core.status import (
+from tslab.lab.cli.common import print_json, UsageError, watch
+from tslab.lab.core.paths import STATUS_FILE
+from tslab.lab.core.status import (
     InstanceRecord,
     read_status,
     RunStatusSnapshot,
     shown_run_state,
     StatusFileError,
 )
-from tslab.core.text import log_table
-from tslab.enums import InstanceState, JobPhase, ShownRunState, StudyState
-from tslab.study.project import load_project_settings
-from tslab.study.reporting.outcome import states_exit_code
-from tslab.study.reporting.state import read_folder, study_state
+from tslab.lab.core.text import log_table
+from tslab.lab.enums import InstanceState, JobPhase, ShownRunState, StudyState
+from tslab.lab.study.project import load_project_settings
+from tslab.lab.study.reporting.outcome import states_exit_code
+from tslab.lab.study.reporting.state import read_folder, study_state
 
 __all__ = ['Status']
 

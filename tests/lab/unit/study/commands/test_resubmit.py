@@ -9,8 +9,7 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     chained_context,
     chained_study,
     context,
@@ -23,23 +22,24 @@ from tests.unit.study.helpers import (
     write_launch,
     write_run_status,
 )
-from tslab.core.meta import hostname
-from tslab.core.paths import LOCK_FILE
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, RunState, StudyState
-from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
-from tslab.study.commands import resubmit, submit, submit_runs
-from tslab.study.commands.resubmit import _remove_ended_locks
-from tslab.study.context import Context, load_context, refresh_context, Selection, study_reports
-from tslab.study.launchers.common.types import LaunchError
-from tslab.study.launchers.slurm.chain_exit import chain_exit
-from tslab.study.records import JobRecord, read_jobs
-from tslab.study.reporting.state import RunReport
+from tests.support.fake_backend import FakeBackend
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.paths import LOCK_FILE
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, RunState, StudyState
+from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
+from tslab.lab.study.commands import resubmit, submit, submit_runs
+from tslab.lab.study.commands.resubmit import _remove_ended_locks
+from tslab.lab.study.context import Context, load_context, refresh_context, Selection, study_reports
+from tslab.lab.study.launchers.common.types import LaunchError
+from tslab.lab.study.launchers.slurm.chain_exit import chain_exit
+from tslab.lab.study.records import JobRecord, read_jobs
+from tslab.lab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from tslab.study.plan import JobGroup
+    from tslab.lab.study.plan import JobGroup
 
 
 def running_run_with_lock(*, project: Path, model: str, seed: int) -> None:
@@ -139,7 +139,7 @@ def test_resubmit_checks_local_launch_before_submission_lock(
         host=hostname(),
         tasks={},
     )
-    submit_module = importlib.import_module('tslab.study.commands.submit')
+    submit_module = importlib.import_module('tslab.lab.study.commands.submit')
     monkeypatch.setattr(
         submit_module,
         'submission_lock',
@@ -368,9 +368,9 @@ def test_local_no_retry_after_signal(project: Path, monkeypatch: pytest.MonkeyPa
     ctx = _local_retry_context(project=project, max_attempts=3)
     calls: list[object] = []
     # the door re-exports `submit` (the function), shadowing the submodule; reach it by name
-    submit_module = importlib.import_module('tslab.study.commands.submit')
+    submit_module = importlib.import_module('tslab.lab.study.commands.submit')
     monkeypatch.setattr(submit_module, 'submit_runs', lambda **_: (143, []))
-    monkeypatch.setattr('tslab.study.commands.resubmit', lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr('tslab.lab.study.commands.resubmit', lambda **kwargs: calls.append(kwargs))
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
     assert code == 143
     assert calls == []
@@ -976,8 +976,8 @@ def test_chain_exit_at_max_batch_requeue_ends_the_job_and_the_followup_resubmits
     job = records[0]
     task = next(task for task in job.tasks if task.run_path.as_posix() == 'pretrain/a')
     _time_limited(project=project, run_path='pretrain/a')
-    requeue = importlib.import_module('tslab.study.launchers.slurm.requeue')
-    chain_exit_module = importlib.import_module('tslab.study.launchers.slurm.chain_exit')
+    requeue = importlib.import_module('tslab.lab.study.launchers.slurm.requeue')
+    chain_exit_module = importlib.import_module('tslab.lab.study.launchers.slurm.chain_exit')
     requeued: list[str] = []
     monkeypatch.setattr(requeue, 'scontrol_requeue', lambda *, task_id: requeued.append(task_id))
     monkeypatch.setattr(chain_exit_module, 'query_cluster_config', lambda: {'MaxBatchRequeue': '5'})

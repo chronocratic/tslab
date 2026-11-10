@@ -6,7 +6,7 @@ from typing import cast
 from lightning import LightningDataModule
 from lightning.pytorch.utilities.model_helpers import is_overridden
 
-from tslab.interfaces.data import Batch
+from tslab.ml.interfaces.data import Batch
 
 __all__ = ['LightningDataSource']
 
@@ -24,7 +24,7 @@ class LightningDataSource[I]:
 
         Args:
             datamodule: The datamodule providing the loaders.
-            info: Facts about the dataset (for example ``tslab.tasks.TSDataInfo``).
+            info: Facts about the dataset (for example ``tslab.ts.tasks.TSDataInfo``).
         """
         self._datamodule = datamodule
         self._info = info

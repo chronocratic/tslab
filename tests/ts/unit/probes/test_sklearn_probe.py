@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 import torch
 
-from tests.unit.probes.helpers import blobs, fitted_svm, ridge_data
-from tslab.core.fingerprint import canonicalize
-from tslab.probes import RidgeProbe, SVMProbe
+from tests.ts.unit.probes.helpers import blobs, fitted_svm, ridge_data
+from tslab.lab.core.fingerprint import canonicalize
+from tslab.ts.probes import RidgeProbe, SVMProbe
 
 
 def test_fitting_leaves_the_global_random_state_alone() -> None:

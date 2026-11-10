@@ -3,12 +3,12 @@
 from collections.abc import Callable, Sequence
 from typing import TextIO
 
-from tslab.enums import JobFlag, StudyState
-from tslab.study.context import Context, refresh_context
-from tslab.study.launchers.common.types import SIGNAL_EXIT_BASE
-from tslab.study.launchers.tables import backend_for
-from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport
+from tslab.lab.enums import JobFlag, StudyState
+from tslab.lab.study.context import Context, refresh_context
+from tslab.lab.study.launchers.common.types import SIGNAL_EXIT_BASE
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['LIVE_STATES']
 
@@ -36,7 +36,7 @@ def _finish_launch(
             context=context, submitted=submitted
         )
         return code
-    from tslab.study.commands.resubmit import resubmit  # noqa: PLC0415 # why: resubmit imports this module
+    from tslab.lab.study.commands.resubmit import resubmit  # noqa: PLC0415 # why: resubmit imports this module
 
     return max(
         code,

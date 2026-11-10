@@ -7,7 +7,7 @@ stages after training and write the checkpoint.
 
 from collections.abc import Mapping
 
-from tslab.jobs.slurm import remaining_job_seconds
+from tslab.lab.jobs.slurm import remaining_job_seconds
 
 __all__ = ['job_training_deadline']
 

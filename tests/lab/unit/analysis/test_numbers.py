@@ -4,14 +4,14 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from tslab.analysis.numbers import (
+from tslab.lab.analysis.numbers import (
     format_number,
     number_key,
     NumberKind,
     numbers_frame,
     write_numbers,
 )
-from tslab.analysis.output import AnalysisOutput
+from tslab.lab.analysis.output import AnalysisOutput
 
 
 def test_number_key() -> None:

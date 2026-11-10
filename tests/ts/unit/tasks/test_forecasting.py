@@ -3,37 +3,39 @@ from pathlib import Path
 import pytest
 import torch
 
-from tests.unit.reference_protocol import (
+from tests.ts.unit.reference_protocol import (
     build_windowed_forecasting_samples,
     dilated_reference,
     generate_forecasting_samples,
     windowed_reference,
 )
-from tests.unit.stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEncoder
-import tslab
-from tslab.tasks import forecasting_representations, horizon_targets, window_samples
+from tests.ts.unit.stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEncoder
+import tslab.lab
+import tslab.ml
+import tslab.ts
+from tslab.ts.tasks import forecasting_representations, horizon_targets, window_samples
 
 SLICES = {'train': slice(0, 24), 'val': slice(24, 32), 'test': slice(32, 40)}
 
 
 def representations(  # noqa: PLR0913
     *,
-    run: tslab.Run,
+    run: tslab.lab.Run,
     model: VectorEncoder,
     horizons: tuple[int, ...],
     window_length: int | None = None,
     name: str | None = None,
-    series: tslab.Tensors | None = None,
-) -> dict[int, tslab.Tensors]:
+    series: tslab.lab.Tensors | None = None,
+) -> dict[int, tslab.lab.Tensors]:
     trainer = FakeTrainer()
-    checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=ToySeries())
+    checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=ToySeries())
     return forecasting_representations(
         run=run,
         trainer=trainer,
         model=model,
         checkpoint=checkpoint,
         data=ToySeries(),
-        encoder=tslab.ModelAsEncoder(device='cpu'),
+        encoder=tslab.ts.ModelAsEncoder(device='cpu'),
         horizons=horizons,
         window_length=window_length,
         stride=2,
@@ -42,8 +44,8 @@ def representations(  # noqa: PLR0913
     )
 
 
-@tslab.stage(name='broken_series', output=tslab.Tensors)
-def broken_series(*, run: tslab.Run) -> tslab.Tensors:
+@tslab.lab.stage(name='broken_series', output=tslab.lab.Tensors)
+def broken_series(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
     del run
     message = 'broken on purpose'
     raise RuntimeError(message)
@@ -163,7 +165,7 @@ def test_a_new_horizon_reuses_the_cached_encoding(tmp_path: Path) -> None:
 
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
-    shifted = tslab.Tensors(tensors={'series': clean + 1.0})
+    shifted = tslab.lab.Tensors(tensors={'series': clean + 1.0})
     model = CausalEncoder()
     with run_in(root=tmp_path) as run:
         result = representations(
@@ -190,7 +192,7 @@ def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) 
 
 def test_a_replacement_series_keeps_clean_window_targets(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
-    shifted = tslab.Tensors(tensors={'series': clean + 1.0})
+    shifted = tslab.lab.Tensors(tensors={'series': clean + 1.0})
     model = VectorEncoder()
     with run_in(root=tmp_path) as run:
         result = representations(
@@ -223,7 +225,7 @@ def test_a_split_too_short_for_windows_names_the_split(tmp_path: Path) -> None:
 
 
 def test_a_replacement_series_must_match_the_data_shape(tmp_path: Path) -> None:
-    short = tslab.Tensors(tensors={'series': ToySeries().full_series()[:, :30]})
+    short = tslab.lab.Tensors(tensors={'series': ToySeries().full_series()[:, :30]})
     with pytest.raises(ValueError, match=r'shape \(2, 30, 3\)'), run_in(root=tmp_path) as run:
         representations(
             run=run, model=VectorEncoder(), horizons=(2,), window_length=4, series=short
@@ -235,6 +237,6 @@ def test_a_failed_replacement_series_skips_the_encoding(tmp_path: Path) -> None:
         series = broken_series(run=run)
         results = representations(run=run, model=CausalEncoder(), horizons=(2,), series=series)
         states = {key: record.state for key, record in run.status().instances.items()}
-    assert not tslab.is_available(artifact=results[2])
-    assert states['forecast_encode[default]'] == tslab.InstanceState.SKIPPED
-    assert states['forecast_samples[h2]'] == tslab.InstanceState.SKIPPED
+    assert not tslab.lab.is_available(artifact=results[2])
+    assert states['forecast_encode[default]'] == tslab.lab.InstanceState.SKIPPED
+    assert states['forecast_samples[h2]'] == tslab.lab.InstanceState.SKIPPED

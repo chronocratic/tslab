@@ -13,8 +13,8 @@ import re
 
 import pandas as pd
 
-from tslab.analysis.output import AnalysisOutput, require_slug
-from tslab.core.files import atomic_write_text
+from tslab.lab.analysis.output import AnalysisOutput, require_slug
+from tslab.lab.core.files import atomic_write_text
 
 __all__ = [
     'NUMBERS_STEM',

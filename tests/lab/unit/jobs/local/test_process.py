@@ -9,8 +9,8 @@ import time
 
 import pytest
 
-from tslab.jobs.local import process_alive, run_process, stop_on_signals
-from tslab.jobs.local.process import _stop_group_and_reap
+from tslab.lab.jobs.local import process_alive, run_process, stop_on_signals
+from tslab.lab.jobs.local.process import _stop_group_and_reap
 
 
 def test_run_process_returns_exit_code_and_lines(*, tmp_path: Path) -> None:
@@ -125,7 +125,7 @@ def test_stop_group_and_reap_escalates_to_kill(
     try:
         # why: the handler is in before the stop, so the TERM cannot work
         _wait_for_file(path=ready)
-        monkeypatch.setattr('tslab.jobs.local.process._LEFTOVER_WAIT_SECONDS', 0.5)
+        monkeypatch.setattr('tslab.lab.jobs.local.process._LEFTOVER_WAIT_SECONDS', 0.5)
         start = time.monotonic()
         _stop_group_and_reap(pid=process.pid, process=process)
         assert process.returncode == -signal.SIGKILL

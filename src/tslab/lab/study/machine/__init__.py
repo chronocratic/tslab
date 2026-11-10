@@ -6,10 +6,10 @@ values. Unknown keys raise: a typo in a profile must fail at submit, not
 silently change a cluster job.
 """
 
-from tslab.study.machine.load import load_machine
-from tslab.study.machine.local import LocalSettings, timeout_seconds
-from tslab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
-from tslab.study.machine.register import (
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.local import LocalSettings, timeout_seconds
+from tslab.lab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
+from tslab.lab.study.machine.register import (
     MachineLocation,
     read_register,
     register_file,
@@ -17,8 +17,8 @@ from tslab.study.machine.register import (
     validate_machine_name,
     write_register,
 )
-from tslab.study.machine.slurm import SlurmSettings
-from tslab.study.machine.tables import flatten_settings, MachineProfileError
+from tslab.lab.study.machine.slurm import SlurmSettings
+from tslab.lab.study.machine.tables import flatten_settings, MachineProfileError
 
 __all__ = [
     'FollowupSettings',
