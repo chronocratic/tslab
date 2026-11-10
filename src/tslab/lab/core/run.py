@@ -461,7 +461,7 @@ class Run:
         """Turn SIGTERM into ``SystemExit`` so a SLURM kill still records the final state.
 
         Only the main thread can install a handler, and a handler that someone
-        else installed (Lightning does for requeueing) is left alone.
+        else installed (a trainer does for requeueing) is left alone.
         """
         if threading.current_thread() is not threading.main_thread():
             return

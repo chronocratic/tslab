@@ -79,7 +79,7 @@ _COMMANDS: dict[str, type] = {
 }
 
 
-def register_command(*, name: str, command: type[Command]) -> None:
+def register_command(*, name: str, command: type[Command], replace: bool = False) -> None:
     """Add a top-level subcommand, so a layer above the lab can offer its own.
 
     Registering the same class under the same name again does nothing.
@@ -87,11 +87,12 @@ def register_command(*, name: str, command: type[Command]) -> None:
     Args:
         name: Subcommand name, as typed after ``tslab``.
         command: Frozen dataclass with a ``run`` method.
+        replace: Allow taking the place of another command registered under ``name``.
 
     Raises:
         ValueError: If ``name`` is already taken by another command.
     """
-    if _COMMANDS.get(name, command) is not command:
+    if not replace and _COMMANDS.get(name, command) is not command:
         message = f'command {name!r} is already registered'
         raise ValueError(message)
     _COMMANDS[name] = command

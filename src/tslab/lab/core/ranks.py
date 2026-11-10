@@ -2,7 +2,7 @@
 
 A multi-rank job runs the user script once per rank. Only rank zero writes
 results; the rank is read from the environment variables the launcher and
-Lightning set. ``RankAgreement`` broadcasts a stage decision made on rank zero
+a trainer set. ``RankAgreement`` broadcasts a stage decision made on rank zero
 to the other ranks.
 """
 
@@ -26,7 +26,7 @@ def is_writer_process() -> bool:
     """Return ``True`` unless this process is a non-zero rank of a distributed job.
 
     Every rank variable that is set must be ``0``. Checking all of them covers
-    both ``srun`` tasks (``SLURM_PROCID``) and processes started by Lightning
+    both ``srun`` tasks (``SLURM_PROCID``) and processes started by a trainer
     inside one SLURM task (``LOCAL_RANK``).
     """
     return all(os.environ.get(variable, '0') == '0' for variable in _RANK_VARIABLES)

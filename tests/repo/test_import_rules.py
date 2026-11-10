@@ -11,25 +11,26 @@ import sys
 
 import pytest
 
+SOURCE_ROOT = Path(__file__).resolve().parents[2] / 'src' / 'tslab'
 ANALYSIS_LIBRARIES = ('pandas', 'scipy', 'matplotlib')
-FORBIDDEN_IN_CORE = (
+ML_LIBRARIES = (
+    'torch',
     'lightning',
     'pytorch_lightning',
+    'safetensors',
     'sklearn',
     'wandb',
     'mlflow',
     'tensorboard',
     'chronocratic',
+)
+FORBIDDEN_IN_LAB_MODULE = (*ML_LIBRARIES, 'tslab.ml', 'tslab.ts')
+FORBIDDEN_IN_ML_MODULE = ('tslab.ts', 'chronocratic')
+FORBIDDEN_IN_CORE = (
+    *ANALYSIS_LIBRARIES,
     'rich',
-    'tslab.ts.adapters',
-    'tslab.ml.lightning',
-    'tslab.ts.tasks',
-    'tslab.ts.probes',
     'tslab.lab.study',
     'tslab.lab.cli',
-    'pandas',
-    'scipy',
-    'matplotlib',
     'tslab.lab.analysis',
 )
 FORBIDDEN_IN_LIGHTNING = (
@@ -116,9 +117,56 @@ def offending(*, loaded: set[str], forbidden: tuple[str, ...]) -> list[str]:
     )
 
 
+def _modules_under(*, layer: str) -> list[str]:
+    root = SOURCE_ROOT / layer
+    names = []
+    for path in sorted(root.rglob('*.py')):
+        if 'templates' in path.relative_to(root).parts:
+            continue
+        parts = list(path.relative_to(SOURCE_ROOT).with_suffix('').parts)
+        if parts[-1] == '__init__':
+            parts.pop()
+        names.append('.'.join(('tslab', *parts)))
+    return names
+
+
 def test_package_import_loads_no_optional_layers() -> None:
-    # The one fast rule: the top-level import is what every user pays for.
+    # The top-level import is what every user pays for.
     assert offending(loaded=loaded_by(module='tslab'), forbidden=FORBIDDEN_IN_CORE) == []
+
+
+def test_core_loads_no_optional_layers() -> None:
+    loaded = loaded_by(module='tslab.lab.core')
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_CORE) == []
+
+
+@pytest.mark.parametrize('module', _modules_under(layer='lab'))
+def test_lab_module_loads_no_ml_or_ts_code(module: str) -> None:
+    loaded = loaded_by(module=module)
+    assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_LAB_MODULE) == []
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize('module', _modules_under(layer='ml'))
+def test_ml_module_loads_no_time_series_code(module: str) -> None:
+    assert offending(loaded=loaded_by(module=module), forbidden=FORBIDDEN_IN_ML_MODULE) == []
+
+
+def test_command_line_help_loads_no_torch_or_lightning() -> None:
+    code = (
+        'import sys\n'
+        'from tslab.cli import main\n'
+        'try:\n'
+        '    main(["--help"])\n'
+        'except SystemExit:\n'
+        '    pass\n'
+        'print("\\n".join(sys.modules), file=sys.stderr)\n'
+    )
+    result = subprocess.run(  # noqa: S603 # why: runs this interpreter on a fixed script
+        [sys.executable, '-c', code], capture_output=True, text=True, check=True
+    )
+    loaded = set(result.stderr.split())
+    assert offending(loaded=loaded, forbidden=('torch', 'lightning', 'pytorch_lightning')) == []
 
 
 @pytest.mark.slow
@@ -186,7 +234,6 @@ def test_chronocratic_namespace_imports_nothing() -> None:
     )
 
 
-SOURCE_ROOT = Path(__file__).resolve().parents[2] / 'src' / 'tslab'
 ANALYSIS_ALLOWED = (
     SOURCE_ROOT / 'lab' / 'analysis',
     SOURCE_ROOT / 'lab' / 'templates',
