@@ -4,10 +4,10 @@ from collections.abc import Callable
 
 import torch
 
-from tslab.lab.core.artifact import Checkpoint, Tensors
 from tslab.lab.core.paths import InstanceName
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
+from tslab.ml.artifacts import Checkpoint, Tensors
 from tslab.ml.interfaces import LabeledSplits, SPLITS, Trainer
 from tslab.ts.interfaces import Encoder
 
@@ -106,7 +106,7 @@ def encode[M](  # noqa: PLR0913 # why: keyword-only public API; each input is fi
         name: Instance name, for encoding several times in one run.
         trainer: Loads the weights into ``model``.
         model: A model of the trained architecture.
-        checkpoint: From ``train``, or ``tslab.lab.Checkpoint.external(...)``.
+        checkpoint: From ``train``, or ``tslab.ml.Checkpoint.external(...)``.
         data: Provides each split as ``(inputs, targets)``.
         encoder: Builds the encoder from the loaded model, for example
             ``tslab.ts.ModelAsEncoder()``; it must be a frozen dataclass or

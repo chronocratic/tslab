@@ -2,6 +2,7 @@
 
 from tslab.lab.core.meta.run import register_hardware, register_versions
 from tslab.lab.core.seeding import register_seeder
+from tslab.ml.artifacts import Checkpoint, Tensors
 from tslab.ml.interfaces import Batch, DataSource, LabeledSplits, Metric, SPLITS, Trainer
 from tslab.ml.split import Split
 from tslab.ml.stages import train
@@ -15,10 +16,12 @@ register_hardware(torch_hardware)
 __all__ = [
     'SPLITS',
     'Batch',
+    'Checkpoint',
     'DataSource',
     'LabeledSplits',
     'Metric',
     'Split',
+    'Tensors',
     'Trainer',
     'WandbMode',
     'train',

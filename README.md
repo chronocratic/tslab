@@ -25,8 +25,8 @@ results, resumes unfinished training, and reruns only what changed or failed.
 import tslab.lab
 
 
-@tslab.lab.stage(name='smooth', output=tslab.lab.Tensors)
-def smooth(*, run: tslab.lab.Run, data: tslab.lab.Tensors, window: int) -> tslab.lab.Tensors: ...
+@tslab.lab.stage(name='smooth', output=tslab.ml.Tensors)
+def smooth(*, run: tslab.lab.Run, data: tslab.ml.Tensors, window: int) -> tslab.ml.Tensors: ...
 
 
 with tslab.lab.Run(config=config, root=Path('runs'), relative_path=Path('minimal')) as run:

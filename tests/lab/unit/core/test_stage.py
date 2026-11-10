@@ -10,6 +10,7 @@ import torch
 
 import tslab.lab
 from tslab.lab.core.status import read_status
+import tslab.ml
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -75,8 +76,8 @@ def test_unfingerprintable_argument_names_the_argument(tmp_path: Path) -> None:
 
 
 def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
-    @tslab.lab.stage(name='wrong', output=tslab.lab.Tensors)
-    def wrong(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
+    @tslab.lab.stage(name='wrong', output=tslab.ml.Tensors)
+    def wrong(*, run: tslab.lab.Run) -> tslab.ml.Tensors:
         return tslab.lab.Json(data={})  # ty: ignore[invalid-return-type]
 
     with open_run(tmp_path) as run:

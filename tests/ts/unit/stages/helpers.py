@@ -8,7 +8,7 @@ import tslab.ts
 __all__ = ['encoded']
 
 
-def encoded(*, run: tslab.lab.Run, model: LinearEncoder | None = None) -> tslab.lab.Tensors:
+def encoded(*, run: tslab.lab.Run, model: LinearEncoder | None = None) -> tslab.ml.Tensors:
     model = LinearEncoder() if model is None else model
     trainer = FakeTrainer()
     checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=ToySplits())

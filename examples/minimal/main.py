@@ -19,6 +19,7 @@ from pathlib import Path
 import torch
 
 import tslab.lab
+import tslab.ml
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -46,31 +47,31 @@ class MinimalConfig:
     run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
-@tslab.lab.stage(name='make_series', output=tslab.lab.Tensors)
-def make_series(*, run: tslab.lab.Run, series: int, length: int, noise: float) -> tslab.lab.Tensors:
+@tslab.lab.stage(name='make_series', output=tslab.ml.Tensors)
+def make_series(*, run: tslab.lab.Run, series: int, length: int, noise: float) -> tslab.ml.Tensors:
     """Draw ``series`` sine waves with random phases, and a noisy copy of each."""
     generator = torch.Generator().manual_seed(run.seed)
     steps = torch.arange(length, dtype=torch.float32)
     phases = 2 * math.pi * torch.rand(series, 1, generator=generator)
     clean = torch.sin(2 * math.pi * steps / 32 + phases)
     noisy = clean + noise * torch.randn(clean.shape, generator=generator)
-    return tslab.lab.Tensors(tensors={'clean': clean, 'noisy': noisy})
+    return tslab.ml.Tensors(tensors={'clean': clean, 'noisy': noisy})
 
 
-@tslab.lab.stage(name='smooth', output=tslab.lab.Tensors)
+@tslab.lab.stage(name='smooth', output=tslab.ml.Tensors)
 def smooth(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    data: tslab.lab.Tensors,
+    data: tslab.ml.Tensors,
     window: int,
-) -> tslab.lab.Tensors:
+) -> tslab.ml.Tensors:
     """Smooth the noisy series with a centered moving average of ``window`` steps."""
     del run, name
     kernel = torch.full((1, 1, window), 1.0 / window)
     noisy = data.tensors['noisy'].unsqueeze(1)
     smoothed = torch.nn.functional.conv1d(noisy, kernel, padding=window // 2)
-    return tslab.lab.Tensors(tensors={'smoothed': smoothed.squeeze(1)[:, : noisy.shape[-1]]})
+    return tslab.ml.Tensors(tensors={'smoothed': smoothed.squeeze(1)[:, : noisy.shape[-1]]})
 
 
 @tslab.lab.stage(name='score', output=tslab.lab.Metrics)
@@ -78,8 +79,8 @@ def score(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    data: tslab.lab.Tensors,
-    smoothed: tslab.lab.Tensors,
+    data: tslab.ml.Tensors,
+    smoothed: tslab.ml.Tensors,
 ) -> tslab.lab.Metrics:
     """Return the mean squared error between the smoothed and the clean series."""
     del run, name

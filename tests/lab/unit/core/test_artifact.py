@@ -3,13 +3,11 @@ import math
 from pathlib import Path
 
 import pytest
-import torch
 
 from tslab.lab.core.artifact import (
     is_available,
     Json,
     Metrics,
-    Tensors,
     UnavailableArtifact,
     UnavailableArtifactError,
     UnavailableReason,
@@ -42,17 +40,6 @@ def test_metrics_round_trip_nan(tmp_path: Path) -> None:
 def test_metrics_reject_non_numbers() -> None:
     with pytest.raises(TypeError, match='must be int or float'):
         Metrics(data={'flag': True})
-
-
-def test_tensors_round_trip_shared_and_noncontiguous(tmp_path: Path) -> None:
-    base = torch.arange(12, dtype=torch.float32).reshape(3, 4)
-    Tensors(tensors={'base': base, 'transposed': base.T, 'row': base[0]}, metadata={'k': 'v'}).save(
-        directory=tmp_path
-    )
-    loaded = Tensors.load(directory=tmp_path)
-    assert torch.equal(loaded.tensors['transposed'], base.T)
-    assert torch.equal(loaded.tensors['row'], base[0])
-    assert loaded.metadata == {'k': 'v'}
 
 
 def test_external_fingerprint_follows_content(tmp_path: Path) -> None:

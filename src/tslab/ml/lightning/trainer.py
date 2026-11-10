@@ -19,11 +19,11 @@ from lightning.pytorch.callbacks import Callback, EarlyStopping, ModelCheckpoint
 from lightning.pytorch.plugins.environments import SLURMEnvironment
 import torch
 
-from tslab.lab.core.artifact import Checkpoint
 from tslab.lab.core.files import atomic_write_json
 from tslab.lab.core.paths import require_path
 from tslab.lab.core.run import JobTimeLimitSignal, Run
 from tslab.lab.jobs.slurm import parse_slurm_duration, task_count
+from tslab.ml.artifacts import Checkpoint
 from tslab.ml.interfaces.data import DataSource
 from tslab.ml.interfaces.trainer import Trainer
 from tslab.ml.lightning.callbacks import _SignalStop, build_callbacks

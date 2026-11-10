@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from tslab.lab.core.artifact import Checkpoint
 from tslab.lab.core.run import Run
+from tslab.ml.artifacts import Checkpoint
 from tslab.ml.interfaces.data import DataSource
 
 __all__ = ['Trainer']

@@ -24,9 +24,9 @@ def encode_with_a_general_trainer(
     *,
     run: tslab.lab.Run,
     trainer: Trainer[torch.nn.Module],
-    checkpoint: tslab.lab.Checkpoint,
+    checkpoint: tslab.ml.Checkpoint,
     data: LabeledSplits,
-) -> tslab.lab.Tensors:
+) -> tslab.ml.Tensors:
     return tslab.ts.stages.encode(
         run=run,
         trainer=trainer,

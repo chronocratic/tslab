@@ -7,6 +7,7 @@ import torch
 from tests.ts.unit.stage_fakes import run_in
 from tests.ts.unit.stages.helpers import encoded
 import tslab.lab
+import tslab.ml
 import tslab.ts
 from tslab.ts.probes import SVMProbe
 
@@ -42,10 +43,10 @@ def test_evaluate_uses_the_given_metrics(tmp_path: Path) -> None:
     assert metrics.values == {'agreement': 1.0}
 
 
-@tslab.lab.stage(name='partial', output=tslab.lab.Tensors)
-def partial(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
+@tslab.lab.stage(name='partial', output=tslab.ml.Tensors)
+def partial(*, run: tslab.lab.Run) -> tslab.ml.Tensors:
     del run
-    return tslab.lab.Tensors(tensors={'train_representations': torch.zeros(2, 2)})
+    return tslab.ml.Tensors(tensors={'train_representations': torch.zeros(2, 2)})
 
 
 def test_evaluate_names_missing_keys(tmp_path: Path) -> None:

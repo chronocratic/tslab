@@ -2,11 +2,9 @@
 
 from tslab.lab.core.artifact import (
     Artifact,
-    Checkpoint,
     is_available,
     Json,
     Metrics,
-    Tensors,
     UnavailableArtifact,
     UnavailableArtifactError,
     UnavailableReason,
@@ -24,7 +22,6 @@ from tslab.lab.enums import InstanceState, LogLevel, RunState
 __all__ = [
     'REQUIRED',
     'Artifact',
-    'Checkpoint',
     'ConfigFileError',
     'Fingerprintable',
     'HardwareSetting',
@@ -42,7 +39,6 @@ __all__ = [
     'RunState',
     'RunStatus',
     'Stage',
-    'Tensors',
     'Tracker',
     'UnavailableArtifact',
     'UnavailableArtifactError',
