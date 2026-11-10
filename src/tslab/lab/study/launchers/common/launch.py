@@ -35,9 +35,9 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     as its job exists, so a failed launch keeps records for submitted groups.
 
     Args:
-        launcher: The backend's implementation that submits one group.
+        launcher: The implementation of the backend that submits one group.
         record_type: The job record class of the backend.
-        write_job_files: The backend's file writer.
+        write_job_files: The file writer of the backend.
         machine: The machine the jobs run on.
         study: The study the groups came from.
         groups: Planned groups in submission order.
@@ -71,7 +71,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
     for position, planned in enumerate(groups):
         group = before_group(planned) if before_group is not None else planned
         if not group.tasks:
-            # why: the hook dropped the group's tasks, so nothing is recorded for it
+            # why: the hook dropped the tasks of the group, so nothing is recorded for it
             continue
         tasks = tuple(
             TaskRecord(

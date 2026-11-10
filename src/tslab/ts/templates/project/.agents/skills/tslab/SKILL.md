@@ -39,7 +39,7 @@ uv run tslab study show example --json
 uv run tslab study submit example --machine local --dry-run --json
 ```
 
-Check each document's `schema` before using its fields. Use `grids[].name` for
+Check the `schema` of each document before using its fields. Use `grids[].name` for
 `--grid` and `grids[].axes` for `--only axis=value`. Review the dry-run jobs and
 resources, then submit only the selection the researcher requested:
 

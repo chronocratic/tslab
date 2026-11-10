@@ -37,7 +37,7 @@ def backend_for(*, machine: MachineProfile) -> Backend:
         machine: The machine profile to read the launcher from.
 
     Returns:
-        The backend object of the machine's launcher.
+        The backend object of the launcher of the machine.
     """
     backend = BACKENDS.get(machine.launcher)
     if backend is None:

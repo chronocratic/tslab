@@ -65,7 +65,7 @@ def take_requested_code_snapshot(
     Args:
         request: The resolved request; its ``tslab.toml`` names the project root
             and the untracked check.
-        context: The context of the launch, for the machine's output root.
+        context: The context of the launch, for the output root of the machine.
         wanted: Whether the command wants a code snapshot at all.
         include_untracked: Copy untracked files under ``src/`` too.
         dry_run: Run every check and compute the hash, copy nothing.

@@ -486,7 +486,7 @@ the project; `--no-code-snapshot` turns it off for one submit.
   deletes a snapshot folder; remove one by hand once no queued or
   resubmittable job records it.
 - **How the jobs use it:** the jobs keep the project root as working folder;
-  the snapshot's `src/` is prepended to `PYTHONPATH`, so the snapshot package
+  `src/` of the snapshot is prepended to `PYTHONPATH`, so the snapshot package
   wins over an editable install. The job checks that the folder still holds a
   `src/` before the task and fails the task with a clear line; there is no
   fallback to the live code.

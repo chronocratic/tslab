@@ -231,7 +231,7 @@ def _preset_choice[C](*, config_class: type[C], presets: _Presets[C]) -> Any:  #
         ]
     ]
     for name, (description, config) in presets.items():
-        preset_class: Any = type(config)  # why: a preset's class is only known at run time
+        preset_class: Any = type(config)  # why: the class of a preset is only known at run time
         members.append(
             Annotated[
                 preset_class,

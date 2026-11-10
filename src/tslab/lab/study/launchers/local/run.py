@@ -181,7 +181,7 @@ class LocalLauncher:
             stream: Console output stream; standard output when omitted.
             on_task_state: Called with the task id and a ``LocalTaskState``; the task id
                 is the job id and the task index.
-            grace_seconds: Seconds to wait after a stop's ``SIGTERM`` before
+            grace_seconds: Seconds to wait after the stop sends ``SIGTERM`` before
                 a ``SIGKILL``.
         """
         self._project_root = project_root

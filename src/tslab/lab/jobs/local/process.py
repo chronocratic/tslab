@@ -232,7 +232,7 @@ def _report_spawn(
 ) -> None:
     """Call ``on_spawn`` with the pid of the child that started.
 
-    When the callback raises, the child's process group is stopped and
+    When the callback raises, the process group of the child is stopped and
     reaped before the error propagates, so a failure of the callback never
     leaves a live process without a watcher.
 
