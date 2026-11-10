@@ -15,7 +15,8 @@ The lab seeds Python `random` and NumPy and sets `PYTHONHASHSEED`. Importing
 
 A stage that uses plain torch without importing `tslab.ml` is not seeded for
 torch and records no GPU block. Import `tslab.ml` in any stage that uses torch.
-The Lightning trainer and the ts stages import it for you. Importing `tslab.ml`
+If torch is loaded when a run starts but `tslab.ml` is not, the run logs one warning
+(once per process) saying torch is not seeded. The Lightning trainer and the ts stages import it for you. Importing `tslab.ml`
 more than once seeds only once. See also [Seeding in the lab](../lab/run-options.md#seeding).
 
 ## Pages

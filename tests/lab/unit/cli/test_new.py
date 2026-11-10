@@ -94,3 +94,8 @@ def test_python_keyword_names_are_rejected(tmp_path: Path, name: str) -> None:
     with pytest.raises(ValueError, match='Python keyword'):
         create_project(path=tmp_path / 'p', template=LAB_TEMPLATE, name=name)
     assert not (tmp_path / 'p').exists()
+
+
+def test_new_creates_a_lab_project_without_any_entry_point(tmp_path: Path) -> None:
+    assert New(path=tmp_path / 'p').run() == 0
+    assert (tmp_path / 'p' / 'src' / 'p' / 'stages.py').exists()

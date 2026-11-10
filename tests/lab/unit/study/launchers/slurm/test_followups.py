@@ -1,5 +1,6 @@
 """Follow-up jobs: the automatic retry and the W&B sync behind the jobs of the study."""
 
+from collections.abc import Iterator
 import dataclasses
 import os
 from pathlib import Path, PurePosixPath
@@ -9,6 +10,8 @@ import pytest
 
 from tests.lab.unit.study.helpers import context, jobs_of, no_sleep, submit_study
 from tests.support.fake_slurm import FakeSlurm
+from tslab.lab.cli import parser
+from tslab.lab.cli.parser import command_scope, register_lazy_command
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, LauncherKind, RunState
 from tslab.lab.study.commands import resubmit, submit
@@ -92,6 +95,14 @@ def bump_attempts(
             ),
         )
         append_job(path=project / 'runs' / 's' / '.study' / 'submissions.jsonl', record=record)
+
+
+@pytest.fixture(autouse=True)
+def wandb_sync_command() -> Iterator[None]:
+    """The command line offers wandb-sync, as the full tslab does."""
+    with command_scope():
+        register_lazy_command(name='wandb-sync', summary='sync', target='unused:Unused')
+        yield
 
 
 @pytest.fixture
@@ -390,3 +401,20 @@ def test_followup_gets_the_absolute_path_of_a_machine_resolved_by_name(
     tasks = job_file_of(project=project, job_file=retry.job_file, suffix='tasks').read_text()
     assert f'--machine {resolved.as_posix()} --auto' in tasks
     assert resolved.is_absolute()
+
+
+def test_wandb_sync_followup_blocks_the_launch_without_the_command(
+    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+) -> None:
+    with_followups(project=project)
+    parser._LAZY_COMMANDS.pop('wandb-sync')  # noqa: SLF001 # why: undone by the autouse scope
+    code = submit(
+        context=context(project=project, machine_file='cluster.toml'),
+        include_done=False,
+        dry_run=False,
+        extra_args=(),
+        sleep=no_sleep,
+    )
+    assert code == 1
+    assert 'no wandb-sync command' in caplog.text
+    assert fake.calls('sbatch') == []

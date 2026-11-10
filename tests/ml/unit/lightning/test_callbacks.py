@@ -14,6 +14,7 @@ import torch
 
 from tslab.lab.core.run import JobTimeLimitSignal, Run
 from tslab.ml.lightning.callbacks import (
+    _save_last,
     _SignalStop,
     AccumulatingTimerCallback,
     build_callbacks,
@@ -285,6 +286,26 @@ def test_training_end_saves_last_checkpoint_at_latest_step(
     assert timer_state['sessions_count'] == 1
     assert timer_state['sessions_times'][1] > 0.0
     assert not list(tmp_path.glob('*.tmp'))
+
+
+def test_save_last_restores_the_path_when_the_save_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    checkpoint = ModelCheckpoint(dirpath=tmp_path, save_last=True)
+    trainer = lightning.Trainer(logger=False, callbacks=[checkpoint], enable_progress_bar=False)
+    checkpoint.last_model_path = 'earlier.ckpt'
+    seen_during_save: list[str] = []
+
+    def failing_save(*, filepath: Path) -> None:  # why: the save signature
+        seen_during_save.append(checkpoint.last_model_path)
+        message = 'disk full'
+        raise OSError(message)
+
+    monkeypatch.setattr(trainer, 'save_checkpoint', failing_save)
+    with pytest.raises(OSError, match='disk full'):
+        _save_last(trainer=trainer, path=tmp_path / 'last.ckpt')
+    assert seen_during_save == [str(tmp_path / 'last.ckpt')]
+    assert checkpoint.last_model_path == 'earlier.ckpt'
 
 
 class _FakeStrategy:

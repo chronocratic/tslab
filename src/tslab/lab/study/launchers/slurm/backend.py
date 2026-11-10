@@ -223,8 +223,19 @@ class SlurmBackend:
         """
         return expected_starts(context=context)
 
-    def launch_blocker(self, *, context: Context) -> str | None:  # noqa: ARG002 # why: Backend API
-        """A SLURM launch has no local pid file to block it."""
+    def launch_blocker(self, *, context: Context) -> str | None:
+        """Block a launch whose queued W&B sync job would call a command this tool lacks.
+
+        There is no local pid file to block a SLURM launch otherwise.
+        """
+        # why: the cli package reads the study commands, which read the backends
+        from tslab.lab.cli.parser import command_available  # noqa: PLC0415
+
+        if context.machine.followup.wandb_sync and not command_available(name='wandb-sync'):
+            return (
+                'followup.wandb_sync is set but this tslab has no wandb-sync command '
+                '(it comes with tslab.ml); remove the setting or use the full tslab command'
+            )
         return None
 
     def resources(

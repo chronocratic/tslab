@@ -169,6 +169,11 @@ def test_command_line_help_loads_no_torch_or_lightning() -> None:
     assert offending(loaded=loaded, forbidden=('torch', 'lightning', 'pytorch_lightning')) == []
 
 
+def test_wandb_sync_command_loads_no_torch_or_lightning() -> None:
+    loaded = loaded_by(module='tslab.ml.cli.wandb_sync')
+    assert offending(loaded=loaded, forbidden=('torch', 'lightning', 'safetensors')) == []
+
+
 @pytest.mark.slow
 def test_lightning_package_loads_no_tracker_sdk_or_time_series_layer() -> None:
     loaded = loaded_by(module='tslab.ml.lightning')
