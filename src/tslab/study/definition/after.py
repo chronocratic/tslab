@@ -13,7 +13,7 @@ __all__ = ['After', 'after_problems', 'chained_grids', 'grid_order', 'match_axes
 class After:
     """An upstream grid and the condition its runs must meet.
 
-    Args:
+    Attributes:
         grid: The upstream grid name.
         match: Axes used to pair runs; ``None`` uses shared axes and ``()`` fans out.
         condition: The condition each matched upstream run must meet.
@@ -218,37 +218,29 @@ def _matching_runs(
 
 def _first_cycle(*, study: Study) -> tuple[str, ...]:
     """The first dependency cycle in study and declaration order."""
-    visited: set[str] = set()
-    active: dict[str, int] = {}
-    path: list[str] = []
+    visited = frozenset[str]()
     for grid_name in study.grids:
-        cycle = _visit_grid(
-            study=study, grid_name=grid_name, visited=visited, active=active, path=path
-        )
+        cycle, visited = _visit_grid(study=study, grid_name=grid_name, visited=visited, path=())
         if cycle:
             return cycle
     return ()
 
 
 def _visit_grid(
-    *, study: Study, grid_name: str, visited: set[str], active: dict[str, int], path: list[str]
-) -> tuple[str, ...]:
-    """Depth-first visit one grid and return a cycle if it reaches an active grid."""
-    if grid_name in active:
-        return (*path[active[grid_name] :], grid_name)
+    *, study: Study, grid_name: str, visited: frozenset[str], path: tuple[str, ...]
+) -> tuple[tuple[str, ...], frozenset[str]]:
+    """Depth-first visit one grid, returning its cycle and newly visited grids."""
+    if grid_name in path:
+        return (*path[path.index(grid_name) :], grid_name), visited
     if grid_name in visited:
-        return ()
-    active[grid_name] = len(path)
-    path.append(grid_name)
+        return (), visited
+    next_path = (*path, grid_name)
     for after in study.grids[grid_name].after:
         if after.grid not in study.grids:
             continue
-        cycle = _visit_grid(
-            study=study, grid_name=after.grid, visited=visited, active=active, path=path
+        cycle, visited = _visit_grid(
+            study=study, grid_name=after.grid, visited=visited, path=next_path
         )
         if cycle:
-            return cycle
-    path.pop()
-    active.pop(grid_name)
-    visited.add(grid_name)
-    return ()
+            return cycle, visited
+    return (), visited | {grid_name}

@@ -10,6 +10,7 @@ import pytest
 
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.launchers.slurm.job_script import foreground_script, job_script
+from tslab.study.launchers.slurm.requeue_mode import RequeueMode
 from tslab.study.machine import SlurmSettings
 
 TASKS_LINES = [
@@ -241,7 +242,7 @@ def test_chained_script_checks_run_state_after_srun(tmp_path: Path) -> None:
     assert text.rstrip().endswith('exit "$CHECK_EXIT"')
 
 
-def _chained_text(*, requeue: bool | str) -> str:
+def _chained_text(*, requeue: RequeueMode) -> str:
     return job_script(
         job_name='train',
         slurm=SlurmSettings(partition='compute', time='1:00:00'),
@@ -251,29 +252,29 @@ def _chained_text(*, requeue: bool | str) -> str:
         project_root=Path('/p'),
         env={},
         chain_check=('chain-check',),
-        requeue=requeue,
+        requeue_mode=requeue,
     )
 
 
 def test_requeue_mode_writes_requeue_not_no_requeue() -> None:
-    text = _chained_text(requeue=True)
+    text = _chained_text(requeue=RequeueMode.ENABLED)
     assert '#SBATCH --requeue\n' in text
     assert '--no-requeue' not in text
 
 
 def test_expedite_requeue_is_written_when_asked() -> None:
-    assert '#SBATCH --requeue=expedite' in _chained_text(requeue='expedite')
+    assert '#SBATCH --requeue=expedite' in _chained_text(requeue=RequeueMode.EXPEDITE)
 
 
 def test_other_modes_keep_no_requeue() -> None:
-    text = _chained_text(requeue=False)
+    text = _chained_text(requeue=RequeueMode.DISABLED)
     assert '#SBATCH --no-requeue' in text
     assert '--requeue' not in text
 
 
 def test_requeue_header_adds_the_restart_count() -> None:
-    assert '${SLURM_RESTART_COUNT:-0}' in _chained_text(requeue=True)
-    assert 'SLURM_RESTART_COUNT' not in _chained_text(requeue=False)
+    assert '${SLURM_RESTART_COUNT:-0}' in _chained_text(requeue=RequeueMode.ENABLED)
+    assert 'SLURM_RESTART_COUNT' not in _chained_text(requeue=RequeueMode.DISABLED)
 
 
 def test_chain_check_runs_after_srun_failure_and_preserves_its_exit_code(tmp_path: Path) -> None:

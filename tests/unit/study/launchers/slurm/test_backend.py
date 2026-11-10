@@ -32,6 +32,7 @@ from tslab.study.launchers.common.types import JobUsage, LaunchError, LaunchRepo
 import tslab.study.launchers.slurm.backend as slurm_backend
 from tslab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.study.launchers.slurm.requeue_mode import RequeueMode
 from tslab.study.launchers.slurm.states import slurm_task_ids
 from tslab.study.machine import MachineOverride, MachineProfileError
 from tslab.study.paths import study_folder
@@ -715,9 +716,9 @@ def test_after_stopped_submit_writes_the_slurm_file_for_queued_jobs(
 @pytest.mark.parametrize(
     ('config', 'expected'),
     [
-        ({'SlurmctldParameters': 'enable_expedited_requeue,foo'}, True),
-        ({'SlurmctldParameters': 'foo'}, False),
-        ({}, False),
+        ({'SlurmctldParameters': 'enable_expedited_requeue,foo'}, RequeueMode.EXPEDITE),
+        ({'SlurmctldParameters': 'foo'}, RequeueMode.ENABLED),
+        ({}, RequeueMode.ENABLED),
     ],
 )
 def test_expedite_only_when_cluster_allows(
@@ -726,14 +727,14 @@ def test_expedite_only_when_cluster_allows(
     fake: FakeSlurm,
     monkeypatch: pytest.MonkeyPatch,
     config: dict[str, str],
-    expected: bool,
+    expected: RequeueMode,
 ) -> None:
     cluster = project / 'cluster.toml'
     cluster.write_text(cluster.read_text() + '\n[followup]\nchained_retry = "requeue"\n')
     ctx = _context(project=project, fake=fake)
     groups = cast('Sequence[JobGroup]', [SimpleNamespace(chained=True)])
     monkeypatch.setattr(slurm_backend, 'query_cluster_config', lambda: config)
-    assert slurm_backend._expedite_allowed(context=ctx, groups=groups) is expected  # noqa: SLF001
+    assert slurm_backend._requeue_mode(context=ctx, groups=groups) is expected  # noqa: SLF001
 
 
 def test_small_signal_seconds_warns_for_requeue(

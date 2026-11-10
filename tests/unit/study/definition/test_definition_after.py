@@ -14,6 +14,7 @@ import tslab.study as study_api
 from tslab.study import Grid, setting_axis, Study
 import tslab.study.definition as definition_api
 from tslab.study.definition import expand_runs, Settings, StudyRun
+from tslab.study.definition.after import _visit_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -274,6 +275,17 @@ def test_after_cycle_is_rejected() -> None:
                 'b': _grid(short_name='b', axes=_axes(datasets=('a',)), after=(_after(grid='a'),)),
             },
         )
+
+
+def test_visit_grid_returns_new_visited_state() -> None:
+    study = chain_study()
+    visited = frozenset()
+
+    cycle, updated = _visit_grid(study=study, grid_name='pretrain', visited=visited, path=())
+
+    assert cycle == ()
+    assert updated == frozenset({'pretrain'})
+    assert visited == frozenset()
 
 
 def test_downstream_run_without_upstream_match_is_rejected() -> None:

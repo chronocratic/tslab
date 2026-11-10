@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 import pytest
@@ -18,7 +19,13 @@ from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile
 from tslab.study.machine.profile import FollowupSettings
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
-from tslab.study.plan_after import AfterTarget, local_after_problems, order_runs, plan_targets
+from tslab.study.plan_after import (
+    _TargetState,
+    AfterTarget,
+    local_after_problems,
+    order_runs,
+    plan_targets,
+)
 from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import FolderFacts, RunReport
 
@@ -180,6 +187,31 @@ def test_live_upstream_gives_job_task() -> None:
             run_paths=(),
         ),
     )
+
+
+def test_target_state_copies_and_freezes_mapping_inputs() -> None:
+    study = _study()
+    upstream = next(run for run in expand_runs(study=study) if run.grid == 'pretrain')
+    report = _report(run=upstream, state=StudyState.RUNNING)
+    job = _job_record(job_id='41', runs=[upstream])
+    reports = {upstream.run_path: report}
+    latest = {upstream.run_path: (job, job.tasks[0])}
+
+    state = _TargetState(
+        study=study,
+        reports=reports,
+        latest=latest,
+        followup=None,
+        defer_failed_targets=False,
+        now=None,
+    )
+    reports.clear()
+    latest.clear()
+
+    assert state.reports[upstream.run_path] == report
+    assert state.latest[upstream.run_path] == (job, job.tasks[0])
+    assert isinstance(state.reports, MappingProxyType)
+    assert isinstance(state.latest, MappingProxyType)
 
 
 @pytest.mark.parametrize(

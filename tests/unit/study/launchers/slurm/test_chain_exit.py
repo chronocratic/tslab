@@ -18,7 +18,7 @@ from tslab.study.context import Context, records_context
 from tslab.study.definition import StudyRun
 from tslab.study.launchers.slurm.chain_exit import chain_exit
 from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.requeue import restarted_attempt
+from tslab.study.launchers.slurm.requeue import at_requeue_limit, restarted_attempt
 from tslab.study.paths import study_folder
 from tslab.study.records import (
     append_job,
@@ -250,11 +250,66 @@ def test_chain_exit_does_not_requeue_in_other_modes(
     assert requeued == []
 
 
-def test_attempt_counts_restarts(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
-    assert restarted_attempt(attempt=1) == 3
-    monkeypatch.delenv('SLURM_RESTART_COUNT')
-    assert restarted_attempt(attempt=1) == 1
+def test_attempt_counts_restarts() -> None:
+    assert restarted_attempt(attempt=1, restart_count=2) == 3
+    assert restarted_attempt(attempt=1, restart_count=0) == 1
+
+
+@pytest.mark.parametrize(
+    ('restart_count', 'max_requeues', 'expected'),
+    [(0, 2, 'below'), (1, 2, 'at-limit'), (2, None, 'unknown')],
+)
+def test_requeue_limit_is_a_pure_decision(
+    restart_count: int, max_requeues: int | None, expected: str
+) -> None:
+    assert at_requeue_limit(restart_count=restart_count, max_requeues=max_requeues) is (
+        expected == 'at-limit'
+    )
+
+
+def test_chain_exit_logs_when_cluster_config_query_fails(
+    project: Path,
+    fake_backend: FakeBackend,
+    requeued: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    del fake_backend
+
+    def fail() -> dict[str, str]:
+        message = 'cluster config unavailable'
+        raise SlurmError(message)
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'query_cluster_config', fail)
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+
+    with caplog.at_level('WARNING'):
+        assert chain_exit(context=ctx, job_file=3, index=17) == 0
+
+    assert 'cluster config unavailable' in caplog.text
+    assert requeued == ['41_17']
+
+
+def test_chain_exit_logs_when_requeue_limit_is_invalid(
+    project: Path,
+    fake_backend: FakeBackend,
+    requeued: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    del fake_backend
+    monkeypatch.setattr(
+        _CHAIN_EXIT_MODULE, 'query_cluster_config', lambda: {'MaxBatchRequeue': 'invalid'}
+    )
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+
+    with caplog.at_level('WARNING'):
+        assert chain_exit(context=ctx, job_file=3, index=17) == 0
+
+    assert 'invalid' in caplog.text
+    assert requeued == ['41_17']
 
 
 def _recorded_requeue_context(*, project: Path, max_attempts: int) -> Context:
@@ -377,7 +432,9 @@ def test_chain_exit_does_not_requeue_at_max_batch_requeue(
     ctx = _requeue_context(project=project, max_attempts=9)
     _interrupted(ctx=ctx, progress=True)
     monkeypatch.setenv('SLURM_RESTART_COUNT', '1')
-    monkeypatch.setattr(_REQUEUE_MODULE, 'query_cluster_config', lambda: {'MaxBatchRequeue': '2'})
+    monkeypatch.setattr(
+        _CHAIN_EXIT_MODULE, 'query_cluster_config', lambda: {'MaxBatchRequeue': '2'}
+    )
     assert chain_exit(context=ctx, job_file=3, index=17) == 1
     assert requeued == []
 

@@ -49,6 +49,7 @@ from tslab.study.launchers.slurm.doctor import cluster_checks, slurm_check
 from tslab.study.launchers.slurm.hints import state_hint
 from tslab.study.launchers.slurm.job_script import foreground_script
 from tslab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.study.launchers.slurm.requeue_mode import RequeueMode
 from tslab.study.launchers.slurm.slurm_file import write_slurm_file
 from tslab.study.launchers.slurm.states import (
     _query_states,
@@ -67,6 +68,9 @@ from tslab.study.reporting.state import RunReport
 __all__ = ['SlurmBackend']
 
 _LOGGER = logging.getLogger(__name__)
+_REQUEUE_MODE_BY_EXPEDITE: Mapping[bool, RequeueMode] = MappingProxyType(
+    {False: RequeueMode.ENABLED, True: RequeueMode.EXPEDITE}
+)
 
 #: The SLURM state sets that give one phase, in the order the logic checks them.
 _PHASE_TABLE: tuple[tuple[frozenset[str], JobPhase], ...] = (
@@ -262,7 +266,7 @@ class SlurmBackend:
             write_job_files=partial(
                 write_job_files,
                 chain_check=chain_check,
-                expedite=_expedite_allowed(context=context, groups=groups),
+                requeue_mode=_requeue_mode(context=context, groups=groups),
             ),
             machine=context.machine,
             study=context.study,
@@ -419,18 +423,20 @@ class SlurmBackend:
         return (check, *cluster_checks(slurm=machine.slurm, followup=machine.followup))
 
 
-def _expedite_allowed(*, context: Context, groups: Sequence[JobGroup]) -> bool:
-    """Whether the cluster lets chained requeues skip ``requeue_delay``."""
+def _requeue_mode(*, context: Context, groups: Sequence[JobGroup]) -> RequeueMode:
+    """The requeue mode allowed by the study and cluster."""
     if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
-        return False
+        return RequeueMode.DISABLED
     if not any(group.chained for group in groups):
-        return False
+        return RequeueMode.DISABLED
     try:
         config = query_cluster_config()
     except SlurmError as error:
         _LOGGER.warning('could not read the cluster config for expedited requeue: %s', error)
-        return False
-    return 'enable_expedited_requeue' in config.get('SlurmctldParameters', '')
+        expedite = False
+    else:
+        expedite = 'enable_expedited_requeue' in config.get('SlurmctldParameters', '')
+    return _REQUEUE_MODE_BY_EXPEDITE[expedite]
 
 
 def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, ...] | None:
