@@ -8,11 +8,9 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import time
-
-import torch
+from typing import cast
 
 import tslab.lab
-import tslab.ml
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -39,34 +37,36 @@ def read_calls(*, root: Path) -> list[str]:
     return calls.read_text(encoding='utf-8').splitlines() if calls.exists() else []
 
 
-@tslab.lab.stage(name='make_data', output=tslab.ml.Tensors)
-def make_data(*, run: tslab.lab.Run, size: int) -> tslab.ml.Tensors:
+@tslab.lab.stage(name='make_data', output=tslab.lab.Json)
+def make_data(*, run: tslab.lab.Run, size: int) -> tslab.lab.Json:
     record_call(run=run, instance='make_data')
-    return tslab.ml.Tensors(tensors={'values': torch.rand(size)})
+    return tslab.lab.Json(data={'values': [float(index + 1) for index in range(size)]})
 
 
-@tslab.lab.stage(name='transform', output=tslab.ml.Tensors)
+@tslab.lab.stage(name='transform', output=tslab.lab.Json)
 def transform(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    data: tslab.ml.Tensors,
+    data: tslab.lab.Json,
     scale: float,
     fail: bool,
-) -> tslab.ml.Tensors:
+) -> tslab.lab.Json:
     record_call(run=run, instance=f'transform[{name}]')
     if fail:
         message = f'scale {scale} fails on purpose'
         raise RuntimeError(message)
-    return tslab.ml.Tensors(tensors={'values': data.tensors['values'] * scale})
+    values = cast('list[float]', data.data['values'])
+    return tslab.lab.Json(data={'values': [value * scale for value in values]})
 
 
 @tslab.lab.stage(name='summarize', output=tslab.lab.Metrics)
 def summarize(
-    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, data: tslab.ml.Tensors
+    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, data: tslab.lab.Json
 ) -> tslab.lab.Metrics:
     record_call(run=run, instance=f'summarize[{name}]')
-    return tslab.lab.Metrics(data={'mean': float(data.tensors['values'].mean())})
+    values = cast('list[float]', data.data['values'])
+    return tslab.lab.Metrics(data={'mean': sum(values) / len(values)})
 
 
 def main(*, config: ToyConfig) -> dict[str, tslab.lab.Artifact]:

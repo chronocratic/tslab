@@ -37,7 +37,7 @@ def test_first_run_executes_everything_and_records_status(tmp_path: Path) -> Non
     assert {record['state'] for record in status['instances'].values()} == {'done'}
     metrics = results['x2']
     assert isinstance(metrics, tslab.lab.Metrics)
-    assert (tmp_path / 'toy' / 'transform' / 'x2' / 'tensors.safetensors').exists()
+    assert (tmp_path / 'toy' / 'transform' / 'x2' / 'data.json').exists()
     assert (tmp_path / 'toy' / 'config.yaml').exists()
     assert (tmp_path / 'toy' / 'logs' / 'run.log').exists()
     assert not (tmp_path / 'toy' / '.lock').exists()
@@ -173,7 +173,7 @@ def wait_for(predicate: Callable[[], bool], timeout: float = 60.0) -> None:
 
 @pytest.mark.slow
 def test_killed_run_resumes_where_it_stopped(tmp_path: Path) -> None:
-    script = Path(__file__).with_name('toy_pipeline.py')
+    script = Path(__file__).parents[2] / 'lab' / 'integration' / 'toy_pipeline.py'
     environment = {**os.environ, 'TOY_SLEEP_IN': 'transform[x2]'}
     process = subprocess.Popen(  # noqa: S603 # why: runs this repository's own script
         [sys.executable, str(script), '--root', str(tmp_path), '--relative-path', 'toy'],

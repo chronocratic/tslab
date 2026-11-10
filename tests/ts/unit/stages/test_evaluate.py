@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from tests.ts.unit.stage_fakes import run_in
+from tests.ml.unit.stage_fakes import run_in
 from tests.ts.unit.stages.helpers import encoded
 import tslab.lab
 import tslab.ml

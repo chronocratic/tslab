@@ -3,13 +3,14 @@ from pathlib import Path
 import pytest
 import torch
 
+from tests.ml.unit.stage_fakes import FakeTrainer, run_in
 from tests.ts.unit.reference_protocol import (
     build_windowed_forecasting_samples,
     dilated_reference,
     generate_forecasting_samples,
     windowed_reference,
 )
-from tests.ts.unit.stage_fakes import CausalEncoder, FakeTrainer, run_in, ToySeries, VectorEncoder
+from tests.ts.unit.stage_fakes import CausalEncoder, ToySeries, VectorEncoder
 import tslab.lab
 import tslab.ml
 import tslab.ts

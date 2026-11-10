@@ -1,6 +1,7 @@
 """Shared helpers of the stage tests."""
 
-from tests.ts.unit.stage_fakes import FakeTrainer, LinearEncoder, ToySplits
+from tests.ml.unit.stage_fakes import FakeTrainer
+from tests.ts.unit.stage_fakes import LinearEncoder, ToySplits
 import tslab.lab
 import tslab.ml
 import tslab.ts

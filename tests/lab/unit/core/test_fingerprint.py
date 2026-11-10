@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Annotated, ClassVar
 
 import pytest
-import torch
 
 from tslab.lab.core.fingerprint import (
     canonicalize,
@@ -110,9 +109,13 @@ def test_fingerprintable_uses_settings() -> None:
     assert canonicalize(value=Describes()) == canonicalize(value=ModelConfig(hidden=3))
 
 
+class Opaque:
+    pass
+
+
 def test_unsupported_values_raise() -> None:
-    with pytest.raises(TypeError, match='cannot fingerprint value of type Linear'):
-        canonicalize(value=torch.nn.Linear(2, 2))
+    with pytest.raises(TypeError, match='cannot fingerprint value of type Opaque'):
+        canonicalize(value=Opaque())
     with pytest.raises(TypeError, match='non-str key'):
         canonicalize(value={1: 'a'})
 
