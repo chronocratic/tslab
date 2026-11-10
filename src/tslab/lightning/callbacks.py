@@ -191,9 +191,12 @@ class AccumulatingTimerCallback(Callback):
         return {'sessions_count': self.sessions_count, 'sessions_times': dict(self.sessions_times)}
 
     def _save_last_checkpoint(self, *, trainer: Trainer) -> None:
-        """Write the final model state to ``last.ckpt``, including a mid-epoch stop."""
+        """Write the final model state to ``last.ckpt``, including a mid-epoch stop.
+
+        Every rank must call this: saving ends in a barrier. Only rank zero writes the file.
+        """
         callback = trainer.checkpoint_callback
-        if not trainer.is_global_zero or not isinstance(callback, ModelCheckpoint):
+        if not isinstance(callback, ModelCheckpoint):
             return
         if callback.last_model_path:
             path = Path(callback.last_model_path)
