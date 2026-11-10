@@ -9,15 +9,16 @@ import subprocess
 import sys
 import threading
 import time
-from typing import override
+from typing import cast, override
 
 import pytest
 
 import tslab.lab
+from tslab.lab.core import meta
 from tslab.lab.core.codec import decode_dataclass
 from tslab.lab.core.config import ConfigFileError
 from tslab.lab.core.lock import RunLockedError
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta import hostname, register_hardware, register_versions
 from tslab.lab.core.run import Run, RunOptions
 from tslab.lab.core.status import InstanceRecord
 from tslab.lab.core.tracker import LocalTracker, RunStatus, Tracker
@@ -95,6 +96,21 @@ def test_meta_and_hashes(tmp_path: Path) -> None:
     assert first['config_hash'] != second['config_hash']
     assert first['config_hash_without_seed'] == second['config_hash_without_seed']
     assert first['finished_at'] is not None
+
+
+def test_environment_includes_collectors_registered_after_the_first_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(meta.run, '_version_collectors', [])
+    monkeypatch.setattr(meta.run, '_hardware_collectors', [])
+    run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
+    assert 'late' not in cast('dict[str, object]', run.environment()['versions'])
+    register_versions(lambda: {'late': '1'})
+    register_hardware(lambda: {'late_gpu': True})
+    environment = run.environment()
+    assert cast('dict[str, object]', environment['versions'])['late'] == '1'
+    assert cast('dict[str, object]', environment['hardware'])['late_gpu'] is True
+    assert run.environment() is environment
 
 
 def test_meta_has_code_snapshot_block_from_environment(

@@ -5,11 +5,10 @@ with the standard library, and two placeholders are replaced in file names and
 contents: ``{{project_name}}`` (the distribution name, for example ``my-paper``)
 and ``{{package_name}}`` (the import name, ``my_paper``). The copy belongs to
 the user from then on. The lab ships the ``lab`` template; layers above it add
-theirs with ``register_template``, inside ``template_scope``.
+theirs through the ``templates`` of the command line entry point.
 """
 
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import resources
 from importlib.resources.abc import Traversable
@@ -23,14 +22,7 @@ import tyro
 
 from tslab.lab.core.paths import require_path
 
-__all__ = [
-    'LAB_TEMPLATE',
-    'New',
-    'ProjectTemplate',
-    'create_project',
-    'register_template',
-    'template_scope',
-]
+__all__ = ['LAB_TEMPLATE', 'New', 'ProjectTemplate', 'create_project']
 
 _LOGGER = logging.getLogger(__name__)
 _NAME_PATTERN = re.compile(r'[A-Za-z][A-Za-z0-9-]*')
@@ -57,42 +49,6 @@ LAB_TEMPLATE = ProjectTemplate(
     files=resources.files('tslab.lab') / 'templates' / 'project',
     next_steps=('uv sync', 'uv run pytest'),
 )
-_TEMPLATES: dict[str, ProjectTemplate] = {LAB_TEMPLATE.name: LAB_TEMPLATE}
-_DEFAULT_TEMPLATE = LAB_TEMPLATE.name
-
-
-@contextmanager
-def template_scope() -> Generator[None]:
-    """Keep the templates registered inside the block from outliving it."""
-    global _DEFAULT_TEMPLATE  # noqa: PLW0603 # why: restored together with the registry
-    saved, saved_default = dict(_TEMPLATES), _DEFAULT_TEMPLATE
-    try:
-        yield
-    finally:
-        _TEMPLATES.clear()
-        _TEMPLATES.update(saved)
-        _DEFAULT_TEMPLATE = saved_default
-
-
-def register_template(*, template: ProjectTemplate, default: bool = False) -> None:
-    """Offer a template to ``tslab new --template``.
-
-    Registering the same template again does nothing.
-
-    Args:
-        template: The template to offer.
-        default: Make it the template ``tslab new`` uses without ``--template``.
-
-    Raises:
-        ValueError: If the name is taken by a different template.
-    """
-    if _TEMPLATES.get(template.name, template) != template:
-        message = f'template {template.name!r} is already registered'
-        raise ValueError(message)
-    _TEMPLATES[template.name] = template
-    if default:
-        global _DEFAULT_TEMPLATE  # noqa: PLW0603 # why: the one default template of the process
-        _DEFAULT_TEMPLATE = template.name
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -113,17 +69,27 @@ class New:
     name: Annotated[str | None, tyro.conf.arg(metavar='NAME', help_behavior_hint='')] = None
     template: Annotated[str | None, tyro.conf.arg(metavar='TEMPLATE', help_behavior_hint='')] = None
 
-    def run(self) -> int:
+    def run(
+        self,
+        *,
+        templates: Sequence[ProjectTemplate] = (LAB_TEMPLATE,),
+        default_template: str = LAB_TEMPLATE.name,
+    ) -> int:
         """Create the project and print the next steps.
+
+        Args:
+            templates: The templates on offer; a layer above the lab adds its own.
+            default_template: Name of the template used without ``--template``.
 
         Returns:
             ``0`` on success, ``1`` if the folder, the name or the template is not usable.
         """
-        chosen = self.template if self.template is not None else _DEFAULT_TEMPLATE
-        if chosen not in _TEMPLATES:
-            _LOGGER.error('unknown template %s; choose from %s', chosen, ', '.join(_TEMPLATES))
+        chosen = self.template if self.template is not None else default_template
+        offered = {template.name: template for template in templates}
+        if chosen not in offered:
+            _LOGGER.error('unknown template %s; choose from %s', chosen, ', '.join(offered))
             return 1
-        template = _TEMPLATES[chosen]
+        template = offered[chosen]
         try:
             package_name = create_project(path=self.path, template=template, name=self.name)
         except ValueError as error:

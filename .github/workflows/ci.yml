@@ -85,13 +85,15 @@ jobs:
           python-version: '3.12'
           enable-cache: true
       - name: Install
-        run: |
-          uv sync --locked --no-dev --extra analysis
-          uv pip install pytest
+        run: uv sync --locked --no-dev --group lab-test
       - name: Check torch is absent
         run: uv run --no-sync python -c "import importlib.util as u; assert u.find_spec('torch') is None"
       - name: Tests
-        run: uv run --no-sync pytest tests/lab -q
+        run: uv run --no-sync pytest tests/lab -q -n auto
+      - name: Install the analysis extra
+        run: uv sync --locked --no-dev --group lab-test --extra analysis
+      - name: Analysis tests
+        run: uv run --no-sync pytest tests/lab/unit/analysis -q -n auto
 
   docs:
     # Same build as Read the Docs; warnings fail it.

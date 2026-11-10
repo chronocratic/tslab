@@ -69,6 +69,7 @@ uv add "tslab[full,wandb]"    # extras combine
 | `ts` | `ml` and scikit-learn |
 | `chronocratic-models`, `chronocratic-datasets` | `ts` and the chronocratic adapter packages |
 | `wandb`, `mlflow`, `tensorboard` | `ml` and the tracker |
+| `wandb-sync` | W&B alone, to run `tslab wandb-sync` on a login node without torch |
 | `analysis` | pandas, SciPy, Matplotlib |
 | `full` | `ts`, both chronocratic adapters and `analysis` |
 

@@ -94,4 +94,4 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 
 ## Install extras
 
-torch, Lightning, safetensors and scikit-learn are no longer base dependencies; `uv add tslab` installs only the lab. They moved to the extras `ml` (torch, Lightning, safetensors) and `ts` (`ml` and scikit-learn). `uv add "tslab[full]"` restores the old install and adds the chronocratic adapters and analysis packages.
+torch, Lightning, safetensors and scikit-learn are no longer base dependencies; `uv add tslab` installs only the lab. They moved to the extras `ml` (torch, Lightning, safetensors) and `ts` (`ml` and scikit-learn). `uv add "tslab[full]"` restores the old install and adds the chronocratic adapters and analysis packages. The extra `wandb-sync` installs only W&B, enough for `tslab wandb-sync` on a login node without torch; `tslab study submit` with `followup.wandb_sync` needs `tslab[wandb]` or `tslab[wandb-sync]` in the submitting environment.

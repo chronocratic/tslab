@@ -5,11 +5,10 @@ assembles them into the nested subcommand groups tyro parses, and owns the
 pass-through (``--``) argument handling.
 """
 
-from collections.abc import Generator, Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Mapping, Sequence
 import dataclasses
-import importlib
 import inspect
+import pkgutil
 from types import MappingProxyType
 from typing import Annotated, Any, cast, Protocol, Union
 
@@ -21,13 +20,7 @@ from tslab.lab.cli.new import New
 from tslab.lab.cli.status import Status
 from tslab.lab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
 
-__all__ = [
-    'Command',
-    'command_available',
-    'command_scope',
-    'register_command',
-    'register_lazy_command',
-]
+__all__ = ['Command', 'LazyCommand']
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -88,15 +81,15 @@ _COMMANDS: dict[str, type] = {
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
-class _LazyCommand:
+class LazyCommand:
     """A command that is listed from a summary and imported only when it is typed."""
 
     summary: str
     target: str  # "package.module:ClassName"
 
     def load(self) -> type:
-        module, _, attribute = self.target.partition(':')
-        return cast('type', getattr(importlib.import_module(module), attribute))
+        """Import the command class."""
+        return cast('type', pkgutil.resolve_name(self.target))
 
     def listing(self) -> type:
         """A stand-in with the summary as its docstring, for the list of commands."""
@@ -111,66 +104,6 @@ def _never_run(self: object) -> int:  # noqa: ARG001 # why: a method of the list
     # why: never reached; `_parse` swaps in the real command when its name is typed
     msg = 'unreachable'
     raise AssertionError(msg)
-
-
-_LAZY_COMMANDS: dict[str, _LazyCommand] = {}
-
-
-@contextmanager
-def command_scope() -> Generator[None]:
-    """Keep the commands registered inside the block from outliving it.
-
-    Each entry point wraps its registrations in this scope, so one process can run
-    the entry points of several layers without one leaking commands into another.
-    """
-    saved, saved_lazy = dict(_COMMANDS), dict(_LAZY_COMMANDS)
-    try:
-        yield
-    finally:
-        _COMMANDS.clear()
-        _COMMANDS.update(saved)
-        _LAZY_COMMANDS.clear()
-        _LAZY_COMMANDS.update(saved_lazy)
-
-
-def register_command(*, name: str, command: type[Command]) -> None:
-    """Add a top-level subcommand, so a layer above the lab can offer its own.
-
-    Registering the same class under the same name again does nothing.
-
-    Args:
-        name: Subcommand name, as typed after ``tslab``.
-        command: Frozen dataclass with a ``run`` method.
-
-    Raises:
-        ValueError: If ``name`` is already taken by another command.
-    """
-    if name in _LAZY_COMMANDS or _COMMANDS.get(name, command) is not command:
-        message = f'command {name!r} is already registered'
-        raise ValueError(message)
-    _COMMANDS[name] = command
-
-
-def register_lazy_command(*, name: str, summary: str, target: str) -> None:
-    """Add a top-level subcommand that is imported only when it is typed.
-
-    Args:
-        name: Subcommand name, as typed after ``tslab``.
-        summary: The one line shown in the list of commands.
-        target: Where the command class lives, as ``package.module:ClassName``.
-
-    Raises:
-        ValueError: If ``name`` is already taken.
-    """
-    if name in _COMMANDS or name in _LAZY_COMMANDS:
-        message = f'command {name!r} is already registered'
-        raise ValueError(message)
-    _LAZY_COMMANDS[name] = _LazyCommand(summary=summary, target=target)
-
-
-def command_available(*, name: str) -> bool:
-    """Whether the running command line offers the top-level command ``name``."""
-    return name in _COMMANDS or name in _LAZY_COMMANDS
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -207,7 +140,7 @@ _GROUPS: Mapping[str, _Group] = MappingProxyType(
 )
 
 
-def _parse(*, argv: Sequence[str]) -> Command:
+def _parse(*, argv: Sequence[str], extra_commands: Mapping[str, type | LazyCommand]) -> Command:
     group = _GROUPS.get(argv[0]) if argv else None
     if group is not None:
         hidden = group.hidden_commands if len(argv) > 1 and argv[1] in group.hidden_commands else {}
@@ -218,7 +151,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
             description=group.description,
         )
     return _cli(
-        commands=_top_level_commands(typed=argv[0] if argv else None),
+        commands=_top_level_commands(typed=argv[0] if argv else None, extra=extra_commands),
         prog='tslab',
         args=argv,
         description=(
@@ -243,13 +176,21 @@ def _parse(*, argv: Sequence[str]) -> Command:
     )
 
 
-def _top_level_commands(*, typed: str | None) -> dict[str, type]:
+def _top_level_commands(
+    *, typed: str | None, extra: Mapping[str, type | LazyCommand]
+) -> dict[str, type]:
     """The top-level commands; a lazy one is imported only when it is the one typed."""
-    lazy = {
-        name: entry.load() if name == typed else entry.listing()
-        for name, entry in _LAZY_COMMANDS.items()
+    added = {
+        name: (entry.load() if name == typed else entry.listing())
+        if isinstance(entry, LazyCommand)
+        else entry
+        for name, entry in extra.items()
     }
-    return dict(sorted({**_COMMANDS, **lazy}.items()))
+    clash = sorted(set(added) & set(_COMMANDS))
+    if clash:
+        message = f'commands {clash} are already lab commands'
+        raise ValueError(message)
+    return dict(sorted({**_COMMANDS, **added}.items()))
 
 
 def _cli(
