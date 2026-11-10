@@ -49,8 +49,8 @@ def package_version(*, distribution: str) -> str | None:
         return None
 
 
-_version_collectors: list[Callable[[], Mapping[str, str | None]]] = []
-_hardware_collectors: list[Callable[[], Mapping[str, object]]] = []
+_version_collectors: dict[str, Callable[[], Mapping[str, str | None]]] = {}
+_hardware_collectors: dict[str, Callable[[], Mapping[str, object]]] = {}
 _generation = 0
 
 
@@ -59,20 +59,28 @@ def collectors_generation() -> int:
     return _generation
 
 
-def register_versions(collector: Callable[[], Mapping[str, str | None]]) -> None:
-    """Add a function returning more package versions; registering it twice is a no-op."""
+def register_versions(collector: Callable[[], Mapping[str, str | None]], *, name: str) -> None:
+    """Add a function returning more package versions; the same ``name`` replaces the earlier one.
+
+    Args:
+        collector: Returns the extra version entries.
+        name: What the collector reports on, for example ``jax``.
+    """
     global _generation  # noqa: PLW0603 # why: counts the registrations of the process
-    if collector not in _version_collectors:
-        _version_collectors.append(collector)
-        _generation += 1
+    _version_collectors[name] = collector
+    _generation += 1
 
 
-def register_hardware(collector: Callable[[], Mapping[str, object]]) -> None:
-    """Add a function returning more hardware facts; registering it twice is a no-op."""
+def register_hardware(collector: Callable[[], Mapping[str, object]], *, name: str) -> None:
+    """Add a function returning more hardware facts; the same ``name`` replaces the earlier one.
+
+    Args:
+        collector: Returns the extra hardware entries.
+        name: What the collector reports on, for example ``jax``.
+    """
     global _generation  # noqa: PLW0603 # why: counts the registrations of the process
-    if collector not in _hardware_collectors:
-        _hardware_collectors.append(collector)
-        _generation += 1
+    _hardware_collectors[name] = collector
+    _generation += 1
 
 
 def collect_versions() -> dict[str, str | None]:
@@ -86,7 +94,7 @@ def collect_versions() -> dict[str, str | None]:
         'python': platform.python_version(),
         'tslab': package_version(distribution='tslab'),
     }
-    for collector in _version_collectors:
+    for collector in _version_collectors.values():
         versions.update(collector())
     return versions
 
@@ -98,7 +106,7 @@ def collect_hardware() -> dict[str, object]:
         Mapping with key ``cpu_count``, plus the keys of every registered collector.
     """
     hardware: dict[str, object] = {'cpu_count': os.cpu_count() or 0}
-    for collector in _hardware_collectors:
+    for collector in _hardware_collectors.values():
         hardware.update(collector())
     return hardware
 

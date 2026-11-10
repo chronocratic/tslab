@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from importlib import resources
+import importlib.util
 
 from tslab.lab.cli.entrypoint import main as lab_main
 from tslab.lab.cli.new import LAB_TEMPLATE, ProjectTemplate
@@ -24,8 +25,8 @@ TS_TEMPLATE = ProjectTemplate(
 def main(args: Sequence[str] | None = None) -> None:
     """Entry point of the ``tslab`` console script.
 
-    Adds the ``wandb-sync`` command and the ``ts`` project template (the default) to the
-    lab command line, then runs it.
+    Adds the ``wandb-sync`` command and the ``ts`` project template to the lab command
+    line, then runs it. ``tslab new`` defaults to ``ts`` when torch is installed, else to ``lab``.
 
     Args:
         args: Arguments to parse; ``None`` means ``sys.argv[1:]``.
@@ -39,5 +40,7 @@ def main(args: Sequence[str] | None = None) -> None:
             )
         },
         templates=(LAB_TEMPLATE, TS_TEMPLATE),
-        default_template=TS_TEMPLATE.name,
+        default_template=(
+            TS_TEMPLATE.name if importlib.util.find_spec('torch') is not None else LAB_TEMPLATE.name
+        ),
     )

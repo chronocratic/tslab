@@ -93,7 +93,7 @@ class LightningTrainerConfig:
             ValueError: If ``max_training_time`` is zero or not in sbatch ``--time`` format.
         """
         if (
-            self.max_training_time is not None
+            isinstance(self.max_training_time, str)
             and not parse_slurm_duration(text=self.max_training_time).total_seconds()
         ):
             message = (

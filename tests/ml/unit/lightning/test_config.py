@@ -188,3 +188,9 @@ def test_zero_max_training_time_message_names_the_value_and_the_fix() -> None:
 
 def test_positive_max_training_time_is_accepted() -> None:
     assert LightningTrainerConfig(max_training_time='0:00:01').max_training_time == '0:00:01'
+
+
+def test_non_string_max_training_time_sentinel_passes_through() -> None:
+    sentinel = object()
+    config = LightningTrainerConfig(max_training_time=typing.cast('typing.Any', sentinel))
+    assert config.max_training_time is sentinel

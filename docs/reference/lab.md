@@ -58,7 +58,7 @@ helpers have no TSLab dependency.
 
 | Command | What it does | Flags |
 |---|---|---|
-| `tslab new PATH` | copy a project template to `PATH` | `--template {lab,ts}` (default `ts`), `--name` (distribution name; default: the folder name) |
+| `tslab new PATH` | copy a project template to `PATH` | `--template {lab,ts}` (default `ts` with torch installed, else `lab`), `--name` (distribution name; default: the folder name) |
 | `tslab status PATH` | one line per run below `PATH`, or per instance for one run | `--stage` (only this stage), `--watch SECONDS` |
 | `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](../lab/studies.md) | see that page |
 | `tslab wandb-sync ROOT` | resync crashed, failed and killed W&B runs below `ROOT` | `--states`, `--include-offline`, `--wandb-project`, `--wandb-entity`, `--dry-run` |

@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import importlib.util
 from pathlib import Path
 import shutil
 
@@ -8,7 +9,28 @@ from tslab.cli import main
 from tslab.lab.cli import main as lab_main
 
 
-def test_default_template_is_ts(tmp_path: Path) -> None:
+def test_default_template_is_lab_without_torch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    present = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        'find_spec',
+        lambda name, *args: None if name == 'torch' else present(name, *args),
+    )
+    with pytest.raises(SystemExit) as exit_info:
+        main(['new', str(tmp_path / 'p')])
+    assert exit_info.value.code == 0
+    assert not (tmp_path / 'p' / 'src' / 'p' / 'forecast.py').exists()
+
+
+def test_default_template_is_ts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    present = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        'find_spec',
+        lambda name, *args: object() if name == 'torch' else present(name, *args),
+    )
     with pytest.raises(SystemExit) as exit_info:
         main(['new', str(tmp_path / 'p')])
     assert exit_info.value.code == 0

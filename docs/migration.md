@@ -87,7 +87,8 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 ## What else changes
 
 - Old run folders, caches and saved configs do not load after this change. Class paths are part of fingerprints, saved configs and artifact metadata, so every cache misses. Produce them again.
-- `tslab new` takes `--template lab|ts`. The default is `ts`, so a bare `tslab new` gives the same project as before. `--template lab` gives a project with no torch and no time series code.
+- Fingerprints use format version 3. Caches, run results and checkpoints written by an earlier version are not reused after upgrading: every stage runs again and the cache says `fingerprint changed` for each instance.
+- `tslab new` takes `--template lab|ts`. The default is `ts` when torch is installed, so a full install gives the same project as before, and `lab` on a bare install. `--template lab` gives a project with no torch and no time series code.
 - Torch seeding and the torch, Lightning, CUDA and GPU metadata happen only when `tslab.ml` is imported. The lab seeds Python `random` and NumPy. A stage that uses torch must import `tslab.ml`. See [Seeding](lab/run-options.md#seeding).
 - `tslab wandb-sync` and the W&B, MLflow and TensorBoard trackers are in `tslab.ml`.
 - The module paths below the packages changed too (for example `tslab.core` became `tslab.lab.core`, `tslab.study` became `tslab.lab.study`, `tslab.adapters.chronocratic` became `tslab.ts.adapters.chronocratic`).

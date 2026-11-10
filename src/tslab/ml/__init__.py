@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from tslab.ml.tracking.wandb_mode import WandbMode
 
 register_seeder(seed_torch, name='torch')
-register_versions(torch_versions)
-register_hardware(torch_hardware)
+register_versions(torch_versions, name='torch')
+register_hardware(torch_hardware, name='torch')
 
 # why: tslab wandb-sync imports a submodule of this package and must not load torch
 _LAZY = {

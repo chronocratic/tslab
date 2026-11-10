@@ -23,10 +23,12 @@ class Config:
 def _restore_registry() -> Iterator[None]:
     saved = dict(seeding._seeders)  # noqa: SLF001
     warned = seeding._warned  # noqa: SLF001
+    last = seeding._last_seed  # noqa: SLF001
     yield
     seeding._seeders.clear()  # noqa: SLF001
     seeding._seeders.update(saved)  # noqa: SLF001
     seeding._warned = warned  # noqa: SLF001
+    seeding._last_seed = last  # noqa: SLF001
 
 
 def test_seed_everything_repeats_python_and_numpy() -> None:
@@ -44,18 +46,32 @@ def test_seed_everything_repeats_python_and_numpy() -> None:
     assert draw() != first
 
 
-def test_registered_seeder_runs_once_with_the_seed() -> None:
+def test_registered_seeder_runs_once_with_the_seed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(seeding, '_last_seed', None)
     seen: list[int] = []
     register_seeder(seen.append, name='seen')
     register_seeder(seen.append, name='seen')
     seed_everything(seed=7)
-    assert seen == [7]
+    assert seen[-1] == 7
+    assert seen.count(7) == 1
 
 
-def test_a_name_taken_by_another_seeder_is_rejected() -> None:
-    register_seeder(lambda _seed: None, name='taken')
-    with pytest.raises(ValueError, match="seeder 'taken' is already registered"):
-        register_seeder(lambda _seed: None, name='taken')
+def test_registering_a_name_again_replaces_the_seeder(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(seeding, '_last_seed', None)
+    first: list[int] = []
+    second: list[int] = []
+    register_seeder(first.append, name='replaced')
+    register_seeder(second.append, name='replaced')
+    seed_everything(seed=5)
+    assert first == []
+    assert second[-1] == 5
+
+
+def test_a_seeder_registered_after_seeding_gets_the_last_seed() -> None:
+    seed_everything(seed=11)
+    late: list[int] = []
+    register_seeder(late.append, name='late_seeder')
+    assert late == [11]
 
 
 def test_warns_once_when_torch_is_loaded_and_no_seeder_is_registered(
@@ -103,8 +119,8 @@ def test_collecting_run_metadata_warns_when_torch_arrives_unseeded(
 ) -> None:
     monkeypatch.setattr(seeding, '_warned', False)
     monkeypatch.setattr(seeding, '_seeders', {})
-    monkeypatch.setattr(meta.run, '_version_collectors', [])
-    monkeypatch.setattr(meta.run, '_hardware_collectors', [])
+    monkeypatch.setattr(meta.run, '_version_collectors', {})
+    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
     run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
     monkeypatch.setitem(sys.modules, 'torch', types.ModuleType('torch'))
     with caplog.at_level(logging.WARNING, logger=seeding.__name__):
