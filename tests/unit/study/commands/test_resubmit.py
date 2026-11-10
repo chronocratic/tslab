@@ -26,7 +26,7 @@ from tests.unit.study.helpers import (
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
+from tslab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
 from tslab.study.commands import resubmit, submit, submit_runs
 from tslab.study.commands.resubmit import _remove_ended_locks
@@ -875,6 +875,63 @@ def test_auto_does_not_resubmit_probe_of_failed_upstream(
     before = len(fake_backend.calls('launch'))
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     assert len(fake_backend.calls('launch')) == before
+
+
+def test_auto_submits_missing_failed_condition_probe_after_terminal_failure(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    study = chained_study(condition=AfterCondition.FAILED)
+    write_status(
+        path=project / 'runs' / 'chain' / 'pretrain' / 'a' / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FAILED,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.FAILED)},
+        ),
+    )
+    write_status(
+        path=project / 'runs' / 'chain' / 'pretrain' / 'b' / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FINISHED,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.DONE)},
+        ),
+    )
+    ctx = chained_context(project=project, study=study, machine_file='cluster.toml')
+
+    assert {report.state for report in ctx.reports if report.run.grid == 'probe'} == {
+        StudyState.MISSING,
+        StudyState.DEPENDENCY_FAILED,
+    }
+    assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
+
+    runs = _launched_runs(fake_backend=fake_backend)
+    assert all(run.startswith('probe/') for run in runs)
+
+
+def test_auto_holds_failed_condition_probe_during_upstream_retry(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    enable_retry(project=project, text='chained_retry = "resubmit"\n')
+    _time_limited(project=project, run_path='pretrain/a')
+    write_status(
+        path=project / 'runs' / 'chain' / 'pretrain' / 'b' / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.FINISHED,
+            updated_at=utc_now_iso(),
+            instances={'train': InstanceRecord(state=InstanceState.DONE)},
+        ),
+    )
+    context = chained_context(
+        project=project,
+        study=chained_study(condition=AfterCondition.FAILED),
+        machine_file='cluster.toml',
+    )
+
+    assert resubmit(context=context, auto=True, sleep=no_sleep) == 0
+
+    assert _launched_runs(fake_backend=fake_backend) == ['pretrain/a']
 
 
 def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: FakeBackend) -> None:

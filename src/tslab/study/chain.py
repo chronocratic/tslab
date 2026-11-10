@@ -18,8 +18,14 @@ if TYPE_CHECKING:
 __all__ = ['after_verdict', 'downstream_of', 'upstream_verdict']
 
 
-def upstream_verdict(
-    *, condition: AfterCondition, state: StudyState, retry_left: bool
+def upstream_verdict(  # noqa: PLR0913 # why: state and retry timing facts are explicit inputs
+    *,
+    condition: AfterCondition,
+    state: StudyState,
+    retry_left: bool,
+    delay_minutes: int = 0,
+    started_at: float | None = None,
+    now: float | None = None,
 ) -> AfterVerdict:
     """Judge one upstream state against a dependency condition.
 
@@ -27,6 +33,9 @@ def upstream_verdict(
         condition: The condition declared by the downstream grid.
         state: The current upstream run state.
         retry_left: Whether the upstream run can still be retried.
+        delay_minutes: Minutes since the upstream job started, for ``STARTED``.
+        started_at: The upstream job start time in UTC Unix seconds, when known.
+        now: The current time in UTC Unix seconds, passed by the caller.
 
     Returns:
         Whether the condition is met, impossible or still open.
@@ -37,7 +46,9 @@ def upstream_verdict(
         return _any_verdict(state=state)
     if condition is AfterCondition.FAILED:
         return _failed_verdict(state=state, retry_left=retry_left)
-    return _started_verdict(state=state)
+    return _started_verdict(
+        state=state, delay_minutes=delay_minutes, started_at=started_at, now=now
+    )
 
 
 def after_verdict(
@@ -46,6 +57,7 @@ def after_verdict(
     run: StudyRun,
     reports: Mapping[PurePosixPath, RunReport],
     followup: FollowupSettings | None = None,
+    now: float | None = None,
 ) -> AfterVerdict:
     """Combine every declared upstream condition for one downstream run.
 
@@ -54,13 +66,16 @@ def after_verdict(
         run: The downstream run to judge.
         reports: The known upstream reports, keyed by run path.
         followup: Retry settings used to keep retryable interruptions open.
+        now: The current time in UTC Unix seconds, passed by the caller.
 
     Returns:
         The combined dependency verdict; every ``After`` entry combines with all.
     """
     grid = study.grids[run.grid]
     verdicts = [
-        _entry_verdict(study=study, run=run, after=after, reports=reports, followup=followup)
+        _entry_verdict(
+            study=study, run=run, after=after, reports=reports, followup=followup, now=now
+        )
         for after in grid.after
     ]
     if AfterVerdict.NEVER in verdicts:
@@ -125,13 +140,14 @@ def _depends_on(*, study: Study, run: StudyRun, paths: Collection[PurePosixPath]
     )
 
 
-def _entry_verdict(
+def _entry_verdict(  # noqa: PLR0913 # why: one input per dependency decision fact
     *,
     study: Study,
     run: StudyRun,
     after: After,
     reports: Mapping[PurePosixPath, RunReport],
     followup: FollowupSettings | None,
+    now: float | None,
 ) -> AfterVerdict:
     """Combine matched runs according to one entry's ``satisfy`` choice."""
     matched = upstream_runs(study=study, run=run, after=after)
@@ -139,7 +155,11 @@ def _entry_verdict(
         return AfterVerdict.OPEN
     verdicts = [
         _report_verdict(
-            report=reports.get(upstream.run_path), condition=after.condition, followup=followup
+            report=reports.get(upstream.run_path),
+            condition=after.condition,
+            delay_minutes=after.delay_minutes,
+            followup=followup,
+            now=now,
         )
         for upstream in matched
     ]
@@ -165,7 +185,12 @@ def _any_entry_verdict(*, verdicts: list[AfterVerdict]) -> AfterVerdict:
 
 
 def _report_verdict(
-    *, report: RunReport | None, condition: AfterCondition, followup: FollowupSettings | None
+    *,
+    report: RunReport | None,
+    condition: AfterCondition,
+    delay_minutes: int,
+    followup: FollowupSettings | None,
+    now: float | None,
 ) -> AfterVerdict:
     """Judge one report, treating an uncollected report as open."""
     if report is None:
@@ -174,6 +199,9 @@ def _report_verdict(
         condition=condition,
         state=report.state,
         retry_left=_retry_left(report=report, followup=followup),
+        delay_minutes=delay_minutes,
+        started_at=report.job_started_at,
+        now=now,
     )
 
 
@@ -220,10 +248,25 @@ def _failed_verdict(*, state: StudyState, retry_left: bool) -> AfterVerdict:
     return AfterVerdict.OPEN
 
 
-def _started_verdict(*, state: StudyState) -> AfterVerdict:
-    """The verdict for a ``STARTED`` dependency."""
+def _started_verdict(
+    *, state: StudyState, delay_minutes: int, started_at: float | None, now: float | None
+) -> AfterVerdict:
+    """The verdict for a ``STARTED`` dependency and its elapsed delay."""
     if state is StudyState.DEPENDENCY_FAILED:
         return AfterVerdict.NEVER
-    if state in (StudyState.RUNNING, StudyState.DONE, StudyState.INTERRUPTED, StudyState.FAILED):
+    started = state in (
+        StudyState.RUNNING,
+        StudyState.DONE,
+        StudyState.INTERRUPTED,
+        StudyState.FAILED,
+    )
+    if not started:
+        return AfterVerdict.OPEN
+    if delay_minutes == 0:
         return AfterVerdict.MET
-    return AfterVerdict.OPEN
+    if started_at is None:
+        return AfterVerdict.OPEN
+    if now is None:
+        return AfterVerdict.OPEN
+    delay_seconds = delay_minutes * 60
+    return AfterVerdict.MET if now - started_at >= delay_seconds else AfterVerdict.OPEN

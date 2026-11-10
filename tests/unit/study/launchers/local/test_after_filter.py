@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState
+from tslab.enums import AfterCondition, InstanceState, RunState
 from tslab.study import After, Grid, Study
 from tslab.study.context import Context, context_for, Selection
 from tslab.study.definition import expand_runs
@@ -17,7 +17,7 @@ from tslab.study.plan import assign_indices, JobGroup, plan_jobs
 from tslab.study.plan_after import plan_targets
 
 
-def _chain_study() -> Study:
+def _chain_study(*, condition: AfterCondition = AfterCondition.OK) -> Study:
     """Pretrain runs a and b; probe a and b depend on the pretrain of the same dataset."""
 
     @dataclass(frozen=True, kw_only=True)
@@ -38,7 +38,7 @@ def _chain_study() -> Study:
         command=('python', 'probe.py'),
         config=ChainConfig,
         axes={'dataset': {'a': {'dataset': 'a'}, 'b': {'dataset': 'b'}}},
-        after=(After(grid='pretrain'),),
+        after=(After(grid='pretrain', condition=condition),),
     )
     return Study(name='chain', grids={'probe': probe, 'pretrain': pretrain})
 
@@ -87,7 +87,12 @@ def _group_of(*, groups: list[JobGroup], run_path: str) -> JobGroup:
 
 
 def _write_pretrain_state(
-    *, project: Path, dataset: str, run_state: RunState, instance: InstanceState
+    *,
+    project: Path,
+    dataset: str,
+    run_state: RunState,
+    instance: InstanceState,
+    error: str | None = None,
 ) -> None:
     folder = project / 'runs' / 'chain' / 'pretrain' / dataset
     folder.mkdir(parents=True, exist_ok=True)
@@ -96,7 +101,7 @@ def _write_pretrain_state(
         snapshot=RunStatusSnapshot(
             run_state=run_state,
             updated_at=utc_now_iso(),
-            instances={'train': InstanceRecord(state=instance)},
+            instances={'train': InstanceRecord(state=instance, error=error)},
         ),
     )
 
@@ -141,3 +146,27 @@ def test_after_filter_drops_tasks_when_the_upstream_failed(
 
     assert [task.resolved.run.run_path.as_posix() for task in filtered.tasks] == ['probe/b']
     assert 'probe/a' in caplog.text
+
+
+def test_after_filter_holds_failed_condition_during_retryable_interruption(project: Path) -> None:
+    profile = project / 'local.toml'
+    profile.write_text(
+        profile.read_text(encoding='utf-8') + '\n[followup]\nchained_retry = "resubmit"\n',
+        encoding='utf-8',
+    )
+    ctx = _context(project=project, study=_chain_study(condition=AfterCondition.FAILED))
+    _write_pretrain_state(
+        project=project,
+        dataset='a',
+        run_state=RunState.RUNNING,
+        instance=InstanceState.FAILED,
+        error='JobTimeLimitSignal: time limit',
+    )
+    _write_pretrain_state(
+        project=project, dataset='b', run_state=RunState.FINISHED, instance=InstanceState.DONE
+    )
+    group = _group_of(groups=_groups(ctx=ctx), run_path='probe/a')
+
+    filtered = after_filter(context=ctx)(group)
+
+    assert not any(task.resolved.run.run_path.as_posix() == 'probe/a' for task in filtered.tasks)

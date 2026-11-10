@@ -1,8 +1,9 @@
 """The types a launch and its backends exchange: errors, reports, states and callbacks."""
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
+from types import MappingProxyType
 from typing import Protocol
 
 from tslab.enums import JobFlag, JobPhase, LocalTaskState
@@ -91,6 +92,7 @@ class JobStates:
         reasons: The one-line reason per id, shown when the run folder gives none.
         flags: The flags per id; only ids that have a flag.
         followup_live_job_ids: The ids of the queued or running follow-up jobs.
+        start_times: The UTC start time in Unix seconds, when known.
     """
 
     known: bool
@@ -99,6 +101,7 @@ class JobStates:
     reasons: Mapping[str, str]
     flags: Mapping[str, frozenset[JobFlag]]
     followup_live_job_ids: tuple[str, ...]
+    start_times: Mapping[str, float] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True, kw_only=True)

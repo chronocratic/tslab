@@ -55,6 +55,7 @@ def make_job_states(  # noqa: PLR0913 # why: one keyword per JobStates field
     reasons: Mapping[str, str] | None = None,
     flags: Mapping[str, frozenset[JobFlag]] | None = None,
     followup_live_job_ids: tuple[str, ...] = (),
+    start_times: Mapping[str, float] | None = None,
 ) -> JobStates:
     """Build a read-only snapshot of backend states for study tests."""
     return JobStates(
@@ -64,6 +65,7 @@ def make_job_states(  # noqa: PLR0913 # why: one keyword per JobStates field
         reasons=MappingProxyType(dict(reasons or {})),
         flags=MappingProxyType(dict(flags or {})),
         followup_live_job_ids=followup_live_job_ids,
+        start_times=MappingProxyType(dict(start_times or {})),
     )
 
 

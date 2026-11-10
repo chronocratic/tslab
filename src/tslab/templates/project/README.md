@@ -78,6 +78,10 @@ the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
 TSLab docs. The profile example uses `retry` for grids that are not chained
 and `chained_retry` for chained grids.
 
+The `chain` study trains one checkpoint, then reuses it for separate `svm` and
+`ridge` probe runs. Ridge outputs are mapped to the nearest training class
+before the example reports accuracy.
+
 Once runs are done, `notebooks/analysis.ipynb` reads the results, lists the runs that
 are missing and compares methods with a critical-difference diagram, paired tests and a
 numbers file for the paper. Open it with `uv sync --group notebooks` and pick the project

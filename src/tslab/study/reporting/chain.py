@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from tslab.enums import AfterVerdict, JobFlag, StudyState
 from tslab.study.chain import after_verdict
-from tslab.study.definition import upstream_runs
+from tslab.study.definition import grid_order, upstream_runs
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -27,6 +27,7 @@ def apply_chain_states(
     reports: Sequence[RunReport],
     upstream: Mapping[PurePosixPath, RunReport],
     followup: FollowupSettings,
+    now: float | None = None,
 ) -> list[RunReport]:
     """Apply dependency-specific state changes to selected run reports.
 
@@ -35,14 +36,21 @@ def apply_chain_states(
         reports: Reports to update, usually the selected runs.
         upstream: Reports needed to judge downstream dependencies.
         followup: Retry settings that keep eligible interruptions open.
+        now: The current time in UTC Unix seconds, passed by the caller.
 
     Returns:
         Updated report list in input order.
     """
-    return [
-        _chain_report(study=study, report=report, upstream=upstream, followup=followup)
-        for report in reports
-    ]
+    order = {grid: position for position, grid in enumerate(grid_order(study=study))}
+    available = dict(upstream)
+    updated: dict[PurePosixPath, RunReport] = {}
+    for report in sorted(reports, key=lambda item: order[item.run.grid]):
+        chained = _chain_report(
+            study=study, report=report, upstream=available, followup=followup, now=now
+        )
+        updated[report.run.run_path] = chained
+        available[report.run.run_path] = chained
+    return [updated[report.run.run_path] for report in reports]
 
 
 def waits_for(*, context: Context, report: RunReport) -> tuple[str, ...]:
@@ -73,6 +81,7 @@ def _chain_report(
     report: RunReport,
     upstream: Mapping[PurePosixPath, RunReport],
     followup: FollowupSettings,
+    now: float | None,
 ) -> RunReport:
     """Apply the first applicable dependency state rule to one report."""
     if report.state is StudyState.QUEUED and JobFlag.DEPENDENCY_PENDING in report.job_flags:
@@ -85,7 +94,9 @@ def _chain_report(
         or not study.grids[report.run.grid].after
     ):
         return report
-    verdict = after_verdict(study=study, run=report.run, reports=upstream, followup=followup)
+    verdict = after_verdict(
+        study=study, run=report.run, reports=upstream, followup=followup, now=now
+    )
     if verdict is AfterVerdict.NEVER:
         return replace(report, state=StudyState.DEPENDENCY_FAILED)
     if _job_was_cancelled(report=report):

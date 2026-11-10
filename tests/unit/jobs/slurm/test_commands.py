@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, UTC
 import os
 from pathlib import Path
 import subprocess
@@ -12,6 +12,7 @@ from tslab.jobs.slurm import (
     query_cluster_config,
     query_expected_starts,
     query_job_reasons,
+    query_job_start_times,
     query_job_states,
     query_job_usage,
     query_partition,
@@ -339,6 +340,23 @@ def test_query_job_states(fake: FakeSlurm) -> None:
         '6_1': 'TIMEOUT',
     }
     assert fake.calls('squeue')[0][:2] == ['--array', '--jobs']
+
+
+def test_query_job_start_times_reads_task_starts_in_utc(fake: FakeSlurm) -> None:
+    fake.set_answers('sacct', [{'exit': 0, 'stdout': '7_0|2026-11-10T12:00:00\n7_1|Unknown\n'}])
+
+    assert query_job_start_times(job_ids=['7']) == {
+        '7_0': datetime(2026, 11, 10, 12, tzinfo=UTC).timestamp()
+    }
+    assert fake.calls('sacct')[0] == [
+        '--jobs',
+        '7',
+        '--noheader',
+        '--parsable2',
+        '--allocations',
+        '--utc',
+        '--format=JobID,Start',
+    ]
 
 
 def test_query_job_reasons_reads_squeue_and_sacct(fake: FakeSlurm) -> None:

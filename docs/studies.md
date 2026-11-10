@@ -536,19 +536,23 @@ probe = Grid(
   both grids have. `match=()` makes every run of the grid wait for every upstream
   run.
 - `condition`: when the upstream run lets the downstream run start. `ok` (default,
-  the run is `done`), `any` (the run ended in any way), `failed` (the run failed)
-  and `started` (the run began, SLURM only; `delay_minutes` adds a wait). `failed`
-  needs `[followup] chained_retry = "manual"`; every command refuses it with
-  `resubmit` or `requeue`, because a retried upstream run has already ended
-  non-zero on SLURM, so `afternotok` would start the downstream run while a local
-  launch waits for the retry.
+  the run is `done`), `any` (the run ended in any way), `failed` (the run is
+  `failed`, `dependency_failed`, or `interrupted` with no retry left), and
+  `started` (the run began; `delay_minutes` waits from its SLURM start time).
+  Every `retry` and `chained_retry` combination is valid. With
+  With either automatic `chained_retry` mode, SLURM dependents using `failed`
+  wait until the upstream retry chain reaches a terminal outcome; they do not
+  use `afternotok` for an intermediate interrupted attempt or a failed requeue.
+  This lets the follow-up retry an upstream before releasing its dependent.
+  Local launches apply the same terminal-state rule before running downstream
+  work.
 - `satisfy`: `all` (default) needs every matched upstream run, `any` needs one. `any`
   works with a single `After` entry only, because SLURM allows one separator per
   job.
 
-`{after:<grid>}` in a setting expands to the run folder of the matched upstream
-run, `<output_root>/<study>/<run path>`; a relative `output_root` stays
-relative to the project root the jobs run in. It needs exactly one matched run.
+`{after:<grid>}` in a setting expands to the absolute run folder of the matched
+upstream run, `<output_root>/<study>/<run path>`. A relative `output_root` is
+anchored at the project root where jobs run. It needs exactly one matched run.
 A grid with a single `After` entry can write `{after}` for the same folder, so
 the upstream grid name is written once.
 
@@ -610,9 +614,6 @@ the submission, waits with it. Nothing resubmits it: `status` shows the run `int
 at MaxBatchRequeue) with a warning, and you run `tslab study resubmit` by hand.
 :::
 
-`condition="failed"` works only with `chained_retry = "manual"` (see
-[Chaining grids](#chaining-grids)).
-
 One-to-one chains (the downstream grid has no axis the upstream grid lacks) take the array index
 of their upstream run when it is free, and wait with `aftercorr`: each downstream task starts
 after the upstream task with the same index.
@@ -622,8 +623,8 @@ covers chained grids; see [Automatic retry](#automatic-retry). The `requeue`
 mode keeps the job id of the upstream run, so downstream jobs keep waiting; see
 [HPC and SLURM](hpc.md).
 
-The project template ships the `chain` study: the `pretrain` grid trains and
-the `probe` grid loads the checkpoint and scores an SVM probe.
+The project template ships the `chain` study: the `pretrain` grid trains once,
+then the `probe` grid reuses its checkpoint for separate SVM and Ridge probes.
 
 ## Automatic retry
 
@@ -646,9 +647,10 @@ resources (`[followup] time`, 1 CPU, the same partition and qos). It runs
 `<tslab_command> study resubmit <study> --machine <name> --auto`:
 
 - `--auto` resubmits **only `interrupted` runs** (and, for chained grids, the
-  `dependency_failed` runs behind them), never `failed` or
-  `missing` (startup failures and code errors, including out-of-memory, stay
-  manual);
+  `dependency_failed` runs behind them), never failed upstream runs or unrelated
+  missing runs. A missing downstream with `condition="failed"` is submitted
+  automatically once its upstream failure is terminal or its retry limit is
+  exhausted;
 - a run is not retried once its attempt number reaches `max_attempts`
   (default 3); attempts whose job ended `PREEMPTED` or `NODE_FAIL` do not
   count and skip the progress rule below, but after 20 of them in a row the

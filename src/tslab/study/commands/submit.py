@@ -170,6 +170,7 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             },
             first_job_file=next_job_file(study_folder=folder),
             environment=os.environ,
+            project_root=context.project_root,
             code_snapshots=code_snapshots,
             after=after_targets,
         )
@@ -236,6 +237,8 @@ def _plan_after(
         submitting=frozenset(run.run_path for run in runs),
         jobs=jobs,
         followup=context.machine.followup,
+        launcher=context.machine.launcher,
+        now=time.time(),
     )
     for report in ordered_reports:
         if report.run.run_path in blocked:

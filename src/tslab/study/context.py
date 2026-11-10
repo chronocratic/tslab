@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+import time
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -197,16 +198,12 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
         jobs=jobs,
         job_states=job_states,
     )
-    reports_by_path = {report.run.run_path: report for report in state_reports}
-    upstream_reports = {
-        path: reports_by_path[path] for path in upstream_paths if path in reports_by_path
-    }
-    reports = apply_chain_states(
-        study=study,
-        reports=[reports_by_path[run.run_path] for run in runs],
-        upstream=upstream_reports,
-        followup=machine.followup,
+    adjusted = apply_chain_states(
+        study=study, reports=state_reports, upstream={}, followup=machine.followup, now=time.time()
     )
+    reports_by_path = {report.run.run_path: report for report in adjusted}
+    upstream_reports = {path: reports_by_path[path] for path in upstream_paths}
+    reports = [reports_by_path[run.run_path] for run in runs]
     return Context(
         study=study,
         reference=reference,
@@ -250,16 +247,16 @@ def refresh_context(*, context: Context) -> Context:
     state_reports = collect_states(
         study_directory=context.study_directory, runs=state_runs, jobs=jobs, job_states=job_states
     )
-    reports_by_path = {report.run.run_path: report for report in state_reports}
-    upstream_reports = {
-        path: reports_by_path[path] for path in upstream_paths if path in reports_by_path
-    }
-    reports = apply_chain_states(
+    adjusted = apply_chain_states(
         study=context.study,
-        reports=[reports_by_path[run.run_path] for run in context.runs],
-        upstream=upstream_reports,
+        reports=state_reports,
+        upstream={},
         followup=context.machine.followup,
+        now=time.time(),
     )
+    reports_by_path = {report.run.run_path: report for report in adjusted}
+    upstream_reports = {path: reports_by_path[path] for path in upstream_paths}
+    reports = [reports_by_path[run.run_path] for run in context.runs]
     return dataclasses.replace(
         context,
         jobs=jobs,
@@ -362,12 +359,26 @@ def _upstream_paths(*, study: Study, runs: list[StudyRun]) -> set[PurePosixPath]
     """The unique upstream paths needed by selected chained runs."""
     if not chained_grids(study=study):
         return set()
-    return {
-        upstream.run_path
-        for run in runs
+    paths: set[PurePosixPath] = set()
+    pending = list(runs)
+    while pending:
+        run = pending.pop()
+        for upstream in _unseen_upstream_runs(study=study, run=run, known_paths=paths):
+            paths.add(upstream.run_path)
+            pending.append(upstream)
+    return paths
+
+
+def _unseen_upstream_runs(
+    *, study: Study, run: StudyRun, known_paths: set[PurePosixPath]
+) -> tuple[StudyRun, ...]:
+    """The direct upstream runs of one run that have not been visited."""
+    return tuple(
+        upstream
         for after in study.grids[run.grid].after
         for upstream in upstream_runs(study=study, run=run, after=after)
-    }
+        if upstream.run_path not in known_paths
+    )
 
 
 def study_reports(*, context: Context) -> dict[PurePosixPath, RunReport]:
@@ -385,15 +396,13 @@ def study_reports(*, context: Context) -> dict[PurePosixPath, RunReport]:
         jobs=context.jobs,
         job_states=context.job_states,
     )
-    reports = raw
-    # why: a run behind two links needs the adjusted state of its direct upstream
-    for _ in range(2):
-        reports = apply_chain_states(
-            study=context.study,
-            reports=raw,
-            upstream={report.run.run_path: report for report in reports},
-            followup=context.machine.followup,
-        )
+    reports = apply_chain_states(
+        study=context.study,
+        reports=raw,
+        upstream={},
+        followup=context.machine.followup,
+        now=time.time(),
+    )
     return {report.run.run_path: report for report in reports}
 
 

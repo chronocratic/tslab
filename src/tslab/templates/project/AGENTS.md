@@ -41,7 +41,7 @@ machines/
 src/{{package_name}}/
   classify.py                   script: train, encode, SVM probe; noisy-test robustness check
   forecast.py                   script: train, encode, ridge probe per horizon
-  probe.py                      script: load a trained checkpoint, encode, SVM probe
+  probe.py                      script: load a trained checkpoint, encode, SVM or Ridge probe
   models.py                     `Models`: the model choice shared by both scripts and the study
   augmentations.py              your augmentation recipes, offered on matching models
   stages.py                     your own stages (example: add_noise)
@@ -56,6 +56,10 @@ tests/
 data/                           datasets (git-ignored)
 runs/                           run folders (git-ignored)
 ```
+
+The `chain` study trains one checkpoint, then runs separate SVM and Ridge
+probes against it. The Ridge head rounds regression outputs to the nearest
+training class before reporting accuracy.
 
 ### What each file is for
 

@@ -206,12 +206,17 @@ def test_collect_states_reads_folders_and_records(tmp_path: Path) -> None:
         study_directory=tmp_path,
         runs=runs,
         jobs=jobs,
-        job_states=make_job_states(states={'7_0': 'COMPLETED'}, phases={'7_0': JobPhase.COMPLETED}),
+        job_states=make_job_states(
+            states={'7_0': 'COMPLETED'},
+            phases={'7_0': JobPhase.COMPLETED},
+            start_times={'7_0': 1_234.0},
+        ),
     )
     assert [(r.state, r.attempt, r.job_id) for r in reports] == [
         (StudyState.DONE, 1, '7_0'),
         (StudyState.MISSING, 0, None),
     ]
+    assert reports[0].job_started_at == 1_234.0
 
 
 def test_unreadable_status_is_reported_not_raised(tmp_path: Path) -> None:

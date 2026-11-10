@@ -6,16 +6,19 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
+import pytest
+
 from tests.support.fake_backend import FakeResources
 from tslab.core.status import utc_now_iso
-from tslab.enums import AfterCondition, JobPhase, LauncherKind, Satisfy, StudyState
+from tslab.enums import AfterCondition, ChainedRetry, JobPhase, LauncherKind, Satisfy, StudyState
 from tslab.study import After, Grid, Study
 from tslab.study.definition import expand_runs, StudyRun
 from tslab.study.launchers.slurm.dependency import dependency_text
 from tslab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.study.machine import MachineProfile
+from tslab.study.machine.profile import FollowupSettings
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
-from tslab.study.plan_after import AfterTarget, order_runs, plan_targets
+from tslab.study.plan_after import AfterTarget, local_after_problems, order_runs, plan_targets
 from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
 from tslab.study.reporting.state import FolderFacts, RunReport
 
@@ -32,7 +35,9 @@ class _ChainConfig:
     run_path: Path = Path('run')
 
 
-def _study(*, fan_out: bool = False, condition: AfterCondition = AfterCondition.OK) -> Study:
+def _study(
+    *, fan_out: bool = False, condition: AfterCondition = AfterCondition.OK, delay_minutes: int = 0
+) -> Study:
     upstream = Grid(
         short_name='pre',
         command=('python', '-m', 'pretrain'),
@@ -45,12 +50,25 @@ def _study(*, fan_out: bool = False, condition: AfterCondition = AfterCondition.
         command=('python', '-m', 'probe'),
         config=_ChainConfig,
         axes={'dataset': {'a': {}, 'b': {}}, 'head': {'svm': {}, 'knn': {}}},
-        after=(After(grid='pretrain', match=() if fan_out else None, condition=condition),),
+        after=(
+            After(
+                grid='pretrain',
+                match=() if fan_out else None,
+                condition=condition,
+                delay_minutes=delay_minutes,
+            ),
+        ),
     )
     return Study(name='chain', grids={'probe': downstream, 'pretrain': upstream})
 
 
-def _report(*, run: StudyRun, state: StudyState, job_id: str | None = None) -> RunReport:
+def _report(
+    *,
+    run: StudyRun,
+    state: StudyState,
+    job_id: str | None = None,
+    job_started_at: float | None = None,
+) -> RunReport:
     phase = {StudyState.QUEUED: JobPhase.QUEUED, StudyState.RUNNING: JobPhase.RUNNING}.get(
         state, JobPhase.UNKNOWN
     )
@@ -64,6 +82,7 @@ def _report(*, run: StudyRun, state: StudyState, job_id: str | None = None) -> R
         attempt=1,
         task=None,
         folder=FolderFacts(snapshot=None, read_error=None, lock_live=False),
+        job_started_at=job_started_at,
     )
 
 
@@ -163,6 +182,105 @@ def test_live_upstream_gives_job_task() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ('elapsed_minutes', 'expected_dependency'), [(1, 'after:41_0+30'), (60, None)]
+)
+def test_started_dependency_waits_from_upstream_start_time(
+    elapsed_minutes: int, expected_dependency: str | None, tmp_path: Path
+) -> None:
+    study = _study(condition=AfterCondition.STARTED, delay_minutes=30)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={
+            upstream.run_path: _report(
+                run=upstream, state=StudyState.RUNNING, job_id='41_0', job_started_at=1_000.0
+            )
+        },
+        submitting=frozenset(),
+        jobs=[_job_record(job_id='41', runs=[upstream])],
+        launcher=LauncherKind.SLURM,
+        now=1_000.0 + elapsed_minutes * 60,
+    )
+
+    expected_target = (
+        (
+            AfterTarget(
+                condition=AfterCondition.STARTED,
+                delay_minutes=30,
+                satisfy=Satisfy.ALL,
+                job_tasks=('41_0',),
+                run_paths=(),
+            ),
+        )
+        if expected_dependency is not None
+        else ()
+    )
+    assert targets[downstream.run_path] == expected_target
+    if expected_dependency is not None:
+        assert dependency_text(after=expected_target, upstream={}) == expected_dependency
+    assert blocked == frozenset()
+
+
+def test_started_dependency_with_zero_delay_needs_no_target() -> None:
+    study = _study(condition=AfterCondition.STARTED)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={
+            upstream.run_path: _report(
+                run=upstream, state=StudyState.RUNNING, job_started_at=1_000.0
+            )
+        },
+        submitting=frozenset(),
+        jobs=[_job_record(job_id='41', runs=[upstream])],
+        launcher=LauncherKind.SLURM,
+        now=1_000.0,
+    )
+
+    assert targets[downstream.run_path] == ()
+    assert blocked == frozenset()
+
+
+def test_started_dependency_on_finished_upstream_after_delay_needs_no_target() -> None:
+    study = _study(condition=AfterCondition.STARTED, delay_minutes=30)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={
+            upstream.run_path: _report(run=upstream, state=StudyState.DONE, job_started_at=1_000.0)
+        },
+        submitting=frozenset(),
+        jobs=(),
+        launcher=LauncherKind.SLURM,
+        now=1_000.0 + 60 * 60,
+    )
+
+    assert targets[downstream.run_path] == ()
+    assert blocked == frozenset()
+
+
+def test_local_machine_rejects_started_dependency() -> None:
+    study = _study(condition=AfterCondition.STARTED, delay_minutes=30)
+    runs = expand_runs(study=study)
+
+    problems = local_after_problems(study=study, runs=runs, launcher=LauncherKind.LOCAL)
+
+    assert problems == ["grid 'probe': condition 'started' needs SLURM"]
+
+
 def test_upstream_in_same_submit_gives_run_path() -> None:
     study = _study()
     runs = expand_runs(study=study)
@@ -196,6 +314,102 @@ def test_failed_upstream_blocks_downstream() -> None:
     )
 
     assert blocked == frozenset({downstream.run_path})
+
+
+@pytest.mark.parametrize('retry', [ChainedRetry.RESUBMIT, ChainedRetry.REQUEUE])
+def test_failed_condition_waits_for_retryable_slurm_upstream(
+    tmp_path: Path, retry: ChainedRetry
+) -> None:
+    study = _study(condition=AfterCondition.FAILED)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+    machine = MachineProfile(
+        path=tmp_path / 'machine.toml', launcher=LauncherKind.SLURM, output_root=tmp_path / 'runs'
+    )
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={upstream.run_path: _report(run=upstream, state=StudyState.RUNNING, job_id='41_0')},
+        submitting=frozenset(),
+        jobs=[_job_record(job_id='41', runs=[upstream])],
+        followup=FollowupSettings(chained_retry=retry),
+        launcher=machine.launcher,
+    )
+
+    assert downstream.run_path not in targets
+    assert blocked == frozenset({downstream.run_path})
+
+
+def test_failed_condition_accepts_terminal_slurm_failure(tmp_path: Path) -> None:
+    study = _study(condition=AfterCondition.FAILED)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+    machine = MachineProfile(
+        path=tmp_path / 'machine.toml', launcher=LauncherKind.SLURM, output_root=tmp_path / 'runs'
+    )
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={upstream.run_path: _report(run=upstream, state=StudyState.FAILED)},
+        submitting=frozenset(),
+        jobs=(),
+        followup=FollowupSettings(chained_retry=ChainedRetry.RESUBMIT),
+        launcher=machine.launcher,
+    )
+
+    assert targets[downstream.run_path] == ()
+    assert blocked == frozenset()
+
+
+@pytest.mark.parametrize('retry', [ChainedRetry.RESUBMIT, ChainedRetry.REQUEUE])
+def test_failed_condition_defers_same_launch_slurm_dependent(
+    tmp_path: Path, retry: ChainedRetry
+) -> None:
+    study = _study(condition=AfterCondition.FAILED)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[upstream, downstream],
+        reports={upstream.run_path: _report(run=upstream, state=StudyState.MISSING)},
+        submitting=frozenset({upstream.run_path, downstream.run_path}),
+        jobs=(),
+        followup=FollowupSettings(chained_retry=retry),
+        launcher=LauncherKind.SLURM,
+    )
+
+    assert downstream.run_path not in targets
+    assert blocked == frozenset({downstream.run_path})
+
+
+@pytest.mark.parametrize('retry', [ChainedRetry.MANUAL])
+def test_failed_condition_keeps_native_dependency_without_resubmit_retry(
+    tmp_path: Path, retry: ChainedRetry
+) -> None:
+    study = _study(condition=AfterCondition.FAILED)
+    runs = expand_runs(study=study)
+    downstream = next(run for run in runs if run.grid == 'probe')
+    upstream = next(run for run in runs if run.run_path == PurePosixPath('pretrain/a'))
+
+    targets, blocked = plan_targets(
+        study=study,
+        runs=[downstream],
+        reports={upstream.run_path: _report(run=upstream, state=StudyState.RUNNING)},
+        submitting=frozenset(),
+        jobs=[_job_record(job_id='41', runs=[upstream])],
+        followup=FollowupSettings(chained_retry=retry),
+        launcher=LauncherKind.SLURM,
+    )
+
+    assert targets[downstream.run_path][0].job_tasks == ('41_0',)
+    assert dependency_text(after=targets[downstream.run_path], upstream={}) == 'afternotok:41_0'
+    assert blocked == frozenset()
 
 
 def test_unselected_missing_upstream_blocks_downstream() -> None:

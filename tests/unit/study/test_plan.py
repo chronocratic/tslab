@@ -13,7 +13,7 @@ import pytest
 from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import chained_study
-from tslab.enums import AfterCondition, ChainedRetry
+from tslab.enums import AfterCondition, ChainedRetry, LauncherKind, Retry
 from tslab.study import After, Grid, setting_axis, Study
 from tslab.study.definition import expand_runs, Settings
 from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
@@ -356,6 +356,52 @@ def test_plan_jobs_expands_after_placeholder_for_each_matched_run(
     assert [task.command[task.command.index('--checkpoint') + 1] for task in tasks] == expected
 
 
+def test_after_placeholder_resolves_relative_output_root_from_project_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project_root = tmp_path / 'project'
+    process_root = tmp_path / 'other'
+    project_root.mkdir()
+    process_root.mkdir()
+    monkeypatch.chdir(process_root)
+    study = _chained_study()
+    machine = _local(tmp_path, output_root=Path('runs'))
+    runs = expand_runs(study=study)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    groups = plan_jobs(
+        study=study,
+        machine=machine,
+        resolved=resolved,
+        indices={run.run_path: index for index, run in enumerate(runs)},
+        extra_args={},
+        attempts={},
+        first_job_file=1,
+        environment={},
+        project_root=project_root,
+    )
+    task = next(
+        task for group in groups for task in group.tasks if task.resolved.run.grid == 'probe'
+    )
+
+    assert task.command[task.command.index('--checkpoint') + 1] == str(
+        project_root / 'runs' / 'chain' / 'pretrain' / 'a' / 'seed_0' / 'train'
+    )
+
+
+def test_after_placeholder_keeps_absolute_output_root(tmp_path: Path) -> None:
+    study = _chained_study()
+    machine = _local(tmp_path, output_root=tmp_path / 'absolute-runs')
+
+    groups = _plan(study, machine)
+    task = next(
+        task for group in groups for task in group.tasks if task.resolved.run.grid == 'probe'
+    )
+
+    assert task.command[task.command.index('--checkpoint') + 1] == str(
+        tmp_path / 'absolute-runs' / 'chain' / 'pretrain' / 'a' / 'seed_0' / 'train'
+    )
+
+
 def test_plan_jobs_reports_fan_out_after_placeholder_error(tmp_path: Path) -> None:
     study = _chained_study(fan_out=True)
     machine = _local(tmp_path)
@@ -386,14 +432,20 @@ def test_plan_jobs_reports_bare_after_placeholder_error_for_fan_out(tmp_path: Pa
     )
 
 
-@pytest.mark.parametrize('chained_retry', [ChainedRetry.RESUBMIT, ChainedRetry.REQUEUE])
-def test_check_machine_rejects_failed_condition_with_chained_retry(
-    tmp_path: Path, chained_retry: ChainedRetry
+@pytest.mark.parametrize('retry', list(Retry))
+@pytest.mark.parametrize('chained_retry', list(ChainedRetry))
+def test_check_machine_accepts_failed_condition_with_retry_settings(
+    tmp_path: Path, retry: Retry, chained_retry: ChainedRetry
 ) -> None:
     study = chained_study(condition=AfterCondition.FAILED)
-    machine = _local(tmp_path, followup=FollowupSettings(chained_retry=chained_retry))
-    with pytest.raises(ValueError, match=r"grid 'probe'.*condition 'failed'.*chained_retry"):
-        check_machine(study=study, machine=machine)
+    machine = _local(
+        tmp_path,
+        launcher=LauncherKind.SLURM,
+        slurm=SlurmSettings(partition='p'),
+        followup=FollowupSettings(retry=retry, chained_retry=chained_retry),
+    )
+
+    check_machine(study=study, machine=machine)
 
 
 def test_check_machine_accepts_failed_condition_with_manual_chained_retry(tmp_path: Path) -> None:

@@ -28,7 +28,10 @@ def probe_grid(*, seeds: tuple[int, ...]) -> Grid:
             'recipe': classification_recipes(),
             'dataset': TOY_UCR,
             'seed': setting_axis(path='seed', values=seeds),
-            'head': {'small': {'max_train_samples': 100}, 'full': {'max_train_samples': 10_000}},
+            'head': {
+                'svm': {'head': probe.ProbeHead.SVM, 'max_train_samples': 100},
+                'ridge': {'head': probe.ProbeHead.RIDGE, 'max_train_samples': 10_000},
+            },
         },
         after=(After(grid='pretrain'),),
         run_settings={'checkpoint': '{after}/train/default'},

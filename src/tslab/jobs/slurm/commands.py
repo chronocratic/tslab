@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, UTC
 import logging
 import os
 from pathlib import Path
@@ -25,6 +25,7 @@ __all__ = [
     'gres_gpus',
     'query_cluster_config',
     'query_expected_starts',
+    'query_job_start_times',
     'query_job_states',
     'query_job_usage',
     'query_partition',
@@ -398,6 +399,56 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     for key, value in _pipe_lines(stdout=sacct.stdout).items():
         states.setdefault(key, value)
     return states
+
+
+def query_job_start_times(*, job_ids: Sequence[str]) -> dict[str, float]:
+    """Return the UTC start time of every started task id, as Unix seconds.
+
+    Args:
+        job_ids: Array or single job ids; empty means no call and ``{}``.
+
+    Returns:
+        ``{task id: start time}``; pending and unparseable rows are omitted.
+
+    Raises:
+        SlurmError: If ``sacct`` exits non-zero.
+    """
+    if not job_ids:
+        return {}
+    ids = ','.join(job_ids)
+    result = _query(
+        command=[
+            'sacct',
+            '--jobs',
+            ids,
+            '--noheader',
+            '--parsable2',
+            '--allocations',
+            '--utc',
+            '--format=JobID,Start',
+        ],
+        accept=_sacct_accepts,
+    )
+    if result.returncode != 0:
+        message = f'sacct start times failed for jobs {ids}:\n{result.stdout}{result.stderr}'
+        raise SlurmError(message)
+    return _parse_job_start_times(stdout=result.stdout)
+
+
+def _parse_job_start_times(*, stdout: str) -> dict[str, float]:
+    """Parse start times and expand compressed array ids."""
+    starts: dict[str, float] = {}
+    for line in stdout.splitlines():
+        job_id, separator, text = line.partition('|')
+        if not separator or text.strip() in ('', 'Unknown', 'N/A'):
+            continue
+        try:
+            started_at = datetime.fromisoformat(text.strip()).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        for task_id in _expand_array_key(key=job_id.strip()):
+            starts[task_id] = started_at.timestamp()
+    return starts
 
 
 def query_job_reasons(*, job_ids: Sequence[str]) -> dict[str, str]:
