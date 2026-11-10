@@ -56,11 +56,21 @@ torch metadata.
 Python 3.12 or newer. With [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv add tslab                                                 # lab, ml and ts
-uv add "tslab[chronocratic-models,chronocratic-datasets]"    # with the adapters
+uv add tslab                  # lab only, no torch
+uv add "tslab[ml]"            # plus torch, Lightning, safetensors
+uv add "tslab[ts]"            # plus scikit-learn, for the time series layer
+uv add "tslab[full]"          # ts, both chronocratic adapters and analysis
+uv add "tslab[full,wandb]"    # extras combine
 ```
 
-Tracker extras: `tslab[wandb]`, `tslab[mlflow]`, `tslab[tensorboard]`.
+| Extra | Adds |
+|---|---|
+| `ml` | torch, Lightning, safetensors |
+| `ts` | `ml` and scikit-learn |
+| `chronocratic-models`, `chronocratic-datasets` | `ts` and the chronocratic adapter packages |
+| `wandb`, `mlflow`, `tensorboard` | `ml` and the tracker |
+| `analysis` | pandas, SciPy, Matplotlib |
+| `full` | `ts`, both chronocratic adapters and `analysis` |
 
 ## Start a project
 

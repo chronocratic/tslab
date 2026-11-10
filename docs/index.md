@@ -5,13 +5,17 @@ TSLab turns a research script into a pipeline of **cached, resumable stages**.
 Keep writing a normal Python `main()`. TSLab saves each stage result, so a
 second run reuses finished work and reruns only steps affected by a change.
 
-TSLab is one distribution with three layers. Each layer builds on the one before:
+TSLab is one distribution with three layers. Each layer builds on the one before, and each has an install extra (the base install is the lab):
 
 | Layer | Package | What it is | Needs torch |
 |---|---|---|---|
 | Lab | `tslab.lab` | runs, stages, artifacts, caching, studies, SLURM jobs, command line | no |
 | ML | `tslab.ml` | the Lightning trainer, `train` stage, `Tensors`, `Checkpoint`, trackers | yes |
 | TS | `tslab.ts` | encoders, probes, forecasting and classification stages, chronocratic adapters | yes |
+
+Install with `uv add tslab` (lab), `uv add "tslab[ml]"`, `uv add "tslab[ts]"` or
+`uv add "tslab[full]"`. Extras combine, for example `"tslab[full,wandb]"`; the
+README lists every extra.
 
 ## Which section to read
 

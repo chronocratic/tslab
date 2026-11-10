@@ -73,7 +73,7 @@ jobs:
           uv run pytest -m "chronocratic$skip" --cov=src/tslab --cov-report=term-missing:skip-covered
 
   lab-without-torch:
-    # tslab.lab must work without torch, Lightning, sklearn and safetensors installed.
+    # the base install (no extras) must run tslab.lab without torch, Lightning, sklearn and safetensors.
     name: lab without torch
     runs-on: ubuntu-latest
     steps:
@@ -86,10 +86,8 @@ jobs:
           enable-cache: true
       - name: Install
         run: |
-          uv sync --locked --extra analysis \
-            --no-install-package torch --no-install-package lightning \
-            --no-install-package pytorch-lightning --no-install-package scikit-learn \
-            --no-install-package safetensors --no-install-package torchmetrics
+          uv sync --locked --no-dev --extra analysis
+          uv pip install pytest
       - name: Check torch is absent
         run: uv run --no-sync python -c "import importlib.util as u; assert u.find_spec('torch') is None"
       - name: Tests

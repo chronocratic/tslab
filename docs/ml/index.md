@@ -4,6 +4,8 @@
 trainer and data source interfaces, the `Tensors` and `Checkpoint` artifacts, and
 the experiment trackers. It never depends on `tslab.ts`.
 
+Install it with `uv add "tslab[ml]"`; add a tracker as `"tslab[ml,wandb]"`.
+
 ## Seeding
 
 The lab seeds Python `random` and NumPy and sets `PYTHONHASHSEED`. Importing

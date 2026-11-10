@@ -1,0 +1,1 @@
+torch, Lightning, safetensors and scikit-learn moved from the base dependencies to the extras `ml` and `ts`; the base install is the lab. New extra `full` bundles `ts`, both chronocratic adapters and `analysis`. `uv add "tslab[full]"` restores the old install. See [Migration](migration.md).
