@@ -1,0 +1,23 @@
+# The project settings of this TSLab project. Committed with the project; the
+# study commands read it from the working folder or a folder above it.
+
+# The package that holds the studies. A short name like `example` expands to
+# `<package>.example:study`.
+studies = "{{package_name}}.studies"
+
+# The default runs folder of `tslab status` without a FOLDER argument.
+runs = "runs"
+
+# Copy src/ into a code snapshot when a study is submitted, so the jobs run
+# the code of submit time. Off by default; resubmits keep the snapshot
+# recorded on their runs and ignore this key.
+# code_snapshot = false
+# With a code snapshot, stop with a list of untracked files under src/
+# instead of leaving them out of the snapshot.
+# code_snapshot_check_untracked = true
+
+# Pick the machine by host, so the study commands need no --machine. Commented
+# out on purpose: a new project should never pick a machine on its own.
+# [machine_by_host]
+# "login*.cluster.example" = "cluster"
+# "*" = "local"

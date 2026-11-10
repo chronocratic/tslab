@@ -10,13 +10,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'src' / 'tslab'
-TEMPLATE = SOURCE / 'ts' / 'templates'
+TEMPLATES = (SOURCE / 'lab' / 'templates', SOURCE / 'ts' / 'templates')
 SEARCH_ROOTS = (ROOT / 'src', ROOT / 'tests', ROOT / 'examples')
 
 
 def _in_template(*, path: Path) -> bool:
     # why: the template files hold {{placeholders}} that do not parse
-    return path.is_relative_to(TEMPLATE)
+    return any(path.is_relative_to(template) for template in TEMPLATES)
 
 
 def _parse(*, path: Path) -> ast.Module:

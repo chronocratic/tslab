@@ -1,0 +1,43 @@
+# Example SLURM machine profile.
+#
+# Copy this file to machines/cluster.toml, fill in the values of the cluster
+# (partition, limits, paths) and commit that file. Nothing here is
+# cluster-specific except what says CHANGE_ME.
+launcher = "slurm"
+output_root = "${SCRATCH}/runs"
+tslab_command = ["uv", "run", "tslab"] # how follow-up jobs call tslab
+
+[settings] # only machine settings; put experiment settings on the study
+# "tracking.wandb_mode" = "offline"
+# "data.num_workers" = "{cpus}" # the cpus_per_task of each run, overrides included
+# "data.num_workers" = "{cpus_per_run}" # the CPUs of one run when several run at once
+
+[env] # exported in every job; ${VAR} in other strings resolves against these
+SCRATCH = "/scratch/CHANGE_ME"
+
+[slurm]
+partition = "CHANGE_ME"
+qos = "normal"
+time = "2-00:00:00"
+cpus_per_task = 2
+mem_per_cpu = "16G"
+gpus = 0
+# gpu_type = "a100" # set a GPU type when gpus is greater than zero
+setup = [] # shell lines run before each task, e.g. ["module load cuda"]
+signal_seconds = 120 # USR2 this many seconds before the time limit; 0 turns it off
+max_concurrent = 100 # the %N of --array
+max_array_size = 1000 # array indices stay below the MaxArraySize of the cluster
+node_local_tmp = true # put TMPDIR and the W&B folders on node-local scratch
+submit_pause_seconds = 0.5
+
+[slurm.sbatch_extra] # sbatch long names; matching defaults are replaced
+# account = "CHANGE_ME"
+# exclude = "login02"
+# exclusive = true
+
+[followup] # the small helper jobs TSLab submits for a study
+retry = "manual" # grids that are not chained: "manual" | "resubmit"
+chained_retry = "manual" # chained grids: "manual" | "resubmit" | "requeue"
+max_attempts = 3
+wandb_sync = false
+time = "00:30:00"

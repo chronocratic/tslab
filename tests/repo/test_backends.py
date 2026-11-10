@@ -23,7 +23,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'src' / 'tslab'
-TEMPLATE = SOURCE / 'ts' / 'templates'
+TEMPLATES = (SOURCE / 'lab' / 'templates', SOURCE / 'ts' / 'templates')
 UNIT = ROOT / 'tests' / 'lab' / 'unit'
 BASELINE = Path(__file__).with_name('backend_baseline.json')
 KINDS = ('name_comparisons', 'none_checks', 'module_imports_both', 'test_imports_both')
@@ -47,7 +47,7 @@ NONE_CHECK_EXEMPT = (
 
 def _in_template(*, path: Path) -> bool:
     # why: the template files hold {{placeholders}} that do not parse
-    return path.is_relative_to(TEMPLATE)
+    return any(path.is_relative_to(template) for template in TEMPLATES)
 
 
 def _parse(*, path: Path) -> ast.Module:
