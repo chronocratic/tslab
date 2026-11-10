@@ -5,7 +5,7 @@ later study layer group runs (``config_hash_without_seed``) and lets a reader
 reproduce a run (versions, git commit).
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from importlib.metadata import PackageNotFoundError, version
 import os
 from pathlib import Path
@@ -24,6 +24,8 @@ __all__ = [
     'collect_versions',
     'hostname',
     'package_version',
+    'register_hardware',
+    'register_versions',
 ]
 
 META_FORMAT_VERSION = 1
@@ -46,38 +48,48 @@ def package_version(*, distribution: str) -> str | None:
         return None
 
 
+_version_collectors: list[Callable[[], Mapping[str, str | None]]] = []
+_hardware_collectors: list[Callable[[], Mapping[str, object]]] = []
+
+
+def register_versions(collector: Callable[[], Mapping[str, str | None]]) -> None:
+    """Add a function returning more package versions; registering it twice is a no-op."""
+    if collector not in _version_collectors:
+        _version_collectors.append(collector)
+
+
+def register_hardware(collector: Callable[[], Mapping[str, object]]) -> None:
+    """Add a function returning more hardware facts; registering it twice is a no-op."""
+    if collector not in _hardware_collectors:
+        _hardware_collectors.append(collector)
+
+
 def collect_versions() -> dict[str, str | None]:
     """Return the versions that most affect results.
 
     Returns:
-        Mapping with keys ``python``, ``tslab``, ``torch``, ``lightning``.
+        Mapping with keys ``python`` and ``tslab``, plus the keys of every
+        registered collector.
     """
-    return {
+    versions: dict[str, str | None] = {
         'python': platform.python_version(),
         'tslab': package_version(distribution='tslab'),
-        'torch': package_version(distribution='torch'),
-        'lightning': package_version(distribution='lightning'),
     }
+    for collector in _version_collectors:
+        versions.update(collector())
+    return versions
 
 
 def collect_hardware() -> dict[str, object]:
-    """Return the CPU and CUDA hardware visible to this process.
+    """Return the hardware visible to this process.
 
     Returns:
-        Mapping with keys ``cpu_count``, ``cuda_available``, ``cuda_version``,
-        ``gpus`` and ``cuda_visible_devices``.
+        Mapping with key ``cpu_count``, plus the keys of every registered collector.
     """
-    import torch  # noqa: PLC0415 # why: torch is slow to import and metadata is read by CLI paths
-
-    cuda_available = torch.cuda.is_available()
-    gpu_count = torch.cuda.device_count() if cuda_available else 0
-    return {
-        'cpu_count': os.cpu_count() or 0,
-        'cuda_available': cuda_available,
-        'cuda_version': torch.version.cuda,
-        'gpus': [torch.cuda.get_device_name(index) for index in range(gpu_count)],
-        'cuda_visible_devices': os.environ.get('CUDA_VISIBLE_DEVICES'),
-    }
+    hardware: dict[str, object] = {'cpu_count': os.cpu_count() or 0}
+    for collector in _hardware_collectors:
+        hardware.update(collector())
+    return hardware
 
 
 def collect_code_snapshot(*, environ: Mapping[str, str]) -> dict[str, object] | None:

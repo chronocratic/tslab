@@ -2,9 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import shutil
 import subprocess
-
-import pytest
-import torch
+import sys
 
 from tslab.lab.core.meta import (
     collect_code_snapshot,
@@ -12,6 +10,9 @@ from tslab.lab.core.meta import (
     collect_hardware,
     collect_versions,
     package_version,
+    register_hardware,
+    register_versions,
+    run as run_module,
 )
 from tslab.lab.core.run import Run
 
@@ -21,35 +22,36 @@ class _MetadataConfig:
     seed: int = 0
 
 
-def test_versions_include_python_and_torch() -> None:
+def test_versions_include_python_and_tslab() -> None:
     versions = collect_versions()
     assert versions['python'] is not None
-    assert versions['torch'] is not None
     assert package_version(distribution='surely-not-installed-package') is None
 
 
-def test_collect_hardware_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
-    monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
+def test_registered_collectors_are_merged_once() -> None:
+    saved = (list(run_module._version_collectors), list(run_module._hardware_collectors))  # noqa: SLF001
+    try:
+        register_versions(lambda: {'extra': '1'})
+        register_hardware(_extra_hardware)
+        register_hardware(_extra_hardware)
+        assert collect_versions()['extra'] == '1'
+        assert collect_hardware()['extra'] is True
+    finally:
+        run_module._version_collectors[:] = saved[0]  # noqa: SLF001
+        run_module._hardware_collectors[:] = saved[1]  # noqa: SLF001
 
-    hardware = collect_hardware()
 
-    assert hardware['cuda_available'] is False
-    assert hardware['gpus'] == []
-    assert hardware['cuda_visible_devices'] is None
+def _extra_hardware() -> dict[str, object]:
+    return {'extra': True}
 
 
-def test_collect_hardware_lists_visible_gpus(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(torch.cuda, 'is_available', lambda: True)
-    monkeypatch.setattr(torch.cuda, 'device_count', lambda: 2)
-    monkeypatch.setattr(torch.cuda, 'get_device_name', lambda index: f'GPU {index}')
-    monkeypatch.setenv('CUDA_VISIBLE_DEVICES', '2,4')
-
-    hardware = collect_hardware()
-
-    assert hardware['cuda_available'] is True
-    assert hardware['gpus'] == ['GPU 0', 'GPU 1']
-    assert hardware['cuda_visible_devices'] == '2,4'
+def test_lab_metadata_has_no_torch_keys() -> None:
+    code = (
+        'from tslab.lab.core.meta import collect_hardware, collect_versions\n'
+        "assert 'torch' not in collect_versions()\n"
+        "assert 'gpus' not in collect_hardware()\n"
+    )
+    subprocess.run([sys.executable, '-c', code], check=True)  # noqa: S603 # why: fixed code
 
 
 def test_run_environment_includes_hardware(tmp_path: Path) -> None:
