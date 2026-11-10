@@ -1,7 +1,7 @@
 """The ready ``ModelAsEncoder`` encoder and its device helpers."""
 
 from dataclasses import dataclass
-from typing import Annotated, cast, ClassVar, Protocol
+from typing import Annotated, cast, Protocol
 
 import torch
 
@@ -52,10 +52,6 @@ class ModelAsEncoder:
 
     device: Annotated[str, HardwareSetting, NotFingerprinted] = 'auto'
     batch_size: int | None = None
-
-    # why: keep the pre-move spelling in fingerprints, so cached encodings
-    # stay reusable; the pin only applies to this exact class, not subclasses
-    _tslab_canonical_name: ClassVar[str] = 'tslab.interfaces.encoder.ModelAsEncoder'
 
     def __post_init__(self) -> None:
         """Reject a ``batch_size`` that is not positive."""

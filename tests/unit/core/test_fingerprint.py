@@ -47,11 +47,6 @@ class PinnedName:
     value: int = 1
 
 
-@dataclass(frozen=True, kw_only=True)
-class PinnedNameChild(PinnedName):
-    extra: int = 2
-
-
 class Describes:
     def fingerprint_settings(self) -> object:
         return ModelConfig(hidden=3)
@@ -87,14 +82,9 @@ def test_type_name_is_part_of_fingerprint() -> None:
     assert fingerprint_of(ModelConfig()) != fingerprint_of(OtherConfig())
 
 
-def test_a_pinned_type_name_is_not_inherited() -> None:
-    assert canonicalize(value=PinnedName()) == {'__type__': 'legacy.module.PinnedName', 'value': 1}
-    assert canonicalize(value=PinnedNameChild()) == {
-        '__type__': f'{PinnedNameChild.__module__}.{PinnedNameChild.__qualname__}',
-        'extra': 2,
-        'value': 1,
-    }
-    assert fingerprint_of(PinnedNameChild()) != fingerprint_of(PinnedName())
+def test_fingerprint_ignores_a_canonical_name_attribute() -> None:
+    expected = f'{PinnedName.__module__}.{PinnedName.__qualname__}'
+    assert canonicalize(value=PinnedName()) == {'__type__': expected, 'value': 1}
 
 
 def test_not_fingerprinted_field_is_ignored() -> None:
