@@ -405,20 +405,18 @@ def test_followup_gets_the_absolute_path_of_a_machine_resolved_by_name(
     assert resolved.is_absolute()
 
 
-@pytest.mark.parametrize('missing', ['tslab.ml', 'wandb'])
-def test_wandb_sync_followup_blocks_the_launch_without_wandb(
+def test_wandb_sync_followup_warns_without_wandb(
     project: Path,
     fake: FakeSlurm,
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
-    missing: str,
 ) -> None:
     with_followups(project=project)
     present = importlib.util.find_spec
     monkeypatch.setattr(
         importlib.util,
         'find_spec',
-        lambda name, *args: None if name == missing else present(name, *args),
+        lambda name, *args: None if name == 'wandb' else present(name, *args),
     )
     code = submit(
         context=context(project=project, machine_file='cluster.toml'),
@@ -427,6 +425,6 @@ def test_wandb_sync_followup_blocks_the_launch_without_wandb(
         extra_args=(),
         sleep=no_sleep,
     )
-    assert code == 1
+    assert code == 0
     assert 'tslab[wandb]' in caplog.text
-    assert fake.calls('sbatch') == []
+    assert fake.calls('sbatch') != []

@@ -3,7 +3,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
 from functools import partial
-import importlib.util
 import logging
 from pathlib import Path
 from types import MappingProxyType
@@ -224,22 +223,8 @@ class SlurmBackend:
         """
         return expected_starts(context=context)
 
-    def launch_blocker(self, *, context: Context) -> str | None:
-        """Block a launch whose queued W&B sync job could not run from this install.
-
-        The check is local and a hint: the cluster side environment is not inspected.
-        """
-        if not context.machine.followup.wandb_sync:
-            return None
-        if (
-            importlib.util.find_spec('tslab.ml') is None
-            or importlib.util.find_spec('wandb') is None
-        ):
-            return (
-                'followup.wandb_sync is set but wandb is not installed here; '
-                'install tslab[wandb] or the lighter tslab[wandb-sync], '
-                'or remove the setting'
-            )
+    def launch_blocker(self, *, context: Context) -> str | None:  # noqa: ARG002 # why: the Backend signature
+        """A SLURM launch is never blocked here; always ``None``."""
         return None
 
     def resources(

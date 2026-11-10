@@ -13,6 +13,7 @@ from tslab.lab.cli.parser import (
     _split_pass_through,
     _system_exit_code,
     _takes_pass_through,
+    check_command_clash,
     Command,
     LazyCommand,
 )
@@ -43,8 +44,11 @@ def main(
         default_template: Template used without ``--template``; ``None`` means the lab template.
 
     Raises:
+        ValueError: If an extra command has the name of a lab command.
         SystemExit: Always, with the exit code of the subcommand.
     """
+    # why: a programmer error, raised before parsing so --json mode never meets it mid-parse
+    check_command_clash(extra=extra_commands or {})
     configure_logging()
     argv = list(sys.argv[1:]) if args is None else list(args)
     head, extra_args = _split_pass_through(argv=argv)

@@ -11,7 +11,7 @@ uv run python -m my_experiments.experiment --scale 2.0
 ```
 
 `tslab new --template lab` copies a small project you own from then on. The
-default template is `ts` (see [the ts getting started page](../ts/getting-started.md)).
+default template is `ts` when torch is installed and `lab` otherwise (see [the ts getting started page](../ts/getting-started.md)).
 
 | File | What it is |
 |---|---|

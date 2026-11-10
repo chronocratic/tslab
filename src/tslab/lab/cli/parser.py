@@ -176,6 +176,14 @@ def _parse(*, argv: Sequence[str], extra_commands: Mapping[str, type | LazyComma
     )
 
 
+def check_command_clash(*, extra: Mapping[str, type | LazyCommand]) -> None:
+    """Raise ``ValueError`` when a layer adds a command whose name a lab command already has."""
+    clash = sorted(set(extra) & set(_COMMANDS))
+    if clash:
+        message = f'commands {clash} are already lab commands'
+        raise ValueError(message)
+
+
 def _top_level_commands(
     *, typed: str | None, extra: Mapping[str, type | LazyCommand]
 ) -> dict[str, type]:
@@ -186,10 +194,7 @@ def _top_level_commands(
         else entry
         for name, entry in extra.items()
     }
-    clash = sorted(set(added) & set(_COMMANDS))
-    if clash:
-        message = f'commands {clash} are already lab commands'
-        raise ValueError(message)
+    check_command_clash(extra=extra)
     return dict(sorted({**_COMMANDS, **added}.items()))
 
 

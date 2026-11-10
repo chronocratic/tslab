@@ -28,17 +28,22 @@ def test_versions_include_python_and_tslab() -> None:
     assert package_version(distribution='surely-not-installed-package') is None
 
 
-def test_registered_collectors_are_merged_once() -> None:
-    saved = (list(run_module._version_collectors), list(run_module._hardware_collectors))  # noqa: SLF001
+def test_registered_collectors_are_keyed_by_name() -> None:
+    saved = (dict(run_module._version_collectors), dict(run_module._hardware_collectors))  # noqa: SLF001
     try:
-        register_versions(lambda: {'extra': '1'})
-        register_hardware(_extra_hardware)
-        register_hardware(_extra_hardware)
-        assert collect_versions()['extra'] == '1'
+        register_versions(lambda: {'extra': '1'}, name='extra')
+        register_versions(lambda: {'extra': '2'}, name='extra')
+        register_hardware(_extra_hardware, name='extra')
+        register_hardware(_extra_hardware, name='extra')
+        assert len(run_module._version_collectors) == len(saved[0]) + 1  # noqa: SLF001
+        assert len(run_module._hardware_collectors) == len(saved[1]) + 1  # noqa: SLF001
+        assert collect_versions()['extra'] == '2'
         assert collect_hardware()['extra'] is True
     finally:
-        run_module._version_collectors[:] = saved[0]  # noqa: SLF001
-        run_module._hardware_collectors[:] = saved[1]  # noqa: SLF001
+        run_module._version_collectors.clear()  # noqa: SLF001
+        run_module._version_collectors.update(saved[0])  # noqa: SLF001
+        run_module._hardware_collectors.clear()  # noqa: SLF001
+        run_module._hardware_collectors.update(saved[1])  # noqa: SLF001
 
 
 def _extra_hardware() -> dict[str, object]:

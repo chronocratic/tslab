@@ -267,13 +267,20 @@ class Run:
         """
         warn_if_torch_unseeded()
         generation = collectors_generation()
-        if self._environment is None or generation != self._environment_generation:
-            self._environment_generation = generation
+        if self._environment is None:
             self._environment = {
                 'versions': collect_versions(),
                 'git': collect_git_state(directory=_project_directory()),
                 'hardware': collect_hardware(),
             }
+        elif generation != self._environment_generation:
+            # why: the first git state stays; only the collectors changed
+            self._environment = {
+                **self._environment,
+                'versions': collect_versions(),
+                'hardware': collect_hardware(),
+            }
+        self._environment_generation = generation
         return self._environment
 
     def status(self) -> RunStatusSnapshot:

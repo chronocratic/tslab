@@ -62,6 +62,12 @@ def test_json_usage_error_prints_error_document(
     assert json.loads(capsys.readouterr().out)['exit_code'] == 2
 
 
+def test_command_name_clash_raises_before_parsing(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(ValueError, match='already lab commands'):
+        main(args=['study', '--json'], extra_commands={'study': object})
+    assert capsys.readouterr().out == ''
+
+
 def test_json_command_exception_prints_error_document(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

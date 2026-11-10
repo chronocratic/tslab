@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 import dataclasses
+import importlib.util
 import logging
 from pathlib import Path
 import shlex
@@ -55,6 +56,11 @@ def queue_followups(
         or not (wants_retry_followup(followup=followup) or followup.wandb_sync)
     ):
         return 0, []
+    if followup.wandb_sync and importlib.util.find_spec('wandb') is None:
+        _LOGGER.warning(
+            'followup.wandb_sync is set but wandb is not installed here; the sync job needs '
+            'tslab[wandb] or tslab[wandb-sync] in the environment that runs it'
+        )
     dependency = 'afterany:' + ':'.join(job_ids)
     slurm = dataclasses.replace(
         machine.slurm,

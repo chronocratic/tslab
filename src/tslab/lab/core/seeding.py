@@ -19,22 +19,21 @@ __all__ = ['register_seeder', 'seed_everything', 'warn_if_torch_unseeded']
 _LOGGER = logging.getLogger(__name__)
 _seeders: dict[str, Callable[[int], None]] = {}
 _warned = False
+_last_seed: int | None = None
 
 
 def register_seeder(seeder: Callable[[int], None], *, name: str) -> None:
-    """Add a function that seeds one more generator; registering it twice is a no-op.
+    """Add a function that seeds one more generator; the same ``name`` replaces the earlier one.
+
+    A seeder registered after ``seed_everything`` ran is called at once with the last seed.
 
     Args:
         seeder: Called with the seed by every ``seed_everything`` call, in registration order.
         name: What the seeder seeds, for example ``torch``; the torch warning looks for ``torch``.
-
-    Raises:
-        ValueError: If ``name`` is taken by a different seeder.
     """
-    if _seeders.get(name, seeder) != seeder:
-        message = f'seeder {name!r} is already registered'
-        raise ValueError(message)
     _seeders[name] = seeder
+    if _last_seed is not None:
+        seeder(_last_seed)
 
 
 def seed_everything(*, seed: int) -> None:
@@ -46,6 +45,8 @@ def seed_everything(*, seed: int) -> None:
     Args:
         seed: The seed. The same seed gives the same random streams.
     """
+    global _last_seed  # noqa: PLW0603 # why: late seeders get the seed
+    _last_seed = seed
     warn_if_torch_unseeded()
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)

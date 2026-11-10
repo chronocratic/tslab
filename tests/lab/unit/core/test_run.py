@@ -101,16 +101,37 @@ def test_meta_and_hashes(tmp_path: Path) -> None:
 def test_environment_includes_collectors_registered_after_the_first_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(meta.run, '_version_collectors', [])
-    monkeypatch.setattr(meta.run, '_hardware_collectors', [])
+    monkeypatch.setattr(meta.run, '_version_collectors', {})
+    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
     run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
     assert 'late' not in cast('dict[str, object]', run.environment()['versions'])
-    register_versions(lambda: {'late': '1'})
-    register_hardware(lambda: {'late_gpu': True})
+    register_versions(lambda: {'late': '1'}, name='late')
+    register_hardware(lambda: {'late_gpu': True}, name='late')
     environment = run.environment()
     assert cast('dict[str, object]', environment['versions'])['late'] == '1'
     assert cast('dict[str, object]', environment['hardware'])['late_gpu'] is True
     assert run.environment() is environment
+
+
+def test_environment_keeps_the_first_git_state_when_collectors_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(meta.run, '_version_collectors', {})
+    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
+    calls: list[int] = []
+
+    def fake_git(*, directory: Path) -> dict[str, object]:  # why: matches the real one
+        calls.append(1)
+        return {'commit': 'c', 'dirty': False}
+
+    monkeypatch.setattr('tslab.lab.core.run.collect_git_state', fake_git)
+    run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
+    run.environment()
+    register_versions(lambda: {'late': '1'}, name='late')
+    environment = run.environment()
+    assert calls == [1]
+    assert environment['git'] == {'commit': 'c', 'dirty': False}
+    assert cast('dict[str, object]', environment['versions'])['late'] == '1'
 
 
 def test_meta_has_code_snapshot_block_from_environment(
