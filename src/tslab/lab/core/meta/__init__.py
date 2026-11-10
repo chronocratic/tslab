@@ -20,6 +20,8 @@ from tslab.lab.core.meta.run import (
     hostname,
     META_FORMAT_VERSION,
     package_version,
+    register_hardware,
+    register_versions,
 )
 
 __all__ = [
@@ -39,5 +41,7 @@ __all__ = [
     'instance_meta_document',
     'package_version',
     'read_instance_meta',
+    'register_hardware',
+    'register_versions',
     'stale_reason',
 ]
