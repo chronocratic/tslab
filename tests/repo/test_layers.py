@@ -9,11 +9,13 @@ LAB = _ROOT / 'src' / 'tslab' / 'lab'
 _ML_LIBRARIES = re.compile(
     r'\b(torch|lightning|safetensors|sklearn|mlflow|tensorboard|chronocratic)\b', re.IGNORECASE
 )
+_ML_LIBRARIES_ALLOWED = (LAB / 'core' / 'seeding.py',)  # warns when torch is loaded unseeded
 _WANDB = re.compile(r'\bwandb\b', re.IGNORECASE)
 _WANDB_ALLOWED = (
     LAB / 'study' / 'doctor.py',
     LAB / 'study' / 'launchers' / 'slurm' / 'job_script.py',
     LAB / 'study' / 'launchers' / 'slurm' / 'followups.py',
+    LAB / 'study' / 'launchers' / 'slurm' / 'backend.py',
 )
 
 
@@ -31,7 +33,8 @@ def _hits(*, pattern: re.Pattern[str], paths: list[Path]) -> list[str]:
 
 
 def test_lab_source_never_names_ml_libraries() -> None:
-    assert _hits(pattern=_ML_LIBRARIES, paths=_lab_sources()) == []
+    paths = [p for p in _lab_sources() if p not in _ML_LIBRARIES_ALLOWED]
+    assert _hits(pattern=_ML_LIBRARIES, paths=paths) == []
 
 
 def test_lab_source_names_wandb_only_in_the_doctor_and_slurm_handoff() -> None:

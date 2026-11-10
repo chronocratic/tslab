@@ -1,8 +1,11 @@
+from collections.abc import Callable
 from pathlib import Path
+import shutil
 
 import pytest
 
 from tslab.cli import main
+from tslab.lab.cli import main as lab_main
 
 
 def test_default_template_is_ts(tmp_path: Path) -> None:
@@ -24,3 +27,27 @@ def test_wandb_sync_is_registered() -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(['wandb-sync', '--help'])
     assert exit_info.value.code == 0
+
+
+def _exit_code(*, main_function: Callable[[list[str]], None], argv: list[str]) -> object:
+    with pytest.raises(SystemExit) as exit_info:
+        main_function(argv)
+    return exit_info.value.code
+
+
+def test_each_entry_point_keeps_its_own_commands_and_templates(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    for order in (('full', 'lab'), ('lab', 'full'), ('full', 'lab')):
+        for kind in order:
+            entry = main if kind == 'full' else lab_main
+            _exit_code(main_function=entry, argv=['--help'])
+            listing = capsys.readouterr().out
+            assert ('wandb-sync' in listing) is (kind == 'full')
+            code = _exit_code(
+                main_function=entry, argv=['new', str(tmp_path / kind), '--template', 'ts']
+            )
+            assert code == (0 if kind == 'full' else 1)
+            shutil.rmtree(tmp_path / kind, ignore_errors=True)
+    assert _exit_code(main_function=lab_main, argv=['new', str(tmp_path / 'plain')]) == 0
+    assert not (tmp_path / 'plain' / 'src' / 'plain' / 'forecast.py').exists()

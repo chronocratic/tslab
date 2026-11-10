@@ -219,9 +219,17 @@ def _save_last(*, trainer: Trainer, path: Path) -> None:
     saving ends in a barrier.
     """
     callback = trainer.checkpoint_callback
-    if isinstance(callback, ModelCheckpoint):
-        callback.last_model_path = str(path)
-    trainer.save_checkpoint(filepath=path)
+    if not isinstance(callback, ModelCheckpoint):
+        trainer.save_checkpoint(filepath=path)
+        return
+    previous = callback.last_model_path
+    # why: set before the save, which writes it into the file; undone if the save fails
+    callback.last_model_path = str(path)
+    try:
+        trainer.save_checkpoint(filepath=path)
+    except BaseException:
+        callback.last_model_path = previous
+        raise
 
 
 def file_safe_name(*, name: str) -> str:

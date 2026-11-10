@@ -25,4 +25,5 @@ Torch is not seeded by the lab. Importing `tslab.ml` (directly, or through any
 seeds torch on all devices and records the torch, Lightning, CUDA and GPU
 metadata. A stage that uses torch without importing `tslab.ml` is not seeded
 for torch and records no GPU block. Import `tslab.ml` in any stage that uses
-torch. See [Seeding in `tslab.ml`](../ml/index.md#seeding).
+torch. If torch is loaded when a run starts but `tslab.ml` is not, the run logs one
+warning (once per process) saying torch is not seeded. See [Seeding in `tslab.ml`](../ml/index.md#seeding).

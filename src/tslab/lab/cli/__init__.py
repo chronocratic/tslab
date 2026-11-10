@@ -7,7 +7,6 @@ and the tool only offers helpers around runs.
 from collections.abc import Sequence
 
 from tslab.lab.cli.entrypoint import main as _main
-from tslab.lab.cli.new import LAB_TEMPLATE, register_template
 
 __all__ = ['main']
 
@@ -18,5 +17,4 @@ def main(args: Sequence[str] | None = None) -> None:
     Args:
         args: Arguments to parse; ``None`` means ``sys.argv[1:]``.
     """
-    register_template(template=LAB_TEMPLATE, default=True)
     _main(args)
