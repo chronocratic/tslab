@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 import torch
 
-from tests.ts.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
+from tests.ml.unit.stage_fakes import FakeTrainer, run_in
+from tests.ts.unit.stage_fakes import LinearEncoder, ToySplits
 from tests.ts.unit.stages.helpers import encoded
 import tslab.ml
 from tslab.ml.split import Split

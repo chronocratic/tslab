@@ -2,6 +2,7 @@ import dataclasses
 from datetime import timedelta
 from pathlib import Path
 import pickle
+import typing
 
 import lightning
 from lightning.pytorch.callbacks import Callback, ModelCheckpoint, Timer
@@ -9,7 +10,8 @@ import pytest
 import torch
 
 from tslab.lab.core.config import config_from_yaml, config_to_yaml
-from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint, is_not_fingerprinted
+from tslab.lab.core.markers import is_hardware_setting, is_machine_setting
 from tslab.lab.core.run import Run
 from tslab.ml.lightning.config import LightningTrainerConfig
 from tslab.ml.lightning.trainer import LightningTrainer
@@ -155,3 +157,17 @@ class _EmptyData:
 
     def test_loader(self) -> list[torch.Tensor]:
         return []
+
+
+def test_lightning_config_fields_are_marked() -> None:
+    hints = typing.get_type_hints(LightningTrainerConfig, include_extras=True)
+    for name in ('accelerator', 'devices'):
+        assert is_hardware_setting(annotation=hints[name])
+    for name in ('job_time_share', 'enable_progress_bar'):
+        assert is_machine_setting(annotation=hints[name])
+        assert not is_hardware_setting(annotation=hints[name])
+    for name in ('max_epochs', 'max_training_time', 'log_every_n_steps', 'checkpoint_save_top_k'):
+        assert not is_machine_setting(annotation=hints[name])
+    assert is_not_fingerprinted(annotation=hints['accelerator'])
+    assert is_not_fingerprinted(annotation=hints['devices'])
+    assert LightningTrainerConfig().devices == 1

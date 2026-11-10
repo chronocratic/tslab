@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
+import typing
 
 from tslab.lab.core.config import config_from_yaml, config_to_yaml, parse_config
+from tslab.lab.core.markers import is_machine_setting
 from tslab.ml.tracking import build_trackers, TrackingOptions
 from tslab.ml.tracking.mlflow_tracker import MLflowTracker
 from tslab.ml.tracking.tensorboard_tracker import TensorBoardTracker
@@ -34,3 +36,9 @@ def test_wandb_mode_is_read_from_a_config_file_and_the_command_line() -> None:
     assert config_from_yaml(config_class=Holder, text=text).tracking.wandb_mode is WandbMode.OFFLINE
     parsed = parse_config(config_class=Holder, args=['--tracking.wandb-mode', 'offline'])
     assert parsed.tracking.wandb_mode is WandbMode.OFFLINE
+
+
+def test_tracking_options_are_marked() -> None:
+    tracking = typing.get_type_hints(TrackingOptions, include_extras=True)
+    assert is_machine_setting(annotation=tracking['wandb_mode'])
+    assert not is_machine_setting(annotation=tracking['wandb_project'])

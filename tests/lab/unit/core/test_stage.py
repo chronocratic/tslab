@@ -6,11 +6,13 @@ import signal
 from typing import Annotated, override
 
 import pytest
-import torch
 
 import tslab.lab
 from tslab.lab.core.status import read_status
-import tslab.ml
+
+
+class Opaque:
+    pass
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -65,19 +67,19 @@ def test_version_bump_reruns(tmp_path: Path) -> None:
 
 def test_unfingerprintable_argument_names_the_argument(tmp_path: Path) -> None:
     @tslab.lab.stage(name='bad', output=tslab.lab.Json)
-    def bad(*, run: tslab.lab.Run, model: torch.nn.Module) -> tslab.lab.Json:
+    def bad(*, run: tslab.lab.Run, model: Opaque) -> tslab.lab.Json:
         return tslab.lab.Json(data={})
 
     with (
         open_run(tmp_path) as run,
         pytest.raises(TypeError, match=r"bad\[default\]: cannot fingerprint argument 'model'"),
     ):
-        bad(run=run, model=torch.nn.Linear(1, 1))
+        bad(run=run, model=Opaque())
 
 
 def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
-    @tslab.lab.stage(name='wrong', output=tslab.ml.Tensors)
-    def wrong(*, run: tslab.lab.Run) -> tslab.ml.Tensors:
+    @tslab.lab.stage(name='wrong', output=tslab.lab.Metrics)
+    def wrong(*, run: tslab.lab.Run) -> tslab.lab.Metrics:
         return tslab.lab.Json(data={})  # ty: ignore[invalid-return-type]
 
     with open_run(tmp_path) as run:
@@ -86,7 +88,7 @@ def test_wrong_return_type_is_a_stage_failure(tmp_path: Path) -> None:
     status = json.loads((tmp_path / 'r' / 'status.json').read_text(encoding='utf-8'))
     assert (
         status['instances']['wrong[default]']['error']
-        == "TypeError: stage 'wrong' must return Tensors, got Json"
+        == "TypeError: stage 'wrong' must return Metrics, got Json"
     )
 
 

@@ -4,8 +4,6 @@ import ast
 from pathlib import Path
 import re
 
-import pytest
-
 _ROOT = Path(__file__).parents[2]
 LAB = _ROOT / 'src' / 'tslab' / 'lab'
 _ML_LIBRARIES = re.compile(
@@ -61,12 +59,10 @@ def _violations(*, root: Path, forbidden: tuple[str, ...]) -> list[str]:
     ]
 
 
-@pytest.mark.xfail(strict=True, reason='lab tests still import ml and ts code until Task 7')
 def test_lab_tests_import_no_ml_or_ts_code() -> None:
     forbidden = ('torch', 'tslab.ml', 'tslab.ts', 'tests.ml', 'tests.ts')
     assert _violations(root=_ROOT / 'tests' / 'lab', forbidden=forbidden) == []
 
 
-@pytest.mark.xfail(strict=True, reason='ml tests still import ts test helpers until Task 7')
 def test_ml_tests_import_no_ts_code() -> None:
     assert _violations(root=_ROOT / 'tests' / 'ml', forbidden=('tslab.ts', 'tests.ts')) == []
