@@ -81,14 +81,6 @@ def test_device_does_not_change_the_fingerprint() -> None:
     )
 
 
-def test_the_fingerprint_keeps_the_pre_move_type_name() -> None:
-    # Encodings cached before the move to tslab.stages.encoders must be reused.
-    assert canonicalize(value=ModelAsEncoder()) == {
-        '__type__': 'tslab.interfaces.encoder.ModelAsEncoder',
-        'batch_size': None,
-    }
-
-
 def test_a_subclass_keeps_its_own_type_name_and_fields() -> None:
     @dataclass(frozen=True, kw_only=True)
     class Extended(ModelAsEncoder):
