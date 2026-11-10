@@ -18,9 +18,8 @@ from tslab.lab.cli.machine import MACHINE_COMMANDS
 from tslab.lab.cli.new import New
 from tslab.lab.cli.status import Status
 from tslab.lab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
-from tslab.ml.cli.wandb_sync import WandbSync
 
-__all__ = ['Command']
+__all__ = ['Command', 'register_command']
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -71,6 +70,31 @@ def _takes_pass_through(*, command: object) -> bool:
 
 _STUDY = 'study'
 _MACHINE = 'machine'
+_COMMANDS: dict[str, type] = {
+    _MACHINE: _Machine,
+    'doctor': Doctor,
+    'new': New,
+    'status': Status,
+    _STUDY: _Study,
+}
+
+
+def register_command(*, name: str, command: type[Command]) -> None:
+    """Add a top-level subcommand, so a layer above the lab can offer its own.
+
+    Registering the same class under the same name again does nothing.
+
+    Args:
+        name: Subcommand name, as typed after ``tslab``.
+        command: Frozen dataclass with a ``run`` method.
+
+    Raises:
+        ValueError: If ``name`` is already taken by another command.
+    """
+    if _COMMANDS.get(name, command) is not command:
+        message = f'command {name!r} is already registered'
+        raise ValueError(message)
+    _COMMANDS[name] = command
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
@@ -118,14 +142,7 @@ def _parse(*, argv: Sequence[str]) -> Command:
             description=group.description,
         )
     return _cli(
-        commands={
-            _MACHINE: _Machine,
-            'doctor': Doctor,
-            'new': New,
-            'status': Status,
-            _STUDY: _Study,
-            'wandb-sync': WandbSync,
-        },
+        commands=dict(sorted(_COMMANDS.items())),
         prog='tslab',
         args=argv,
         description=(

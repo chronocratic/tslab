@@ -10,7 +10,7 @@ import zlib
 import pytest
 from wandb.proto import wandb_internal_pb2
 
-from tslab.lab.cli import main
+from tslab.cli import main
 from tslab.ml.cli.wandb_sync import WandbSync
 from tslab.ml.tracking.wandb import sync
 from tslab.ml.tracking.wandb.sync import LocalRun

@@ -47,7 +47,7 @@ chronocratic-datasets = [
 analysis = ["pandas>=3.1,<4", "scipy>=1.18,<2", "matplotlib>=3.11,<4"]
 
 [project.scripts]
-tslab = "tslab.lab.cli:main"
+tslab = "tslab.cli:main"
 
 [project.urls]
 Repository = "https://github.com/skafai/tslab"
@@ -109,8 +109,8 @@ error-on-warning = true
 
 [tool.ty.src]
 # Case files contain deliberate type errors; tests/repo/typing/test_typing.py checks them one by one.
-# Template files hold {{placeholders}}; tests/ts/template checks a generated project instead.
-exclude = ["tests/repo/typing/cases", "src/tslab/ts/templates"]
+# Template files of both layers hold {{placeholders}}; tests/ts/template checks a generated project instead.
+exclude = ["tests/repo/typing/cases", "src/tslab/lab/templates", "src/tslab/ts/templates"]
 
 [tool.towncrier]
 directory = "changelog.d"

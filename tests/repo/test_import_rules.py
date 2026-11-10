@@ -187,7 +187,11 @@ def test_chronocratic_namespace_imports_nothing() -> None:
 
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / 'src' / 'tslab'
-ANALYSIS_ALLOWED = (SOURCE_ROOT / 'lab' / 'analysis', SOURCE_ROOT / 'ts' / 'templates')
+ANALYSIS_ALLOWED = (
+    SOURCE_ROOT / 'lab' / 'analysis',
+    SOURCE_ROOT / 'lab' / 'templates',
+    SOURCE_ROOT / 'ts' / 'templates',
+)
 
 
 def _analysis_imports(*, path: Path) -> list[str]:

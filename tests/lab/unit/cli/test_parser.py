@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from tslab.lab.cli import main, parser
+from tslab.lab.cli import entrypoint, main, parser
 
 COMMANDS: list[list[str]] = [
     [],
@@ -11,7 +11,6 @@ COMMANDS: list[list[str]] = [
     ['machine'],
     ['new'],
     ['status'],
-    ['wandb-sync'],
     ['study', 'submit'],
     ['study', 'status'],
     ['study', 'list'],
@@ -27,7 +26,7 @@ LEAF_COMMANDS = COMMANDS[3:]
 
 def test_entrypoint_and_group_commands_live_in_sibling_modules() -> None:
     assert find_spec('tslab.lab.cli.entrypoint') is not None
-    assert main.__module__ == 'tslab.lab.cli.entrypoint'
+    assert entrypoint.main.__module__ == 'tslab.lab.cli.entrypoint'
     assert vars(parser)['_Study'].__module__ == 'tslab.lab.cli.parser'
     assert vars(parser)['_Machine'].__module__ == 'tslab.lab.cli.parser'
 
