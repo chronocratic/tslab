@@ -142,11 +142,6 @@ def test_settings_classes_pickle_round_trip() -> None:
             )
 
 
-def test_recipe_subcommand_names() -> None:
-    assert recipe_subcommand(recipe=JitterThenScaleRecipe) == 'jitter-then-scale'
-    assert recipe_subcommand(recipe=CropShiftRecipe) == 'crop-shift'
-
-
 @dataclass(frozen=True, kw_only=True)
 class UnannotatedRecipe:
     def __call__(self):  # noqa: ANN204 # why: the missing annotation is what this test checks

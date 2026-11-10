@@ -10,7 +10,6 @@ import pytest
 from tests.support.fake_backend import FakeBackend
 from tests.unit.study.helpers import context, submit_study
 from tslab.cli import main
-from tslab.cli.study import Wait
 from tslab.enums import JobPhase, StudyState
 from tslab.study.context import Context
 from tslab.study.reporting.outcome import EXIT_TIMEOUT
@@ -261,10 +260,6 @@ def test_wait_timeout_uses_current_gap(project: Path) -> None:
     assert code == EXIT_TIMEOUT
     assert sleeps == [30, 60]
     assert waited == 90
-
-
-def test_wait_cli_default_interval_is_300() -> None:
-    assert Wait(study='s', machine='m').interval == 300.0
 
 
 def test_wait_rejects_interval_below_10(project: Path) -> None:

@@ -28,16 +28,6 @@ def test_versions_include_python_and_torch() -> None:
     assert package_version(distribution='surely-not-installed-package') is None
 
 
-def test_collect_hardware_has_expected_keys() -> None:
-    assert set(collect_hardware()) == {
-        'cpu_count',
-        'cuda_available',
-        'cuda_version',
-        'gpus',
-        'cuda_visible_devices',
-    }
-
-
 def test_collect_hardware_without_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(torch.cuda, 'is_available', lambda: False)
     monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)

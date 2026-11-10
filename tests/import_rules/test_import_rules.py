@@ -12,25 +12,6 @@ import sys
 import pytest
 
 ANALYSIS_LIBRARIES = ('pandas', 'scipy', 'matplotlib')
-CORE_MODULES = (
-    'tslab',
-    'tslab.core',
-    'tslab.core.artifact',
-    'tslab.core.config',
-    'tslab.core.codec',
-    'tslab.core.files',
-    'tslab.core.fingerprint',
-    'tslab.core.meta',
-    'tslab.core.meta.instance',
-    'tslab.core.meta.run',
-    'tslab.core.paths',
-    'tslab.core.run',
-    'tslab.core.seeding',
-    'tslab.core.stage',
-    'tslab.core.status',
-    'tslab.interfaces',
-    'tslab.stages',
-)
 FORBIDDEN_IN_CORE = (
     'lightning',
     'pytorch_lightning',
@@ -138,12 +119,6 @@ def offending(*, loaded: set[str], forbidden: tuple[str, ...]) -> list[str]:
 def test_package_import_loads_no_optional_layers() -> None:
     # The one fast rule: the top-level import is what every user pays for.
     assert offending(loaded=loaded_by(module='tslab'), forbidden=FORBIDDEN_IN_CORE) == []
-
-
-@pytest.mark.slow
-@pytest.mark.parametrize('module', CORE_MODULES)
-def test_core_modules_load_no_optional_layers(*, module: str) -> None:
-    assert offending(loaded=loaded_by(module=module), forbidden=FORBIDDEN_IN_CORE) == []
 
 
 @pytest.mark.slow

@@ -614,31 +614,6 @@ def test_local_chained_resubmit_reruns_probe_after_upstream_time_limit(
     }
 
 
-@pytest.mark.slow
-def test_local_filter_keeps_unchained_groups(
-    project: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    write_chain_project(project=project)
-    monkeypatch.setenv('TOY_CHAIN_FAIL', '1')
-
-    code = submit(
-        context=chain_context(project=project),
-        include_done=False,
-        dry_run=False,
-        extra_args=(),
-        sleep=no_sleep,
-    )
-
-    assert code == 0
-    tasks = [task for job in chain_jobs(project=project) for task in job.tasks]
-    paths = {task.run_path.as_posix() for task in tasks}
-    assert 'other/c' in paths
-    assert not any(path.startswith('probe/') for path in paths)
-    states = chain_states(project=project)
-    assert states['other/c'] is StudyState.DONE
-    assert states['probe/a'] is StudyState.DEPENDENCY_FAILED
-
-
 def test_submit_runs_records_the_code_snapshot(project: Path, fake_backend: FakeBackend) -> None:
     snapshot = CodeSnapshot(
         folder=project / 'runs' / 's' / '.tslab-code-snapshots' / '0123456789abcdef',

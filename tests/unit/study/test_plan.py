@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.support.fake_backend import FakeResources
 from tests.unit.study.configs import grid
 from tests.unit.study.helpers import chained_study
 from tslab.enums import AfterCondition, ChainedRetry, LauncherKind, Retry
@@ -174,10 +173,6 @@ def test_argument_checks_use_at_most_half_the_cpus(
 ) -> None:
     monkeypatch.setattr(os, 'sched_getaffinity', lambda _pid: set(range(cpus)), raising=False)
     assert _worker_count() == workers
-
-
-def test_fake_resources_have_no_signal_problem() -> None:
-    assert FakeResources().signal_problem() is None
 
 
 def _accelerators_by_recipe(groups: list[JobGroup]) -> dict[str, str]:

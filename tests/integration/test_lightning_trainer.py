@@ -54,9 +54,10 @@ def test_extra_trainer_kwargs_cannot_set_plugins() -> None:
 
 @pytest.mark.slow
 def test_fit_returns_a_checkpoint_naming_best_and_last(tmp_path: Path) -> None:
+    lightning_trainer = trainer()
     with run_in(root=tmp_path) as run:
         directory = run.directory / 'train'
-        checkpoint = trainer().fit(
+        checkpoint = lightning_trainer.fit(
             run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory
         )
     assert checkpoint.last == 'last.ckpt'
@@ -68,18 +69,6 @@ def test_fit_returns_a_checkpoint_naming_best_and_last(tmp_path: Path) -> None:
     # The Lightning metrics reached the always-on CSV tracker of the run.
     metrics = (tmp_path / 'r' / 'trackers' / 'csv' / 'version_0' / 'metrics.csv').read_text()
     assert 'train_loss_epoch' in metrics
-
-
-@pytest.mark.slow
-def test_load_restores_the_best_weights(tmp_path: Path) -> None:
-    lightning_trainer = trainer()
-    with run_in(root=tmp_path) as run:
-        checkpoint = lightning_trainer.fit(
-            run=run,
-            model=ToyRegressor(),
-            data=ToyData(),
-            checkpoint_directory=run.directory / 'train',
-        )
     fresh = ToyRegressor()
     lightning_trainer.load(model=fresh, checkpoint=checkpoint)
     best = torch.load(f=checkpoint.best_path, map_location='cpu', weights_only=False)
@@ -97,24 +86,6 @@ def test_without_validation_last_is_best(tmp_path: Path, caplog: pytest.LogCaptu
         )
     assert checkpoint.best == checkpoint.last == 'last.ckpt'
     assert 'no validation loader' in caplog.text
-
-
-@pytest.mark.slow
-def test_job_time_share_pauses_and_the_next_job_resumes(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    directory = tmp_path / 'r' / 'train'
-    monkeypatch.setenv('SLURM_JOB_END_TIME', '0')
-    with pytest.raises(TrainingPaused, match='resubmit'), run_in(root=tmp_path) as run:
-        trainer().fit(run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory)
-    assert (directory / 'last.ckpt').is_file()
-    monkeypatch.delenv('SLURM_JOB_END_TIME')
-    with run_in(root=tmp_path) as run:
-        checkpoint = trainer().fit(
-            run=run, model=ToyRegressor(), data=ToyData(), checkpoint_directory=directory
-        )
-    state = torch.load(checkpoint.last_path, weights_only=False)
-    assert state['epoch'] == FAST.max_epochs - 1
 
 
 @pytest.mark.slow

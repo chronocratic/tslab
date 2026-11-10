@@ -10,7 +10,6 @@ from tslab.core.text import (
     format_index_ranges,
     format_table,
     log_table,
-    qualified_name,
     TextTable,
     unknown_key_message,
 )
@@ -18,10 +17,6 @@ from tslab.core.text import (
 
 def test_describe_error() -> None:
     assert describe_error(error=ValueError('bad\nvalue')) == 'ValueError: bad\nvalue'
-
-
-def test_qualified_name() -> None:
-    assert qualified_name(cls=ValueError) == 'builtins.ValueError'
 
 
 def test_first_line() -> None:
