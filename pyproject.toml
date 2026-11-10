@@ -60,6 +60,7 @@ dev = [
     "scipy>=1.18",
     "pytest>=8.2",
     "pytest-cov>=5.0",
+    "pytest-xdist>=3.6",
     "ruff>=0.17",
     "towncrier>=24.8",
     "torchdata>=0.11",
