@@ -92,10 +92,10 @@ def test_without_validation_last_is_best(tmp_path: Path, caplog: pytest.LogCaptu
 def test_max_training_time_finishes_and_last_holds_the_stop_step(tmp_path: Path) -> None:
     with run_in(root=tmp_path) as run:
         checkpoint = trainer(
-            max_epochs=500, max_training_time='00:00:00', early_stopping_patience=300
+            max_epochs=500, max_training_time='00:00:01', early_stopping_patience=300
         ).fit(
             run=run,
-            model=ToyRegressor(),
+            model=_SlowToyRegressor(sleep_seconds=0.6),
             data=ToyData(),
             checkpoint_directory=run.directory / 'train',
         )

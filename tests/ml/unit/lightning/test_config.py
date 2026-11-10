@@ -171,3 +171,20 @@ def test_lightning_config_fields_are_marked() -> None:
     assert is_not_fingerprinted(annotation=hints['accelerator'])
     assert is_not_fingerprinted(annotation=hints['devices'])
     assert LightningTrainerConfig().devices == 1
+
+
+@pytest.mark.parametrize('text', ['00:00:00', '0', '0:00', '0-00:00:00'])
+def test_zero_max_training_time_is_rejected(text: str) -> None:
+    with pytest.raises(ValueError, match=r'max_training_time must be greater than zero; got .*'):
+        LightningTrainerConfig(max_training_time=text)
+
+
+def test_zero_max_training_time_message_names_the_value_and_the_fix() -> None:
+    with pytest.raises(ValueError, match=r"got '00:00:00'\. Set a positive limit"):
+        LightningTrainer(
+            config=dataclasses.replace(LightningTrainerConfig(), max_training_time='00:00:00')
+        )
+
+
+def test_positive_max_training_time_is_accepted() -> None:
+    assert LightningTrainerConfig(max_training_time='0:00:01').max_training_time == '0:00:01'
