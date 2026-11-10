@@ -39,6 +39,8 @@ def test_wandb_check_uses_given_environment(project: Path, monkeypatch: pytest.M
             return None
 
     monkeypatch.setattr(doctor_module.netrc, 'netrc', Netrc)
+    # the check only runs when wandb is installed; the slim CI job has no wandb
+    monkeypatch.setattr(doctor_module.importlib.util, 'find_spec', lambda _name: object())
 
     checks = run_checks(
         machine_path=project / 'local.toml',
