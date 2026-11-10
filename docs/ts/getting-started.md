@@ -1,4 +1,7 @@
-# Getting started
+# Getting started with time series
+
+This page uses the `ts` project template. For a general project without time
+series code, see [Getting started with the lab](../lab/getting-started.md).
 
 ## Install
 
@@ -9,19 +12,20 @@ uv add "tslab[chronocratic-models,chronocratic-datasets]"
 ```
 
 The extras add the chronocratic adapters. Trackers are extras too:
-`tslab[wandb]`, `tslab[mlflow]`, `tslab[tensorboard]`. The core
-(`tslab` alone) needs none of them.
+`tslab[wandb]`, `tslab[mlflow]`, `tslab[tensorboard]`. `tslab` alone needs
+none of them.
 
 ## Start a project
 
 ```bash
-uvx tslab new my-paper
+uvx tslab new my-paper --template ts
 cd my-paper
 uv sync
 uv run python -m my_paper.toy_data data
 ```
 
-`tslab new` copies a small project you own from then on:
+`--template ts` is the default, so `tslab new my-paper` gives the same project.
+It copies a small project you own from then on:
 
 | File | What it is |
 |---|---|
@@ -30,7 +34,7 @@ uv run python -m my_paper.toy_data data
 | `src/my_paper/stages.py` | an example custom stage, `add_noise` |
 | `src/my_paper/augmentations.py` | an example augmentation recipe |
 | `src/my_paper/models.py` | the model choice shared by the scripts |
-| `src/my_paper/studies/` | one package per study; `common/` holds shared grids (see {doc}`studies`) |
+| `src/my_paper/studies/` | one package per study; `common/` holds shared grids (see [Studies and HPC](../lab/studies.md)) |
 | `machines/` | a local and an example SLURM machine profile |
 | `src/my_paper/toy_data.py` | writes small synthetic datasets, so everything runs before you have real data |
 | `tests/test_smoke.py` | runs both scripts on toy data and dry-runs the `example` and `quick` studies |
@@ -47,5 +51,5 @@ Add `--watch SECONDS` to refresh run status until Ctrl-C. Status hints suggest
 the next command; open a failed run to see its `error.txt` path.
 
 Run the same command again: every stage loads its result. Change a setting
-and only the stages it affects run again. See {doc}`configs-and-presets` for
-choosing models and datasets, and {doc}`concepts` for what is cached and why.
+and only the stages it affects run again. See [Configs and presets](../lab/configs-and-presets.md) for
+choosing models and datasets, and [Concepts](../lab/concepts.md) for what is cached and why.

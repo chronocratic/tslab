@@ -1,7 +1,7 @@
-# Tracking
+# Tracking in ml
 
-A CSV tracker is always on: metrics land in `trackers/csv/version_<n>/` of
-the run folder, one `version` per execution. Others are opt-in through
+The local CSV tracker of the lab is always on (see [Tracking](../lab/tracking.md)).
+The trackers below are opt-in through
 `tslab.ml.tracking.TrackingOptions` (`--tracking.*` flags) and
 `tslab.ml.tracking.build_trackers(options=...)`:
 
@@ -12,17 +12,17 @@ the run folder, one `version` per execution. Others are opt-in through
 | TensorBoard | `tslab[tensorboard]` | `--tracking.tensorboard` |
 
 Each tracker receives the config (flattened with `/`), every `Metrics`
-result, and the training metrics of Lightning. The final state of the run (`finished`
-or `failed`) is sent at the end. A tracker that fails never fails the run: it
-is logged and skipped.
+result, and the training metrics of Lightning. The final state of the run
+(`finished` or `failed`) is sent at the end. A tracker that fails never fails
+the run: it is logged and skipped.
 
 ## W&B on clusters
 
 W&B can mark a run `crashed` when the network drops or a job is killed. The
-full notes — offline mode on clusters without network, and
-`tslab wandb-sync` to repair the server afterwards (also available as an
-automatic follow-up job of a study) — are on the
-[Studies and HPC](studies.md#hpc-environment-notes) page.
+full notes (offline mode on clusters without network, and
+`tslab wandb-sync` to repair the server afterwards, also available as an
+automatic follow-up job of a study) are on the
+[Studies and HPC](../lab/studies.md#hpc-environment-notes) page.
 
 `--tracking.shell-log-path` uploads a SLURM output file to W&B at the end of
 the run.

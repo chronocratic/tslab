@@ -82,7 +82,7 @@ study = Study(
 
 A sibling `quick/study.py` can reuse the grid with `seeds=(0,)` and shorter
 training limits. Package `__init__.py` files expose `study`; the template also
-shares a forecasting grid in `common`.
+shares grids in `common`.
 
 ### Study settings
 
@@ -137,8 +137,8 @@ Rules that matter when writing one:
   the parallel slots on a local one; use it for settings that do not change
   results, such as `data.num_workers`.
 - **A study holds data, not logic.** A study file may list data — including
-  one dict comprehension over a constant tuple, as the `variant` axis of
-  `forecasting` does — but it must not compute, branch or loop over results. The presets of the
+  one dict comprehension over a constant tuple, as the `variant` axis of a
+  shared grid does — but it must not compute, branch or loop over results. The presets of the
   script stay complete and unchanged (see
   [Configs and presets](configs-and-presets.md)); the study only re-reads
   them through `from_presets` and drops the parts it chooses on its own axes.
@@ -518,10 +518,10 @@ entries:
 ```python
 from tslab.lab.study import After, Grid
 
-probe = Grid(
-    short_name='probe',
-    command=('uv', 'run', 'python', '-m', 'my_paper.probe'),
-    config=ProbeConfig,
+evaluate = Grid(
+    short_name='evaluate',
+    command=('uv', 'run', 'python', '-m', 'my_paper.evaluate'),
+    config=EvaluateConfig,
     axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'head': heads},
     after=(After(grid='pretrain'),),
     run_settings={'checkpoint': '{after}/train/default'},
@@ -623,8 +623,9 @@ covers chained grids; see [Automatic retry](#automatic-retry). The `requeue`
 mode keeps the job id of the upstream run, so downstream jobs keep waiting; see
 [HPC and SLURM](hpc.md).
 
-The project template ships the `chain` study: the `pretrain` grid trains once,
-then the `probe` grid reuses its checkpoint for separate SVM and Ridge probes.
+The `ts` project template ships the `chain` study: the `pretrain` grid
+trains once, then the `evaluate` grid reuses its checkpoint for separate
+downstream models. See [the ts template](../ts/getting-started.md).
 
 ## Automatic retry
 

@@ -14,6 +14,11 @@ study in `study.py` and exposes `study`; shared definitions live in
 `studies/common/`. Its `[machine_by_host]` table can pick the machine by host,
 so `--machine` can be dropped from every command.
 
+## Seeding
+
+Import `tslab.ml` in any stage that uses torch. The lab seeds Python `random` and
+NumPy; `tslab.ml` adds torch seeding and the torch, CUDA and GPU metadata.
+
 ## Before submitting
 
 For a new machine, run its readiness checks before the first submit:

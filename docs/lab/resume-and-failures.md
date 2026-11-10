@@ -66,12 +66,12 @@ A [study](studies.md) is the supported way to run many runs: one saved
 definition, one SLURM array per grid, fixed run names, status and resubmit.
 
 For one-off batches without a study, give each run its own folder
-(`--run-path ts2vec/Coffee/seed_0`) and submit one job per run. Check the
+(`--run-path experiment/small/seed_0`) and submit one job per run. Check the
 folders afterwards:
 
 ```bash
 uv run tslab status runs/            # one line per run: state and instance counts
-uv run tslab status runs/ --stage attack
+uv run tslab status runs/ --stage measure
 ```
 
 Add `--watch SECONDS` to refresh run status until Ctrl-C. Run-level hints point

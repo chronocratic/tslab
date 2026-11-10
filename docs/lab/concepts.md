@@ -4,16 +4,16 @@
 
 - A **run** is one execution context:
   `with tslab.lab.Run(config=..., root=..., relative_path=...) as run:`.
-  It owns a folder `root / relative_path`, takes a lock on it, seeds Python,
-  NumPy and torch, writes `config.yaml`, `meta.json` and `status.json`, and
+  It owns a folder `root / relative_path`, takes a lock on it, seeds Python
+  `random` and NumPy (see [Seeding](run-options.md#seeding)), writes `config.yaml`, `meta.json` and `status.json`, and
   starts the trackers. Leaving the `with` block always records the final state.
 - A **stage** is a cached step: a function decorated with `@tslab.lab.stage`, or a
-  ready one such as `tslab.ml.stages.train`. Stages are ordinary callables; your
+  ready one from another layer, such as `tslab.ml.stages.train`. Stages are ordinary callables; your
   script decides their order, loops and conditions.
 - An **instance** is one call of a stage in a run. A stage called several times
-  gives each call a name: `attack(run=run, name=('forecasting', 'h24', 'fgsm'), ...)`
-  is the instance `attack[forecasting/h24/fgsm]`, stored in
-  `attack/forecasting/h24/fgsm/`. Names may nest in parts, but within one
+  gives each call a name: `measure(run=run, name=('small', 'a'), ...)`
+  is the instance `measure[small/a]`, stored in
+  `measure/small/a/`. Names may nest in parts, but within one
   stage no name may be a prefix of another.
 
 ## Fingerprints
@@ -46,8 +46,8 @@ A stage returns an **artifact**, saved atomically in the instance folder:
 |---|---|
 | `tslab.lab.Json` | a JSON document |
 | `tslab.lab.Metrics` | named numbers (`metrics.values`), also sent to the trackers |
-| `tslab.ml.Tensors` | named tensors, with safetensors (no pickle) |
-| `tslab.ml.Checkpoint` | the best and last Lightning checkpoints of `train` |
+| `tslab.ml.Tensors` | named tensors, with safetensors (no pickle); defined in `tslab.ml` |
+| `tslab.ml.Checkpoint` | the best and last Lightning checkpoints of `train`; defined in `tslab.ml` |
 
 `SomeArtifact.external(path=...)` brings an outside file into the pipeline,
 fingerprinted by its content, for example a pretrained checkpoint.
@@ -55,13 +55,11 @@ fingerprinted by its content, for example a pretrained checkpoint.
 ## The run folder
 
 ```
-runs/ts2vec/Coffee/seed_0/
+runs/experiment/small/seed_0/
   config.yaml        the parsed config; reload it with tslab.lab.load_config
   meta.json          versions, git commit, hardware, host, config hashes
   status.json        the state of every instance
   logs/run.log       everything logged during the run
   trackers/csv/      always-on CSV metrics
-  train/default/     checkpoints
-  encode/default/    representations
-  evaluate/default/  metrics
+  measure/default/   the result of each stage instance
 ```
