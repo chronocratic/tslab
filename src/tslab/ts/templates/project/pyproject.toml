@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Experiments built with TSLab."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["tslab[analysis,chronocratic-models,chronocratic-datasets]>=0.1.0a1,<0.2"]
+dependencies = ["tslab[full]>=0.1.0a1,<0.2"]
 
 [build-system]
 requires = ["hatchling>=1.25"]

@@ -91,3 +91,7 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 - Torch seeding and the torch, Lightning, CUDA and GPU metadata happen only when `tslab.ml` is imported. The lab seeds Python `random` and NumPy. A stage that uses torch must import `tslab.ml`. See [Seeding](lab/run-options.md#seeding).
 - `tslab wandb-sync` and the W&B, MLflow and TensorBoard trackers are in `tslab.ml`.
 - The module paths below the packages changed too (for example `tslab.core` became `tslab.lab.core`, `tslab.study` became `tslab.lab.study`, `tslab.adapters.chronocratic` became `tslab.ts.adapters.chronocratic`).
+
+## Install extras
+
+torch, Lightning, safetensors and scikit-learn are no longer base dependencies; `uv add tslab` installs only the lab. They moved to the extras `ml` (torch, Lightning, safetensors) and `ts` (`ml` and scikit-learn). `uv add "tslab[full]"` restores the old install and adds the chronocratic adapters and analysis packages.

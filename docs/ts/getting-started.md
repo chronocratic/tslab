@@ -8,12 +8,13 @@ series code, see [Getting started with the lab](../lab/getting-started.md).
 TSLab needs Python 3.12 or newer. With [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv add "tslab[chronocratic-models,chronocratic-datasets]"
+uv add "tslab[full]"
 ```
 
-The extras add the chronocratic adapters. Trackers are extras too:
-`tslab[wandb]`, `tslab[mlflow]`, `tslab[tensorboard]`. `tslab` alone needs
-none of them.
+`full` adds torch, Lightning, scikit-learn, both chronocratic adapters and the
+analysis packages. Trackers are extras too and combine with it, for example
+`"tslab[full,wandb]"`. `tslab[ts]` alone gives the time series layer without
+the adapters.
 
 ## Start a project
 

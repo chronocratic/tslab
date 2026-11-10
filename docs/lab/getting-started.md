@@ -1,6 +1,7 @@
 # Getting started with the lab
 
-The lab needs Python 3.12 or newer and no torch. With [uv](https://docs.astral.sh/uv/):
+The lab needs Python 3.12 or newer and no torch: `uv add tslab` installs only the lab.
+With [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uvx tslab new my-experiments --template lab
