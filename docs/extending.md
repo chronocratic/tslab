@@ -5,14 +5,14 @@ Everything TSLab offers ready-made has a small interface you can implement.
 ## A stage
 
 ```python
-@tslab.lab.stage(name='attack', output=tslab.lab.Tensors, version=1)
+@tslab.lab.stage(name='attack', output=tslab.ml.Tensors, version=1)
 def attack(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    representations: tslab.lab.Tensors,
+    representations: tslab.ml.Tensors,
     epsilon: float,
-) -> tslab.lab.Tensors: ...
+) -> tslab.ml.Tensors: ...
 ```
 
 Arguments are keyword-only. Artifacts among them are the inputs of the stage; the

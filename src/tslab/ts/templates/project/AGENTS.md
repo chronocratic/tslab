@@ -23,8 +23,8 @@ For agent-driven study runs, follow the [TSLab skill](.agents/skills/tslab/SKILL
   fingerprint loads the saved result instead of computing it. Anything else
   recomputes the instance and everything after it.
 - **Artifact:** what a stage returns, saved atomically: `tslab.lab.Json`,
-  `tslab.lab.Metrics` (also sent to the trackers), `tslab.lab.Tensors` (safetensors),
-  `tslab.lab.Checkpoint`.
+  `tslab.lab.Metrics` (also sent to the trackers), `tslab.ml.Tensors` (safetensors),
+  `tslab.ml.Checkpoint`.
 
 Running the same command again is always safe: finished work is loaded,
 interrupted training resumes from its last checkpoint, failed and skipped
@@ -189,14 +189,14 @@ in the docstring; use it in `main`. Settings that cannot change a result
 In `stages.py`:
 
 ```python
-@tslab.lab.stage(name='my_step', output=tslab.lab.Tensors, version=1)
+@tslab.lab.stage(name='my_step', output=tslab.ml.Tensors, version=1)
 def my_step(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,  # only if one run calls it several times
-    representations: tslab.lab.Tensors,  # artifacts are inputs
+    representations: tslab.ml.Tensors,  # artifacts are inputs
     strength: float,  # everything else is a fingerprinted setting
-) -> tslab.lab.Tensors: ...
+) -> tslab.ml.Tensors: ...
 ```
 
 Then call it from `main` like a function:
@@ -209,7 +209,7 @@ Then call it from `main` like a function:
   hidden inside another object is not seen as an input.
 - An artifact you build by hand has no fingerprint and cannot be passed to a
   stage: compute it in a stage, or wrap a file with
-  `tslab.lab.Tensors.external(path=...)` (or another artifact class).
+  `tslab.ml.Tensors.external(path=...)` (or another artifact class).
 - `in_place=True` lets a long stage write into its folder while running and
   resume from what it wrote.
 - Within one stage no instance name may be a prefix of another.

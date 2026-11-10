@@ -14,10 +14,10 @@ from typing import Protocol
 
 import torch
 
-from tslab.lab.core.artifact import Checkpoint, Tensors
 from tslab.lab.core.paths import InstanceName, normalize_instance_name
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
+from tslab.ml.artifacts import Checkpoint, Tensors
 from tslab.ml.interfaces import SPLITS, Trainer
 from tslab.ml.split import Split
 from tslab.ts.interfaces import Encoder, SequenceEncoder
@@ -397,7 +397,7 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
         run: The current run.
         trainer: Loads the weights into ``model``.
         model: A model of the trained architecture.
-        checkpoint: From ``train``, or ``tslab.lab.Checkpoint.external(...)``.
+        checkpoint: From ``train``, or ``tslab.ml.Checkpoint.external(...)``.
         data: The full series and its split boundaries.
         encoder: Builds the encoder from the loaded model.
         horizons: Steps to forecast, one result each.

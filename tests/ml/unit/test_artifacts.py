@@ -2,10 +2,22 @@ import json
 from pathlib import Path
 
 import pytest
+import torch
 
-from tslab.lab.core.artifact import Checkpoint
+from tslab.ml.artifacts import Checkpoint, Tensors
 
 BEST = 'epoch=3-val_loss_epoch=0.10.ckpt'
+
+
+def test_tensors_round_trip_shared_and_noncontiguous(tmp_path: Path) -> None:
+    base = torch.arange(12, dtype=torch.float32).reshape(3, 4)
+    Tensors(tensors={'base': base, 'transposed': base.T, 'row': base[0]}, metadata={'k': 'v'}).save(
+        directory=tmp_path
+    )
+    loaded = Tensors.load(directory=tmp_path)
+    assert torch.equal(loaded.tensors['transposed'], base.T)
+    assert torch.equal(loaded.tensors['row'], base[0])
+    assert loaded.metadata == {'k': 'v'}
 
 
 def write_files(*, directory: Path, names: tuple[str, ...]) -> None:

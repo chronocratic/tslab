@@ -8,8 +8,8 @@ from typing import cast, override
 
 import torch
 
-from tslab.lab.core.artifact import Checkpoint
 from tslab.lab.core.run import Run, RunOptions
+from tslab.ml.artifacts import Checkpoint
 from tslab.ml.interfaces import Batch, Trainer
 from tslab.ml.split import Split
 from tslab.ts.tasks import TSClassificationDataInfo, TSForecastingDataInfo

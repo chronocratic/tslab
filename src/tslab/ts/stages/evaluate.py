@@ -4,10 +4,11 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from tslab.lab.core.artifact import Metrics, Tensors
+from tslab.lab.core.artifact import Metrics
 from tslab.lab.core.paths import InstanceName, normalize_instance_name
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
+from tslab.ml.artifacts import Tensors
 from tslab.ml.interfaces import Metric
 from tslab.ts.interfaces import DownstreamModel
 

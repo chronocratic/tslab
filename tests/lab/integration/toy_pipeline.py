@@ -12,6 +12,7 @@ import time
 import torch
 
 import tslab.lab
+import tslab.ml
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -38,31 +39,31 @@ def read_calls(*, root: Path) -> list[str]:
     return calls.read_text(encoding='utf-8').splitlines() if calls.exists() else []
 
 
-@tslab.lab.stage(name='make_data', output=tslab.lab.Tensors)
-def make_data(*, run: tslab.lab.Run, size: int) -> tslab.lab.Tensors:
+@tslab.lab.stage(name='make_data', output=tslab.ml.Tensors)
+def make_data(*, run: tslab.lab.Run, size: int) -> tslab.ml.Tensors:
     record_call(run=run, instance='make_data')
-    return tslab.lab.Tensors(tensors={'values': torch.rand(size)})
+    return tslab.ml.Tensors(tensors={'values': torch.rand(size)})
 
 
-@tslab.lab.stage(name='transform', output=tslab.lab.Tensors)
+@tslab.lab.stage(name='transform', output=tslab.ml.Tensors)
 def transform(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    data: tslab.lab.Tensors,
+    data: tslab.ml.Tensors,
     scale: float,
     fail: bool,
-) -> tslab.lab.Tensors:
+) -> tslab.ml.Tensors:
     record_call(run=run, instance=f'transform[{name}]')
     if fail:
         message = f'scale {scale} fails on purpose'
         raise RuntimeError(message)
-    return tslab.lab.Tensors(tensors={'values': data.tensors['values'] * scale})
+    return tslab.ml.Tensors(tensors={'values': data.tensors['values'] * scale})
 
 
 @tslab.lab.stage(name='summarize', output=tslab.lab.Metrics)
 def summarize(
-    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, data: tslab.lab.Tensors
+    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, data: tslab.ml.Tensors
 ) -> tslab.lab.Metrics:
     record_call(run=run, instance=f'summarize[{name}]')
     return tslab.lab.Metrics(data={'mean': float(data.tensors['values'].mean())})

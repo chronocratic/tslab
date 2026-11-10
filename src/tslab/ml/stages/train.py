@@ -1,9 +1,9 @@
 """The ready ``train`` stage."""
 
-from tslab.lab.core.artifact import Checkpoint
 from tslab.lab.core.paths import InstanceName
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
+from tslab.ml.artifacts import Checkpoint
 from tslab.ml.interfaces import DataSource, Trainer
 
 __all__ = ['train']

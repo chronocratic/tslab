@@ -16,17 +16,18 @@ times, once per instance name.
 
 import torch
 import tslab.lab
+import tslab.ml
 import tslab.ts
 
 
-@tslab.lab.stage(name='add_noise', output=tslab.lab.Tensors, version=1)
+@tslab.lab.stage(name='add_noise', output=tslab.ml.Tensors, version=1)
 def add_noise(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    representations: tslab.lab.Tensors,
+    representations: tslab.ml.Tensors,
     std: float,
-) -> tslab.lab.Tensors:
+) -> tslab.ml.Tensors:
     """Add Gaussian noise to the test representations.
 
     A small robustness check: a probe fitted on clean training
@@ -47,4 +48,4 @@ def add_noise(
     clean = tensors['test_representations']
     noise = torch.randn(clean.shape, generator=generator, dtype=clean.dtype)
     tensors['test_representations'] = clean + std * noise
-    return tslab.lab.Tensors(tensors=tensors)
+    return tslab.ml.Tensors(tensors=tensors)

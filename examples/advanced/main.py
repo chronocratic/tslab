@@ -129,17 +129,17 @@ class BatchEncoding(Protocol):
         ...
 
 
-@tslab.lab.stage(name='attack', output=tslab.lab.Tensors)
+@tslab.lab.stage(name='attack', output=tslab.ml.Tensors)
 def attack(  # noqa: PLR0913 # why: a stage takes its inputs as keyword arguments
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
     trainer: LightningTrainer,
     model: FingerprintedModel,
-    checkpoint: tslab.lab.Checkpoint,
+    checkpoint: tslab.ml.Checkpoint,
     data: ChronocraticForecastingData,
     fgsm: FgsmAttack,
-) -> tslab.lab.Tensors:
+) -> tslab.ml.Tensors:
     """Perturb the test part of the series to move its representation away (one FGSM step).
 
     The loss is the squared distance between the representations of the
@@ -177,24 +177,24 @@ def attack(  # noqa: PLR0913 # why: a stage takes its inputs as keyword argument
     (gradient,) = torch.autograd.grad(outputs=drift, inputs=start)
     attacked = series.clone()
     attacked[:, test] = clean + fgsm.epsilon * gradient.sign() * movable
-    return tslab.lab.Tensors(tensors={'series': attacked})
+    return tslab.ml.Tensors(tensors={'series': attacked})
 
 
-@tslab.lab.stage(name='attacked_test_split', output=tslab.lab.Tensors)
+@tslab.lab.stage(name='attacked_test_split', output=tslab.ml.Tensors)
 def attacked_test_split(
     *,
     run: tslab.lab.Run,
     name: tslab.lab.InstanceName | None = None,
-    clean: tslab.lab.Tensors,
-    attacked: tslab.lab.Tensors,
-) -> tslab.lab.Tensors:
+    clean: tslab.ml.Tensors,
+    attacked: tslab.ml.Tensors,
+) -> tslab.ml.Tensors:
     """Keep the clean training and validation splits and take the attacked test split.
 
     The probe is then fitted on clean representations and scored on attacked ones.
     """
     del run, name
     test = {key: value for key, value in attacked.tensors.items() if key.startswith('test_')}
-    return tslab.lab.Tensors(tensors={**clean.tensors, **test})
+    return tslab.ml.Tensors(tensors={**clean.tensors, **test})
 
 
 def main(*, config: AdvancedConfig) -> dict[str, float]:

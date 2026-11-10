@@ -17,6 +17,7 @@ from tslab.lab.study.definition import expand_runs, load_study
 from tslab.lab.study.reporting.result_table import (
     collect_results,
     format_results_csv,
+    METRICS_TYPE,
     write_results_csv,
 )
 from tslab.lab.study.reporting.state import collect_states, RunReport
@@ -81,6 +82,10 @@ def reports_of(*, study_directory: Path) -> list[RunReport]:
         jobs=[],
         job_states=make_job_states(states={}, phases={}),
     )
+
+
+def test_metrics_type_follows_the_lab_module() -> None:
+    assert METRICS_TYPE == 'tslab.lab.core.artifact.Metrics'
 
 
 def test_rows_per_instance_with_metrics(tmp_path: Path) -> None:

@@ -46,8 +46,8 @@ A stage returns an **artifact**, saved atomically in the instance folder:
 |---|---|
 | `tslab.lab.Json` | a JSON document |
 | `tslab.lab.Metrics` | named numbers (`metrics.values`), also sent to the trackers |
-| `tslab.lab.Tensors` | named tensors, with safetensors (no pickle) |
-| `tslab.lab.Checkpoint` | the best and last Lightning checkpoints of `train` |
+| `tslab.ml.Tensors` | named tensors, with safetensors (no pickle) |
+| `tslab.ml.Checkpoint` | the best and last Lightning checkpoints of `train` |
 
 `SomeArtifact.external(path=...)` brings an outside file into the pipeline,
 fingerprinted by its content, for example a pretrained checkpoint.

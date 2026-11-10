@@ -25,8 +25,8 @@ def representations(  # noqa: PLR0913
     horizons: tuple[int, ...],
     window_length: int | None = None,
     name: str | None = None,
-    series: tslab.lab.Tensors | None = None,
-) -> dict[int, tslab.lab.Tensors]:
+    series: tslab.ml.Tensors | None = None,
+) -> dict[int, tslab.ml.Tensors]:
     trainer = FakeTrainer()
     checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=ToySeries())
     return forecasting_representations(
@@ -44,8 +44,8 @@ def representations(  # noqa: PLR0913
     )
 
 
-@tslab.lab.stage(name='broken_series', output=tslab.lab.Tensors)
-def broken_series(*, run: tslab.lab.Run) -> tslab.lab.Tensors:
+@tslab.lab.stage(name='broken_series', output=tslab.ml.Tensors)
+def broken_series(*, run: tslab.lab.Run) -> tslab.ml.Tensors:
     del run
     message = 'broken on purpose'
     raise RuntimeError(message)
@@ -165,7 +165,7 @@ def test_a_new_horizon_reuses_the_cached_encoding(tmp_path: Path) -> None:
 
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
-    shifted = tslab.lab.Tensors(tensors={'series': clean + 1.0})
+    shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})
     model = CausalEncoder()
     with run_in(root=tmp_path) as run:
         result = representations(
@@ -192,7 +192,7 @@ def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) 
 
 def test_a_replacement_series_keeps_clean_window_targets(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
-    shifted = tslab.lab.Tensors(tensors={'series': clean + 1.0})
+    shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})
     model = VectorEncoder()
     with run_in(root=tmp_path) as run:
         result = representations(
@@ -225,7 +225,7 @@ def test_a_split_too_short_for_windows_names_the_split(tmp_path: Path) -> None:
 
 
 def test_a_replacement_series_must_match_the_data_shape(tmp_path: Path) -> None:
-    short = tslab.lab.Tensors(tensors={'series': ToySeries().full_series()[:, :30]})
+    short = tslab.ml.Tensors(tensors={'series': ToySeries().full_series()[:, :30]})
     with pytest.raises(ValueError, match=r'shape \(2, 30, 3\)'), run_in(root=tmp_path) as run:
         representations(
             run=run, model=VectorEncoder(), horizons=(2,), window_length=4, series=short

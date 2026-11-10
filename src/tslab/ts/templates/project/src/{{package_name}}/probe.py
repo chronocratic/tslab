@@ -103,12 +103,12 @@ def _ridge_probe(*, max_train_samples: int) -> Probe:
     return RidgeProbe(max_samples=max_train_samples)
 
 
-def _svm_metrics(*, representations: tslab.lab.Tensors) -> Sequence[Metric] | None:
+def _svm_metrics(*, representations: tslab.ml.Tensors) -> Sequence[Metric] | None:
     del representations
     return None
 
 
-def _ridge_metrics(*, representations: tslab.lab.Tensors) -> Sequence[Metric]:
+def _ridge_metrics(*, representations: tslab.ml.Tensors) -> Sequence[Metric]:
     targets = representations.tensors['train_targets']
     classes = tuple(float(value) for value in torch.unique(targets).tolist())
     return (RidgeClassificationAccuracy(classes=classes),)
@@ -143,7 +143,7 @@ def main(*, config: ProbeConfig) -> None:
             raise TypeError(message)
         model = build_chronocratic_model(config=config.model, data_info=data.info)
         trainer = LightningTrainer(config=config.trainer)
-        checkpoint = tslab.lab.Checkpoint.external(path=config.checkpoint, trusted=True)
+        checkpoint = tslab.ml.Checkpoint.external(path=config.checkpoint, trusted=True)
         representations = tslab.ts.stages.encode(
             run=run,
             trainer=trainer,
