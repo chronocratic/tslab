@@ -167,6 +167,7 @@ def test_signal_stop_saves_at_validation_safe_points(tmp_path: Path, hook_name: 
 
     class FakeTrainer:
         strategy = Strategy()
+        checkpoint_callback = None
 
         def __init__(self) -> None:
             self.saved: list[Path] = []
@@ -297,6 +298,8 @@ class _FakeStrategy:
 
 
 class _FakeTrainer:
+    checkpoint_callback = None
+
     def __init__(self, *, strategy: _FakeStrategy) -> None:
         self.strategy = strategy
         self.saved: list[Path] = []

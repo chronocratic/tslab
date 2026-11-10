@@ -109,7 +109,7 @@ class _SignalStop(Callback):
         )
         if not stop:
             return
-        trainer.save_checkpoint(filepath=self._checkpoint_directory / 'last.ckpt')
+        _save_last(trainer=trainer, path=self._checkpoint_directory / 'last.ckpt')
         if not self._writer:
             raise SystemExit(0)
         raise self._pause_error()
@@ -204,12 +204,24 @@ class AccumulatingTimerCallback(Callback):
             path = Path(callback.dirpath) / 'last.ckpt'
         else:
             return
-        trainer.save_checkpoint(filepath=path)
-        callback.last_model_path = str(path)
+        _save_last(trainer=trainer, path=path)
 
     def _record_session(self) -> None:
         if self.start_time is not None:
             self.sessions_times[self.sessions_count] = time.perf_counter() - self.start_time
+
+
+def _save_last(*, trainer: Trainer, path: Path) -> None:
+    """Save ``path`` as the last checkpoint, recorded in the ``ModelCheckpoint`` state.
+
+    The path goes into the saved state, so a resumed run overwrites this file instead
+    of writing ``last-v1.ckpt`` next to a stale ``last.ckpt``. Every rank must call this:
+    saving ends in a barrier.
+    """
+    callback = trainer.checkpoint_callback
+    if isinstance(callback, ModelCheckpoint):
+        callback.last_model_path = str(path)
+    trainer.save_checkpoint(filepath=path)
 
 
 def file_safe_name(*, name: str) -> str:
