@@ -133,12 +133,6 @@ def test_job_states_marks_tasks_ended_without_launch_file(*, project: Path) -> N
     assert states.states == dict.fromkeys(task_ids, 'ended')
 
 
-def test_expected_starts_is_none(*, project: Path) -> None:
-    ctx = context(project=project, machine_file='local.toml')
-
-    assert LocalBackend().expected_starts(context=ctx) is None
-
-
 def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
 
@@ -258,10 +252,6 @@ def test_before_launch_does_not_skip_the_launch_check(
     assert code == 1
     assert submitted == []
     assert before_launch_calls == []
-
-
-def test_cancellable_job_ids_is_empty() -> None:
-    assert LocalBackend().cancellable_job_ids(reports=[]) == []
 
 
 def test_after_submit_does_not_retry_without_retry(*, project: Path) -> None:

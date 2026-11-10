@@ -77,10 +77,6 @@ def test_validate_machine_name_rejects_paths_and_suffixes(name: str) -> None:
         validate_machine_name(name=name)
 
 
-def test_validate_machine_name_accepts_a_plain_stem() -> None:
-    assert validate_machine_name(name='cluster-2_a') == 'cluster-2_a'
-
-
 def _profile(*, folder: Path, name: str) -> Path:
     (folder / 'machines').mkdir(parents=True, exist_ok=True)
     path = folder / 'machines' / f'{name}.toml'

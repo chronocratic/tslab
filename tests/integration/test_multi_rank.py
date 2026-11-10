@@ -51,22 +51,15 @@ def run_two_ranks(*, run_root: Path, logs_root: Path) -> tuple[list[int], list[s
 
 
 @pytest.mark.slow
-def test_two_ranks_train_then_rank_zero_finishes(tmp_path: Path) -> None:
-    run_root = tmp_path / 'run'
-    codes, logs = run_two_ranks(run_root=run_root, logs_root=tmp_path / 'first-logs')
-    assert codes == [0, 0], '\n'.join(logs)
-    snapshot = read_status(path=run_root / 'r' / 'status.json')
-    assert snapshot is not None
-    assert {record.state for record in snapshot.instances.values()} == {InstanceState.DONE}
-    result = Json.load(directory=run_root / 'r' / 'after' / 'default')
-    assert result.data == {'rank': '0'}
-
-
-@pytest.mark.slow
 def test_two_ranks_skip_cached_training_together(tmp_path: Path) -> None:
     run_root = tmp_path / 'run'
     first_codes, _ = run_two_ranks(run_root=run_root, logs_root=tmp_path / 'first-logs')
     second_codes, logs = run_two_ranks(run_root=run_root, logs_root=tmp_path / 'second-logs')
     assert first_codes == [0, 0]
+    snapshot = read_status(path=run_root / 'r' / 'status.json')
+    assert snapshot is not None
+    assert {record.state for record in snapshot.instances.values()} == {InstanceState.DONE}
+    result = Json.load(directory=run_root / 'r' / 'after' / 'default')
+    assert result.data == {'rank': '0'}
     assert second_codes == [0, 0], '\n'.join(logs)
     assert all('load train' in log for log in logs)

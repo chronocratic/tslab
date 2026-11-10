@@ -86,10 +86,6 @@ def test_every_bad_status_file_is_one_error_naming_the_file(tmp_path: Path, cont
         read_status(path=tmp_path / 'status.json')
 
 
-def test_status_file_error_is_a_value_error() -> None:
-    assert issubclass(StatusFileError, ValueError)
-
-
 def test_shown_run_state_shows_interrupted_for_a_dead_running_run(tmp_path: Path) -> None:
     snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t')
     assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'interrupted'

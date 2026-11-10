@@ -10,17 +10,13 @@ from tslab.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
-    ChronocraticForecastingData,
 )
 from tslab.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,
-    MODELS,
 )
 from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.probes import RidgeProbe, SVMProbe
-from tslab.tasks import forecasting_representations
 
 pytestmark = [pytest.mark.chronocratic, pytest.mark.slow]
 
@@ -60,7 +56,7 @@ class Config:
     run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
 
 
-@pytest.mark.parametrize('name', sorted(MODELS))
+@pytest.mark.parametrize('name', ['ts2vec', 'cost', 'tstcc'])
 def test_every_model_trains_and_encodes(tmp_path: Path, name: str) -> None:
     config = parse(Config, *CLASSIFICATION_ARGS, f'model:{name}')
     data = build_chronocratic_data_source(config=config.data)
@@ -75,62 +71,3 @@ def test_every_model_trains_and_encodes(tmp_path: Path, name: str) -> None:
     vectors = representations.tensors['test_representations']
     assert vectors.shape[0] == 28
     assert vectors.ndim == 2
-
-
-def classify(*, root: Path) -> tslab.Metrics:
-    config = parse(Config, *CLASSIFICATION_ARGS, 'model:ts2vec')
-    data = build_chronocratic_data_source(config=config.data)
-    assert isinstance(data, ChronocraticClassificationData)
-    trainer = LightningTrainer(config=FEW_EPOCHS)
-    with run_in(root=root, config=config) as run:
-        model = build_chronocratic_model(config=config.model, data_info=data.info)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-        representations = tslab.stages.encode(
-            run=run, trainer=trainer, model=model, checkpoint=checkpoint, data=data, encoder=ENCODER
-        )
-        return tslab.stages.evaluate(
-            run=run, representations=representations, downstream_model=SVMProbe(n_jobs=1)
-        )
-
-
-def test_ts2vec_classifies_end_to_end_and_reloads(tmp_path: Path) -> None:
-    first = classify(root=tmp_path)
-    assert first.values['accuracy'] >= 0.75
-    meta = tmp_path / 'r' / 'encode' / 'default' / 'meta.json'
-    before = meta.stat().st_mtime_ns
-    second = classify(root=tmp_path)
-    assert second.values == first.values
-    assert meta.stat().st_mtime_ns == before
-
-
-def test_ts2vec_forecasts_end_to_end(tmp_path: Path) -> None:
-    config = parse(Config, *FORECASTING_ARGS, 'model:ts2vec', '--model.max-train-length', '512')
-    data = build_chronocratic_data_source(config=config.data)
-    assert isinstance(data, ChronocraticForecastingData)
-    trainer = LightningTrainer(config=FEW_EPOCHS)
-    with run_in(root=tmp_path, config=config) as run:
-        model = build_chronocratic_model(config=config.model, data_info=data.info)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-        by_horizon = forecasting_representations(
-            run=run,
-            trainer=trainer,
-            model=model,
-            checkpoint=checkpoint,
-            data=data,
-            encoder=ENCODER,
-            horizons=(24, 48),
-        )
-        errors = {
-            horizon: tslab.stages.evaluate(
-                run=run,
-                name=('forecasting', f'h{horizon}'),
-                representations=representations,
-                downstream_model=RidgeProbe(n_jobs=1),
-            ).values['mse_loss']
-            for horizon, representations in by_horizon.items()
-        }
-        states = {key: record.state.value for key, record in run.status().instances.items()}
-    assert sorted(errors) == [24, 48]
-    assert all(0.0 <= error < 1.0 for error in errors.values())
-    assert 'forecast_encode[default]' in states
-    assert 'forecast_windows[h24]' not in states

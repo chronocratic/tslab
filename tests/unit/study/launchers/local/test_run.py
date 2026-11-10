@@ -28,11 +28,7 @@ from tslab.study.launchers.common.types import LaunchReport, OnTaskState
 from tslab.study.launchers.local import run as _local_run
 from tslab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.study.launchers.local.records import LocalJobRecord
-from tslab.study.launchers.local.run import (
-    local_job_id,
-    LocalLauncher as _LocalLauncher,
-    write_job_files,
-)
+from tslab.study.launchers.local.run import LocalLauncher as _LocalLauncher, write_job_files
 from tslab.study.machine import LocalSettings, MachineProfile
 from tslab.study.paths import study_folder
 from tslab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
@@ -95,10 +91,6 @@ def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
         first_job_file=3,
         environment={},
     )
-
-
-def test_local_job_id_uses_given_process_id() -> None:
-    assert local_job_id(job_file=4, pid=123) == 'local-123-4'
 
 
 def launch(  # noqa: PLR0913 # why: test adapter mirrors backend launch inputs

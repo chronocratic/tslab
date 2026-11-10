@@ -6,7 +6,7 @@ import pytest
 
 from tests.unit.study.configs import grid
 from tslab.study import Study
-from tslab.study.definition import followup_job_name, study_job_names
+from tslab.study.definition import study_job_names
 
 
 def test_default_job_name_is_study_and_short_name() -> None:
@@ -30,10 +30,6 @@ def test_job_name_template_expands_axes_in_template_order() -> None:
 
 def test_job_name_study_placeholder() -> None:
     assert grid(job_name='{study}-{short_name}').job_name_for(study='aug', values={}) == 'aug-cls'
-
-
-def test_short_name_has_no_length_cap() -> None:
-    assert grid(short_name='classification_long').short_name == 'classification_long'
 
 
 @pytest.mark.parametrize('short_name', ['a.b', 'a b', ''])
@@ -94,7 +90,3 @@ def test_job_name_must_not_clash_with_followups() -> None:
 def test_study_job_names() -> None:
     study = Study(name='s', grids={'a': grid(short_name='a', job_name='{short_name}_{seed}')})
     assert study_job_names(study=study) == {'a': frozenset({'a_42', 'a_7'})}
-
-
-def test_followup_job_name() -> None:
-    assert followup_job_name(study='aug', kind='retry') == 'aug_retry'

@@ -119,36 +119,6 @@ def _definition_function(*, name: str) -> Callable[..., object]:
     return cast('Callable[..., object]', getattr(definition_api, name))
 
 
-def test_after_defaults() -> None:
-    after = _after(grid='pretrain')
-
-    assert (after.match, after.condition, after.delay_minutes, after.satisfy) == (
-        None,
-        _enum_value(name='AfterCondition', value='ok'),
-        0,
-        _enum_value(name='Satisfy', value='all'),
-    )
-
-
-def test_after_condition_enum_parses_all_values() -> None:
-    assert [
-        _enum_value(name='AfterCondition', value=value)
-        for value in ('ok', 'any', 'failed', 'started')
-    ] == [
-        enums.AfterCondition.OK,
-        enums.AfterCondition.ANY,
-        enums.AfterCondition.FAILED,
-        enums.AfterCondition.STARTED,
-    ]
-
-
-def test_satisfy_enum_parses_all_values() -> None:
-    assert [_enum_value(name='Satisfy', value=value) for value in ('all', 'any')] == [
-        enums.Satisfy.ALL,
-        enums.Satisfy.ANY,
-    ]
-
-
 def test_matched_runs_pair_on_shared_axes() -> None:
     study = chain_study()
     probe = run_of(

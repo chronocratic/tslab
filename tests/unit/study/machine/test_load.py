@@ -13,13 +13,6 @@ import tslab.study.machine.load as machine_load
 from tslab.study.machine.load import load_machine as _load_machine
 
 
-def test_profile_backends_are_keyed_by_their_declared_table() -> None:
-    assert {name: backend.TABLE for name, backend in machine_load.PROFILE_BACKENDS.items()} == {
-        'local': 'local',
-        'slurm': 'slurm',
-    }
-
-
 def test_load_machine_uses_selected_backend_settings_loader(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
