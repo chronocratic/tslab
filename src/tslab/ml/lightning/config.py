@@ -6,6 +6,7 @@ from typing import Annotated, override
 
 from tslab.lab.core.fingerprint import NotFingerprinted
 from tslab.lab.core.markers import HardwareSetting, MachineSetting
+from tslab.lab.jobs.slurm import parse_slurm_duration
 
 __all__ = ['LightningTrainerConfig']
 
@@ -61,7 +62,7 @@ class LightningTrainerConfig:
             stopping; ``None`` computes ``max(1, max_epochs // (10 * check_val_every_n_epoch))``.
         early_stopping_min_delta: Smallest change of ``monitor`` that counts as improvement.
         max_training_time: Total training limit in sbatch ``--time`` format. It counts across
-            resumed jobs and ends training when reached.
+            resumed jobs and ends training when reached. Must be greater than zero.
         job_time_share: Fraction of the remaining SLURM job time used by each job before
             training pauses.
         extra_trainer_kwargs: Further ``lightning.Trainer`` arguments, for example
@@ -86,5 +87,18 @@ class LightningTrainerConfig:
     )
 
     def __post_init__(self) -> None:
-        """Copy ``extra_trainer_kwargs`` into a read-only mapping, so the config stays frozen."""
+        """Reject a zero ``max_training_time``; make ``extra_trainer_kwargs`` read-only.
+
+        Raises:
+            ValueError: If ``max_training_time`` is zero or not in sbatch ``--time`` format.
+        """
+        if (
+            self.max_training_time is not None
+            and not parse_slurm_duration(text=self.max_training_time).total_seconds()
+        ):
+            message = (
+                f'max_training_time must be greater than zero; got {self.max_training_time!r}. '
+                "Set a positive limit such as '6:00:00', or leave it unset for no limit."
+            )
+            raise ValueError(message)
         object.__setattr__(self, 'extra_trainer_kwargs', FrozenKwargs(self.extra_trainer_kwargs))
