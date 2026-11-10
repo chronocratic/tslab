@@ -74,6 +74,8 @@ class _TargetState:
     submitting: set[PurePosixPath]
     latest: Mapping[PurePosixPath, tuple[JobRecord, TaskRecord]]
     followup: FollowupSettings | None
+    defer_failed_targets: bool
+    now: float | None
 
 
 def order_runs(*, study: Study, runs: Sequence[StudyRun]) -> list[StudyRun]:
@@ -122,6 +124,8 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     submitting: frozenset[PurePosixPath],
     jobs: Sequence[JobRecord],
     followup: FollowupSettings | None = None,
+    launcher: LauncherKind | None = None,
+    now: float | None = None,
 ) -> tuple[dict[PurePosixPath, tuple[AfterTarget, ...]], frozenset[PurePosixPath]]:
     """Resolve upstream reports into existing-job or same-launch targets.
 
@@ -132,6 +136,8 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
         submitting: Runs that would enter this launch before dependency filtering.
         jobs: Recorded submissions used to resolve live tasks and array indices.
         followup: Retry settings used to keep eligible interruptions open.
+        launcher: The launcher that will represent open dependencies.
+        now: The current time in UTC Unix seconds, passed by the caller.
 
     Returns:
         Targets per downstream run and the downstream runs that cannot be submitted.
@@ -143,6 +149,8 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
         submitting=pending,
         latest=latest_tasks(jobs=jobs),
         followup=followup,
+        defer_failed_targets=launcher is LauncherKind.SLURM,
+        now=now,
     )
     targets: dict[PurePosixPath, tuple[AfterTarget, ...]] = {}
     blocked: set[PurePosixPath] = set()
@@ -164,7 +172,7 @@ def _run_targets(*, state: _TargetState, run: StudyRun) -> tuple[tuple[AfterTarg
         return (), False
     verdict_reports = _reports_for_launch(reports=state.reports, submitting=state.submitting)
     verdict = after_verdict(
-        study=state.study, run=run, reports=verdict_reports, followup=state.followup
+        study=state.study, run=run, reports=verdict_reports, followup=state.followup, now=state.now
     )
     if verdict is AfterVerdict.NEVER:
         return (), True
@@ -211,13 +219,20 @@ def _entry_target(
     if not upstream:
         return None, True
     verdicts = [
-        _run_verdict(run=upstream_run, condition=after.condition, state=state)
+        _run_verdict(
+            run=upstream_run,
+            condition=after.condition,
+            delay_minutes=after.delay_minutes,
+            state=state,
+        )
         for upstream_run in upstream
     ]
     return _satisfy_target(upstream=upstream, verdicts=verdicts, after=after, state=state)
 
 
-def _run_verdict(*, state: _TargetState, run: StudyRun, condition: AfterCondition) -> AfterVerdict:
+def _run_verdict(
+    *, state: _TargetState, run: StudyRun, condition: AfterCondition, delay_minutes: int
+) -> AfterVerdict:
     """Judge one upstream, with an in-launch rerun treated as open."""
     if run.run_path in state.submitting:
         return AfterVerdict.OPEN
@@ -228,6 +243,9 @@ def _run_verdict(*, state: _TargetState, run: StudyRun, condition: AfterConditio
         condition=condition,
         state=report.state,
         retry_left=_retry_left(report=report, followup=state.followup),
+        delay_minutes=delay_minutes,
+        started_at=report.job_started_at,
+        now=state.now,
     )
 
 
@@ -239,10 +257,12 @@ def _satisfy_target(
     after: After,
 ) -> tuple[AfterTarget | None, bool]:
     """Choose which open targets make one dependency entry safe to schedule."""
-    if after.satisfy is Satisfy.ALL and AfterVerdict.NEVER in verdicts:
-        return None, True
     if after.satisfy is Satisfy.ANY and AfterVerdict.MET in verdicts:
         return None, False
+    if (after.satisfy is Satisfy.ALL and AfterVerdict.NEVER in verdicts) or _defer_failed_target(
+        after=after, verdicts=verdicts, state=state
+    ):
+        return None, True
     open_runs = [
         run for run, verdict in zip(upstream, verdicts, strict=True) if verdict is AfterVerdict.OPEN
     ]
@@ -265,6 +285,19 @@ def _satisfy_target(
             run_paths=run_paths,
         ),
         False,
+    )
+
+
+def _defer_failed_target(
+    *, after: After, verdicts: Sequence[AfterVerdict], state: _TargetState
+) -> bool:
+    """Hold SLURM dependents until retryable upstream attempts reach a final state."""
+    return (
+        after.condition is AfterCondition.FAILED
+        and state.defer_failed_targets
+        and state.followup is not None
+        and state.followup.chained_retry is not ChainedRetry.MANUAL
+        and AfterVerdict.OPEN in verdicts
     )
 
 

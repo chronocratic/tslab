@@ -9,7 +9,15 @@ from types import MappingProxyType
 from typing import cast, TextIO
 
 from tslab.core.status import utc_now_iso
-from tslab.enums import ChainedRetry, CheckStatus, JobFlag, JobPhase, LauncherKind, StudyState
+from tslab.enums import (
+    AfterCondition,
+    ChainedRetry,
+    CheckStatus,
+    JobFlag,
+    JobPhase,
+    LauncherKind,
+    StudyState,
+)
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     format_slurm_duration,
@@ -17,6 +25,7 @@ from tslab.jobs.slurm import (
     INTERRUPTING_JOB_STATES,
     query_cluster_config,
     query_job_reasons,
+    query_job_start_times,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
     scancel,
@@ -127,6 +136,22 @@ def _unknown_states() -> JobStates:
     )
 
 
+def _start_times_of(*, study: Study, task_ids: Sequence[str]) -> dict[str, float]:
+    """Read task start times only when a delayed ``STARTED`` condition needs them."""
+    needs_times = any(
+        after.condition is AfterCondition.STARTED
+        for grid in study.grids.values()
+        for after in grid.after
+    )
+    if not needs_times:
+        return {}
+    try:
+        return query_job_start_times(job_ids=task_ids)
+    except SlurmError as error:
+        _LOGGER.warning('%s', error)
+        return {}
+
+
 class SlurmBackend:
     """The backend of a SLURM machine: sbatch jobs, sacct states, accounting."""
 
@@ -156,6 +181,7 @@ class SlurmBackend:
         except SlurmError as error:
             _LOGGER.warning('%s', error)
             return _unknown_states(), cache
+        start_times = _start_times_of(study=study, task_ids=task_ids)
         live = tuple(
             job_id
             for job_id in followups
@@ -176,6 +202,7 @@ class SlurmBackend:
                 ),
                 flags=MappingProxyType(_flags_of(states=states, reasons=reasons)),
                 followup_live_job_ids=live,
+                start_times=MappingProxyType(start_times),
             ),
             new_cache,
         )

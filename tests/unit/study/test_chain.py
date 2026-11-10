@@ -28,7 +28,9 @@ class _ChainConfig:
     run_path: Path = Path('run')
 
 
-def _study(*, satisfy: Satisfy = Satisfy.ALL) -> Study:
+def _study(
+    *, satisfy: Satisfy = Satisfy.ALL, condition: AfterCondition = AfterCondition.OK
+) -> Study:
     upstream = Grid(
         short_name='pre',
         command=('python', '-m', 'pretrain'),
@@ -41,7 +43,7 @@ def _study(*, satisfy: Satisfy = Satisfy.ALL) -> Study:
         command=('python', '-m', 'probe'),
         config=_ChainConfig,
         axes={'dataset': {'all': {}}},
-        after=(After(grid='pretrain', match=(), satisfy=satisfy),),
+        after=(After(grid='pretrain', match=(), satisfy=satisfy, condition=condition),),
         run_path='{grid}/{dataset}',
     )
     return Study(name='chain', grids={'pretrain': upstream, 'probe': downstream})
@@ -71,8 +73,10 @@ def test_upstream_verdict_table() -> None:
         (AfterCondition.OK, StudyState.INTERRUPTED, False, AfterVerdict.NEVER),
         (AfterCondition.ANY, StudyState.FAILED, False, AfterVerdict.MET),
         (AfterCondition.FAILED, StudyState.DONE, False, AfterVerdict.NEVER),
+        (AfterCondition.FAILED, StudyState.FAILED, True, AfterVerdict.MET),
+        (AfterCondition.FAILED, StudyState.INTERRUPTED, True, AfterVerdict.OPEN),
+        (AfterCondition.FAILED, StudyState.INTERRUPTED, False, AfterVerdict.MET),
         (AfterCondition.FAILED, StudyState.DEPENDENCY_FAILED, False, AfterVerdict.MET),
-        (AfterCondition.STARTED, StudyState.RUNNING, False, AfterVerdict.MET),
         (AfterCondition.STARTED, StudyState.DEPENDENCY_FAILED, False, AfterVerdict.NEVER),
         (AfterCondition.OK, StudyState.QUEUED, False, AfterVerdict.OPEN),
     )
@@ -81,6 +85,49 @@ def test_upstream_verdict_table() -> None:
         upstream_verdict(condition=condition, state=state, retry_left=retry_left)
         for condition, state, retry_left, _ in cases
     ] == [expected for _, _, _, expected in cases]
+
+
+def test_started_condition_uses_recorded_start_time() -> None:
+    assert (
+        upstream_verdict(
+            condition=AfterCondition.STARTED,
+            state=StudyState.RUNNING,
+            retry_left=False,
+            delay_minutes=30,
+            started_at=100.0,
+            now=1_900.0,
+        )
+        is AfterVerdict.MET
+    )
+    assert (
+        upstream_verdict(
+            condition=AfterCondition.STARTED,
+            state=StudyState.RUNNING,
+            retry_left=False,
+            delay_minutes=30,
+            now=1_900.0,
+        )
+        is AfterVerdict.OPEN
+    )
+
+
+def test_started_condition_with_zero_delay_needs_no_recorded_start_time() -> None:
+    assert (
+        upstream_verdict(
+            condition=AfterCondition.STARTED,
+            state=StudyState.RUNNING,
+            retry_left=False,
+        )
+        is AfterVerdict.MET
+    )
+    assert (
+        upstream_verdict(
+            condition=AfterCondition.STARTED,
+            state=StudyState.DONE,
+            retry_left=False,
+        )
+        is AfterVerdict.MET
+    )
 
 
 def test_satisfy_any_needs_one_met() -> None:
@@ -190,3 +237,22 @@ def test_uncounted_attempts_leave_retries_open() -> None:
         after_verdict(study=study, run=probe, reports=upstream, followup=followup)
         is AfterVerdict.OPEN
     )
+
+
+def test_failed_condition_meets_interrupted_upstream_at_attempt_limit() -> None:
+    study = _study(condition=AfterCondition.FAILED)
+    run = next(run for run in expand_runs(study=study) if run.grid == 'probe')
+    upstream_runs = [run for run in expand_runs(study=study) if run.grid == 'pretrain']
+    upstream = {
+        item.run_path: _report(run=item, state=StudyState.INTERRUPTED, attempt=3)
+        for item in upstream_runs
+    }
+
+    verdict = after_verdict(
+        study=study,
+        run=run,
+        reports=upstream,
+        followup=FollowupSettings(chained_retry=ChainedRetry.RESUBMIT, max_attempts=3),
+    )
+
+    assert verdict is AfterVerdict.MET

@@ -12,7 +12,15 @@ from typing import TextIO, TYPE_CHECKING
 from tslab.core.lock import read_lock_owner
 from tslab.core.meta import hostname
 from tslab.core.paths import LOCK_FILE
-from tslab.enums import AfterVerdict, ChainedRetry, JobFlag, JobPhase, Retry, StudyState
+from tslab.enums import (
+    AfterCondition,
+    AfterVerdict,
+    ChainedRetry,
+    JobFlag,
+    JobPhase,
+    Retry,
+    StudyState,
+)
 from tslab.study.chain import after_verdict, downstream_of
 from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
 from tslab.study.commands.submit import submit_runs
@@ -202,7 +210,29 @@ def _auto_selection(*, reports: Sequence[RunReport], context: Context) -> list[R
         if report.state is StudyState.DEPENDENCY_FAILED
         and report.run.grid in chained
         and after_verdict(
-            study=context.study, run=report.run, reports=everything, followup=followup
+            study=context.study,
+            run=report.run,
+            reports=everything,
+            followup=followup,
+            now=time.time(),
+        )
+        is AfterVerdict.MET
+    ]
+    taken += [
+        report
+        for report in context.reports
+        if report.state is StudyState.MISSING
+        and report.run.grid in chained
+        and any(
+            after.condition is AfterCondition.FAILED
+            for after in context.study.grids[report.run.grid].after
+        )
+        and after_verdict(
+            study=context.study,
+            run=report.run,
+            reports=everything,
+            followup=followup,
+            now=time.time(),
         )
         is AfterVerdict.MET
     ]
@@ -213,7 +243,11 @@ def _verdict_met(
     *, context: Context, run: StudyRun, reports: Mapping[PurePosixPath, RunReport]
 ) -> bool:
     verdict = after_verdict(
-        study=context.study, run=run, reports=reports, followup=context.machine.followup
+        study=context.study,
+        run=run,
+        reports=reports,
+        followup=context.machine.followup,
+        now=time.time(),
     )
     return verdict is AfterVerdict.MET
 
@@ -493,6 +527,7 @@ def run_one(
         attempts={run.run_path: report.attempt},
         first_job_file=0,
         environment=os.environ,
+        project_root=context.project_root,
     )
     problems = validate_jobs(study=context.study, groups=groups)
     if problems:

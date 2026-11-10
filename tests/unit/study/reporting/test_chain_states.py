@@ -122,3 +122,40 @@ def test_dependency_never_flag_is_dependency_failed_without_upstream_reports() -
     )
 
     assert updated.state is StudyState.DEPENDENCY_FAILED
+
+
+def test_four_grid_chain_propagates_dependency_failure_in_one_pass() -> None:
+    study, runs = _deep_chain()
+    reports = [
+        _report(run=run, state=StudyState.FAILED if run.grid == 'a' else StudyState.MISSING)
+        for run in reversed(runs)
+    ]
+
+    updated = apply_chain_states(
+        study=study, reports=reports, upstream={}, followup=FollowupSettings()
+    )
+
+    states = {report.run.grid: report.state for report in updated}
+    assert states == {
+        'a': StudyState.FAILED,
+        'b': StudyState.DEPENDENCY_FAILED,
+        'c': StudyState.DEPENDENCY_FAILED,
+        'd': StudyState.DEPENDENCY_FAILED,
+    }
+
+
+def _deep_chain() -> tuple[Study, list[StudyRun]]:
+    config = _ChainConfig
+    grids = {
+        name: Grid(
+            short_name=name,
+            command=('python', '-m', name),
+            config=config,
+            axes={'dataset': {'a': {}}},
+            after=() if upstream is None else (After(grid=upstream),),
+            run_path='{grid}/{dataset}',
+        )
+        for name, upstream in (('d', 'c'), ('b', 'a'), ('a', None), ('c', 'b'))
+    }
+    study = Study(name='deep', grids=grids)
+    return study, expand_runs(study=study)

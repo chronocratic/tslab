@@ -16,7 +16,7 @@ import pytest
 from tests.support.fake_slurm import FakeSlurm
 from tests.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tslab.cli import main
-from tslab.enums import CheckStatus, JobFlag, JobPhase, LauncherKind
+from tslab.enums import AfterCondition, CheckStatus, JobFlag, JobPhase, LauncherKind
 from tslab.jobs.slurm import (
     FAILING_JOB_STATES,
     INTERRUPTING_JOB_STATES,
@@ -95,6 +95,35 @@ def test_job_states_returns_phases_and_read_only_mappings(
         cast('MutableMapping[str, str]', states.states)['1000_0'] = 'FAILED'
     with pytest.raises(TypeError):
         cast('MutableMapping[str, JobPhase]', states.phases)['1000_0'] = JobPhase.FAILED
+
+
+def test_job_states_reads_start_times_for_delayed_started_dependencies(
+    *, project: Path, fake: FakeSlurm
+) -> None:
+    submit_study(project=project)
+    ctx = _context(project=project, fake=fake)
+    study = _chained_study(study=ctx.study)
+    probe = replace(
+        study.grids['probe'],
+        after=(After(grid='g', condition=AfterCondition.STARTED, delay_minutes=30),),
+    )
+    study = replace(study, grids={**study.grids, 'probe': probe})
+    fake.set_answers('squeue', [{'stdout': '1000_0|RUNNING\n'}, {'stdout': ''}])
+    fake.set_answers(
+        'sacct',
+        [
+            {'stdout': '1000_0|RUNNING\n'},
+            {'stdout': ''},
+            {'stdout': '1000_0|2026-11-10T12:00:00\n'},
+        ],
+    )
+
+    states, _ = SlurmBackend().job_states(
+        machine=ctx.machine, study=study, jobs=jobs_of(project=project), cache={}
+    )
+
+    assert states.start_times['1000_0'] > 0
+    assert fake.calls('sacct')[-1][-1] == '--format=JobID,Start'
 
 
 def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -> None:

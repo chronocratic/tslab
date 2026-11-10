@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from tslab.enums import AfterVerdict, JobPhase
@@ -65,6 +66,7 @@ def after_filter(*, context: Context) -> Callable[[JobGroup], JobGroup]:
                 run=task.resolved.run,
                 reports=reports,
                 followup=context.machine.followup,
+                now=time.time(),
             )
             if verdict is AfterVerdict.MET:
                 kept.append(task)

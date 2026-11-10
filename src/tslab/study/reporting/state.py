@@ -71,6 +71,7 @@ class RunReport:
         job_phase: The backend phase of the task, or ``UNKNOWN`` when absent.
         job_reason: The one-line reason the backend gives for that task id.
         job_flags: What the backend says that state means for the state logic.
+        job_started_at: The latest job start time in UTC Unix seconds, when known.
         attempt: The attempt of the latest submission; 0 when never submitted.
         task: The latest submitted task of the run.
         folder: The facts of the run folder.
@@ -85,6 +86,7 @@ class RunReport:
     attempt: int
     task: TaskRecord | None
     folder: FolderFacts
+    job_started_at: float | None = None
     job_reason: str | None = None
     job_flags: 'frozenset[JobFlag]' = frozenset()
 
@@ -290,14 +292,17 @@ def collect_states(
             if task_id is None
             else job_states.phases.get(task_id, JobPhase.UNKNOWN)
         )
-        entries.append((run, job_id, job_state, job_reason, job_flags, job_phase, task))
+        job_started_at = None if task_id is None else job_states.start_times.get(task_id)
+        entries.append(
+            (run, job_id, job_state, job_reason, job_flags, job_phase, task, job_started_at)
+        )
         if _needs_grace(job_phase=job_phase, folder=folders[run.run_path]):
             waiting[run.run_path] = directory
     folders.update(
         _grace_wait(directories=waiting, completed_phase=JobPhase.COMPLETED, sleep=sleep)
     )
     reports: list[RunReport] = []
-    for run, job_id, job_state, job_reason, job_flags, job_phase, task in entries:
+    for run, job_id, job_state, job_reason, job_flags, job_phase, task, job_started_at in entries:
         folder = folders[run.run_path]
         state, reason = study_state(
             job_reason=job_reason, job_phase=job_phase, folder=folder, job_flags=job_flags
@@ -315,6 +320,7 @@ def collect_states(
                 attempt=task.attempt if task is not None else 0,
                 task=task,
                 folder=folder,
+                job_started_at=job_started_at,
             )
         )
     return reports

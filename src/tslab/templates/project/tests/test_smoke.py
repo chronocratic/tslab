@@ -162,15 +162,27 @@ def test_chain_study_runs_locally(project: Path, monkeypatch: pytest.MonkeyPatch
         '--encoder.device',
         'cpu',
     ]
-    submit = ['study', 'submit', 'chain', '--machine', machine, '--only', 'head=small']
+    submit = ['study', 'submit', 'chain', '--machine', machine, '--only', 'head=svm,ridge']
     with pytest.raises(SystemExit) as raised:
         tslab_main(args=[*submit, '--', *extra])
     assert raised.value.code == 0
     runs = project / 'runs' / 'chain'
     relatives = (
         'pretrain/ts2vec-archive-split/ToySpectra/seed_0',
-        'probe/ts2vec-archive-split/ToySpectra/seed_0/small',
+        'probe/ts2vec-archive-split/ToySpectra/seed_0/svm',
+        'probe/ts2vec-archive-split/ToySpectra/seed_0/ridge',
     )
     for relative in relatives:
-        status = json.loads((runs / relative / 'status.json').read_text(encoding='utf-8'))
+        folder = runs / relative
+        status = json.loads((folder / 'status.json').read_text(encoding='utf-8'))
         assert status['run_state'] == 'finished'
+        if relative.endswith('/svm'):
+            metrics = json.loads(
+                (folder / 'evaluate' / 'default' / 'data.json').read_text(encoding='utf-8')
+            )
+            assert {'accuracy', 'precision', 'recall', 'f1'} <= metrics.keys()
+        if relative.endswith('/ridge'):
+            metrics = json.loads(
+                (folder / 'evaluate' / 'default' / 'data.json').read_text(encoding='utf-8')
+            )
+            assert 'ridge_accuracy' in metrics

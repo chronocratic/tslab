@@ -13,7 +13,7 @@ import pickle
 from typing import TYPE_CHECKING
 
 import tslab
-from tslab.enums import AfterCondition, ChainedRetry, Satisfy
+from tslab.enums import AfterCondition, Satisfy
 from tslab.study.code_snapshot import CodeSnapshot
 from tslab.study.definition import (
     chained_grids,
@@ -163,37 +163,15 @@ def check_machine(*, study: Study, machine: MachineProfile, warned: set[str] | N
     Raises:
         ValueError: If a machine setting path is not a field of a grid it
             applies to; the error names the profile file, the override index
-            or ``settings``, the grid and the paths; or if a grid waits with
-            ``condition='failed'`` while ``chained_retry`` is not ``"manual"``.
+            or ``settings``, the grid and the paths.
     """
     _settings_problems(study=study, machine=machine)
-    _check_failed_condition(study=study, machine=machine)
     seen = warned if warned is not None else set()
     for text in _override_warnings(study=study, machine=machine):
         if text in seen:
             continue
         seen.add(text)
         _LOGGER.warning('%s', text)
-
-
-def _check_failed_condition(*, study: Study, machine: MachineProfile) -> None:
-    """Refuse ``condition='failed'`` together with chained retries.
-
-    An upstream run that is retried later has already ended non-zero, so a scheduler
-    starts the downstream run, while a local launch waits for the retry.
-    """
-    retry = machine.followup.chained_retry
-    if retry is ChainedRetry.MANUAL:
-        return
-    for name, grid in study.grids.items():
-        if any(after.condition is AfterCondition.FAILED for after in grid.after):
-            message = (
-                f"grid {name!r}: condition 'failed' cannot be used with [followup] "
-                f'chained_retry = "{retry.value}" in {machine.path}: an upstream run that is '
-                'retried later already counts as failed for the scheduler; set '
-                'chained_retry = "manual" or use condition \'any\''
-            )
-            raise ValueError(message)
 
 
 def _settings_problems(*, study: Study, machine: MachineProfile) -> None:
@@ -517,20 +495,31 @@ def _task_error(*, grid_name: str, run_path: PurePosixPath, index: int, max_arra
 
 
 def _after_placeholders(
-    *, study: Study, machine: MachineProfile, grid: Grid, run: StudyRun
+    *, study: Study, machine: MachineProfile, grid: Grid, run: StudyRun, project_root: Path | None
 ) -> tuple[dict[str, str], dict[str, tuple[StudyRun, ...]]]:
     """The single upstream run paths a downstream run can use as placeholders."""
     upstream_by_grid = {
         after.grid: upstream_runs(study=study, run=run, after=after) for after in grid.after
     }
+    output_root = _absolute_output_root(output_root=machine.output_root, project_root=project_root)
     values = {
-        f'after:{grid_name}': str(machine.output_root / study.name / runs[0].run_path)
+        f'after:{grid_name}': str(output_root / study.name / runs[0].run_path)
         for grid_name, runs in upstream_by_grid.items()
         if len(runs) == 1
     }
     if len(grid.after) == 1 and f'after:{grid.after[0].grid}' in values:
         values['after'] = values[f'after:{grid.after[0].grid}']
     return values, upstream_by_grid
+
+
+def _absolute_output_root(*, output_root: Path, project_root: Path | None) -> Path:
+    """Resolve a relative output root against the project's directory."""
+    if output_root.is_absolute():
+        return output_root
+    if project_root is None:
+        message = 'project_root is required for {after} with a relative output_root'
+        raise ValueError(message)
+    return project_root / output_root
 
 
 def _after_placeholder_error(
@@ -573,6 +562,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
     attempts: Mapping[PurePosixPath, int],
     first_job_file: int,
     environment: Mapping[str, str],
+    project_root: Path | None = None,
     uncounted: Mapping[PurePosixPath, tuple[int, int]] | None = None,
     code_snapshots: Mapping[PurePosixPath, CodeSnapshot | None] | None = None,
     after: Mapping[PurePosixPath, tuple['AfterTarget', ...]] | None = None,
@@ -595,6 +585,8 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
         attempts: The run path to attempts already made; 0 when absent.
         first_job_file: The first job file number to number groups from.
         environment: The process environment used to expand run settings.
+        project_root: The directory jobs run in, needed to make a relative
+            ``output_root`` absolute for an ``{after}`` placeholder.
         uncounted: The run path to ``(uncounted attempts, uncounted in a row)``,
             see ``TaskRecord``; ``(0, 0)`` when absent.
         code_snapshots: The run path to code snapshot; ``None`` when absent,
@@ -650,7 +642,7 @@ def plan_jobs(  # noqa: PLR0913 # why: keyword-only public API; each option is d
             'cpus_per_run': str(run.resources.cpus_per_run),
         }
         after_placeholders, upstream_by_grid = _after_placeholders(
-            study=study, machine=machine, grid=grid, run=run.run
+            study=study, machine=machine, grid=grid, run=run.run, project_root=project_root
         )
         placeholders.update(after_placeholders)
         try:
