@@ -72,6 +72,29 @@ jobs:
           if [ "$RUN_SLOW" = true ]; then skip=""; else skip=" and not slow"; fi
           uv run pytest -m "chronocratic$skip" --cov=src/tslab --cov-report=term-missing:skip-covered
 
+  lab-without-torch:
+    # tslab.lab must work without torch, Lightning, sklearn and safetensors installed.
+    name: lab without torch
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: '3.12'
+          enable-cache: true
+      - name: Install
+        run: |
+          uv sync --locked --extra analysis \
+            --no-install-package torch --no-install-package lightning \
+            --no-install-package pytorch-lightning --no-install-package scikit-learn \
+            --no-install-package safetensors --no-install-package torchmetrics
+      - name: Check torch is absent
+        run: uv run --no-sync python -c "import importlib.util as u; assert u.find_spec('torch') is None"
+      - name: Tests
+        run: uv run --no-sync pytest tests/lab -q
+
   docs:
     # Same build as Read the Docs; warnings fail it.
     name: docs
