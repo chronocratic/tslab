@@ -9,7 +9,7 @@ PyPI; never edit it inside `.venv/`. The full guide is at
 ## 1. What TSLab gives you
 
 - **Run:** `with tslab.lab.Run(config=..., root=..., relative_path=...) as run:`
-  owns one folder, locks it, seeds the random number generators, writes
+  owns one folder, locks it, seeds Python `random` and NumPy, writes
   `config.yaml`, `meta.json` and `status.json`, and starts the trackers.
 - **Stage:** a cached, resumable step; a function decorated with
   `@tslab.lab.stage`. A script calls stages like ordinary functions, in any
@@ -65,4 +65,5 @@ Check the plan with `--dry-run` before a real submit. Never edit files under
 - Put experiment settings on the config dataclass or the study, machine
   settings only in `machines/*.toml`.
 - A stage takes keyword-only arguments, including `run`, and returns an artifact.
+- A stage that uses deep learning code must import `tslab.ml`. The lab seeds Python `random` and NumPy only; importing `tslab.ml` adds seeding and hardware metadata for that code. Without the import, the stage is not seeded for it.
 - Keep tests fast; add a smoke test for every new script.

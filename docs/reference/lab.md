@@ -1,4 +1,4 @@
-# API reference
+# Lab reference
 
 ## Core
 
@@ -24,36 +24,12 @@ The fixed sets of choices that more than one package uses. `InstanceState`,
    :exclude-members: InstanceState, LogLevel, RunState
 ```
 
-## Interfaces
-
-```{eval-rst}
-.. automodule:: tslab.ml.interfaces
-   :members:
-   :imported-members:
-
-.. automodule:: tslab.ts.interfaces
-   :members:
-   :imported-members:
-```
-
-## Ready stages
-
-```{eval-rst}
-.. automodule:: tslab.ml.stages
-   :members:
-   :imported-members:
-
-.. automodule:: tslab.ts.stages
-   :members:
-   :imported-members:
-```
-
 ## Studies
 
 The study layer; user study modules import only from `tslab.lab.study`, and that
 import never pulls in heavy code. The commands (`submit`, `status`,
 `resubmit`, `results`) are the `tslab study` CLI; see
-[Studies and HPC](studies.md).
+[Studies and HPC](../lab/studies.md).
 
 ```{eval-rst}
 .. autoclass:: tslab.lab.study.Study
@@ -82,45 +58,13 @@ helpers have no TSLab dependency.
 
 | Command | What it does | Flags |
 |---|---|---|
-| `tslab new PATH` | copy the project template to `PATH` | `--name` (distribution name; default: the folder name) |
+| `tslab new PATH` | copy a project template to `PATH` | `--template {lab,ts}` (default `ts`), `--name` (distribution name; default: the folder name) |
 | `tslab status PATH` | one line per run below `PATH`, or per instance for one run | `--stage` (only this stage), `--watch SECONDS` |
-| `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](studies.md) | see that page |
+| `tslab study {submit,status,resubmit,results}` | run and follow a study; see [Studies and HPC](../lab/studies.md) | see that page |
 | `tslab wandb-sync ROOT` | resync crashed, failed and killed W&B runs below `ROOT` | `--states`, `--include-offline`, `--wandb-project`, `--wandb-entity`, `--dry-run` |
 
 `--watch SECONDS` refreshes both status commands until Ctrl-C. `tslab status`
 hints point to failed-instance error files; `tslab study status` hints suggest the next action.
-
-## Time series
-
-```{eval-rst}
-.. automodule:: tslab.ts.tasks
-   :members:
-   :imported-members:
-```
-
-## Probes
-
-```{eval-rst}
-.. automodule:: tslab.ts.probes
-   :members:
-   :imported-members:
-```
-
-## Lightning
-
-```{eval-rst}
-.. automodule:: tslab.ml.lightning
-   :members:
-   :imported-members:
-```
-
-## Tracking
-
-```{eval-rst}
-.. automodule:: tslab.ml.tracking
-   :members:
-   :imported-members:
-```
 
 ## Analysis
 
@@ -130,14 +74,3 @@ hints point to failed-instance error files; `tslab study status` hints suggest t
    :imported-members:
 ```
 
-## chronocratic adapters
-
-```{eval-rst}
-.. automodule:: tslab.ts.adapters.chronocratic.models
-   :members:
-   :imported-members:
-
-.. automodule:: tslab.ts.adapters.chronocratic.datasets
-   :members:
-   :imported-members:
-```

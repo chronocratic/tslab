@@ -10,7 +10,7 @@ For agent-driven study runs, follow the [TSLab skill](.agents/skills/tslab/SKILL
 ## 1. What TSLab gives you
 
 - **Run:** `with tslab.lab.Run(config=..., root=..., relative_path=...) as run:`
-  owns one folder, locks it, seeds Python, NumPy and torch, writes
+  owns one folder, locks it, seeds Python `random` and NumPy, and torch once `tslab.ml` is imported, writes
   `config.yaml`, `meta.json` and `status.json`, and starts the trackers.
 - **Stage:** a cached, resumable step. Ready ones are `tslab.ml.stages.train`,
   `tslab.ts.stages.encode` and `tslab.ts.stages.evaluate`; your own are functions
@@ -353,6 +353,7 @@ The project uses the same tooling as TSLab: ruff with every rule on, ty, pytest.
 - Do not delete or hand-edit files in a run folder to force a rerun; use the
   `--run.*` flags.
 - Do not change what a stage computes without bumping its `version`.
+- Do not use torch in a stage without importing `tslab.ml`. A run seeds Python `random` and NumPy; importing `tslab.ml` adds torch seeding and the torch, CUDA and GPU metadata. The ready ts stages import it for you, your own stages must do it.
 - Do not run two processes on the same run folder; the second one fails with
   `tslab.lab.RunLockedError`.
 - Do not commit `data/`, `runs/` or cluster secrets.

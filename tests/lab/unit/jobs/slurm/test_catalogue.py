@@ -103,7 +103,7 @@ def test_unknown_name_lists_valid_names() -> None:
 
 def test_docs_table_matches_catalogue() -> None:
     repo = Path(__file__).resolve().parents[5]
-    text = (repo / 'docs' / 'hpc.md').read_text(encoding='utf-8')
+    text = (repo / 'docs' / 'lab' / 'hpc.md').read_text(encoding='utf-8')
     names = re.findall(r'^\| `([a-z]+-[a-z-]+)` \|', text, re.MULTILINE)
     assert names == [command.name for command in SLURM_COMMANDS]
 

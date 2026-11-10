@@ -20,7 +20,7 @@ myst_enable_extensions = ['colon_fence', 'deflist']
 # register heading slugs so cross-file [text](page.md#section) links resolve at build time
 myst_heading_anchors = 3
 source_suffix = {'.md': 'markdown'}
-exclude_patterns = ['_build']
+exclude_patterns = ['_build', 'superpowers']
 
 html_theme = 'pydata_sphinx_theme'
 html_title = 'TSLab'

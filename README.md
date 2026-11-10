@@ -46,12 +46,17 @@ It also ships:
   `tslab study`, experiment grids on SLURM or locally; and `tslab wandb-sync`,
   which uploads offline W&B runs.
 
+One distribution, three layers: `tslab.lab` (runs, stages, studies, jobs; no
+torch), `tslab.ml` (torch and Lightning) and `tslab.ts` (time series). The lab
+seeds Python `random` and NumPy; importing `tslab.ml` adds torch seeding and
+torch metadata.
+
 ## Install
 
 Python 3.12 or newer. With [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv add tslab                                                 # core only
+uv add tslab                                                 # lab, ml and ts
 uv add "tslab[chronocratic-models,chronocratic-datasets]"    # with the adapters
 ```
 
@@ -60,7 +65,7 @@ Tracker extras: `tslab[wandb]`, `tslab[mlflow]`, `tslab[tensorboard]`.
 ## Start a project
 
 ```bash
-uvx tslab new my-paper
+uvx tslab new my-paper                  # the ts template; add --template lab for a bare project
 cd my-paper
 uv sync
 uv run python -m my_paper.toy_data data
@@ -79,9 +84,9 @@ The generated `README.md` explains the rest.
 
 ## Documentation
 
-[tslab.readthedocs.io](https://tslab.readthedocs.io): concepts, resuming and
-failures, configs and presets, studies, HPC, tracking, extending TSLab, and
-the API.
+[tslab.readthedocs.io](https://tslab.readthedocs.io): three sections, one per
+layer (`tslab.lab` without torch, `tslab.ml`, `tslab.ts`), plus the API and a
+migration page for older code.
 
 ## Contributing
 

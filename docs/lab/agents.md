@@ -171,6 +171,10 @@ uv run tslab study results "$STUDY" --machine "$MACHINE" --out - --json
 
 ## Safety
 
+- Import `tslab.ml` in any stage that uses torch. The lab seeds Python `random` and
+  NumPy only; `tslab.ml` adds torch seeding and the torch, CUDA and GPU metadata.
+  A stage that uses torch without it is not seeded for torch. See
+  [Seeding](run-options.md#seeding).
 - Never pass `--include-done` or `--cancel-live` unless the researcher asks.
 - `--include-done` belongs to `study submit`, not `study resubmit`. It selects
   every non-live run in the chosen slice, including failed, interrupted, and

@@ -76,7 +76,7 @@ from tslab.ts.adapters.chronocratic.datasets import (
   `data:uea`, `data:ett`, `data:electricity`, `data:weather`, with its
   constructor arguments as flags.
 - `ucr_datasets(root=Path(...), names=...)` and `uea_datasets(...)` build the dataset
-  axis of a study (see [Studies and HPC](studies.md)); they set `data`,
+  axis of a study (see [Studies and HPC](../lab/studies.md)); they set `data`,
   `data.dataset_folder_path` and `data.target_column_name` for every name.
 - `build_chronocratic_data_source(config=...)` returns a
   `ChronocraticClassificationData` or a `ChronocraticForecastingData`; check
