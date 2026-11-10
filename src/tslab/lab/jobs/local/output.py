@@ -37,7 +37,7 @@ class TaskInfo:
     """One task of the output.
 
     Attributes:
-        log_file: The file the task's lines are appended to.
+        log_file: The file the lines of the task are appended to.
         index: The task number, shown on the console lines.
         name: The task name, shown between the start and end of the console
             lines.
@@ -73,7 +73,7 @@ class TaskOutput:
             single_slot: Whether the launch runs one task at a time; then the
                 console gets every line, not one line per start and end.
             tasks: The task info per key.
-            header: The header line of a task's log, given its key; called
+            header: The header line of the log of a task, given its key; called
                 when the task starts.
             on_task_state: Called with the key and ``'running'`` or
                 ``'ended'``, or ``None``.

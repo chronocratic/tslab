@@ -105,7 +105,7 @@ def order_runs(*, study: Study, runs: Sequence[StudyRun]) -> list[StudyRun]:
         runs: The runs to order.
 
     Returns:
-        Runs grouped in topological grid order, preserving each grid's input order.
+        Runs grouped in topological grid order, preserving the input order of each grid.
     """
     order = {name: index for index, name in enumerate(grid_order(study=study))}
     return sorted(runs, key=lambda run: order[run.grid])

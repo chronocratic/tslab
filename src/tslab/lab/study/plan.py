@@ -81,7 +81,7 @@ class ResolvedRun:
         run: The study run this resolves.
         settings: The settings of the run, then the machine settings, then the
             settings of the matching machine overrides; not yet expanded.
-        resources: The resources of the run, from its machine's backend.
+        resources: The resources of the run, from the backend of its machine.
     """
 
     run: StudyRun

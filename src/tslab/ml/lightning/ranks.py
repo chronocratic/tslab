@@ -15,7 +15,7 @@ def agree(*, key: str, value: bool, environment: Mapping[str, str]) -> bool:
 
     Args:
         key: Unique stage decision key.
-        value: This rank's decision; rank zero decides for all ranks.
+        value: The decision of this rank; rank zero decides for all ranks.
         environment: SLURM job and process variables.
 
     Returns:
