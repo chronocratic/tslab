@@ -10,14 +10,14 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tests.unit.study.helpers import chained_study
-from tslab.enums import AfterCondition, ChainedRetry, LauncherKind, Retry
-from tslab.study import After, Grid, setting_axis, Study
-from tslab.study.definition import expand_runs, Settings
-from tslab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
-from tslab.study.machine.profile import FollowupSettings
-from tslab.study.plan import (
+from tests.lab.unit.study.configs import grid
+from tests.lab.unit.study.helpers import chained_study
+from tslab.lab.enums import AfterCondition, ChainedRetry, LauncherKind, Retry
+from tslab.lab.study import After, Grid, setting_axis, Study
+from tslab.lab.study.definition import expand_runs, Settings
+from tslab.lab.study.machine import LocalSettings, MachineOverride, MachineProfile, SlurmSettings
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.plan import (
     _override_warnings,
     _worker_count,
     check_machine,
@@ -86,7 +86,7 @@ def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
         check_machine(study=study, machine=machine)
     machine = _local(tmp_path, overrides=(MachineOverride(match={'nope': ('x',)}, settings={}),))
     warned: set[str] = set()
-    with caplog.at_level(logging.WARNING, logger='tslab.study'):
+    with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         check_machine(study=study, machine=machine, warned=warned)
         resolve_runs(
             study=study, machine=machine, runs=expand_runs(study=study), warned=warned, local_cpus=1

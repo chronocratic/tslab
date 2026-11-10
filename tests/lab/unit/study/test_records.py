@@ -10,11 +10,11 @@ from typing import Any, cast
 
 import pytest
 
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, LauncherKind, RunState
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.launchers.tables import JOB_RECORDS
-from tslab.study.records import (
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, LauncherKind, RunState
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.launchers.tables import JOB_RECORDS
+from tslab.lab.study.records import (
     append_job,
     JobKind,
     JobRecord,
@@ -100,7 +100,7 @@ def test_partial_last_line_is_skipped(tmp_path: Path, caplog: pytest.LogCaptureF
     append_job(path=path, record=job(job_id='100'))
     with path.open('a') as handle:
         handle.write('{"format_version": 1, "kind": "ru')
-    with caplog.at_level(logging.WARNING, logger='tslab.study'):
+    with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         assert [record.job_id for record in read_jobs(path=path)] == ['100']
     assert 'line 2' in caplog.text
 

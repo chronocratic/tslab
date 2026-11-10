@@ -6,19 +6,19 @@ import logging
 import sys
 from typing import Any, cast
 
-from tslab.cli.common import configure_logging, output, UsageError, use_stderr
-from tslab.cli.parser import (
+from tslab.lab.cli.common import configure_logging, output, UsageError, use_stderr
+from tslab.lab.cli.parser import (
     _parse,
     _split_pass_through,
     _system_exit_code,
     _takes_pass_through,
     Command,
 )
-from tslab.enums import OutputFormat
+from tslab.lab.enums import OutputFormat
 
 __all__ = ['main']
 
-_LOGGER = logging.getLogger('tslab.cli')
+_LOGGER = logging.getLogger('tslab.lab.cli')
 
 
 def main(args: Sequence[str] | None = None) -> None:

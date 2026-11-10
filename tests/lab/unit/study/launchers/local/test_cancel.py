@@ -10,8 +10,7 @@ import time
 
 import pytest
 
-from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finished_pid,
     no_sleep,
@@ -19,11 +18,12 @@ from tests.unit.study.helpers import (
     study_directory,
     write_launch,
 )
-from tslab.cli import main
-from tslab.core.meta import hostname
-from tslab.jobs.local import boot_id
-from tslab.study.commands import cancel, resubmit, submit
-from tslab.study.context import load_context, Selection
+from tests.support.fake_slurm import FakeSlurm
+from tslab.lab.cli import main
+from tslab.lab.core.meta import hostname
+from tslab.lab.jobs.local import boot_id
+from tslab.lab.study.commands import cancel, resubmit, submit
+from tslab.lab.study.context import load_context, Selection
 
 
 def _sleeper() -> subprocess.Popen[bytes]:
@@ -46,7 +46,7 @@ def test_local_cancel_without_launch_is_noop(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    with caplog.at_level('INFO', logger='tslab.study.launchers.local.cancel'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.launchers.local.cancel'):
         assert cancel(context=ctx, dry_run=False) == (0, [])
     assert 'nothing to cancel' in caplog.text
 
@@ -176,7 +176,7 @@ def test_local_cancel_dead_partial_selection_is_usage_error(
         selected = {report.job_id for report in ctx.reports}
         missed = [key for key in ids if key not in selected]
         assert missed
-        with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
+        with caplog.at_level('ERROR', logger='tslab.lab.study.launchers.local.cancel'):
             assert cancel(context=ctx, dry_run=False) == (2, [])
         assert 'as one unit' in caplog.text
         assert all(key in caplog.text for key in missed)
@@ -230,7 +230,7 @@ def test_local_cancel_signal_flag_is_usage_error(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     ctx = context(project=project, machine_file='local.toml')
-    with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
+    with caplog.at_level('ERROR', logger='tslab.lab.study.launchers.local.cancel'):
         assert cancel(context=ctx, dry_run=False, signal='USR2') == (2, [])
     assert 'cancel --signal is SLURM only' in caplog.text
 
@@ -258,7 +258,7 @@ def test_local_cancel_partial_selection_is_usage_error(
             local_cpus=1,
             environment=os.environ,
         )
-        with caplog.at_level('ERROR', logger='tslab.study.launchers.local.cancel'):
+        with caplog.at_level('ERROR', logger='tslab.lab.study.launchers.local.cancel'):
             assert cancel(context=ctx, dry_run=False) == (2, [])
         assert 'as one unit' in caplog.text
         assert child.poll() is None

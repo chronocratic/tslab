@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.tasks import TSDataInfo
+from tslab.ts.tasks import TSDataInfo
 
 
 def test_ts_data_info_rejects_bad_facts() -> None:

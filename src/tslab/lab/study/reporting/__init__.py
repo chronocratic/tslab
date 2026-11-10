@@ -6,8 +6,8 @@ table (``result_table``), the failure accounting (``failures``), the usage
 document (``usage``), the JSON and text documents (``documents``) and the
 wait for a study to settle (``wait``).
 
-The modules import ``tslab.study.context`` and ``tslab.study.launchers`` at
+The modules import ``tslab.lab.study.context`` and ``tslab.lab.study.launchers`` at
 import time, so this package does not re-export them from its ``__init__``:
 it would create an import cycle. Import from a submodule,
-e.g. ``from tslab.study.reporting.state import StudyState``.
+e.g. ``from tslab.lab.study.reporting.state import StudyState``.
 """

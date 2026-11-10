@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from tslab.jobs.slurm import (
+from tslab.lab.jobs.slurm import (
     format_slurm_duration,
     parse_sacct_duration,
     parse_slurm_duration,

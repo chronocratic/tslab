@@ -10,10 +10,10 @@ pytest.importorskip('pandas')
 pytest.importorskip('matplotlib')
 pytest.importorskip('scipy')
 
-from tslab.analysis import Caption  # why: the extras must be checked first
+from tslab.lab.analysis import Caption  # why: the extras must be checked first
 
-REPOSITORY = Path(__file__).parents[2]
-NOTEBOOK = REPOSITORY / 'src/tslab/templates/project/notebooks/analysis.ipynb'
+REPOSITORY = Path(__file__).parents[3]
+NOTEBOOK = REPOSITORY / 'src/tslab/ts/templates/project/notebooks/analysis.ipynb'
 SYNTHETIC_MARKER = '# synthetic'
 
 
@@ -48,7 +48,7 @@ def test_synthetic_sections_run_and_are_marked(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     shown: list[object] = []
-    monkeypatch.setattr('tslab.analysis.show', lambda *, blocks: shown.extend(blocks))
+    monkeypatch.setattr('tslab.lab.analysis.show', lambda *, blocks: shown.extend(blocks))
     code = cells(kind='code')
     namespace: dict[str, object] = {}
     for source in [code[0], code[1], *(s for s in code if s.startswith(SYNTHETIC_MARKER))]:

@@ -2,9 +2,9 @@
 
 import json
 
-from tslab.enums import LauncherKind
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.records import JobKind, JobRecord
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.records import JobKind, JobRecord
 
 
 def _record(*, job_name: str | None) -> SlurmJobRecord:

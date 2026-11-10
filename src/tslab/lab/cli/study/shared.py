@@ -8,17 +8,17 @@ import os
 from pathlib import Path
 import shlex
 
-from tslab.cli.common import Request, UsageError
-from tslab.enums import StudyState
-from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
-from tslab.study.commands import parse_states
-from tslab.study.context import Context, load_context, records_context, Selection
-from tslab.study.launchers.cpus import available_cpus
-from tslab.study.launchers.tables import backend_for
-from tslab.study.machine import resolve_machine
-from tslab.study.project import find_studies, load_project_settings, ProjectSettings
+from tslab.lab.cli.common import Request, UsageError
+from tslab.lab.enums import StudyState
+from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
+from tslab.lab.study.commands import parse_states
+from tslab.lab.study.context import Context, load_context, records_context, Selection
+from tslab.lab.study.launchers.cpus import available_cpus
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.machine import resolve_machine
+from tslab.lab.study.project import find_studies, load_project_settings, ProjectSettings
 
-_LOGGER = logging.getLogger('tslab.cli.study')
+_LOGGER = logging.getLogger('tslab.lab.cli.study')
 
 
 def _context_of(  # noqa: PLR0913 # why: keyword-only; each option is one flag of the command

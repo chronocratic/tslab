@@ -13,11 +13,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from tslab.analysis.stats import Direction
-from tslab.core.paths import require_path
-from tslab.enums import InstanceState
-from tslab.study.definition import Study
-from tslab.study.reporting.result_table import (
+from tslab.lab.analysis.stats import Direction
+from tslab.lab.core.paths import require_path
+from tslab.lab.enums import InstanceState
+from tslab.lab.study.definition import Study
+from tslab.lab.study.reporting.result_table import (
     INSTANCE_COLUMN,
     INSTANCE_STATE_COLUMN,
     METRIC_PREFIX,

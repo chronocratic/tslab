@@ -3,10 +3,10 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from tslab.enums import ChainedRetry, LauncherKind, Retry
-from tslab.study.definition import SettingValue
-from tslab.study.machine.local import LocalSettings
-from tslab.study.machine.slurm import SlurmSettings
+from tslab.lab.enums import ChainedRetry, LauncherKind, Retry
+from tslab.lab.study.definition import SettingValue
+from tslab.lab.study.machine.local import LocalSettings
+from tslab.lab.study.machine.slurm import SlurmSettings
 
 __all__ = ['FollowupSettings', 'MachineOverride', 'MachineProfile', 'wants_retry_followup']
 

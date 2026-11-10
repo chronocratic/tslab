@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from tslab.core.paths import (
+from tslab.lab.core.paths import (
     normalize_instance_name,
     require_path,
     validate_relative_path,

@@ -5,11 +5,11 @@ from types import MappingProxyType
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Grid, Override, Study
-from tslab.study.definition import expand_runs
-from tslab.study.reporting.documents import show_document
-from tslab.study.reporting.report import log_show
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Grid, Override, Study
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.reporting.documents import show_document
+from tslab.lab.study.reporting.report import log_show
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -163,7 +163,7 @@ def test_log_show_lists_study_settings_before_grids(caplog: pytest.LogCaptureFix
     study = Study(
         name='s', settings={'trainer.max_epochs': 5}, grids={'g': _grid_without_trainer_axis()}
     )
-    with caplog.at_level(logging.INFO, logger='tslab.study.reporting.report'):
+    with caplog.at_level(logging.INFO, logger='tslab.lab.study.reporting.report'):
         log_show(study=study)
     messages = [record.message for record in caplog.records]
     assert messages.index('study settings:') < next(

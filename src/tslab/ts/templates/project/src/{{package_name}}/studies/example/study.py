@@ -1,6 +1,6 @@
 """The full example study, with classification and forecasting grids."""
 
-from tslab.study import Study
+from tslab.lab.study import Study
 
 from {{package_name}}.studies.common import classification_grid, forecasting_grid
 

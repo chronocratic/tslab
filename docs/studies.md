@@ -44,7 +44,7 @@ The common package can build a grid from shared axes and recipes:
 
 ```python
 # my_paper/studies/common/grids.py
-from tslab.study import Grid, setting_axis
+from tslab.lab.study import Grid, setting_axis
 
 from my_paper import classify
 from my_paper.studies.common.datasets import TOY_UCR
@@ -69,7 +69,7 @@ that study, while machine profiles set only machine settings:
 
 ```python
 # my_paper/studies/example/study.py
-from tslab.study import Study
+from tslab.lab.study import Study
 
 from my_paper.studies.common import classification_grid
 
@@ -95,7 +95,7 @@ recipe value with `from_presets(..., without=(...))` when the study owns it.
 With `studies = "my_paper.studies"` in `tslab.toml`, the short name `example`
 resolves to `my_paper.studies.example:study`. Put each study in its own module
 or package; shared definitions belong in `common`. Run `tslab study list` to
-discover the available names; `--json` emits the `tslab.study-list/1` schema.
+discover the available names; `--json` emits the `tslab.lab.study-list/1` schema.
 Importing a study imports the user's scripts, so a few seconds on a login node
 is normal.
 
@@ -119,7 +119,7 @@ Rules that matter when writing one:
 - **Validation at import:** every settings path must exist on the
   `config` of the grid (a typo fails before anything is submitted). **Validation at
   `submit`, `resubmit` and `--dry-run`:** each selected run is parsed with
-  `tslab.parse_config` before any job is written, so missing required fields,
+  `tslab.lab.parse_config` before any job is written, so missing required fields,
   wrong types and impossible union choices are caught there.
 - **`setting_axis(*, path, values)`** is `{str(v): {path: v} for v in values}`:
   seeds, learning rates, epochs. Any other hand-written mapping of value name
@@ -516,7 +516,7 @@ A grid can run after other grids of its study. Give it `after`, a tuple of `Afte
 entries:
 
 ```python
-from tslab.study import After, Grid
+from tslab.lab.study import After, Grid
 
 probe = Grid(
     short_name='probe',
@@ -691,7 +691,7 @@ TSLab writes the CSV with the standard library and adds no analysis;
 Python: `Study.results(*, machine)` returns the rows).
 
 Use `--out -` to write CSV to standard output. Add `--json` to write the
-versioned `tslab.study-results/1` document to a file or standard output:
+versioned `tslab.lab.study-results/1` document to a file or standard output:
 
 ```bash
 uv run tslab study results example --machine cluster --out -
@@ -703,7 +703,7 @@ uv run tslab study results example --machine cluster --out - --json
 `tslab study show` lists each grid, its command, axis value names, and run
 counts without needing a machine profile. Use those names to form `--grid` and
 `--only axis=value` selections. Add `--json` for the
-`tslab.study-show/1` document. See the [Agent guide](agents.md).
+`tslab.lab.study-show/1` document. See the [Agent guide](agents.md).
 
 ```bash
 uv run tslab study show example --json
@@ -793,7 +793,7 @@ of the time suggestion, their memory still counting.
 One line per resource group (the runs that share the resolved `[slurm]`
 settings) suggests a `time` and a `mem_per_cpu` that fit the largest run of
 the group with a 20 percent margin; that is the value to put in the machine
-profile. `--json` prints the `tslab.study-usage/1` document. On a local machine
+profile. `--json` prints the `tslab.lab.study-usage/1` document. On a local machine
 it reads the usage files of the tasks instead of `sacct` (see
 [Local machines](#local-machines)).
 

@@ -108,7 +108,7 @@ A run killed by a time limit shows as `interrupted`; the same command resumes it
 ## Add a stage
 
 `src/{{package_name}}/stages.py` has an example (`add_noise`) and explains
-`@tslab.stage`. Call your stage from a script like any function.
+`@tslab.lab.stage`. Call your stage from a script like any function.
 
 ## Check the code
 

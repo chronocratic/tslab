@@ -6,7 +6,7 @@ import sys
 
 import pytest
 
-from tslab.study.definition import load_study
+from tslab.lab.study.definition import load_study
 
 
 @pytest.fixture(autouse=True)
@@ -18,8 +18,8 @@ def _drop_loaded_studies() -> Generator[None]:
 
 def test_load_study(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / 'my_studies.py').write_text(
-        'from tests.unit.study.configs import grid\n'
-        'from tslab.study import Study\n'
+        'from tests.lab.unit.study.configs import grid\n'
+        'from tslab.lab.study import Study\n'
         '\n'
         'rbs = Study(name="rbs", grids={"c": grid()})\n'
         'NOT_A_STUDY = 1\n'
@@ -47,8 +47,8 @@ def test_load_study_import_error_keeps_the_cause(
 
 def test_load_study_leaves_sys_path_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / 'my_studies.py').write_text(
-        'from tests.unit.study.configs import grid\n'
-        'from tslab.study import Study\n'
+        'from tests.lab.unit.study.configs import grid\n'
+        'from tslab.lab.study import Study\n'
         '\n'
         'rbs = Study(name="rbs", grids={"c": grid()})\n'
     )
@@ -79,8 +79,8 @@ def test_load_study_prefers_the_module_of_the_current_folder(
     for folder, name in (('one', 'first'), ('two', 'second')):
         (tmp_path / folder).mkdir()
         (tmp_path / folder / 'my_studies.py').write_text(
-            'from tests.unit.study.configs import grid\n'
-            'from tslab.study import Study\n'
+            'from tests.lab.unit.study.configs import grid\n'
+            'from tslab.lab.study import Study\n'
             '\n'
             f'rbs = Study(name="{name}", grids={{"c": grid()}})\n'
         )
@@ -100,8 +100,8 @@ def test_load_study_prefers_the_nested_package_of_the_current_folder(
         for package in (root / 'pkg', root / 'pkg' / 'studies'):
             (package / '__init__.py').write_text('', encoding='utf-8')
         (study_package / '__init__.py').write_text(
-            'from tests.unit.study.configs import grid\n'
-            'from tslab.study import Study\n'
+            'from tests.lab.unit.study.configs import grid\n'
+            'from tslab.lab.study import Study\n'
             f"study = Study(name='{name}', grids={{'g': grid()}})\n",
             encoding='utf-8',
         )

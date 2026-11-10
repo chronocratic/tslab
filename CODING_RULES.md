@@ -9,7 +9,7 @@ fragments.
 Part I and Part II are general principles and standards. Part III holds the
 rules specific to TSLab; where a general rule and a TSLab rule differ, the
 TSLab rule wins. Ruff (every rule on), ty (every rule an error) and the tests
-in `tests/import_rules/` enforce most of Part III. Where a tool does not
+in `tests/repo/` enforce most of Part III. Where a tool does not
 enforce a rule, reviewers do.
 
 # Part I: Principles of Effective Coding and Collaboration
@@ -91,7 +91,7 @@ experimentation code rather than production-grade deployments.
 - Keep lines concise; avoid deeply nested loops and rely on built-in library functions where possible. No nested `if` either (see Part III, Control flow).
 - Always write robust code that is readable and expandable. Follow the principles introduced in the "Robust Python" book by Patrick Viafore, which emphasizes writing clear and maintainable code, using type hints and docstrings effectively, and organizing code into modular components for better readability and maintainability.
 - Do not always write `from __future__ import annotations` at the top of every file. Use it when it is absolutely necessary to avoid crashes due to circular imports or when it significantly improves readability by allowing for forward references in type hints.
-- **Prioritize Lightning** for all training-related code, inside `tslab.lightning` only (the engine never imports Lightning; see `AGENTS.md`):
+- **Prioritize Lightning** for all training-related code, inside `tslab.ml.lightning` only (the engine never imports Lightning; see `AGENTS.md`):
   - Use `LightningModule` to define models and training/validation/test steps.
   - Use `LightningDataModule` or well-structured data-loading classes for consistent, scalable datasets.
   - Keep logging and checkpointing within the Lightning ecosystem (loggers, callbacks) for minimal boilerplate. Configuration stays in TSLab configs.
@@ -104,15 +104,15 @@ experimentation code rather than production-grade deployments.
 - All function calls should be using keyword arguments (kwargs) for better readability and flexibility.
 - When needed, use design patterns to structure the codebase, including but not limited to the ones below. Use one when it removes a branch that repeats or when two or more implementations exist; never for single-use code.
   - **Creational Patterns:** Singleton, Factory Method, Abstract Factory, Builder, Prototype, Object Pool
-    - e.g. Factory Method (a table) to pick the launcher of a machine profile, Prototype with `dataclasses.replace` for changed settings, Object Pool for the GPU leases in `tslab.jobs.local`. No Singleton: it is hidden state; pass shared objects as parameters.
+    - e.g. Factory Method (a table) to pick the launcher of a machine profile, Prototype with `dataclasses.replace` for changed settings, Object Pool for the GPU leases in `tslab.lab.jobs.local`. No Singleton: it is hidden state; pass shared objects as parameters.
   - **Structural Patterns:** Adapter, Bridge, Composite, Decorator, Facade, Flyweight, Proxy
-    - e.g. Adapter for integrating third-party libraries or APIs (`tslab.adapters.chronocratic`, `LightningTrainer`), Facade for simplifying complex subsystems (`tslab/__init__.py`), Decorator for extending functionality dynamically (`@tslab.stage`).
+    - e.g. Adapter for integrating third-party libraries or APIs (`tslab.ts.adapters.chronocratic`, `LightningTrainer`), Facade for simplifying complex subsystems (`tslab/__init__.py`), Decorator for extending functionality dynamically (`@tslab.lab.stage`).
   - **Behavioral Patterns:** Chain of Responsibility, Command, Interpreter, Iterator, Mediator, Memento, Observer, State, Strategy, Template Method, Visitor, Null Object
     - e.g. Strategy for swappable algorithms or processing pipelines (`Tracker`, `Trainer`, `DownstreamModel`, the study `Launcher`), Observer for event-driven logic (the `on_start`, `on_line`, `on_end` callbacks of `run_commands`, Lightning callbacks), Command for encapsulating actions or operations (`PoolCommand`), Template Method for fixed steps with hooks (`Stage`), Null Object to remove `None` checks (`UnavailableArtifact`), Chain of Responsibility for "the first rule that matches wins", Memento for resumable state (checkpoints, `status.json`), State for fixed state sets (`RunState`, `StudyState`), Iterator for lazy items (generators).
   - **Architectural Patterns:** MVC, MVP, MVVM, Repository, Unit of Work, CQRS, Event Sourcing, Layered Architecture, Hexagonal (Ports & Adapters), Clean Architecture, Microservices, Service Locator, Dependency Injection
     - e.g. Repository for data access abstraction (`read_jobs` and `append_job` in `study/records.py`), Dependency Injection for decoupling components (`sleep`, `environment`, `now` and `trackers` keyword parameters), Layered Architecture and Ports & Adapters for the engine against its integrations (`core/` and `interfaces/` against `lightning/`, `probes/`, `adapters/`), Unit of Work for changes kept or dropped together (`Run` as a context manager, a stage work folder published by rename). TSLab is a library, not a service or a GUI: no MVC, MVP, MVVM, CQRS, Event Sourcing, Microservices or Service Locator.
   - **Concurrency Patterns:** Active Object, Monitor Object, Half-Sync/Half-Async, Thread Pool, Reactor, Proactor, Scheduler, Read-Write Lock, Producer-Consumer
-    - e.g. Thread Pool for managing parallel workloads (`run_commands` in `tslab.jobs.local`), Producer-Consumer for async data pipelines (the output lines of `run_process`), Read-Write Lock for safe concurrent access (shared and exclusive GPU locks with `tasks_per_gpu`), Monitor Object for shared state behind one lock (the task output of a local launch).
+    - e.g. Thread Pool for managing parallel workloads (`run_commands` in `tslab.lab.jobs.local`), Producer-Consumer for async data pipelines (the output lines of `run_process`), Read-Write Lock for safe concurrent access (shared and exclusive GPU locks with `tasks_per_gpu`), Monitor Object for shared state behind one lock (the task output of a local launch).
 
 ## Naming Conventions
 - For **Python**, use `snake_case` for functions/variables and `PascalCase` for classes.
@@ -128,8 +128,8 @@ experimentation code rather than production-grade deployments.
 - Write **unit tests** for data preprocessing and model components:
   - In Python, use `pytest`; maintain test coverage (`pytest-cov` is installed; a change does not lower the coverage of the code it touches).
   - In Rust, use the built-in test framework (`cargo test`).
-- Include integration tests for training loops (small dataset or subset), in `tests/integration/` on small synthetic data.
-- Set seeds for reproducible experiments with `tslab.core.seeding.seed_everything(seed=...)`, which seeds `random`, NumPy and PyTorch; `Run` calls it for every run.
+- Include integration tests for training loops (small dataset or subset), in `tests/<layer>/integration/` on small synthetic data.
+- Set seeds for reproducible experiments with `tslab.lab.core.seeding.seed_everything(seed=...)`, which seeds `random`, NumPy and PyTorch; `Run` calls it for every run.
 
 ## Research Code (No Deployment)
 - Assume code is local or HPC-based; skip production frameworks and containerization unless you specify otherwise.
@@ -271,7 +271,7 @@ they have to read.
 16. Keyword arguments in calls also apply to your own functions; the only
     exception is a third-party API with positional-only parameters.
 17. **Dataclasses are `@dataclass(frozen=True, kw_only=True)`**, written on one
-    line. `tests/import_rules/test_dataclass_rules.py` checks every `.py` and
+    line. `tests/repo/test_dataclass_rules.py` checks every `.py` and
     `.md` file. Mappings in frozen dataclasses are read-only (`MappingProxyType`
     or a tuple of pairs), so frozen really means frozen.
 18. **Paths are always `pathlib.Path`, never `str`.** Every value that is a
@@ -287,7 +287,7 @@ they have to read.
     opens directly is a `pathlib.PurePosixPath`; join it to a root `Path` before
     touching the disk, and save it with `.as_posix()`.
 19. **Atomic writes:** write a temporary file, `fsync`, then rename. Use the
-    helpers in `tslab.core.files` (`atomic_write_text`, `atomic_write_json`).
+    helpers in `tslab.lab.core.files` (`atomic_write_text`, `atomic_write_json`).
     A crash must never leave a half-written file that looks valid.
 20. **Names say what things are:** a scope prefix plus what it is
     (`TSForecastingDataInfo`, `LightningTrainer`, `DownstreamModel`), never a
@@ -326,7 +326,7 @@ they have to read.
 29. Comments explain **why**, not what. Remove comments that repeat the code.
 30. Comments and docs explain themselves: never refer to internal design
     notes, decision ids, issue-tracker shorthand or files that are not in the
-    repository. Write the reason itself ("keeps `import tslab.core.run` free
+    repository. Write the reason itself ("keeps `import tslab.lab.core.run` free
     of Lightning").
 31. No academic citations in code, docstrings or docs: no author names, no
     years, no "as in the ... paper". Model names such as `TS2Vec` and `CoST` stay.
@@ -343,13 +343,13 @@ they have to read.
 
 36. Test first: write the test, see it fail for the expected reason, write the
     code, see it pass, then run the full checks.
-37. Tests mirror the source: code in `src/tslab/study/plan.py` is tested in
-    `tests/unit/study/test_plan.py`. Tests of a package that may move to its
-    own distribution (`tslab.jobs`) import no other test folder, and no other
+37. Tests mirror the source: code in `src/tslab/lab/study/plan.py` is tested in
+    `tests/lab/unit/study/test_plan.py`. Tests of a package that may move to its
+    own distribution (`tslab.lab.jobs`) import no other test folder, and no other
     test folder imports them.
 38. Every folder a test writes to comes from `tmp_path`. Tests never write
     into the repository.
-39. Tests that use randomness call `tslab.core.seeding.seed_everything(seed=0)`
+39. Tests that use randomness call `tslab.lab.core.seeding.seed_everything(seed=0)`
     or pass an explicit seed.
 40. Test names say what they check (`test_require_path_rejects_str`),
     so they need no docstring.
@@ -362,10 +362,10 @@ they have to read.
 
 44. Settings that change a result change the fingerprint. Settings that
     cannot change a result (device, workers, logging intervals) are
-    `Annotated[..., tslab.NotFingerprinted]`.
+    `Annotated[..., tslab.lab.NotFingerprinted]`.
 45. A change to what a ready stage computes bumps the `version` of that
     stage, so cached results of the old code are not reused.
-46. Run options (`tslab.RunOptions`) never change a fingerprint.
+46. Run options (`tslab.lab.RunOptions`) never change a fingerprint.
 
 ## 12. Modules
 

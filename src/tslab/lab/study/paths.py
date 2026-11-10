@@ -8,11 +8,11 @@ return a ``Path`` or an index, so they stay free of the heavier study modules.
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from tslab.core.paths import require_path
+from tslab.lab.core.paths import require_path
 
 if TYPE_CHECKING:
-    from tslab.study.definition import Study
-    from tslab.study.machine import MachineProfile
+    from tslab.lab.study.definition import Study
+    from tslab.lab.study.machine import MachineProfile
 
 __all__ = ['instance_directory', 'log_file_of', 'next_job_file', 'study_folder', 'usage_file']
 

@@ -4,14 +4,19 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from adapter_helpers import parse
 import chronocratic.datasets
 import pytest
-from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
 import torch
 
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+from tests.ts.adapters.adapter_helpers import parse
+from tests.ts.adapters.synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
+import tslab.lab
+from tslab.lab.core.fingerprint import canonicalize
+import tslab.ml
+from tslab.ml.interfaces import SPLITS
+from tslab.ml.split import Split
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
@@ -19,9 +24,6 @@ from tslab.adapters.chronocratic.datasets import (
     data_settings,
     DATAMODULES,
 )
-from tslab.core.fingerprint import canonicalize
-from tslab.enums import Split
-from tslab.interfaces import SPLITS
 
 pytestmark = pytest.mark.chronocratic
 
@@ -79,8 +81,8 @@ def test_data_settings_round_trip_through_a_config_file(tmp_path: Path) -> None:
     path = tmp_path / 'config.yaml'
     for args in (CLASSIFICATION_ARGS, FORECASTING_ARGS):
         config = parse(Config, *args, '--data.batch-size', '16')
-        tslab.save_config(config=config, path=path)
-        assert tslab.load_config(config_class=Config, path=path) == config
+        tslab.lab.save_config(config=config, path=path)
+        assert tslab.lab.load_config(config_class=Config, path=path) == config
 
 
 def test_classification_info() -> None:

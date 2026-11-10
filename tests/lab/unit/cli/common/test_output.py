@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.cli import main
-from tslab.cli.common import print_json
+from tslab.lab.cli import main
+from tslab.lab.cli.common import print_json
 
 
 def run_main_raw(*args: str) -> int:
@@ -74,7 +74,7 @@ def test_json_command_exception_prints_error_document(
         del argv
         return FailingCommand()
 
-    monkeypatch.setattr('tslab.cli.entrypoint._parse', parse_command)
+    monkeypatch.setattr('tslab.lab.cli.entrypoint._parse', parse_command)
     with pytest.raises(RuntimeError, match='unexpected command failure'):
         main(args=['study', 'show', 'toy_studies:study', '--json'])
 

@@ -6,7 +6,7 @@ import subprocess
 
 import pytest
 
-from tests.unit.study.project import write_toy_project
+from tests.lab.unit.study.project import write_toy_project
 
 
 def toy_project(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str = 'project') -> Path:

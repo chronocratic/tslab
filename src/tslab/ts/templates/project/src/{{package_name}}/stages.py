@@ -1,6 +1,6 @@
 """Your own stages.
 
-``@tslab.stage`` turns a function into a cached, resumable step:
+``@tslab.lab.stage`` turns a function into a cached, resumable step:
 
 - ``name`` is the folder name of the stage under the run folder;
 - ``output`` is the artifact type the function returns;
@@ -10,22 +10,23 @@
 The function takes keyword-only arguments, including ``run``. Its other
 arguments (settings and input artifacts) form the fingerprint; when it matches
 a finished result, the result is loaded instead of computed. Declaring
-``name: tslab.InstanceName | None = None`` lets one run call the stage several
+``name: tslab.lab.InstanceName | None = None`` lets one run call the stage several
 times, once per instance name.
 """
 
 import torch
-import tslab
+import tslab.lab
+import tslab.ts
 
 
-@tslab.stage(name='add_noise', output=tslab.Tensors, version=1)
+@tslab.lab.stage(name='add_noise', output=tslab.lab.Tensors, version=1)
 def add_noise(
     *,
-    run: tslab.Run,
-    name: tslab.InstanceName | None = None,
-    representations: tslab.Tensors,
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,
+    representations: tslab.lab.Tensors,
     std: float,
-) -> tslab.Tensors:
+) -> tslab.lab.Tensors:
     """Add Gaussian noise to the test representations.
 
     A small robustness check: a probe fitted on clean training
@@ -34,7 +35,7 @@ def add_noise(
     Args:
         run: The current run; its seed seeds the noise.
         name: Instance name, one per noise level.
-        representations: From ``tslab.stages.encode``.
+        representations: From ``tslab.ts.stages.encode``.
         std: Standard deviation of the noise.
 
     Returns:
@@ -46,4 +47,4 @@ def add_noise(
     clean = tensors['test_representations']
     noise = torch.randn(clean.shape, generator=generator, dtype=clean.dtype)
     tensors['test_representations'] = clean + std * noise
-    return tslab.Tensors(tensors=tensors)
+    return tslab.lab.Tensors(tensors=tensors)

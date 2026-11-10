@@ -7,18 +7,18 @@ from typing import cast
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, finish_run, submit_study
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import context, finish_run, submit_study
-from tslab.cli import main
-from tslab.cli.study import Status
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
-from tslab.study.commands import parse_states, status
-from tslab.study.context import Context, context_for, expected_starts, Selection
-from tslab.study.definition import After, Grid, Study
-from tslab.study.launchers.common.types import QueuedJob
-from tslab.study.reporting.documents import status_document
-from tslab.study.reporting.report import log_status
+from tslab.lab.cli import main
+from tslab.lab.cli.study import Status
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
+from tslab.lab.study.commands import parse_states, status
+from tslab.lab.study.context import Context, context_for, expected_starts, Selection
+from tslab.lab.study.definition import After, Grid, Study
+from tslab.lab.study.launchers.common.types import QueuedJob
+from tslab.lab.study.reporting.documents import status_document
+from tslab.lab.study.reporting.report import log_status
 
 
 def normalized(text: str) -> str:
@@ -82,7 +82,7 @@ def test_run_lines_stop_after_a_limit(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    monkeypatch.setattr('tslab.study.reporting.report._PROBLEMS_SHOWN', 1)
+    monkeypatch.setattr('tslab.lab.study.reporting.report._PROBLEMS_SHOWN', 1)
     submit_study(project=project)
     fake_backend.set_states(phases={'job-0_0': JobPhase.QUEUED})
     with caplog.at_level('INFO'):
@@ -127,7 +127,7 @@ def test_status_json_has_expected_start(project: Path, fake_backend: FakeBackend
     document = status_document(context=ctx, exit_code=0, starts=starts)
     # why: status_document types the value as object; the runs list is a list of dicts
     runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
-    assert document['schema'] == 'tslab.study-status/1'
+    assert document['schema'] == 'tslab.lab.study-status/1'
     assert runs['g/small/1']['expected_start'] == '2026-11-01T10:00:00'
     assert runs['g/small/1']['pending_reason'] is None
     assert runs['g/small/1']['pending_stuck'] is False

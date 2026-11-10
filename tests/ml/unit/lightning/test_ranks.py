@@ -2,7 +2,7 @@
 
 import pytest
 
-from tslab.lightning import LightningTrainer
+from tslab.ml.lightning import LightningTrainer
 
 
 def test_agree_is_the_identity_in_a_single_task_job(monkeypatch: pytest.MonkeyPatch) -> None:

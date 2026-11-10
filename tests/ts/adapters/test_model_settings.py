@@ -5,14 +5,16 @@ import pickle
 import typing
 from typing import Any
 
-from adapter_helpers import parse
 import chronocratic.models
 from chronocratic.models.augmentation import AugmentationProducer, ViewPair
 import pytest
-from recipes import CropShiftRecipe, JitterThenScaleRecipe
 
-import tslab
-from tslab.adapters.chronocratic.models import (
+from tests.ts.adapters.adapter_helpers import parse
+from tests.ts.adapters.recipes import CropShiftRecipe, JitterThenScaleRecipe
+import tslab.lab
+from tslab.lab.core.fingerprint import canonicalize
+import tslab.ts
+from tslab.ts.adapters.chronocratic.models import (
     chronocratic_model_choice,
     ChronocraticModelChoice,
     model_settings,
@@ -20,8 +22,7 @@ from tslab.adapters.chronocratic.models import (
     recipe_subcommand,
     recipe_view_type,
 )
-from tslab.adapters.chronocratic.models.settings import entry_of
-from tslab.core.fingerprint import canonicalize
+from tslab.ts.adapters.chronocratic.models.settings import entry_of
 
 pytestmark = pytest.mark.chronocratic
 
@@ -123,8 +124,8 @@ def test_model_settings_round_trip_through_a_config_file(tmp_path: Path) -> None
         ('model:timenet',),
     ):
         config = parse(Config, *args)
-        tslab.save_config(config=config, path=path)
-        loaded = tslab.load_config(config_class=Config, path=path)
+        tslab.lab.save_config(config=config, path=path)
+        loaded = tslab.lab.load_config(config_class=Config, path=path)
         assert loaded == config, args
         assert canonicalize(value=loaded) == canonicalize(value=config), args
 
@@ -198,7 +199,7 @@ def test_model_settings_builds_a_member_of_the_choice() -> None:
     )
     assert entry_of(settings=settings).name == 'tstcc'
     assert settings.augmentation == JitterThenScaleRecipe(sigma=0.5)
-    parsed = tslab.parse_config(
+    parsed = tslab.lab.parse_config(
         config_class=Config,
         presets={'tstcc-jitter': ('TSTCC with jitter', Config(model=settings))},
         args=['tstcc-jitter'],

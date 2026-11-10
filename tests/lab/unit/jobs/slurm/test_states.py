@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.jobs.slurm import job_ended, pending_reason_stuck
+from tslab.lab.jobs.slurm import job_ended, pending_reason_stuck
 
 
 def test_a_job_has_ended_unless_it_is_unknown_queued_or_running() -> None:

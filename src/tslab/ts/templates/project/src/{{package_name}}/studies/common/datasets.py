@@ -3,8 +3,8 @@
 from collections.abc import Mapping
 from pathlib import Path
 
-from tslab.adapters.chronocratic.datasets import ucr_datasets
-from tslab.study import Settings
+from tslab.lab.study import Settings
+from tslab.ts.adapters.chronocratic.datasets import ucr_datasets
 
 __all__ = ['TOY_ETT', 'TOY_UCR']
 

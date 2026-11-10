@@ -12,10 +12,10 @@ from chronocratic.datasets import (
 import numpy as np
 import torch
 
-from tslab.adapters.chronocratic.datasets.settings import datamodule_class_of
-from tslab.enums import Split
-from tslab.lightning import LightningDataSource
-from tslab.tasks import check_label_range, TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.ml.lightning import LightningDataSource
+from tslab.ml.split import Split
+from tslab.ts.adapters.chronocratic.datasets.settings import datamodule_class_of
+from tslab.ts.tasks import check_label_range, TSClassificationDataInfo, TSForecastingDataInfo
 
 __all__ = [
     'ChronocraticClassificationData',

@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from tslab.jobs.local import start_detached, start_keep_awake, stop_keep_awake
+from tslab.lab.jobs.local import start_detached, start_keep_awake, stop_keep_awake
 
 
 def _write_command(tmp_path: Path, name: str, body: str) -> Path:

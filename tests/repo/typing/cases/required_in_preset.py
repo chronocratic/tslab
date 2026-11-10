@@ -1,10 +1,10 @@
 # expect-error: none
-"""``tslab.REQUIRED`` type-checks where the marked field's annotation stands."""
+"""``tslab.lab.REQUIRED`` type-checks where the marked field's annotation stands."""
 
 from dataclasses import dataclass
 from pathlib import Path
 
-import tslab
+import tslab.lab
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -13,4 +13,4 @@ class Data:
 
 
 def preset() -> Data:
-    return Data(folder=tslab.REQUIRED)
+    return Data(folder=tslab.lab.REQUIRED)

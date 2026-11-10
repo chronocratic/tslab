@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch
 
-from tslab.core.seeding import seed_everything
+from tslab.lab.core.seeding import seed_everything
 
 
 def draw() -> tuple[float, float, float]:

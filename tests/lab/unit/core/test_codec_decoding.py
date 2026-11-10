@@ -5,9 +5,9 @@ from typing import Annotated
 
 import pytest
 
-from tslab.core.codec import config_to_data, decode_dataclass, strip_annotated, union_members
-from tslab.core.config import ConfigFileError
-from tslab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.codec import config_to_data, decode_dataclass, strip_annotated, union_members
+from tslab.lab.core.config import ConfigFileError
+from tslab.lab.core.fingerprint import NotFingerprinted
 
 
 @dataclass(frozen=True, kw_only=True)

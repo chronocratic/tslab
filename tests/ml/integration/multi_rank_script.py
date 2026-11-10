@@ -4,12 +4,12 @@ import os
 from pathlib import Path
 import sys
 
-from integration_helpers import run_in
-from lightning_toy import ToyData, ToyRegressor
-
-import tslab
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.stages import train
+from tests.ml.integration.lightning_toy import ToyData, ToyRegressor
+from tests.support.integration_helpers import run_in
+import tslab.lab
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+from tslab.ml.stages import train
 
 
 class _MultiRankRegressor(ToyRegressor):
@@ -22,10 +22,10 @@ class _MultiRankData(ToyData):
         return 'multi-rank-data'
 
 
-@tslab.stage(name='after', output=tslab.Json)
-def after(*, run: tslab.Run) -> tslab.Json:
+@tslab.lab.stage(name='after', output=tslab.lab.Json)
+def after(*, run: tslab.lab.Run) -> tslab.lab.Json:
     del run
-    return tslab.Json(data={'rank': os.environ['SLURM_PROCID']})
+    return tslab.lab.Json(data={'rank': os.environ['SLURM_PROCID']})
 
 
 def main(*, run_root: Path) -> None:

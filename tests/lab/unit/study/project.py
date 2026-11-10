@@ -1,7 +1,7 @@
 """A tiny study project written into a folder, for the study command tests.
 
 ``write_toy_project`` writes ``toy_script.py`` (a two-model config that writes
-a real ``status.json`` through ``tslab.Run``), ``toy_studies.py`` (a study with
+a real ``status.json`` through ``tslab.lab.Run``), ``toy_studies.py`` (a study with
 one grid over ``model`` and ``seed``) and the machine profiles ``local.toml``
 and ``cluster.toml``. The command tests point ``tslab study`` at
 ``toy_studies:s`` from this folder, so loading, expansion, planning, launching
@@ -23,7 +23,7 @@ from typing import Annotated
 
 import tyro
 
-import tslab
+import tslab.lab
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -56,10 +56,10 @@ class ToyConfig:
 
 
 def main() -> None:
-    # why: the same parse config tslab.parse_config uses, so the ``model:small``
+    # why: the same parse config tslab.lab.parse_config uses, so the ``model:small``
     # words of the study reach the union
     config = tyro.cli(ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
-    with tslab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
         time.sleep(float(os.environ.get('TOY_SLEEP', '0')))
         succeed_on = int(os.environ.get('TOY_SUCCEED_ON', '0'))
         if succeed_on:
@@ -69,7 +69,7 @@ def main() -> None:
             counter.write_text(str(attempt))
             (folder / 'last.ckpt').write_text('checkpoint')
             if attempt < succeed_on:
-                raise tslab.JobTimeLimitSignal('time limit near')
+                raise tslab.lab.JobTimeLimitSignal('time limit near')
 
 
 if __name__ == '__main__':
@@ -82,7 +82,7 @@ TOY_STUDIES = '''
 import sys
 
 import toy_script
-from tslab.study import DEFAULT_RUN_SETTINGS, Grid, Study
+from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 
 study = Study(
     name='s',

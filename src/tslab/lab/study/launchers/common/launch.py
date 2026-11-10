@@ -4,13 +4,13 @@ from collections.abc import Callable, Sequence
 from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
-from tslab.study.definition import Study
-from tslab.study.launchers.common.protocols import Launcher, WriteJobFiles
-from tslab.study.launchers.common.types import LaunchError, LaunchReport, LaunchStopped
-from tslab.study.machine import MachineProfile
-from tslab.study.paths import study_folder
-from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobRecord, take_progress, TaskRecord
+from tslab.lab.study.definition import Study
+from tslab.lab.study.launchers.common.protocols import Launcher, WriteJobFiles
+from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, LaunchStopped
+from tslab.lab.study.machine import MachineProfile
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import append_job, JobRecord, take_progress, TaskRecord
 
 __all__ = ['launch']
 

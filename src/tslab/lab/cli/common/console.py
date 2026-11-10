@@ -13,8 +13,8 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from tslab.cli.common.errors import UsageError
-from tslab.core.text import TextTable
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.core.text import TextTable
 
 __all__ = ['CONSOLE', 'ConsoleHandler', 'configure_logging', 'make_console', 'use_stderr', 'watch']
 

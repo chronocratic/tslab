@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import AfterCondition, InstanceState, RunState
-from tslab.study import After, Grid, Study
-from tslab.study.context import Context, context_for, Selection
-from tslab.study.definition import expand_runs
-from tslab.study.launchers.local.after_filter import after_filter
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs
-from tslab.study.plan_after import plan_targets
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import AfterCondition, InstanceState, RunState
+from tslab.lab.study import After, Grid, Study
+from tslab.lab.study.context import Context, context_for, Selection
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.launchers.local.after_filter import after_filter
+from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs
+from tslab.lab.study.plan_after import plan_targets
 
 
 def _chain_study(*, condition: AfterCondition = AfterCondition.OK) -> Study:

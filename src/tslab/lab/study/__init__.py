@@ -5,11 +5,11 @@ command and hands them to a launcher; TSLab never runs experiment code.
 
 This package exports the authoring surface, what a study module imports to
 define its grids, and ``slurm_output`` for notebooks. The commands, machine
-profiles and job records live in the submodules (``tslab.study.commands``,
-``tslab.study.context``, ...).
+profiles and job records live in the submodules (``tslab.lab.study.commands``,
+``tslab.lab.study.context``, ...).
 """
 
-from tslab.study.definition import (
+from tslab.lab.study.definition import (
     After,
     check_paths,
     DEFAULT_RUN_SETTINGS,
@@ -23,7 +23,7 @@ from tslab.study.definition import (
     Study,
     StudyRun,
 )
-from tslab.study.slurm import slurm_output
+from tslab.lab.study.slurm import slurm_output
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',

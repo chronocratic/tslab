@@ -1,1 +1,1 @@
-"""Unit tests for the ``tslab.core.meta`` package."""
+"""Unit tests for the ``tslab.lab.core.meta`` package."""

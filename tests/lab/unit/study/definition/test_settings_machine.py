@@ -1,5 +1,5 @@
-from tests.unit.study.configs import ClassifyConfig
-from tslab.study.definition.settings import non_machine_paths
+from tests.lab.unit.study.configs import ClassifyConfig
+from tslab.lab.study.definition.settings import non_machine_paths
 
 
 def test_machine_paths_pass() -> None:

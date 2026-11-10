@@ -6,10 +6,10 @@ from pathlib import Path, PurePosixPath
 
 import pytest
 
+from tests.lab.unit.cli.study.helpers import toy_project
+from tests.lab.unit.study.helpers import context, study_directory, submit_study
 from tests.support.fake_backend import FakeBackend
-from tests.unit.cli.study.helpers import toy_project
-from tests.unit.study.helpers import context, study_directory, submit_study
-from tslab.cli.study import Logs, logs as logs_module
+from tslab.lab.cli.study import Logs, logs as logs_module
 
 _ONE = ('model=small', 'seed=1')
 

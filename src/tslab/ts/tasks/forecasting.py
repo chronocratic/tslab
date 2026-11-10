@@ -3,8 +3,8 @@
 Encoders with per-timestep output (``SequenceEncoder``) encode each full
 series once; every horizon is then cut out of that encoding. Other encoders
 encode sliding windows, once per horizon. Both paths produce the keys of
-``tslab.stages.encode``, so ``tslab.stages.evaluate`` with
-``tslab.probes.RidgeProbe`` evaluates the result.
+``tslab.ts.stages.encode``, so ``tslab.ts.stages.evaluate`` with
+``tslab.ts.probes.RidgeProbe`` evaluates the result.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -14,14 +14,15 @@ from typing import Protocol
 
 import torch
 
-from tslab.core.artifact import Checkpoint, Tensors
-from tslab.core.paths import InstanceName, normalize_instance_name
-from tslab.core.run import Run
-from tslab.core.stage import stage
-from tslab.enums import Split
-from tslab.interfaces import Encoder, SequenceEncoder, SPLITS, Trainer
-from tslab.stages.encode import check_representations, encode_checked, load_encoder
-from tslab.tasks.data import TSDataInfo
+from tslab.lab.core.artifact import Checkpoint, Tensors
+from tslab.lab.core.paths import InstanceName, normalize_instance_name
+from tslab.lab.core.run import Run
+from tslab.lab.core.stage import stage
+from tslab.ml.interfaces import SPLITS, Trainer
+from tslab.ml.split import Split
+from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.stages.encode import check_representations, encode_checked, load_encoder
+from tslab.ts.tasks.data import TSDataInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -396,7 +397,7 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
         run: The current run.
         trainer: Loads the weights into ``model``.
         model: A model of the trained architecture.
-        checkpoint: From ``train``, or ``tslab.Checkpoint.external(...)``.
+        checkpoint: From ``train``, or ``tslab.lab.Checkpoint.external(...)``.
         data: The full series and its split boundaries.
         encoder: Builds the encoder from the loaded model.
         horizons: Steps to forecast, one result each.

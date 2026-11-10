@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.core.ranks import is_writer_process
+from tslab.lab.core.ranks import is_writer_process
 
 
 def test_is_writer_process_is_true_when_all_rank_variables_are_zero_or_unset(

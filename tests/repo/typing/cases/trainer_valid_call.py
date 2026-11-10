@@ -3,12 +3,13 @@ from pathlib import Path
 
 import torch
 
-import tslab
-from tslab.interfaces import DataSource, Trainer
+import tslab.lab
+import tslab.ml
+from tslab.ml.interfaces import DataSource, Trainer
 
 
 def fit_a_linear_model(
-    *, trainer: Trainer[torch.nn.Module], run: tslab.Run, data: DataSource[object]
+    *, trainer: Trainer[torch.nn.Module], run: tslab.lab.Run, data: DataSource[object]
 ) -> torch.nn.Linear:
     model = torch.nn.Linear(in_features=4, out_features=1)
     checkpoint = trainer.fit(

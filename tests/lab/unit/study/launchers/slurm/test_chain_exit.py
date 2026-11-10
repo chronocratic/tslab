@@ -8,19 +8,19 @@ import time
 
 import pytest
 
+from tests.lab.unit.study.helpers import context
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.helpers import context
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, LauncherKind, RunState, StudyState
-from tslab.jobs.slurm import SlurmError
-from tslab.study.commands.resubmit import may_retry
-from tslab.study.context import Context, records_context
-from tslab.study.definition import StudyRun
-from tslab.study.launchers.slurm.chain_exit import chain_exit
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.requeue import at_requeue_limit, restarted_attempt
-from tslab.study.paths import study_folder
-from tslab.study.records import (
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, LauncherKind, RunState, StudyState
+from tslab.lab.jobs.slurm import SlurmError
+from tslab.lab.study.commands.resubmit import may_retry
+from tslab.lab.study.context import Context, records_context
+from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.launchers.slurm.chain_exit import chain_exit
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.requeue import at_requeue_limit, restarted_attempt
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import (
     append_job,
     JobKind,
     latest_tasks,
@@ -28,11 +28,11 @@ from tslab.study.records import (
     read_jobs,
     TaskRecord,
 )
-from tslab.study.reporting.state import collect_states, FolderFacts
+from tslab.lab.study.reporting.state import collect_states, FolderFacts
 
-_STATE_MODULE = import_module('tslab.study.reporting.state')
-_CHAIN_EXIT_MODULE = import_module('tslab.study.launchers.slurm.chain_exit')
-_REQUEUE_MODULE = import_module('tslab.study.launchers.slurm.requeue')
+_STATE_MODULE = import_module('tslab.lab.study.reporting.state')
+_CHAIN_EXIT_MODULE = import_module('tslab.lab.study.launchers.slurm.chain_exit')
+_REQUEUE_MODULE = import_module('tslab.lab.study.launchers.slurm.requeue')
 
 
 def _job_record(*, run: StudyRun, job_file: int, index: int) -> SlurmJobRecord:

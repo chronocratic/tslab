@@ -3,9 +3,9 @@
 This is the only TSLab package that imports scikit-learn.
 """
 
-from tslab.probes.metrics import classification_metrics, forecasting_metrics
-from tslab.probes.ridge import RidgeProbe, RidgeProbeSettings
-from tslab.probes.svm import SVMProbe, SVMProbeSettings
+from tslab.ts.probes.metrics import classification_metrics, forecasting_metrics
+from tslab.ts.probes.ridge import RidgeProbe, RidgeProbeSettings
+from tslab.ts.probes.svm import SVMProbe, SVMProbeSettings
 
 __all__ = [
     'RidgeProbe',

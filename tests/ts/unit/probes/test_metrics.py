@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from sklearn.metrics import f1_score, precision_score
 
-from tslab.probes import classification_metrics, forecasting_metrics
+from tslab.ts.probes import classification_metrics, forecasting_metrics
 
 
 @pytest.mark.parametrize('classes', [2, 3])

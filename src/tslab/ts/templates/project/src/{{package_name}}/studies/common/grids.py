@@ -1,6 +1,6 @@
 """Grid builders shared by the template studies."""
 
-from tslab.study import Grid, Override, setting_axis
+from tslab.lab.study import Grid, Override, setting_axis
 
 from {{package_name}} import classify, forecast
 

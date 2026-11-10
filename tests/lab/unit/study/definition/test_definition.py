@@ -2,9 +2,9 @@
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Override, setting_axis, Study
-from tslab.study.definition import merge_overrides
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Override, setting_axis, Study
+from tslab.lab.study.definition import merge_overrides
 
 
 def test_setting_axis() -> None:

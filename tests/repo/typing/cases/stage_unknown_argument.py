@@ -1,14 +1,14 @@
 # expect-error: unknown-argument
 from pathlib import Path
 
-import tslab
+import tslab.lab
 
 
-@tslab.stage(name='scale', output=tslab.Json)
-def scale(*, run: tslab.Run, factor: float) -> tslab.Json:
-    return tslab.Json(data={'factor': factor})
+@tslab.lab.stage(name='scale', output=tslab.lab.Json)
+def scale(*, run: tslab.lab.Run, factor: float) -> tslab.lab.Json:
+    return tslab.lab.Json(data={'factor': factor})
 
 
-def call(run: tslab.Run) -> None:
+def call(run: tslab.lab.Run) -> None:
     scale(run=run, factr=2.0)
     _ = Path()

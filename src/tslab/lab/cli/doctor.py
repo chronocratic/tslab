@@ -8,13 +8,13 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.core.meta import hostname
-from tslab.core.text import log_table
-from tslab.enums import CheckStatus
-from tslab.study.doctor import run_checks
-from tslab.study.machine import resolve_machine
-from tslab.study.project import ProjectSettings
+from tslab.lab.cli.common import print_json, resolve_request, UsageError
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.text import log_table
+from tslab.lab.enums import CheckStatus
+from tslab.lab.study.doctor import run_checks
+from tslab.lab.study.machine import resolve_machine
+from tslab.lab.study.project import ProjectSettings
 
 __all__ = ['Doctor']
 

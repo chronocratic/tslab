@@ -22,9 +22,9 @@ from typing import override, TYPE_CHECKING
 
 from lightning.pytorch.loggers import Logger, WandbLogger
 
-from tslab.core.tracker import RunStatus
-from tslab.enums import WandbMode
-from tslab.tracking.lightning_bridge import LightningLoggerTracker
+from tslab.lab.core.tracker import RunStatus
+from tslab.ml.tracking.lightning_bridge import LightningLoggerTracker
+from tslab.ml.tracking.wandb_mode import WandbMode
 
 if TYPE_CHECKING:
     import wandb

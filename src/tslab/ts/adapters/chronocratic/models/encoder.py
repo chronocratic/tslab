@@ -11,10 +11,10 @@ from chronocratic.models.convolutional.dilated._mixin.encoding import (
 from chronocratic.models.enums import EncodingOutputShape
 import torch
 
-from tslab.core.fingerprint import NotFingerprinted
-from tslab.core.markers import HardwareSetting
-from tslab.interfaces import Encoder
-from tslab.stages.encoders import resolve_device
+from tslab.lab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.markers import HardwareSetting
+from tslab.ts.interfaces import Encoder
+from tslab.ts.stages.encoders import resolve_device
 
 __all__ = ['ChronocraticEncoder']
 

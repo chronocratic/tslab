@@ -23,7 +23,7 @@ What it shows:
   result is evaluated never recomputes it.
 
 Run it from the root of a TSLab checkout (it reads the toy series in
-``tests/adapters/data``); results go to ``runs/advanced``::
+``tests/ts/adapters/data``); results go to ``runs/advanced``::
 
     uv run python examples/advanced/main.py
     uv run python examples/advanced/main.py --fix-broken-attack
@@ -37,26 +37,28 @@ from typing import Protocol, runtime_checkable
 from chronocratic.models import EncodingOutputShape
 import torch
 
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+import tslab.lab
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+from tslab.ml.split import Split
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticDataChoice,
     ChronocraticForecastingData,
     data_settings,
 )
-from tslab.adapters.chronocratic.models import (
+from tslab.ts.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,
     FingerprintedModel,
     model_settings,
 )
-from tslab.enums import Split
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.probes import RidgeProbe
-from tslab.tasks import forecasting_representations
+from tslab.ts.probes import RidgeProbe
+from tslab.ts.tasks import forecasting_representations
 
-TOY_HOURLY = Path(__file__).parents[2] / 'tests' / 'adapters' / 'data' / 'toy_hourly.csv.gz'
+TOY_HOURLY = Path(__file__).parents[2] / 'tests' / 'ts' / 'adapters' / 'data' / 'toy_hourly.csv.gz'
 TASK = 'forecasting'
 
 
@@ -115,7 +117,7 @@ class AdvancedConfig:
     root: Path = Path('runs')
     relative_path: Path = Path('advanced')
     seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
 @runtime_checkable
@@ -127,17 +129,17 @@ class BatchEncoding(Protocol):
         ...
 
 
-@tslab.stage(name='attack', output=tslab.Tensors)
+@tslab.lab.stage(name='attack', output=tslab.lab.Tensors)
 def attack(  # noqa: PLR0913 # why: a stage takes its inputs as keyword arguments
     *,
-    run: tslab.Run,
-    name: tslab.InstanceName | None = None,
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,
     trainer: LightningTrainer,
     model: FingerprintedModel,
-    checkpoint: tslab.Checkpoint,
+    checkpoint: tslab.lab.Checkpoint,
     data: ChronocraticForecastingData,
     fgsm: FgsmAttack,
-) -> tslab.Tensors:
+) -> tslab.lab.Tensors:
     """Perturb the test part of the series to move its representation away (one FGSM step).
 
     The loss is the squared distance between the representations of the
@@ -175,24 +177,24 @@ def attack(  # noqa: PLR0913 # why: a stage takes its inputs as keyword argument
     (gradient,) = torch.autograd.grad(outputs=drift, inputs=start)
     attacked = series.clone()
     attacked[:, test] = clean + fgsm.epsilon * gradient.sign() * movable
-    return tslab.Tensors(tensors={'series': attacked})
+    return tslab.lab.Tensors(tensors={'series': attacked})
 
 
-@tslab.stage(name='attacked_test_split', output=tslab.Tensors)
+@tslab.lab.stage(name='attacked_test_split', output=tslab.lab.Tensors)
 def attacked_test_split(
     *,
-    run: tslab.Run,
-    name: tslab.InstanceName | None = None,
-    clean: tslab.Tensors,
-    attacked: tslab.Tensors,
-) -> tslab.Tensors:
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,
+    clean: tslab.lab.Tensors,
+    attacked: tslab.lab.Tensors,
+) -> tslab.lab.Tensors:
     """Keep the clean training and validation splits and take the attacked test split.
 
     The probe is then fitted on clean representations and scored on attacked ones.
     """
     del run, name
     test = {key: value for key, value in attacked.tensors.items() if key.startswith('test_')}
-    return tslab.Tensors(tensors={**clean.tensors, **test})
+    return tslab.lab.Tensors(tensors={**clean.tensors, **test})
 
 
 def main(*, config: AdvancedConfig) -> dict[str, float]:
@@ -206,14 +208,14 @@ def main(*, config: AdvancedConfig) -> dict[str, float]:
         for fgsm in config.attacks
     )
     errors: dict[str, float] = {}
-    with tslab.Run(config=config, root=config.root, relative_path=config.relative_path) as run:
+    with tslab.lab.Run(config=config, root=config.root, relative_path=config.relative_path) as run:
         data = build_chronocratic_data_source(config=config.data)
         if not isinstance(data, ChronocraticForecastingData):
             message = 'this example needs a forecasting dataset'
             raise TypeError(message)
         model = build_chronocratic_model(config=config.model, data_info=data.info)
         trainer = LightningTrainer(config=config.trainer)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
         clean = forecasting_representations(
             run=run,
             name=(TASK, 'clean'),
@@ -257,17 +259,17 @@ def main(*, config: AdvancedConfig) -> dict[str, float]:
             }
         for variant, per_horizon in variants.items():
             for horizon, representations in per_horizon.items():
-                metrics = tslab.stages.evaluate(
+                metrics = tslab.ts.stages.evaluate(
                     run=run,
                     name=(TASK, variant, f'h{horizon}'),
                     representations=representations,
                     downstream_model=RidgeProbe(),
                 )
-                if tslab.is_available(artifact=metrics):
+                if tslab.lab.is_available(artifact=metrics):
                     errors[f'{variant}/h{horizon}'] = metrics.values['mse_loss']
     return errors
 
 
 if __name__ == '__main__':
-    for key, error in main(config=tslab.parse_config(config_class=AdvancedConfig)).items():
+    for key, error in main(config=tslab.lab.parse_config(config_class=AdvancedConfig)).items():
         print(f'{key}: mse {error:.4f}')

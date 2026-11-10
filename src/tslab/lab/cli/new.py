@@ -1,7 +1,7 @@
 """``tslab new``: start a research project from the TSLab template.
 
 The template is a set of plain files shipped inside the package
-(``tslab/templates/project``). They are copied with the standard library, and
+(``tslab/ts/templates/project``). They are copied with the standard library, and
 two placeholders are replaced in file names and contents: ``{{project_name}}``
 (the distribution name, for example ``my-paper``) and ``{{package_name}}``
 (the import name, ``my_paper``). The copy belongs to the user from then on.
@@ -17,7 +17,7 @@ from typing import Annotated
 
 import tyro
 
-from tslab.core.paths import require_path
+from tslab.lab.core.paths import require_path
 
 __all__ = ['New', 'create_project']
 
@@ -98,7 +98,7 @@ def create_project(*, path: Path, name: str | None = None) -> str:
         )
         raise ValueError(message)
     replacements = {'{{project_name}}': project_name, '{{package_name}}': package_name}
-    with resources.as_file(resources.files('tslab') / 'templates' / 'project') as template:
+    with resources.as_file(resources.files('tslab') / 'ts' / 'templates' / 'project') as template:
         for source in sorted(template.rglob('*')):
             _copy_template_file(
                 source=source, template=template, path=path, replacements=replacements

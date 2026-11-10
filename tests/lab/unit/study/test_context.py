@@ -8,11 +8,11 @@ from types import MappingProxyType
 
 import pytest
 
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, RunState, StudyState
-from tslab.study import After, Grid, Study
-from tslab.study.context import _upstream_paths, context_for, Selection
-from tslab.study.definition import expand_runs, StudyRun
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, RunState, StudyState
+from tslab.lab.study import After, Grid, Study
+from tslab.lab.study.context import _upstream_paths, context_for, Selection
+from tslab.lab.study.definition import expand_runs, StudyRun
 
 
 @dataclass(frozen=True, kw_only=True)

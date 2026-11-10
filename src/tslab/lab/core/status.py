@@ -11,9 +11,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, UTC
 from pathlib import Path
 
-from tslab.core.files import atomic_write_json, JsonFileError, read_json_object
-from tslab.core.paths import require_path
-from tslab.enums import InstanceState, RunState, ShownRunState
+from tslab.lab.core.files import atomic_write_json, JsonFileError, read_json_object
+from tslab.lab.core.paths import require_path
+from tslab.lab.enums import InstanceState, RunState, ShownRunState
 
 __all__ = [
     'STATUS_FORMAT_VERSION',
@@ -253,7 +253,7 @@ def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> ShownRun
     """
     # why: core.meta.instance imports core.status at module level and core.lock
     # imports core.meta, so a module-level import back would cycle
-    from tslab.core.lock import is_run_active  # noqa: PLC0415
+    from tslab.lab.core.lock import is_run_active  # noqa: PLC0415
 
     if snapshot.run_state is RunState.RUNNING and not is_run_active(directory=directory):
         return ShownRunState.INTERRUPTED

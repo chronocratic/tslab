@@ -7,8 +7,8 @@ from typing import Any
 
 from lightning import LightningModule
 
-from tslab.adapters.chronocratic.models.settings import entry_of, ModelEntry, MODELS
-from tslab.tasks import TSDataInfo
+from tslab.ts.adapters.chronocratic.models.settings import entry_of, ModelEntry, MODELS
+from tslab.ts.tasks import TSDataInfo
 
 __all__ = ['FingerprintedModel', 'build_chronocratic_model']
 

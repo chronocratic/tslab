@@ -11,9 +11,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 import torch
 
-from tslab.enums import Split
-from tslab.probes.metrics import forecasting_metrics
-from tslab.probes.sklearn_probe import (
+from tslab.ml.split import Split
+from tslab.ts.probes.metrics import forecasting_metrics
+from tslab.ts.probes.sklearn_probe import (
     cap_samples,
     fit_on_predefined_split,
     PROTOCOL_RANDOM_STATE,

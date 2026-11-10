@@ -3,12 +3,12 @@
 ## Run, stage, instance
 
 - A **run** is one execution context:
-  `with tslab.Run(config=..., root=..., relative_path=...) as run:`.
+  `with tslab.lab.Run(config=..., root=..., relative_path=...) as run:`.
   It owns a folder `root / relative_path`, takes a lock on it, seeds Python,
   NumPy and torch, writes `config.yaml`, `meta.json` and `status.json`, and
   starts the trackers. Leaving the `with` block always records the final state.
-- A **stage** is a cached step: a function decorated with `@tslab.stage`, or a
-  ready one such as `tslab.stages.train`. Stages are ordinary callables; your
+- A **stage** is a cached step: a function decorated with `@tslab.lab.stage`, or a
+  ready one such as `tslab.ml.stages.train`. Stages are ordinary callables; your
   script decides their order, loops and conditions.
 - An **instance** is one call of a stage in a run. A stage called several times
   gives each call a name: `attack(run=run, name=('forecasting', 'h24', 'fgsm'), ...)`
@@ -30,7 +30,7 @@ When the stored fingerprint matches, the result is loaded. Anything else runs
 the instance again, and everything downstream follows because the
 fingerprints of its inputs changed.
 
-Fields annotated `Annotated[..., tslab.NotFingerprinted]` (device, number of
+Fields annotated `Annotated[..., tslab.lab.NotFingerprinted]` (device, number of
 workers, logging intervals) never change a fingerprint: they cannot change the
 result. Paths are fingerprinted as paths, not by content; use
 `Artifact.external(path=...)` for a file whose content must count.
@@ -44,10 +44,10 @@ A stage returns an **artifact**, saved atomically in the instance folder:
 
 | Artifact | Stores |
 |---|---|
-| `tslab.Json` | a JSON document |
-| `tslab.Metrics` | named numbers (`metrics.values`), also sent to the trackers |
-| `tslab.Tensors` | named tensors, with safetensors (no pickle) |
-| `tslab.Checkpoint` | the best and last Lightning checkpoints of `train` |
+| `tslab.lab.Json` | a JSON document |
+| `tslab.lab.Metrics` | named numbers (`metrics.values`), also sent to the trackers |
+| `tslab.lab.Tensors` | named tensors, with safetensors (no pickle) |
+| `tslab.lab.Checkpoint` | the best and last Lightning checkpoints of `train` |
 
 `SomeArtifact.external(path=...)` brings an outside file into the pipeline,
 fingerprinted by its content, for example a pretrained checkpoint.
@@ -56,7 +56,7 @@ fingerprinted by its content, for example a pretrained checkpoint.
 
 ```
 runs/ts2vec/Coffee/seed_0/
-  config.yaml        the parsed config; reload it with tslab.load_config
+  config.yaml        the parsed config; reload it with tslab.lab.load_config
   meta.json          versions, git commit, hardware, host, config hashes
   status.json        the state of every instance
   logs/run.log       everything logged during the run

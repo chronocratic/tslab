@@ -5,8 +5,8 @@ from datetime import timedelta
 import logging
 import shutil
 
-from tslab.enums import ChainedRetry, CheckStatus
-from tslab.jobs.slurm import (
+from tslab.lab.enums import ChainedRetry, CheckStatus
+from tslab.lab.jobs.slurm import (
     format_slurm_duration,
     gres_gpus,
     parse_slurm_duration,
@@ -15,9 +15,9 @@ from tslab.jobs.slurm import (
     SlurmError,
     SlurmNodeGroup,
 )
-from tslab.study.doctor import DoctorCheck
-from tslab.study.machine import SlurmSettings
-from tslab.study.machine.profile import FollowupSettings
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.machine import SlurmSettings
+from tslab.lab.study.machine.profile import FollowupSettings
 
 __all__ = ['cluster_checks', 'slurm_check']
 

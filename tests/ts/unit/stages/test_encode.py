@@ -3,11 +3,12 @@ from pathlib import Path
 import pytest
 import torch
 
-from tests.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
-from tests.unit.stages.helpers import encoded
-import tslab
-from tslab.enums import Split
-from tslab.stages import check_representations
+from tests.ts.unit.stage_fakes import FakeTrainer, LinearEncoder, run_in, ToySplits
+from tests.ts.unit.stages.helpers import encoded
+import tslab.ml
+from tslab.ml.split import Split
+import tslab.ts
+from tslab.ts.stages import check_representations
 
 
 def test_encode_never_uses_the_training_loaders(tmp_path: Path) -> None:
@@ -49,8 +50,8 @@ def test_encode_requires_a_fingerprintable_encoder(tmp_path: Path) -> None:
     model, trainer = LinearEncoder(), FakeTrainer()
     # why: the train call sets up the encode call that must fail
     with pytest.raises(TypeError, match='encoder'), run_in(root=tmp_path) as run:  # noqa: PT012
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=ToySplits())
-        tslab.stages.encode(
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=ToySplits())
+        tslab.ts.stages.encode(
             run=run,
             trainer=trainer,
             model=model,

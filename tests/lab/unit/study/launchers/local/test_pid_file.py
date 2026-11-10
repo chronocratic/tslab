@@ -13,22 +13,22 @@ import time
 
 import pytest
 
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     finished_pid,
     record_local_job,
     study_directory,
     write_launch,
 )
-from tslab.cli import main
-from tslab.core.files import atomic_write_json
-from tslab.core.meta import hostname
-from tslab.core.paths import LOCK_FILE
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
-from tslab.enums import InstanceState, LocalTaskState, RunState, StudyState
-from tslab.jobs.local import process_alive
-from tslab.study.launchers.local import pid_file
-from tslab.study.launchers.local.pid_file import (
+from tslab.lab.cli import main
+from tslab.lab.core.files import atomic_write_json
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.paths import LOCK_FILE
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
+from tslab.lab.enums import InstanceState, LocalTaskState, RunState, StudyState
+from tslab.lab.jobs.local import process_alive
+from tslab.lab.study.launchers.local import pid_file
+from tslab.lab.study.launchers.local.pid_file import (
     _stop_detached,
     detach_launch,
     hold_launch,

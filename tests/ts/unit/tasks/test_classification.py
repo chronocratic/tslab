@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from tslab.enums import Split
-from tslab.tasks import check_label_range, TSClassificationDataInfo
+from tslab.ml.split import Split
+from tslab.ts.tasks import check_label_range, TSClassificationDataInfo
 
 
 def test_ts_classification_data_info_requires_num_classes() -> None:

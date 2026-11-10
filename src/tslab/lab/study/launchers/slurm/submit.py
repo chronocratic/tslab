@@ -8,20 +8,20 @@ import time
 from typing import cast
 from uuid import uuid4
 
-from tslab.core.files import atomic_write_text
-from tslab.enums import LauncherKind
-from tslab.jobs.slurm import sbatch, SlurmError
-from tslab.study.code_snapshot import without_code_snapshot
-from tslab.study.launchers.common.protocols import RecordJob
-from tslab.study.launchers.common.types import LaunchError
-from tslab.study.launchers.slurm.dependency import dependency_text
-from tslab.study.launchers.slurm.job_script import job_script
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.study.machine import MachineProfile, SlurmSettings
-from tslab.study.paths import next_job_file
-from tslab.study.plan import JobGroup
-from tslab.study.records import append_job, JobKind
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.enums import LauncherKind
+from tslab.lab.jobs.slurm import sbatch, SlurmError
+from tslab.lab.study.code_snapshot import without_code_snapshot
+from tslab.lab.study.launchers.common.protocols import RecordJob
+from tslab.lab.study.launchers.common.types import LaunchError
+from tslab.lab.study.launchers.slurm.dependency import dependency_text
+from tslab.lab.study.launchers.slurm.job_script import job_script
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
+from tslab.lab.study.machine import MachineProfile, SlurmSettings
+from tslab.lab.study.paths import next_job_file
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import append_job, JobKind
 
 __all__ = ['SlurmLauncher', 'submit_helper_job', 'write_job_files']
 

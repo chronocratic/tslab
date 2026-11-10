@@ -1,9 +1,9 @@
 """``run_arguments`` and ``validate_arguments``: settings to flags, checked."""
 
-from tests.unit.study.configs import ClassifyConfig, grid
-from tslab.study import Study
-from tslab.study.definition import expand_runs
-from tslab.study.plan import run_arguments, validate_arguments
+from tests.lab.unit.study.configs import ClassifyConfig, grid
+from tslab.lab.study import Study
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.plan import run_arguments, validate_arguments
 
 PLACEHOLDER_VALUES = {'output_root': '/x', 'study': 's', 'run_path': 'g/r', 'log_file': '/l'}
 

@@ -12,7 +12,7 @@ import threading
 from typing import cast
 import uuid
 
-from tslab.core.paths import _TEMPORARY_MARKER, require_path
+from tslab.lab.core.paths import _TEMPORARY_MARKER, require_path
 
 __all__ = [
     'JsonFileError',

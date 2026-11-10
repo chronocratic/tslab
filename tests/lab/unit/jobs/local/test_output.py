@@ -2,7 +2,7 @@ import io
 import json
 from pathlib import Path
 
-from tslab.jobs.local import ProcessResult, tail_lines, TaskInfo, TaskOutput
+from tslab.lab.jobs.local import ProcessResult, tail_lines, TaskInfo, TaskOutput
 
 
 def test_tail_lines_returns_last_lines(*, tmp_path: Path) -> None:

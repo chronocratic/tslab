@@ -33,81 +33,86 @@ fixes most lint and format problems.
 
 ```
 src/tslab/
-  __init__.py          the public API (re-exports); __all__ is the contract
-  core/                the engine: Run, stage, artifacts, fingerprints, status, config, paths
-  enums/               enums shared by more than one package: states, splits, log levels, kinds
-  interfaces/          Protocols and ABCs: Trainer, DataSource, Encoder, DownstreamModel, Metric, Tracker
-  stages/              the ready stages: train, encode, evaluate
-  tasks/               classification and forecasting data shapes and helpers
-  jobs/                general job helpers (slurm/, local/), no TSLab imports (planned own package)
-  lightning/           LightningTrainer, LightningDataSource, resume, SLURM signals
-  probes/              SVMProbe, RidgeProbe (scikit-learn)
-  tracking/            W&B, MLflow, TensorBoard trackers and TrackingOptions
-    wandb/             the W&B tracker, the transaction-log reader and the resync logic
-  analysis/            post-hoc analysis: tests, CD diagram, numbers file, output tree (extra 'analysis')
-  adapters/chronocratic/
-    models/            chronocratic-models as TSLab models and encoders
-    datasets/          chronocratic-datasets as TSLab data sources, study helpers
-  study/               studies: grids, machine profiles, SLURM and local launch, results
-     commands/          the study commands: submit, status, resubmit, results
-     definition/        the Study and StudyRun types, expansion, loading, settings
-     reporting/         states, outcomes, results, usage and the study documents
-     launchers/         the launch backends: one per launcher, SLURM and local apart
-  cli/                 `tslab new | status | study | wandb-sync`
-     study/             the study subcommands: one module per command
-     common/            shared console, JSON output and usage errors
-  templates/project/   the files `tslab new` copies (see section 3)
+  __init__.py          only __version__; users import from lab, ml or ts
+  lab/                 general lab: no torch, no Lightning
+    core/              the engine: Run, stage, artifacts, fingerprints, status, config, paths
+    enums/             enums shared by more than one package: states, log levels, kinds
+    jobs/              general job helpers (slurm/, local/), no TSLab imports (planned own package)
+    analysis/          post-hoc analysis: tests, CD diagram, numbers file, output tree (extra 'analysis')
+    study/             studies: grids, machine profiles, SLURM and local launch, results
+       commands/        the study commands: submit, status, resubmit, results
+       definition/      the Study and StudyRun types, expansion, loading, settings
+       reporting/       states, outcomes, results, usage and the study documents
+       launchers/       the launch backends: one per launcher, SLURM and local apart
+    cli/               `tslab new | status | study`
+       study/           the study subcommands: one module per command
+       common/          shared console, JSON output and usage errors
+  ml/                  torch and Lightning on top of lab
+    interfaces/        Trainer, DataSource, Metric
+    stages/            the train stage
+    lightning/         LightningTrainer, LightningDataSource, resume, SLURM signals
+    tracking/          W&B, MLflow, TensorBoard trackers and TrackingOptions
+      wandb/           the W&B tracker, the transaction-log reader and the resync logic
+    cli/               `tslab wandb-sync`
+  ts/                  time series on top of ml
+    interfaces/        Encoder, DownstreamModel
+    stages/            the ready stages: encode, evaluate
+    tasks/             classification and forecasting data shapes and helpers
+    probes/            SVMProbe, RidgeProbe (scikit-learn)
+    adapters/chronocratic/
+      models/          chronocratic-models as TSLab models and encoders
+      datasets/        chronocratic-datasets as TSLab data sources, study helpers
+    templates/project/ the files `tslab new` copies (see section 3)
 tests/
-  unit/<package>/      unit tests, one folder per source package
-  integration/         whole pipelines on toy data
-  adapters/            chronocratic adapter tests (marker `chronocratic`)
-  import_rules/        dependency direction and dataclass rules
-  typing/              files with deliberate type errors, checked one by one
-  template/            generates a project and runs its own checks
-  examples/            runs examples/
+  lab/ ml/ ts/         unit/<package>/ and integration/ per layer, mirroring src/tslab/<layer>
+  ts/adapters/         chronocratic adapter tests (marker `chronocratic`)
+  ts/template/         generates a project and runs its own checks
+  ts/examples/         runs examples/
+  repo/                dependency direction, dataclass rules, typing cases (typing/)
+  support/             fakes shared by every layer
 docs/                  Sphinx + MyST, published on Read the Docs
 examples/              minimal/ and advanced/ scripts
 changelog.d/           towncrier fragments, one per pull request
 ```
 
-### Dependency direction (enforced by `tests/import_rules/`)
+### Dependency direction (enforced by `tests/repo/`)
 
 - `enums` imports nothing from TSLab, so every package may import it.
 - `core`, `interfaces` and `stages` never import Lightning,
-  scikit-learn, any tracker SDK, chronocratic, or `tslab.adapters`,
-  `tslab.lightning`, `tslab.tasks`, `tslab.probes`, `tslab.study`, `tslab.cli`.
+  scikit-learn, any tracker SDK, chronocratic, or `tslab.ts.adapters`,
+  `tslab.ml.lightning`, `tslab.ts.tasks`, `tslab.ts.probes`, `tslab.lab.study`, `tslab.lab.cli`.
   Tracker SDKs are imported lazily, inside the tracker that needs them.
-- `core` may import `tslab.jobs.slurm` and `tslab.jobs.local`.
-- `tslab.lightning` builds on Lightning; `tslab.tracking` (trackers wrap
-  Lightning loggers) and `tslab.adapters.chronocratic` import it in their
-  submodules, but importing `tslab.tracking` itself loads no Lightning and
+- `core` may import `tslab.lab.jobs.slurm` and `tslab.lab.jobs.local`.
+- `tslab.ml.lightning` builds on Lightning; `tslab.ml.tracking` (trackers wrap
+  Lightning loggers) and `tslab.ts.adapters.chronocratic` import it in their
+  submodules, but importing `tslab.ml.tracking` itself loads no Lightning and
   no tracker SDK.
-- Only `tslab.probes` imports scikit-learn.
-- Only `tslab.analysis` imports pandas, SciPy and matplotlib; it may import `core`, `enums` and `study`, and no other TSLab package imports it.
-- Only `tslab.adapters.chronocratic` imports chronocratic; the models adapter
+- Only `tslab.ts.probes` imports scikit-learn.
+- Only `tslab.lab.analysis` imports pandas, SciPy and matplotlib; it may import `core`, `enums` and `study`, and no other TSLab package imports it.
+- Only `tslab.ts.adapters.chronocratic` imports chronocratic; the models adapter
   never imports the datasets adapter and the other way round.
-- `tslab.tasks` imports none of the optional libraries.
-- `tslab.jobs` imports only the standard library. TSLab code imports from
-  `tslab.jobs.slurm` or `tslab.jobs.local`, only through each domain root.
+- `tslab.ts.tasks` imports none of the optional libraries.
+- `tslab.lab.jobs` imports only the standard library. TSLab code imports from
+  `tslab.lab.jobs.slurm` or `tslab.lab.jobs.local`, only through each domain root.
 
 If a feature seems to need a forbidden import, the design is wrong: add an
 interface in `interfaces/`, or put the code in the package that may import
 the library. Never weaken a rule in `test_import_rules.py`.
 
-### The `tslab.jobs` package
+### The `tslab.lab.jobs` package
 
 These rules keep SLURM and local job helpers movable to their own distribution.
-Static checks live in `tests/import_rules/test_jobs_package.py`; API and runtime
+Static checks live in `tests/repo/test_jobs_package.py`; API and runtime
 rules are enforced by review.
 
-1. **Standard library only.** Files in `src/tslab/jobs/` import only modules in
-   `sys.stdlib_module_names` and `tslab.jobs.*`. Ask a maintainer before adding a
+1. **Standard library only.** Files in `src/tslab/lab/jobs/` import only modules in
+   `sys.stdlib_module_names` and `tslab.lab.jobs.*`. Ask a maintainer before adding a
    third-party dependency. The static AST check
    `test_jobs_package_imports_only_stdlib_and_itself` enforces this rule.
 2. **No TSLab imports.** Job code imports no `tslab.*` module except
-   `tslab.jobs.*`. Keep local copies of small helpers such as `require_path` or
+   `tslab.lab.jobs.*`. Keep local copies of small helpers such as `require_path` or
    `atomic_write_text` if needed. The same static AST check enforces this rule.
-3. **No TSLab words.** After removing `tslab.jobs`, no package file contains
+3. **No TSLab words.** After removing `tslab.lab.jobs`, no package file contains
    `tslab`, in any case, except the required package docstring. Do not use TSLab
    vocabulary such as a TSLab run, a stage, a study, an attempt, a machine
    profile, a fingerprint or W&B. Pass TSLab values such as a `/tmp/tslab-...`
@@ -115,9 +120,9 @@ rules are enforced by review.
    `test_jobs_package_only_mentions_tslab_in_required_docstring` check enforces
    the text rule; review enforces the vocabulary rule.
 4. **Domain doors in.** Code outside the package imports APIs only from
-   `tslab.jobs.slurm` or `tslab.jobs.local`, never from `tslab.jobs` or an
+   `tslab.lab.jobs.slurm` or `tslab.lab.jobs.local`, never from `tslab.lab.jobs` or an
    internal module. `test_code_outside_imports_only_jobs_domain_roots` checks
-   `src/` and `tests/`, except the package and `tests/unit/jobs/`.
+   `src/` and `tests/`, except the package and `tests/lab/unit/jobs/`.
 5. **SLURM vocabulary in the API.** Use sbatch long option names such as
    `cpus_per_task`, `mem_per_cpu`, `gres` and `array`, with
    `Mapping[str, object]`. `True` writes a flag; `False` omits it. Add no
@@ -128,11 +133,11 @@ rules are enforced by review.
    `os.environ` only when called, then must filter inherited job variables.
    Review enforces this rule.
 7. **One subprocess door.** Route every scheduler command through private
-   `_run` in `tslab/jobs/slurm/commands.py`. Missing commands raise `SlurmError`
+   `_run` in `tslab/lab/jobs/slurm/commands.py`. Missing commands raise `SlurmError`
    with the command name. Review enforces this rule.
-8. **Own tests, movable.** Keep job tests in `tests/unit/jobs/`. They may import
-   the standard library, `pytest`, `tslab.jobs.slurm`, `tslab.jobs.local` and
-   `tests.unit.jobs.*`; tests may import internal job modules to test private
+8. **Own tests, movable.** Keep job tests in `tests/lab/unit/jobs/`. They may import
+   the standard library, `pytest`, `tslab.lab.jobs.slurm`, `tslab.lab.jobs.local` and
+   `tests.lab.unit.jobs.*`; tests may import internal job modules to test private
    helpers. `test_jobs_tests_import_only_the_jobs_domains` enforces this rule.
 9. **TSLab code rules still apply.** Every rule in `CODING_RULES.md` holds:
    keyword-only parameters, `__all__`, Google-style docstrings, assigned
@@ -157,20 +162,20 @@ rules are enforced by review.
 
 ## 3. The project template
 
-`src/tslab/templates/project/` holds plain files that `tslab new` copies into a
+`src/tslab/ts/templates/project/` holds plain files that `tslab new` copies into a
 folder the user owns. `{{project_name}}` (for example `my-paper`) and
 `{{package_name}}` (`my_paper`) are replaced in file names and contents.
 
 - The template is excluded from ruff and ty in this repository because the
-  placeholders do not parse. `tests/template/test_template.py` (slow) creates a
+  placeholders do not parse. `tests/ts/template/test_template.py` (slow) creates a
   project and runs ruff, ty and pytest inside it, so template code must pass
   the same rules as the library.
 - Template code is user-facing example code: keep it short, commented for
   someone new to TSLab, and runnable on the toy data in under a minute.
 - When the public API changes, update the template, `examples/`, `docs/` and
   the template `AGENTS.md` and `README.md` in the same change.
-- Use only the public API there (`tslab`, `tslab.stages`, `tslab.lightning`,
-  `tslab.tracking`, `tslab.adapters...`), never private `_` names.
+- Use only the public API there (`tslab.lab`, `tslab.ml`, `tslab.ts.stages`, `tslab.ml.lightning`,
+  `tslab.ml.tracking`, `tslab.ts.adapters...`), never private `_` names.
 
 ## 4. Public API and compatibility
 

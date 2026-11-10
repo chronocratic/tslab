@@ -11,17 +11,20 @@ from enum import auto, StrEnum
 from pathlib import Path
 
 import torch
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+import tslab.lab
+import tslab.ml
+from tslab.ml.interfaces import Metric
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+from tslab.ml.tracking import build_trackers, TrackingOptions
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
 )
-from tslab.adapters.chronocratic.models import build_chronocratic_model, ChronocraticEncoder
-from tslab.interfaces import Metric, Probe
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.probes import RidgeProbe, SVMProbe
-from tslab.tracking import build_trackers, TrackingOptions
+from tslab.ts.adapters.chronocratic.models import build_chronocratic_model, ChronocraticEncoder
+from tslab.ts.interfaces import Probe
+from tslab.ts.probes import RidgeProbe, SVMProbe
 
 from {{package_name}}.models import Models
 
@@ -60,7 +63,7 @@ class ProbeConfig:
     trainer: LightningTrainerConfig = field(default_factory=LightningTrainerConfig)
     encoder: ChronocraticEncoder = field(default_factory=ChronocraticEncoder)
     tracking: TrackingOptions = field(default_factory=TrackingOptions)
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
     run_path: Path = Path('probe')
     output_root: Path = Path('runs')
     seed: int = 0
@@ -100,12 +103,12 @@ def _ridge_probe(*, max_train_samples: int) -> Probe:
     return RidgeProbe(max_samples=max_train_samples)
 
 
-def _svm_metrics(*, representations: tslab.Tensors) -> Sequence[Metric] | None:
+def _svm_metrics(*, representations: tslab.lab.Tensors) -> Sequence[Metric] | None:
     del representations
     return None
 
 
-def _ridge_metrics(*, representations: tslab.Tensors) -> Sequence[Metric]:
+def _ridge_metrics(*, representations: tslab.lab.Tensors) -> Sequence[Metric]:
     targets = representations.tensors['train_targets']
     classes = tuple(float(value) for value in torch.unique(targets).tolist())
     return (RidgeClassificationAccuracy(classes=classes),)
@@ -131,7 +134,7 @@ def main(*, config: ProbeConfig) -> None:
         TypeError: If ``config.data`` is not a classification dataset.
     """
     trackers = build_trackers(options=config.tracking)
-    with tslab.Run(
+    with tslab.lab.Run(
         config=config, root=config.output_root, relative_path=config.run_path, trackers=trackers
     ) as run:
         data = build_chronocratic_data_source(config=config.data)
@@ -140,8 +143,8 @@ def main(*, config: ProbeConfig) -> None:
             raise TypeError(message)
         model = build_chronocratic_model(config=config.model, data_info=data.info)
         trainer = LightningTrainer(config=config.trainer)
-        checkpoint = tslab.Checkpoint.external(path=config.checkpoint, trusted=True)
-        representations = tslab.stages.encode(
+        checkpoint = tslab.lab.Checkpoint.external(path=config.checkpoint, trusted=True)
+        representations = tslab.ts.stages.encode(
             run=run,
             trainer=trainer,
             model=model,
@@ -151,7 +154,7 @@ def main(*, config: ProbeConfig) -> None:
         )
         downstream_model = _PROBES[config.head](max_train_samples=config.max_train_samples)
         metrics = _METRICS[config.head](representations=representations)
-        tslab.stages.evaluate(
+        tslab.ts.stages.evaluate(
             run=run,
             representations=representations,
             downstream_model=downstream_model,
@@ -160,4 +163,4 @@ def main(*, config: ProbeConfig) -> None:
 
 
 if __name__ == '__main__':
-    main(config=tslab.parse_config(config_class=ProbeConfig))
+    main(config=tslab.lab.parse_config(config_class=ProbeConfig))

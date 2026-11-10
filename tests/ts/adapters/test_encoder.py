@@ -4,14 +4,14 @@ from typing import Any
 import pytest
 import torch
 
-from tslab.adapters.chronocratic.models import (
+from tslab.lab.core.fingerprint import canonicalize
+from tslab.ts.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,
 )
-from tslab.core.fingerprint import canonicalize
-from tslab.interfaces import Encoder, SequenceEncoder
-from tslab.tasks import TSClassificationDataInfo
+from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.tasks import TSClassificationDataInfo
 
 pytestmark = pytest.mark.chronocratic
 

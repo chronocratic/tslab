@@ -3,8 +3,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from tslab.enums import AfterCondition, Satisfy
-from tslab.study.definition.definition import expand_runs, Grid, Study, StudyRun
+from tslab.lab.enums import AfterCondition, Satisfy
+from tslab.lab.study.definition.definition import expand_runs, Grid, Study, StudyRun
 
 __all__ = ['After', 'after_problems', 'chained_grids', 'grid_order', 'match_axes', 'upstream_runs']
 

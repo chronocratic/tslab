@@ -9,10 +9,10 @@ import subprocess
 import time
 from typing import TextIO, TYPE_CHECKING
 
-from tslab.core.lock import read_lock_owner
-from tslab.core.meta import hostname
-from tslab.core.paths import LOCK_FILE
-from tslab.enums import (
+from tslab.lab.core.lock import read_lock_owner
+from tslab.lab.core.meta import hostname
+from tslab.lab.core.paths import LOCK_FILE
+from tslab.lab.enums import (
     AfterCondition,
     AfterVerdict,
     ChainedRetry,
@@ -21,23 +21,23 @@ from tslab.enums import (
     Retry,
     StudyState,
 )
-from tslab.study.chain import after_verdict, downstream_of
-from tslab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
-from tslab.study.commands.submit import submit_runs
-from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
-from tslab.study.context import Context, study_reports, widen_context
-from tslab.study.definition import chained_grids, StudyRun, upstream_runs
-from tslab.study.launchers.common.types import OnLaunch
-from tslab.study.launchers.tables import backend_for
-from tslab.study.machine.profile import FollowupSettings
-from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
-from tslab.study.records import latest_tasks, take_progress
-from tslab.study.reporting.report import log_problems
-from tslab.study.reporting.state import RunReport
+from tslab.lab.study.chain import after_verdict, downstream_of
+from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_FOLDER
+from tslab.lab.study.commands.submit import submit_runs
+from tslab.lab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
+from tslab.lab.study.context import Context, study_reports, widen_context
+from tslab.lab.study.definition import chained_grids, StudyRun, upstream_runs
+from tslab.lab.study.launchers.common.types import OnLaunch
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.plan import assign_indices, plan_jobs, validate_jobs
+from tslab.lab.study.records import latest_tasks, take_progress
+from tslab.lab.study.reporting.report import log_problems
+from tslab.lab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers.common.protocols import Backend
-    from tslab.study.records import JobRecord, TaskRecord
+    from tslab.lab.study.launchers.common.protocols import Backend
+    from tslab.lab.study.records import JobRecord, TaskRecord
 
 __all__ = ['may_retry', 'resubmit', 'run_one']
 

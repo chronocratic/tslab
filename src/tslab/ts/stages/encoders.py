@@ -5,9 +5,9 @@ from typing import Annotated, cast, Protocol
 
 import torch
 
-from tslab.core.fingerprint import NotFingerprinted
-from tslab.core.markers import HardwareSetting
-from tslab.interfaces.encoder import Encoder, SequenceEncoder
+from tslab.lab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.markers import HardwareSetting
+from tslab.ts.interfaces.encoder import Encoder, SequenceEncoder
 
 __all__ = ['ModelAsEncoder', 'resolve_device']
 

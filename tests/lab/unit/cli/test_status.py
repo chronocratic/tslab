@@ -8,34 +8,36 @@ from typing import cast
 
 import pytest
 
-import tslab
-from tslab.cli import main
-from tslab.cli.status import Status
+import tslab.lab
+from tslab.lab.cli import main
+from tslab.lab.cli.status import Status
 
 
 @dataclass(frozen=True, kw_only=True)
 class Config:
     seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
-@tslab.stage(name='scale', output=tslab.Json)
-def scale(*, run: tslab.Run, name: tslab.InstanceName | None = None, factor: int) -> tslab.Json:
+@tslab.lab.stage(name='scale', output=tslab.lab.Json)
+def scale(
+    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, factor: int
+) -> tslab.lab.Json:
     if factor < 0:
         message = 'negative factor\nsecond line'
         raise ValueError(message)
-    return tslab.Json(data={'factor': factor})
+    return tslab.lab.Json(data={'factor': factor})
 
 
-@tslab.stage(name='report', output=tslab.Json)
+@tslab.lab.stage(name='report', output=tslab.lab.Json)
 def report(
-    *, run: tslab.Run, name: tslab.InstanceName | None = None, scaled: tslab.Json
-) -> tslab.Json:
+    *, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None, scaled: tslab.lab.Json
+) -> tslab.lab.Json:
     return scaled
 
 
 def make_run(*, root: Path, relative_path: Path, factors: tuple[int, ...]) -> None:
-    with tslab.Run(config=Config(), root=root, relative_path=relative_path) as run:
+    with tslab.lab.Run(config=Config(), root=root, relative_path=relative_path) as run:
         for factor in factors:
             scaled = scale(run=run, name=f'f{factor}', factor=factor)
             report(run=run, name=f'f{factor}', scaled=scaled)
@@ -119,7 +121,7 @@ def test_a_malformed_run_folder_exits_1(tmp_path: Path, caplog: pytest.LogCaptur
 
 
 def test_live_run_is_running(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
-    with tslab.Run(config=Config(), root=tmp_path, relative_path=Path('a')):
+    with tslab.lab.Run(config=Config(), root=tmp_path, relative_path=Path('a')):
         _, text = shown(caplog=caplog, path=tmp_path)
     assert '1 run: 1 running' in text
     assert 'follow active runs: tslab status' in text

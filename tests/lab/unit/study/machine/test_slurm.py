@@ -4,14 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.machine.helpers import (
+from tests.lab.unit.study.machine.helpers import (
     BASE_SLURM,
     load_profile as load_machine,
     SLURM_TABLE,
     write,
 )
-from tslab.study.machine import MachineOverride, MachineProfileError, SlurmSettings
-import tslab.study.machine.slurm as slurm_machine
+from tslab.lab.study.machine import MachineOverride, MachineProfileError, SlurmSettings
+import tslab.lab.study.machine.slurm as slurm_machine
 
 
 def test_slurm_settings_from_normalizes_its_profile_table(tmp_path: Path) -> None:

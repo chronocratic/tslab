@@ -6,11 +6,11 @@ from pathlib import Path
 import pytest
 
 from tests.support.fake_slurm import FakeSlurm
-from tslab.enums import ChainedRetry
-from tslab.study.doctor import DoctorCheck, run_checks
-from tslab.study.launchers.slurm import doctor
-from tslab.study.machine import SlurmSettings
-from tslab.study.machine.profile import FollowupSettings
+from tslab.lab.enums import ChainedRetry
+from tslab.lab.study.doctor import DoctorCheck, run_checks
+from tslab.lab.study.launchers.slurm import doctor
+from tslab.lab.study.machine import SlurmSettings
+from tslab.lab.study.machine.profile import FollowupSettings
 
 
 def test_slurm_check_lists_missing_scheduler_commands(monkeypatch: pytest.MonkeyPatch) -> None:

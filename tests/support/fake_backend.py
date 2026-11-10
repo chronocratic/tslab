@@ -1,6 +1,6 @@
 """A fake backend for the study tests: recorded calls, canned answers, no SLURM.
 
-``FakeBackend`` implements every member of ``tslab.study.launchers.common.protocols.Backend``
+``FakeBackend`` implements every member of ``tslab.lab.study.launchers.common.protocols.Backend``
 with neutral values. A test sets the answers it wants before the command
 runs, and reads the calls the command made. ``install_fake_backend`` puts
 the fake in place of both real backends, so a command that picks its
@@ -17,24 +17,24 @@ from typing import TextIO
 
 import pytest
 
-from tslab.enums import JobFlag, JobPhase, LauncherKind
-from tslab.study.context import Context
-from tslab.study.definition import Study
-from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers.common.launch import launch
-from tslab.study.launchers.common.protocols import Backend, Launcher, RecordJob
-from tslab.study.launchers.common.types import (
+from tslab.lab.enums import JobFlag, JobPhase, LauncherKind
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import Study
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.launchers.common.launch import launch
+from tslab.lab.study.launchers.common.protocols import Backend, Launcher, RecordJob
+from tslab.lab.study.launchers.common.types import (
     JobStates,
     JobUsage,
     LaunchReport,
     QueuedJob,
     Resources,
 )
-import tslab.study.launchers.tables
-from tslab.study.machine import MachineOverride, MachineProfile
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport
+import tslab.lab.study.launchers.tables
+from tslab.lab.study.machine import MachineOverride, MachineProfile
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['FakeBackend', 'FakeResources', 'install_fake_backend']
 
@@ -309,7 +309,7 @@ class FakeBackend:
         launcher: Launcher = _FakeLauncher(next_job_id=self._take_job_id)
         return launch(
             launcher=launcher,
-            record_type=tslab.study.launchers.tables.JOB_RECORDS[context.machine.launcher],
+            record_type=tslab.lab.study.launchers.tables.JOB_RECORDS[context.machine.launcher],
             write_job_files=_write_no_job_files,
             machine=context.machine,
             study=context.study,
@@ -386,7 +386,7 @@ def install_fake_backend(*, monkeypatch: pytest.MonkeyPatch) -> FakeBackend:
     """
     fake = FakeBackend()
     monkeypatch.setattr(
-        tslab.study.launchers.tables,
+        tslab.lab.study.launchers.tables,
         'BACKENDS',
         {LauncherKind.SLURM: fake, LauncherKind.LOCAL: fake},
     )

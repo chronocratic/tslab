@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
-from tslab.core.markers import MachineSetting
-from tslab.enums import WandbMode
+from tslab.lab.core.markers import MachineSetting
+from tslab.ml.tracking.wandb_mode import WandbMode
 
 __all__ = ['TrackingOptions']
 

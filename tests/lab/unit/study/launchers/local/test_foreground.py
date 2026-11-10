@@ -5,7 +5,7 @@ import shlex
 
 import pytest
 
-from tslab.study.launchers.local.foreground import foreground_script
+from tslab.lab.study.launchers.local.foreground import foreground_script
 
 
 def test_foreground_script_has_no_setup(tmp_path: Path) -> None:

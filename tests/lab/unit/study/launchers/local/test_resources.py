@@ -1,6 +1,6 @@
 """Local CPU availability."""
 
-from tslab.study.launchers.local.resources import usable_cpus
+from tslab.lab.study.launchers.local.resources import usable_cpus
 
 
 def test_usable_cpus_returns_at_least_one() -> None:

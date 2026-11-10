@@ -9,14 +9,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 import subprocess
 
-from tslab.jobs.slurm.commands import (
+from tslab.lab.jobs.slurm.commands import (
     _pipe_lines,
     _run,
     _UNKNOWN_JOB,
     QUERY_TIMEOUT_SECONDS,
     SlurmError,
 )
-from tslab.jobs.slurm.states import QUEUED_JOB_STATES, RUNNING_JOB_STATES
+from tslab.lab.jobs.slurm.states import QUEUED_JOB_STATES, RUNNING_JOB_STATES
 
 __all__ = [
     'SLURM_COMMANDS',

@@ -5,9 +5,9 @@ from dataclasses import dataclass, replace
 import logging
 import time
 
-from tslab.enums import StudyState
-from tslab.study.context import Context
-from tslab.study.reporting.outcome import (
+from tslab.lab.enums import StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.reporting.outcome import (
     counts_live,
     EXIT_LIVE,
     EXIT_TIMEOUT,

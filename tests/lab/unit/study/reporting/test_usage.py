@@ -8,19 +8,19 @@ from typing import cast
 
 import pytest
 
-from tests.support.fake_backend import FakeBackend, FakeResources
-from tests.unit.study.helpers import (
+from tests.lab.unit.study.helpers import (
     context,
     record_local_job,
     study_directory,
     submit_study,
     write_run_status,
 )
-from tslab.cli import main
-from tslab.enums import InstanceState, RunState
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import JobUsage, LaunchError
-from tslab.study.reporting.usage import log_usage, usage_document
+from tests.support.fake_backend import FakeBackend, FakeResources
+from tslab.lab.cli import main
+from tslab.lab.enums import InstanceState, RunState
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import JobUsage, LaunchError
+from tslab.lab.study.reporting.usage import log_usage, usage_document
 
 
 def _submitted_context(*, project: Path, fake_backend: FakeBackend) -> Context:
@@ -122,7 +122,7 @@ def test_usage_cli_json_schema(
         main(args=['study', 'usage', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
-    assert document['schema'] == 'tslab.study-usage/1'
+    assert document['schema'] == 'tslab.lab.study-usage/1'
 
 
 def test_usage_backend_failure_exits_1(project: Path, fake_backend: FakeBackend) -> None:
@@ -197,7 +197,7 @@ def test_local_usage_log_shows_no_limit_and_dash(
     project: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     document = usage_document(context=_local_usage_context(project=project))
-    with caplog.at_level('INFO', logger='tslab.study.reporting.usage'):
+    with caplog.at_level('INFO', logger='tslab.lab.study.reporting.usage'):
         log_usage(document=document, has_time_limit=False)
     assert '1:00:00/no limit' in caplog.text
     assert 'suggest' not in caplog.text

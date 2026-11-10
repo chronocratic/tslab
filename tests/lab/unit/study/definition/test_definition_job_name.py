@@ -4,9 +4,9 @@ import re
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Study
-from tslab.study.definition import study_job_names
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Study
+from tslab.lab.study.definition import study_job_names
 
 
 def test_default_job_name_is_study_and_short_name() -> None:

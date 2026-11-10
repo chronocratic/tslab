@@ -2,7 +2,7 @@
 
 The files only resemble the real ones in format and rough statistics; they are
 generated from the constants below and never derived from real data. Run this
-file to regenerate the committed copies in ``tests/adapters/data``.
+file to regenerate the committed copies in ``tests/ts/adapters/data``.
 """
 
 import gzip

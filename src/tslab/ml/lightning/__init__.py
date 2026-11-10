@@ -1,10 +1,10 @@
 """Lightning integration. Besides the trackers, the only part of TSLab that imports Lightning."""
 
-from tslab.lightning.callbacks import AccumulatingTimerCallback
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.data import LightningDataSource
-from tslab.lightning.exceptions import TrainingPaused
-from tslab.lightning.trainer import LightningTrainer
+from tslab.ml.lightning.callbacks import AccumulatingTimerCallback
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.data import LightningDataSource
+from tslab.ml.lightning.exceptions import TrainingPaused
+from tslab.ml.lightning.trainer import LightningTrainer
 
 __all__ = [
     'AccumulatingTimerCallback',

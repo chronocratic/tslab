@@ -4,9 +4,9 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Override, Study
-from tslab.study.definition import expand_runs
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Override, Study
+from tslab.lab.study.definition import expand_runs
 
 
 def test_run_path_follows_axis_order() -> None:

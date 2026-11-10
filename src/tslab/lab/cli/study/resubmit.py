@@ -9,8 +9,8 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, resolve_request, UsageError
-from tslab.cli.study.shared import (
+from tslab.lab.cli.common import print_json, resolve_request, UsageError
+from tslab.lab.cli.study.shared import (
     _context_of,
     _detach,
     _log_next_step,
@@ -20,13 +20,13 @@ from tslab.cli.study.shared import (
     _warn_no_runs,
     take_requested_code_snapshot,
 )
-from tslab.core.meta import hostname
-from tslab.study.code_snapshot import CodeSnapshotError
-from tslab.study.commands import resubmit, run_one
-from tslab.study.launchers.common.types import LaunchReport
-from tslab.study.launchers.tables import backend_for
-from tslab.study.plan import JobGroup
-from tslab.study.reporting.documents import launch_document
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.code_snapshot import CodeSnapshotError
+from tslab.lab.study.commands import resubmit, run_one
+from tslab.lab.study.launchers.common.types import LaunchReport
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.reporting.documents import launch_document
 
 __all__ = ['Resubmit', 'RunOne']
 

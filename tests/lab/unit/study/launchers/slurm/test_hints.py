@@ -1,8 +1,8 @@
 """Tests for the failure hints of the SLURM scheduler states."""
 
-from tslab.study.launchers.common.types import JobUsage
-from tslab.study.launchers.slurm.hints import state_hint
-from tslab.study.machine import SlurmSettings
+from tslab.lab.study.launchers.common.types import JobUsage
+from tslab.lab.study.launchers.slurm.hints import state_hint
+from tslab.lab.study.machine import SlurmSettings
 
 
 def _oom_usage(*, max_rss: int | None) -> JobUsage:

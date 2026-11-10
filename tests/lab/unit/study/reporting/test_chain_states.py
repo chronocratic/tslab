@@ -3,12 +3,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from tslab.enums import AfterCondition, JobFlag, JobPhase, StudyState
-from tslab.study import After, Grid, Study
-from tslab.study.definition import expand_runs, StudyRun
-from tslab.study.machine.profile import FollowupSettings
-from tslab.study.reporting.chain import apply_chain_states
-from tslab.study.reporting.state import FolderFacts, RunReport
+from tslab.lab.enums import AfterCondition, JobFlag, JobPhase, StudyState
+from tslab.lab.study import After, Grid, Study
+from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.reporting.chain import apply_chain_states
+from tslab.lab.study.reporting.state import FolderFacts, RunReport
 
 
 @dataclass(frozen=True, kw_only=True)

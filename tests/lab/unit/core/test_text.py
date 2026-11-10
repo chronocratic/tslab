@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from tslab.core.text import (
+from tslab.lab.core.text import (
     describe_error,
     first_line,
     format_bytes,

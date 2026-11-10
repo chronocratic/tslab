@@ -4,9 +4,9 @@ from pathlib import PurePosixPath
 
 import pytest
 
-from tslab.enums import AfterCondition, Satisfy
-from tslab.study.launchers.slurm.dependency import dependency_text
-from tslab.study.plan_after import AfterTarget
+from tslab.lab.enums import AfterCondition, Satisfy
+from tslab.lab.study.launchers.slurm.dependency import dependency_text
+from tslab.lab.study.plan_after import AfterTarget
 
 
 def _target(

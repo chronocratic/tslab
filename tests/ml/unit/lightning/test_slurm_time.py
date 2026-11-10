@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.lightning.slurm import job_training_deadline
+from tslab.ml.lightning.slurm import job_training_deadline
 
 NOW = 1_000_000.0
 

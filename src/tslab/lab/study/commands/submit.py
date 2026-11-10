@@ -8,22 +8,22 @@ import socket
 import time
 from typing import TextIO, TYPE_CHECKING
 
-from tslab.core.status import utc_now_iso
-from tslab.enums import StudyState
-from tslab.study.code_snapshot import CodeSnapshot
-from tslab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
-from tslab.study.context import Context
-from tslab.study.launchers.common.types import LaunchError, OnLaunch
-from tslab.study.launchers.tables import backend_for
-from tslab.study.paths import next_job_file, study_folder
-from tslab.study.plan import assign_indices, plan_jobs, validate_jobs
-from tslab.study.plan_after import AfterTarget, local_after_problems, order_runs, plan_targets
-from tslab.study.records import JobRecord, read_jobs, submission_lock
-from tslab.study.reporting.report import log_launch, log_problems
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import StudyState
+from tslab.lab.study.code_snapshot import CodeSnapshot
+from tslab.lab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.types import LaunchError, OnLaunch
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.paths import next_job_file, study_folder
+from tslab.lab.study.plan import assign_indices, plan_jobs, validate_jobs
+from tslab.lab.study.plan_after import AfterTarget, local_after_problems, order_runs, plan_targets
+from tslab.lab.study.records import JobRecord, read_jobs, submission_lock
+from tslab.lab.study.reporting.report import log_launch, log_problems
+from tslab.lab.study.reporting.state import RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers.common.protocols import Backend
+    from tslab.lab.study.launchers.common.protocols import Backend
 
 __all__ = ['submit', 'submit_runs']
 

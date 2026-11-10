@@ -6,11 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.machine.helpers import BASE_SLURM, load_profile as load_machine, LOCAL, write
-from tslab.enums import LauncherKind
-from tslab.study.machine import LocalSettings, MachineProfileError, SlurmSettings
-import tslab.study.machine.load as machine_load
-from tslab.study.machine.load import load_machine as _load_machine
+from tests.lab.unit.study.machine.helpers import (
+    BASE_SLURM,
+    load_profile as load_machine,
+    LOCAL,
+    write,
+)
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.machine import LocalSettings, MachineProfileError, SlurmSettings
+import tslab.lab.study.machine.load as machine_load
+from tslab.lab.study.machine.load import load_machine as _load_machine
 
 
 def test_load_machine_uses_selected_backend_settings_loader(

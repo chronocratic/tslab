@@ -3,7 +3,7 @@
 ``Settings`` maps a dotted field path of the config class of the script to a value
 (``{'model': 'ts2vec', 'model.depth': 10}``). ``settings_to_args`` turns them
 into the flags tyro reads back into the same config; the round trip
-settings to flags to ``tslab.parse_config`` is pinned by tests.
+settings to flags to ``tslab.lab.parse_config`` is pinned by tests.
 """
 
 from collections.abc import Mapping, Sequence
@@ -15,9 +15,9 @@ from pathlib import Path
 import types
 from typing import Any, cast, get_args, get_origin, get_type_hints, Union
 
-from tslab.core.codec import strip_annotated, union_choices
-from tslab.core.config import REQUIRED
-from tslab.core.markers import is_machine_setting
+from tslab.lab.core.codec import strip_annotated, union_choices
+from tslab.lab.core.config import REQUIRED
+from tslab.lab.core.markers import is_machine_setting
 
 __all__ = [
     'SettingValue',
@@ -276,7 +276,7 @@ def from_presets(
     member, and for every other field, the value only where it differs from
     the default tyro starts from (the default instance of the field when it
     has one, else the default of the class), plus every field that has no
-    default. Fields holding ``tslab.REQUIRED`` are skipped: the study must
+    default. Fields holding ``tslab.lab.REQUIRED`` are skipped: the study must
     supply them on an axis. Every path under a path named in ``without`` is
     dropped too.
 

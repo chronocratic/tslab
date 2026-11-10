@@ -1,22 +1,24 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from adapter_helpers import parse, run_in
 import pytest
-from synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
 
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+from tests.ts.adapters.adapter_helpers import parse, run_in
+from tests.ts.adapters.synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY, FORECASTING_FILE
+import tslab.lab
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
 )
-from tslab.adapters.chronocratic.models import (
+from tslab.ts.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     ChronocraticModelChoice,
 )
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
 
 pytestmark = [pytest.mark.chronocratic, pytest.mark.slow]
 
@@ -53,7 +55,7 @@ class Config:
     data: ChronocraticDataChoice
     model: ChronocraticModelChoice
     seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
 @pytest.mark.parametrize('name', ['ts2vec', 'cost', 'tstcc'])
@@ -64,8 +66,8 @@ def test_every_model_trains_and_encodes(tmp_path: Path, name: str) -> None:
     trainer = LightningTrainer(config=ONE_BATCH)
     with run_in(root=tmp_path, config=config, name=name) as run:
         model = build_chronocratic_model(config=config.model, data_info=data.info)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-        representations = tslab.stages.encode(
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
+        representations = tslab.ts.stages.encode(
             run=run, trainer=trainer, model=model, checkpoint=checkpoint, data=data, encoder=ENCODER
         )
     vectors = representations.tensors['test_representations']

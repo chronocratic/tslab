@@ -5,13 +5,13 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
+from tests.lab.unit.study.commands.test_resubmit import _chain_states, _chain_submitted
 from tests.support.fake_backend import FakeBackend
-from tests.unit.study.commands.test_resubmit import _chain_states, _chain_submitted
-from tslab.enums import JobFlag, JobPhase
-from tslab.study.commands import cancel
+from tslab.lab.enums import JobFlag, JobPhase
+from tslab.lab.study.commands import cancel
 
 if TYPE_CHECKING:
-    from tslab.study.context import Context
+    from tslab.lab.study.context import Context
 
 
 def test_cancel_upstream_cancels_waiting_downstream(

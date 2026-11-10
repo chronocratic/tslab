@@ -1,10 +1,10 @@
 """The ready ``train`` stage."""
 
-from tslab.core.artifact import Checkpoint
-from tslab.core.paths import InstanceName
-from tslab.core.run import Run
-from tslab.core.stage import stage
-from tslab.interfaces import DataSource, Trainer
+from tslab.lab.core.artifact import Checkpoint
+from tslab.lab.core.paths import InstanceName
+from tslab.lab.core.run import Run
+from tslab.lab.core.stage import stage
+from tslab.ml.interfaces import DataSource, Trainer
 
 __all__ = ['train']
 
@@ -30,7 +30,7 @@ def train[M](
     Args:
         run: The current run.
         name: Instance name, for training several models in one run.
-        trainer: The trainer, for example ``tslab.lightning.LightningTrainer``.
+        trainer: The trainer, for example ``tslab.ml.lightning.LightningTrainer``.
         model: The model; trained in place. It must be fingerprintable.
         data: The training data.
 

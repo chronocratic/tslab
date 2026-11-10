@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 import scipy.stats
 
-from tslab.analysis.stats import (
+from tslab.lab.analysis.stats import (
     annotate_tests,
     average_ranks,
     bootstrap_median,

@@ -10,24 +10,31 @@ from typing import TYPE_CHECKING
 import pytest
 
 from tests.support.fake_backend import FakeResources
-from tslab.core.status import utc_now_iso
-from tslab.enums import AfterCondition, ChainedRetry, JobPhase, LauncherKind, Satisfy, StudyState
-from tslab.study import After, Grid, Study
-from tslab.study.definition import expand_runs, StudyRun
-from tslab.study.launchers.slurm.dependency import dependency_text
-from tslab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.study.machine import MachineProfile
-from tslab.study.machine.profile import FollowupSettings
-from tslab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
-from tslab.study.plan_after import (
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import (
+    AfterCondition,
+    ChainedRetry,
+    JobPhase,
+    LauncherKind,
+    Satisfy,
+    StudyState,
+)
+from tslab.lab.study import After, Grid, Study
+from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.launchers.slurm.dependency import dependency_text
+from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
+from tslab.lab.study.machine import MachineProfile
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
+from tslab.lab.study.plan_after import (
     _TargetState,
     AfterTarget,
     local_after_problems,
     order_runs,
     plan_targets,
 )
-from tslab.study.records import JobKind, ProgressSnapshot, TaskRecord
-from tslab.study.reporting.state import FolderFacts, RunReport
+from tslab.lab.study.records import JobKind, ProgressSnapshot, TaskRecord
+from tslab.lab.study.reporting.state import FolderFacts, RunReport
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence

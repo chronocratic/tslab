@@ -17,9 +17,9 @@ from typing import override
 
 import yaml
 
-from tslab.core.files import atomic_write_text
-from tslab.core.paths import TRACKERS_DIRECTORY
-from tslab.enums import RunState
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.core.paths import TRACKERS_DIRECTORY
+from tslab.lab.enums import RunState
 
 __all__ = ['LocalTracker', 'RunStatus', 'Tracker']
 
@@ -107,7 +107,7 @@ class LocalTracker(Tracker):
 
     This is the record that survives when every remote tracker is down, so
     ``Run`` always adds it. It uses only the standard library and PyYAML, which
-    keeps ``tslab.core`` free of Lightning.
+    keeps ``tslab.lab.core`` free of Lightning.
 
     Each execution of the run gets the next ``version_<n>`` folder, so a resumed
     run never overwrites the metrics of the interrupted one. Columns are

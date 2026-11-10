@@ -8,11 +8,11 @@ from typing import cast, override
 
 import torch
 
-from tslab.core.artifact import Checkpoint
-from tslab.core.run import Run, RunOptions
-from tslab.enums import Split
-from tslab.interfaces import Batch, Trainer
-from tslab.tasks import TSClassificationDataInfo, TSForecastingDataInfo
+from tslab.lab.core.artifact import Checkpoint
+from tslab.lab.core.run import Run, RunOptions
+from tslab.ml.interfaces import Batch, Trainer
+from tslab.ml.split import Split
+from tslab.ts.tasks import TSClassificationDataInfo, TSForecastingDataInfo
 
 
 @dataclass(frozen=True, kw_only=True)

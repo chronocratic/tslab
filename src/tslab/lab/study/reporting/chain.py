@@ -5,18 +5,18 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from tslab.enums import AfterVerdict, JobFlag, StudyState
-from tslab.study.chain import after_verdict
-from tslab.study.definition import grid_order, upstream_runs
+from tslab.lab.enums import AfterVerdict, JobFlag, StudyState
+from tslab.lab.study.chain import after_verdict
+from tslab.lab.study.definition import grid_order, upstream_runs
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import PurePosixPath
 
-    from tslab.study.context import Context
-    from tslab.study.definition import Study
-    from tslab.study.machine.profile import FollowupSettings
-    from tslab.study.reporting.state import RunReport
+    from tslab.lab.study.context import Context
+    from tslab.lab.study.definition import Study
+    from tslab.lab.study.machine.profile import FollowupSettings
+    from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['apply_chain_states', 'waits_for']
 

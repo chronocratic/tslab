@@ -3,8 +3,8 @@ from collections.abc import Mapping
 import pytest
 import torch
 
-from tslab.enums import Split
-from tslab.tasks import checked_split_slices, TSForecastingDataInfo
+from tslab.ml.split import Split
+from tslab.ts.tasks import checked_split_slices, TSForecastingDataInfo
 
 
 def test_ts_forecasting_data_info_rejects_zero_channels() -> None:

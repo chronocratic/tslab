@@ -7,13 +7,13 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.cli.common import print_json, resolve_request
-from tslab.cli.study.shared import _context_of, _states_of
-from tslab.core.meta import hostname
-from tslab.study.launchers.common.types import LaunchError
-from tslab.study.launchers.tables import backend_for
-from tslab.study.reporting.failures import collect_failures, log_failures
-from tslab.study.reporting.usage import log_usage, usage_document
+from tslab.lab.cli.common import print_json, resolve_request
+from tslab.lab.cli.study.shared import _context_of, _states_of
+from tslab.lab.core.meta import hostname
+from tslab.lab.study.launchers.common.types import LaunchError
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.reporting.failures import collect_failures, log_failures
+from tslab.lab.study.reporting.usage import log_usage, usage_document
 
 __all__ = ['Failures', 'Usage']
 
@@ -65,7 +65,7 @@ class Failures:
             context=context, states=_states_of(values=self.states), lines=self.lines
         )
         if self.json:
-            print_json(document={'schema': 'tslab.study-failures/1', 'runs': failures})
+            print_json(document={'schema': 'tslab.lab.study-failures/1', 'runs': failures})
         elif failures:
             log_failures(failures=failures)
         else:

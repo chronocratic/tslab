@@ -1,18 +1,20 @@
 # expect-error: missing-argument
 import torch
 
-import tslab
-from tslab.interfaces import LabeledSplits, Trainer
+import tslab.lab
+import tslab.ml
+import tslab.ts
+from tslab.ml.interfaces import LabeledSplits, Trainer
 
 
 def encode_without_encoder(
     *,
-    run: tslab.Run,
+    run: tslab.lab.Run,
     trainer: Trainer[torch.nn.Module],
-    checkpoint: tslab.Checkpoint,
+    checkpoint: tslab.lab.Checkpoint,
     data: LabeledSplits,
-) -> tslab.Tensors:
-    return tslab.stages.encode(
+) -> tslab.lab.Tensors:
+    return tslab.ts.stages.encode(
         run=run,
         trainer=trainer,
         model=torch.nn.Linear(in_features=2, out_features=2),

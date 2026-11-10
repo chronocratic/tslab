@@ -6,9 +6,9 @@ from datetime import timedelta
 from pathlib import Path
 from typing import cast
 
-from tslab.enums import LauncherKind
-from tslab.jobs.local import GpuDiscovery, MPS_GPU
-from tslab.study.machine.tables import from_table, MachineProfileError
+from tslab.lab.enums import LauncherKind
+from tslab.lab.jobs.local import GpuDiscovery, MPS_GPU
+from tslab.lab.study.machine.tables import from_table, MachineProfileError
 
 __all__ = [
     'FOLLOWUP_KEYS',

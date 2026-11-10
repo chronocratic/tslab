@@ -2,9 +2,9 @@
 
 import json
 
-from tslab.enums import LauncherKind
-from tslab.study.launchers.local.records import LocalJobRecord
-from tslab.study.records import JobKind, JobRecord
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.launchers.local.records import LocalJobRecord
+from tslab.lab.study.records import JobKind, JobRecord
 
 
 def test_local_record_round_trips_as_a_local_record() -> None:

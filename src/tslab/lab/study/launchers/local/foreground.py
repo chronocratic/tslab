@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 import shlex
 
-from tslab.jobs.local import export_lines
+from tslab.lab.jobs.local import export_lines
 
 __all__ = ['foreground_script']
 

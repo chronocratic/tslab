@@ -12,17 +12,17 @@ import logging
 from pathlib import Path
 from typing import cast, TYPE_CHECKING
 
-from tslab.core.artifact import Artifact, ArtifactIdentity
-from tslab.core.files import JsonFileError, read_json_object
-from tslab.core.paths import META_FILE
-from tslab.core.status import InstanceRecord, StatusFileError, utc_now_iso
-from tslab.core.text import qualified_name
-from tslab.enums import InstanceState
+from tslab.lab.core.artifact import Artifact, ArtifactIdentity
+from tslab.lab.core.files import JsonFileError, read_json_object
+from tslab.lab.core.paths import META_FILE
+from tslab.lab.core.status import InstanceRecord, StatusFileError, utc_now_iso
+from tslab.lab.core.text import qualified_name
+from tslab.lab.enums import InstanceState
 
 if TYPE_CHECKING:
     from typing import Any
 
-    from tslab.core.stage import _Execution, Stage
+    from tslab.lab.core.stage import _Execution, Stage
 
 __all__ = [
     'INSTANCE_META_FORMAT_VERSION',

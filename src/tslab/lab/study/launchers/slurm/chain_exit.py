@@ -7,17 +7,21 @@ import os
 from pathlib import Path
 from types import MappingProxyType
 
-from tslab.core.status import utc_now_iso
-from tslab.enums import ChainedRetry, JobPhase, StudyState
-from tslab.jobs.slurm import query_cluster_config, SlurmError
-from tslab.study.commands.resubmit import may_retry
-from tslab.study.context import Context
-from tslab.study.definition import expand_runs
-from tslab.study.launchers.common.types import JobStates
-from tslab.study.launchers.slurm.requeue import at_requeue_limit, requeue_task, restarted_attempt
-from tslab.study.paths import study_folder
-from tslab.study.records import append_job, JobRecord, read_jobs, take_progress, TaskRecord
-from tslab.study.reporting.state import collect_states, RunReport
+from tslab.lab.core.status import utc_now_iso
+from tslab.lab.enums import ChainedRetry, JobPhase, StudyState
+from tslab.lab.jobs.slurm import query_cluster_config, SlurmError
+from tslab.lab.study.commands.resubmit import may_retry
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.launchers.common.types import JobStates
+from tslab.lab.study.launchers.slurm.requeue import (
+    at_requeue_limit,
+    requeue_task,
+    restarted_attempt,
+)
+from tslab.lab.study.paths import study_folder
+from tslab.lab.study.records import append_job, JobRecord, read_jobs, take_progress, TaskRecord
+from tslab.lab.study.reporting.state import collect_states, RunReport
 
 __all__ = ['chain_exit']
 

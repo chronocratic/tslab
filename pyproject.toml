@@ -34,7 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # the private x_* settings of wandb are version-unstable; the range is pinned to the version the
-# settings were verified against (see tslab/tracking/wandb_tracker.py).
+# settings were verified against (see tslab/ml/tracking/wandb_tracker.py).
 wandb = ["wandb>=0.30,<0.31"]
 mlflow = ["mlflow>=3.0,<4"]
 tensorboard = ["tensorboard>=2.18"]
@@ -47,7 +47,7 @@ chronocratic-datasets = [
 analysis = ["pandas>=3.1,<4", "scipy>=1.18,<2", "matplotlib>=3.11,<4"]
 
 [project.scripts]
-tslab = "tslab.cli:main"
+tslab = "tslab.lab.cli:main"
 
 [project.urls]
 Repository = "https://github.com/skafai/tslab"
@@ -108,9 +108,9 @@ all = "error"
 error-on-warning = true
 
 [tool.ty.src]
-# Case files contain deliberate type errors; tests/typing/test_typing.py checks them one by one.
-# Template files hold {{placeholders}}; tests/template checks a generated project instead.
-exclude = ["tests/typing/cases", "src/tslab/templates"]
+# Case files contain deliberate type errors; tests/repo/typing/test_typing.py checks them one by one.
+# Template files hold {{placeholders}}; tests/ts/template checks a generated project instead.
+exclude = ["tests/repo/typing/cases", "src/tslab/ts/templates"]
 
 [tool.towncrier]
 directory = "changelog.d"

@@ -1,6 +1,6 @@
 """A second, independent implementation of the forecasting samples.
 
-The tests compare ``tslab.tasks.forecasting`` with this straightforward version,
+The tests compare ``tslab.ts.tasks.forecasting`` with this straightforward version,
 which builds the samples step by step, and require identical tensors.
 """
 

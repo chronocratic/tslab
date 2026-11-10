@@ -8,9 +8,9 @@ from pathlib import Path
 import sys
 from typing import Protocol
 
-from tslab.core.files import atomic_write_text
-from tslab.study.context import Context
-from tslab.study.reporting.result_table import collect_results, format_results_csv, ResultRow
+from tslab.lab.core.files import atomic_write_text
+from tslab.lab.study.context import Context
+from tslab.lab.study.reporting.result_table import collect_results, format_results_csv, ResultRow
 
 __all__ = ['ResultsFormat', 'results']
 
@@ -34,7 +34,7 @@ class _Formatter(Protocol):
 
 
 def _format_json(*, rows: Sequence[ResultRow]) -> str:
-    return json.dumps({'schema': 'tslab.study-results/1', 'rows': rows}, indent=2)
+    return json.dumps({'schema': 'tslab.lab.study-results/1', 'rows': rows}, indent=2)
 
 
 _FORMATTERS: Mapping[ResultsFormat, _Formatter] = {

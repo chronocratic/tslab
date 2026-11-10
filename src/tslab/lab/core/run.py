@@ -19,12 +19,12 @@ import threading
 from types import FrameType, MappingProxyType, TracebackType
 from typing import Literal, Self
 
-from tslab.core.codec import config_to_data
-from tslab.core.config import config_to_yaml, save_config
-from tslab.core.files import atomic_write_json
-from tslab.core.fingerprint import canonicalize, compute_fingerprint
-from tslab.core.lock import acquire_lock, Heartbeat, release_lock
-from tslab.core.meta import (
+from tslab.lab.core.codec import config_to_data
+from tslab.lab.core.config import config_to_yaml, save_config
+from tslab.lab.core.files import atomic_write_json
+from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint
+from tslab.lab.core.lock import acquire_lock, Heartbeat, release_lock
+from tslab.lab.core.meta import (
     collect_code_snapshot,
     collect_git_state,
     collect_hardware,
@@ -32,7 +32,7 @@ from tslab.core.meta import (
     hostname,
     META_FORMAT_VERSION,
 )
-from tslab.core.paths import (
+from tslab.lab.core.paths import (
     CONFIG_FILE,
     InstanceName,
     LOCK_FILE,
@@ -44,9 +44,9 @@ from tslab.core.paths import (
     validate_relative_path,
     validate_stage_name,
 )
-from tslab.core.ranks import is_writer_process
-from tslab.core.seeding import seed_everything
-from tslab.core.status import (
+from tslab.lab.core.ranks import is_writer_process
+from tslab.lab.core.seeding import seed_everything
+from tslab.lab.core.status import (
     format_instance_id,
     InstanceRecord,
     read_status,
@@ -54,8 +54,8 @@ from tslab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.core.tracker import LocalTracker, RunStatus, Tracker
-from tslab.enums import InstanceState, LogLevel, RunState
+from tslab.lab.core.tracker import LocalTracker, RunStatus, Tracker
+from tslab.lab.enums import InstanceState, LogLevel, RunState
 
 __all__ = ['JobTimeLimitSignal', 'Run', 'RunOptions']
 
@@ -106,8 +106,8 @@ class Run:
 
     Example::
 
-        with tslab.Run(config=config, root=Path('runs'), relative_path=Path('a/b')) as run:
-            checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
+        with tslab.lab.Run(config=config, root=Path('runs'), relative_path=Path('a/b')) as run:
+            checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
     """
 
     def __init__(  # noqa: PLR0913 # why: keyword-only public API; each option is documented below

@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 
-from tslab.core.config import config_from_yaml, config_to_yaml, parse_config
-from tslab.enums import WandbMode
-from tslab.tracking import build_trackers, TrackingOptions
-from tslab.tracking.mlflow_tracker import MLflowTracker
-from tslab.tracking.tensorboard_tracker import TensorBoardTracker
-from tslab.tracking.wandb.tracker import WandbTracker
+from tslab.lab.core.config import config_from_yaml, config_to_yaml, parse_config
+from tslab.ml.tracking import build_trackers, TrackingOptions
+from tslab.ml.tracking.mlflow_tracker import MLflowTracker
+from tslab.ml.tracking.tensorboard_tracker import TensorBoardTracker
+from tslab.ml.tracking.wandb.tracker import WandbTracker
+from tslab.ml.tracking.wandb_mode import WandbMode
 
 
 def test_build_trackers_follows_options() -> None:

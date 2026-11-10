@@ -4,17 +4,17 @@ from pathlib import Path
 import time
 from typing import override
 
-from integration_helpers import run_in
 from lightning.pytorch.plugins.environments import SLURMEnvironment
-from lightning_toy import FAST, ToyData, ToyDataModule, ToyInfo, ToyRegressor
 from mlflow.tracking.client import MlflowClient
 import pytest
 import torch
 
-from tslab.core.artifact import Checkpoint
-from tslab.lightning import LightningDataSource, LightningTrainer, TrainingPaused
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.tracking.mlflow_tracker import MLflowTracker
+from tests.ml.integration.lightning_toy import FAST, ToyData, ToyDataModule, ToyInfo, ToyRegressor
+from tests.support.integration_helpers import run_in
+from tslab.lab.core.artifact import Checkpoint
+from tslab.ml.lightning import LightningDataSource, LightningTrainer, TrainingPaused
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.tracking.mlflow_tracker import MLflowTracker
 
 
 def trainer(**changes: object) -> LightningTrainer:

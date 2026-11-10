@@ -10,9 +10,9 @@ import time
 from typing import Any
 
 import pytest
-from toy_pipeline import main, make_data, read_calls, summarize, ToyConfig
 
-import tslab
+from tests.lab.integration.toy_pipeline import main, make_data, read_calls, summarize, ToyConfig
+import tslab.lab
 
 
 def toy(tmp_path: Path, **changes: object) -> ToyConfig:
@@ -36,7 +36,7 @@ def test_first_run_executes_everything_and_records_status(tmp_path: Path) -> Non
     assert status['run_state'] == 'finished'
     assert {record['state'] for record in status['instances'].values()} == {'done'}
     metrics = results['x2']
-    assert isinstance(metrics, tslab.Metrics)
+    assert isinstance(metrics, tslab.lab.Metrics)
     assert (tmp_path / 'toy' / 'transform' / 'x2' / 'tensors.safetensors').exists()
     assert (tmp_path / 'toy' / 'config.yaml').exists()
     assert (tmp_path / 'toy' / 'logs' / 'run.log').exists()
@@ -94,26 +94,26 @@ def test_failure_skips_dependants_and_rerun_repeats_only_them(tmp_path: Path) ->
 
 def test_fail_fast_reraises_and_marks_run_failed(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match='fails on purpose'):
-        main(config=toy(tmp_path, fail_scale=1.0, run=tslab.RunOptions(fail_fast=True)))
+        main(config=toy(tmp_path, fail_scale=1.0, run=tslab.lab.RunOptions(fail_fast=True)))
     assert status_of(tmp_path)['run_state'] == 'failed'
     assert not (tmp_path / 'toy' / '.lock').exists()
 
 
 def test_force_all_reruns_everything(tmp_path: Path) -> None:
     main(config=toy(tmp_path))
-    main(config=toy(tmp_path, run=tslab.RunOptions(force_all=True)))
+    main(config=toy(tmp_path, run=tslab.lab.RunOptions(force_all=True)))
     assert len(read_calls(root=tmp_path)) == 10
 
 
 def test_rerun_one_instance_also_reruns_its_dependants(tmp_path: Path) -> None:
     main(config=toy(tmp_path))
-    main(config=toy(tmp_path, run=tslab.RunOptions(rerun=('transform[x1]',))))
+    main(config=toy(tmp_path, run=tslab.lab.RunOptions(rerun=('transform[x1]',))))
     assert read_calls(root=tmp_path)[5:] == ['transform[x1]', 'summarize[x1]']
 
 
 def test_rerun_from_reruns_stage_and_everything_after(tmp_path: Path) -> None:
     main(config=toy(tmp_path))
-    main(config=toy(tmp_path, run=tslab.RunOptions(rerun_from='transform')))
+    main(config=toy(tmp_path, run=tslab.lab.RunOptions(rerun_from='transform')))
     assert read_calls(root=tmp_path)[5:] == [
         'transform[x1]',
         'summarize[x1]',
@@ -128,10 +128,10 @@ def test_dry_run_executes_and_writes_nothing(
     main(config=toy(tmp_path))
     before = (tmp_path / 'toy' / 'status.json').read_text(encoding='utf-8')
     caplog.set_level('INFO')
-    results = main(config=toy(tmp_path, scales=(1.0, 3.0), run=tslab.RunOptions(dry_run=True)))
+    results = main(config=toy(tmp_path, scales=(1.0, 3.0), run=tslab.lab.RunOptions(dry_run=True)))
     assert len(read_calls(root=tmp_path)) == 5
     assert (tmp_path / 'toy' / 'status.json').read_text(encoding='utf-8') == before
-    assert not tslab.is_available(artifact=results['x1'])
+    assert not tslab.lab.is_available(artifact=results['x1'])
     assert 'make_data[default] -> load' in caplog.text
     assert 'summarize[x1] -> load' in caplog.text
     assert 'transform[x3] -> run (new)' in caplog.text
@@ -139,14 +139,14 @@ def test_dry_run_executes_and_writes_nothing(
 
 
 def test_duplicate_unnamed_call_raises(tmp_path: Path) -> None:
-    with tslab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('dup')) as run:
+    with tslab.lab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('dup')) as run:
         make_data(run=run, size=2)
         with pytest.raises(ValueError, match='called twice without name='):
             make_data(run=run, size=3)
 
 
 def test_nested_name_conflict_raises(tmp_path: Path) -> None:
-    with tslab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('nested')) as run:
+    with tslab.lab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('nested')) as run:
         data = make_data(run=run, size=2)
         summarize(run=run, name=('a', 'b'), data=data)
         with pytest.raises(ValueError, match='conflicts'):
@@ -155,7 +155,7 @@ def test_nested_name_conflict_raises(tmp_path: Path) -> None:
 
 def test_name_on_single_instance_stage_raises(tmp_path: Path) -> None:
     with (
-        tslab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('single')) as run,
+        tslab.lab.Run(config=toy(tmp_path), root=tmp_path, relative_path=Path('single')) as run,
         pytest.raises(TypeError, match='single-instance'),
     ):
         make_data(run=run, name='x', size=2)  # ty: ignore[unknown-argument]

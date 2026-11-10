@@ -4,11 +4,12 @@ from collections.abc import Mapping, Sequence
 
 import torch
 
-from tslab.core.artifact import Metrics, Tensors
-from tslab.core.paths import InstanceName, normalize_instance_name
-from tslab.core.run import Run
-from tslab.core.stage import stage
-from tslab.interfaces import DownstreamModel, Metric
+from tslab.lab.core.artifact import Metrics, Tensors
+from tslab.lab.core.paths import InstanceName, normalize_instance_name
+from tslab.lab.core.run import Run
+from tslab.lab.core.stage import stage
+from tslab.ml.interfaces import Metric
+from tslab.ts.interfaces import DownstreamModel
 
 __all__ = ['evaluate']
 
@@ -51,7 +52,7 @@ def evaluate(
         representations: From ``encode`` or the forecasting stages:
             ``train_*`` and ``test_*`` keys, and ``val_*`` when there is a
             validation split.
-        downstream_model: For example ``tslab.probes.SVMProbe()``.
+        downstream_model: For example ``tslab.ts.probes.SVMProbe()``.
         metrics: Scores to compute; ``None`` uses the protocol metrics of
             ``downstream_model``.
 

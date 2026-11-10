@@ -9,17 +9,17 @@ from typing import cast, TYPE_CHECKING
 
 import pytest
 
-from tslab import enums
-import tslab.study as study_api
-from tslab.study import Grid, setting_axis, Study
-import tslab.study.definition as definition_api
-from tslab.study.definition import expand_runs, Settings, StudyRun
-from tslab.study.definition.after import _visit_grid
+from tslab.lab import enums
+import tslab.lab.study as study_api
+from tslab.lab.study import Grid, setting_axis, Study
+import tslab.lab.study.definition as definition_api
+from tslab.lab.study.definition import expand_runs, Settings, StudyRun
+from tslab.lab.study.definition.after import _visit_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
-    from tslab.study import After
+    from tslab.lab.study import After
 
 
 @dataclass(frozen=True, kw_only=True)

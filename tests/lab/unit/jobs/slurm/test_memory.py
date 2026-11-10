@@ -2,7 +2,7 @@
 
 import pytest
 
-from tslab.jobs.slurm import format_slurm_memory, parse_slurm_memory
+from tslab.lab.jobs.slurm import format_slurm_memory, parse_slurm_memory
 
 
 def test_parse_slurm_memory_units() -> None:

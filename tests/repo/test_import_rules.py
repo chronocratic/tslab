@@ -21,25 +21,25 @@ FORBIDDEN_IN_CORE = (
     'tensorboard',
     'chronocratic',
     'rich',
-    'tslab.adapters',
-    'tslab.lightning',
-    'tslab.tasks',
-    'tslab.probes',
-    'tslab.study',
-    'tslab.cli',
+    'tslab.ts.adapters',
+    'tslab.ml.lightning',
+    'tslab.ts.tasks',
+    'tslab.ts.probes',
+    'tslab.lab.study',
+    'tslab.lab.cli',
     'pandas',
     'scipy',
     'matplotlib',
-    'tslab.analysis',
+    'tslab.lab.analysis',
 )
 FORBIDDEN_IN_LIGHTNING = (
     'sklearn',
     'wandb',
     'mlflow',
     'chronocratic',
-    'tslab.adapters',
-    'tslab.tasks',
-    'tslab.analysis',
+    'tslab.ts.adapters',
+    'tslab.ts.tasks',
+    'tslab.lab.analysis',
 )
 FORBIDDEN_IN_PROBES = (
     'lightning',
@@ -48,10 +48,10 @@ FORBIDDEN_IN_PROBES = (
     'mlflow',
     'tensorboard',
     'chronocratic',
-    'tslab.adapters',
-    'tslab.lightning',
-    'tslab.tasks',
-    'tslab.analysis',
+    'tslab.ts.adapters',
+    'tslab.ml.lightning',
+    'tslab.ts.tasks',
+    'tslab.lab.analysis',
 )
 FORBIDDEN_IN_TASKS = (
     'lightning',
@@ -61,25 +61,25 @@ FORBIDDEN_IN_TASKS = (
     'mlflow',
     'tensorboard',
     'chronocratic',
-    'tslab.adapters',
-    'tslab.lightning',
+    'tslab.ts.adapters',
+    'tslab.ml.lightning',
     'pandas',
     'scipy',
     'matplotlib',
-    'tslab.analysis',
+    'tslab.lab.analysis',
 )
 TRACKER_SDKS = ('wandb', 'mlflow', 'tensorboard')
-FORBIDDEN_IN_TRACKING = ('lightning', 'pytorch_lightning', 'tslab.analysis', *TRACKER_SDKS)
+FORBIDDEN_IN_TRACKING = ('lightning', 'pytorch_lightning', 'tslab.lab.analysis', *TRACKER_SDKS)
 FORBIDDEN_IN_MODELS_ADAPTER = (
     'chronocratic.datasets',
-    'tslab.adapters.chronocratic.datasets',
-    'tslab.analysis',
+    'tslab.ts.adapters.chronocratic.datasets',
+    'tslab.lab.analysis',
     *TRACKER_SDKS,
 )
 FORBIDDEN_IN_DATASETS_ADAPTER = (
     'chronocratic.models',
-    'tslab.adapters.chronocratic.models',
-    'tslab.analysis',
+    'tslab.ts.adapters.chronocratic.models',
+    'tslab.lab.analysis',
     *TRACKER_SDKS,
 )
 FORBIDDEN_IN_STUDY = (
@@ -88,15 +88,15 @@ FORBIDDEN_IN_STUDY = (
     'sklearn',
     'chronocratic',
     'rich',
-    'tslab.tasks',
-    'tslab.adapters',
-    'tslab.lightning',
-    'tslab.tracking',
+    'tslab.ts.tasks',
+    'tslab.ts.adapters',
+    'tslab.ml.lightning',
+    'tslab.ml.tracking',
     *TRACKER_SDKS,
     'pandas',
     'scipy',
     'matplotlib',
-    'tslab.analysis',
+    'tslab.lab.analysis',
 )
 
 
@@ -123,34 +123,34 @@ def test_package_import_loads_no_optional_layers() -> None:
 
 @pytest.mark.slow
 def test_lightning_package_loads_no_tracker_sdk_or_time_series_layer() -> None:
-    loaded = loaded_by(module='tslab.lightning')
+    loaded = loaded_by(module='tslab.ml.lightning')
     assert 'lightning' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_LIGHTNING) == []
 
 
 def test_tracking_package_loads_no_lightning_or_tracker_sdk() -> None:
-    # The door of tslab.tracking stays importable without Lightning or a
+    # The door of tslab.ml.tracking stays importable without Lightning or a
     # tracker SDK; build_trackers imports the concrete trackers.
-    loaded = loaded_by(module='tslab.tracking')
+    loaded = loaded_by(module='tslab.ml.tracking')
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_TRACKING) == []
 
 
 @pytest.mark.slow
 def test_probes_load_scikit_learn_and_nothing_else_optional() -> None:
-    loaded = loaded_by(module='tslab.probes')
+    loaded = loaded_by(module='tslab.ts.probes')
     assert 'sklearn' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_PROBES) == []
 
 
 @pytest.mark.slow
 def test_time_series_layer_loads_neither_lightning_nor_scikit_learn() -> None:
-    assert offending(loaded=loaded_by(module='tslab.tasks'), forbidden=FORBIDDEN_IN_TASKS) == []
+    assert offending(loaded=loaded_by(module='tslab.ts.tasks'), forbidden=FORBIDDEN_IN_TASKS) == []
 
 
 @pytest.mark.slow
 @pytest.mark.chronocratic
 def test_models_adapter_loads_no_dataset_code() -> None:
-    loaded = loaded_by(module='tslab.adapters.chronocratic.models')
+    loaded = loaded_by(module='tslab.ts.adapters.chronocratic.models')
     assert 'chronocratic.models' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_MODELS_ADAPTER) == []
 
@@ -158,28 +158,28 @@ def test_models_adapter_loads_no_dataset_code() -> None:
 @pytest.mark.slow
 @pytest.mark.chronocratic
 def test_datasets_adapter_loads_no_model_code() -> None:
-    loaded = loaded_by(module='tslab.adapters.chronocratic.datasets')
+    loaded = loaded_by(module='tslab.ts.adapters.chronocratic.datasets')
     assert 'chronocratic.datasets' in loaded
     assert offending(loaded=loaded, forbidden=FORBIDDEN_IN_DATASETS_ADAPTER) == []
 
 
 @pytest.mark.slow
 def test_study_loads_no_heavy_code() -> None:
-    # tslab.study is the import surface user study modules use; it must not
+    # tslab.lab.study is the import surface user study modules use; it must not
     # pull in heavy code.
-    assert offending(loaded=loaded_by(module='tslab.study'), forbidden=FORBIDDEN_IN_STUDY) == []
+    assert offending(loaded=loaded_by(module='tslab.lab.study'), forbidden=FORBIDDEN_IN_STUDY) == []
 
 
 def test_chronocratic_namespace_imports_nothing() -> None:
-    loaded = loaded_by(module='tslab.adapters.chronocratic')
+    loaded = loaded_by(module='tslab.ts.adapters.chronocratic')
     assert (
         offending(
             loaded=loaded,
             forbidden=(
                 'chronocratic.models',
                 'chronocratic.datasets',
-                'tslab.adapters.chronocratic.models',
-                'tslab.adapters.chronocratic.datasets',
+                'tslab.ts.adapters.chronocratic.models',
+                'tslab.ts.adapters.chronocratic.datasets',
             ),
         )
         == []
@@ -187,7 +187,7 @@ def test_chronocratic_namespace_imports_nothing() -> None:
 
 
 SOURCE_ROOT = Path(__file__).resolve().parents[2] / 'src' / 'tslab'
-ANALYSIS_ALLOWED = (SOURCE_ROOT / 'analysis', SOURCE_ROOT / 'templates')
+ANALYSIS_ALLOWED = (SOURCE_ROOT / 'lab' / 'analysis', SOURCE_ROOT / 'ts' / 'templates')
 
 
 def _analysis_imports(*, path: Path) -> list[str]:
@@ -220,9 +220,9 @@ def test_analysis_package_loads_no_training_code() -> None:
     forbidden = (
         'lightning',
         'pytorch_lightning',
-        'tslab.lightning',
-        'tslab.adapters',
-        'tslab.cli',
+        'tslab.ml.lightning',
+        'tslab.ts.adapters',
+        'tslab.lab.cli',
         *TRACKER_SDKS,
     )
-    assert offending(loaded=loaded_by(module='tslab.analysis'), forbidden=forbidden) == []
+    assert offending(loaded=loaded_by(module='tslab.lab.analysis'), forbidden=forbidden) == []

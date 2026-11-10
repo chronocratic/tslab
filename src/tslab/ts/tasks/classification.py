@@ -4,8 +4,8 @@ from dataclasses import dataclass
 
 import torch
 
-from tslab.enums import Split
-from tslab.tasks.data import TSDataInfo
+from tslab.ml.split import Split
+from tslab.ts.tasks.data import TSDataInfo
 
 __all__ = ['TSClassificationDataInfo', 'check_label_range']
 

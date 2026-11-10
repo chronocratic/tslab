@@ -1,7 +1,7 @@
 import matplotlib as mpl
 from matplotlib.figure import Figure
 
-from tslab.analysis.style import is_dark_cell, paper_style
+from tslab.lab.analysis.style import is_dark_cell, paper_style
 
 
 def test_paper_style_sets_and_restores() -> None:

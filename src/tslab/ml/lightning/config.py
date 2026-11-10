@@ -4,8 +4,8 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, override
 
-from tslab.core.fingerprint import NotFingerprinted
-from tslab.core.markers import HardwareSetting, MachineSetting
+from tslab.lab.core.fingerprint import NotFingerprinted
+from tslab.lab.core.markers import HardwareSetting, MachineSetting
 
 __all__ = ['LightningTrainerConfig']
 

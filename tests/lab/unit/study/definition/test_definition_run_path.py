@@ -6,9 +6,9 @@ from time import perf_counter
 
 import pytest
 
-from tests.unit.study.configs import grid
-from tslab.study import Study
-from tslab.study.definition import expand_runs
+from tests.lab.unit.study.configs import grid
+from tslab.lab.study import Study
+from tslab.lab.study.definition import expand_runs
 
 
 def test_default_template_is_grid_then_axes() -> None:

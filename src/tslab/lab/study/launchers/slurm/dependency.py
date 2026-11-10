@@ -3,8 +3,8 @@
 from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
 
-from tslab.enums import AfterCondition, Satisfy
-from tslab.study.plan_after import AfterTarget
+from tslab.lab.enums import AfterCondition, Satisfy
+from tslab.lab.study.plan_after import AfterTarget
 
 __all__ = ['dependency_text']
 

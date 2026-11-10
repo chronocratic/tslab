@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from tslab.study.records import JobRecord
+from tslab.lab.study.records import JobRecord
 
 __all__ = ['LocalJobRecord']
 

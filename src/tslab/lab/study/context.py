@@ -8,7 +8,7 @@ import time
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from tslab.study.definition import (
+from tslab.lab.study.definition import (
     chained_grids,
     expand_runs,
     load_study,
@@ -17,15 +17,15 @@ from tslab.study.definition import (
     StudyRun,
     upstream_runs,
 )
-from tslab.study.machine import load_machine, MachineProfile
-from tslab.study.paths import log_file_of, study_folder
-from tslab.study.plan import check_machine, resolve_runs, ResolvedRun
-from tslab.study.records import JobRecord, read_jobs, submission_in_progress
-from tslab.study.reporting.chain import apply_chain_states
-from tslab.study.reporting.state import collect_states, RunReport
+from tslab.lab.study.machine import load_machine, MachineProfile
+from tslab.lab.study.paths import log_file_of, study_folder
+from tslab.lab.study.plan import check_machine, resolve_runs, ResolvedRun
+from tslab.lab.study.records import JobRecord, read_jobs, submission_in_progress
+from tslab.lab.study.reporting.chain import apply_chain_states
+from tslab.lab.study.reporting.state import collect_states, RunReport
 
 if TYPE_CHECKING:
-    from tslab.study.launchers.common.types import JobStates, QueuedJob
+    from tslab.lab.study.launchers.common.types import JobStates, QueuedJob
 
 __all__ = [
     'Context',
@@ -128,7 +128,7 @@ def expected_starts(*, context: Context) -> Mapping[str, 'QueuedJob'] | None:
         the scheduler call fails (a failed call is logged as a warning).
     """
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
+    from tslab.lab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     return backend_for(machine=context.machine).expected_starts(context=context)
 
@@ -185,7 +185,7 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     )
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
+    from tslab.lab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     cache = {} if ended_states is None else ended_states
     job_states, new_cache = backend_for(machine=machine).job_states(
@@ -240,7 +240,7 @@ def refresh_context(*, context: Context) -> Context:
         path=study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
     )
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
+    from tslab.lab.study.launchers.tables import backend_for  # noqa: PLC0415
 
     job_states, _ = backend_for(machine=context.machine).job_states(
         machine=context.machine, study=context.study, jobs=jobs, cache={}
@@ -334,7 +334,7 @@ def records_context(
         The context with ``jobs`` read and no runs, reports or job states.
     """
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers.common.types import JobStates  # noqa: PLC0415
+    from tslab.lab.study.launchers.common.types import JobStates  # noqa: PLC0415
 
     study = load_study(reference=reference)
     machine = load_machine(path=machine_path, lenient_env=True, environment=environment)
@@ -423,7 +423,7 @@ def widen_context(*, context: Context, reports: Sequence[RunReport]) -> Context:
         upstream reports their dependencies need.
     """
     # why: the launcher door imports Context, so this import must wait until calls
-    from tslab.study.launchers.cpus import available_cpus  # noqa: PLC0415
+    from tslab.lab.study.launchers.cpus import available_cpus  # noqa: PLC0415
 
     new = [report for report in reports if report.run.run_path not in context.resolved]
     if not new:

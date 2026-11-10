@@ -6,7 +6,7 @@ The package holds the ``Study`` and ``StudyRun`` types and their expansion
 and the typed dotted settings they are built from (``settings``).
 """
 
-from tslab.study.definition.after import (
+from tslab.lab.study.definition.after import (
     After,
     after_problems,
     chained_grids,
@@ -14,7 +14,7 @@ from tslab.study.definition.after import (
     match_axes,
     upstream_runs,
 )
-from tslab.study.definition.definition import (
+from tslab.lab.study.definition.definition import (
     DEFAULT_RUN_SETTINGS,
     expand_runs,
     followup_job_name,
@@ -36,14 +36,14 @@ from tslab.study.definition.definition import (
     StudyRun,
     WANDB_SYNC_JOB,
 )
-from tslab.study.definition.expansion import (
+from tslab.lab.study.definition.expansion import (
     expand_placeholders,
     expand_setting,
     expand_variables,
     PLACEHOLDERS,
 )
-from tslab.study.definition.loading import load_study
-from tslab.study.definition.settings import (
+from tslab.lab.study.definition.loading import load_study
+from tslab.lab.study.definition.settings import (
     check_paths,
     field_annotation,
     from_presets,

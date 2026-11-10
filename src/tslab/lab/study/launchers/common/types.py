@@ -6,9 +6,9 @@ from datetime import timedelta
 from types import MappingProxyType
 from typing import Protocol
 
-from tslab.enums import JobFlag, JobPhase, LocalTaskState
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
+from tslab.lab.enums import JobFlag, JobPhase, LocalTaskState
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
 
 __all__ = [
     'SIGNAL_EXIT_BASE',

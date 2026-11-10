@@ -2,7 +2,7 @@
 
 import pytest
 
-from tslab.jobs.local.shell import export_lines
+from tslab.lab.jobs.local.shell import export_lines
 
 
 def test_export_lines_quote_values() -> None:

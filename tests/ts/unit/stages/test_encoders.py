@@ -3,9 +3,9 @@ from dataclasses import dataclass
 import pytest
 import torch
 
-from tslab.core.fingerprint import canonicalize
-from tslab.interfaces import Encoder, SequenceEncoder
-from tslab.stages.encoders import ModelAsEncoder
+from tslab.lab.core.fingerprint import canonicalize
+from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.stages.encoders import ModelAsEncoder
 
 
 class VectorModel(torch.nn.Module):

@@ -6,13 +6,13 @@ import logging
 import math
 from typing import cast
 
-from tslab.core.text import format_bytes, format_duration, log_table
-from tslab.study.context import Context
-from tslab.study.launchers.common.protocols import Backend
-from tslab.study.launchers.common.types import JobUsage, Resources
-from tslab.study.launchers.tables import backend_for
-from tslab.study.reporting.report import resources_of
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.text import format_bytes, format_duration, log_table
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.common.protocols import Backend
+from tslab.lab.study.launchers.common.types import JobUsage, Resources
+from tslab.lab.study.launchers.tables import backend_for
+from tslab.lab.study.reporting.report import resources_of
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['log_usage', 'usage_document']
 
@@ -51,7 +51,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         for report, usage_item in selected
     ]
     return {
-        'schema': 'tslab.study-usage/1',
+        'schema': 'tslab.lab.study-usage/1',
         'launcher': context.machine.launcher,
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),

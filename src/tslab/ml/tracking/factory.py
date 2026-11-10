@@ -1,8 +1,8 @@
 """Build only the tracking integrations selected by run options."""
 
-from tslab.core.tracker import Tracker
-from tslab.enums import WandbMode
-from tslab.tracking.options import TrackingOptions
+from tslab.lab.core.tracker import Tracker
+from tslab.ml.tracking.options import TrackingOptions
+from tslab.ml.tracking.wandb_mode import WandbMode
 
 __all__ = ['build_trackers']
 
@@ -17,10 +17,10 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
         Unstarted trackers; ``Run`` starts and finishes them.
     """
     trackers: list[Tracker] = []
-    # why: imported inside each branch so that `import tslab.tracking` never imports
+    # why: imported inside each branch so that `import tslab.ml.tracking` never imports
     # Lightning or a tracker SDK, and a tracker nobody enabled is never imported.
     if options.wandb_mode is not WandbMode.DISABLED:
-        from tslab.tracking.wandb.tracker import WandbTracker  # noqa: PLC0415
+        from tslab.ml.tracking.wandb.tracker import WandbTracker  # noqa: PLC0415
 
         trackers.append(
             WandbTracker(
@@ -32,7 +32,7 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
             )
         )
     if options.mlflow:
-        from tslab.tracking.mlflow_tracker import MLflowTracker  # noqa: PLC0415
+        from tslab.ml.tracking.mlflow_tracker import MLflowTracker  # noqa: PLC0415
 
         trackers.append(
             MLflowTracker(
@@ -41,7 +41,7 @@ def build_trackers(*, options: TrackingOptions) -> tuple[Tracker, ...]:
             )
         )
     if options.tensorboard:
-        from tslab.tracking.tensorboard_tracker import TensorBoardTracker  # noqa: PLC0415
+        from tslab.ml.tracking.tensorboard_tracker import TensorBoardTracker  # noqa: PLC0415
 
         trackers.append(TensorBoardTracker())
     return tuple(trackers)

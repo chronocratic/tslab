@@ -4,18 +4,18 @@ from collections.abc import Callable, Mapping, Sequence
 import shlex
 from types import MappingProxyType
 
-from tslab.core.text import format_index_ranges
-from tslab.enums import StudyState
-from tslab.study.context import Context
-from tslab.study.definition import expand_runs, Study
-from tslab.study.definition.settings import SettingValue
-from tslab.study.launchers.common.types import LaunchReport, QueuedJob
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
-from tslab.study.reporting.chain import waits_for
-from tslab.study.reporting.outcome import counts_live
-from tslab.study.reporting.report import resources_of
-from tslab.study.reporting.state import RunReport
+from tslab.lab.core.text import format_index_ranges
+from tslab.lab.enums import StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import expand_runs, Study
+from tslab.lab.study.definition.settings import SettingValue
+from tslab.lab.study.launchers.common.types import LaunchReport, QueuedJob
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.chain import waits_for
+from tslab.lab.study.reporting.outcome import counts_live
+from tslab.lab.study.reporting.report import resources_of
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['cancel_document', 'launch_document', 'run_entry', 'show_document', 'status_document']
 
@@ -97,7 +97,7 @@ def status_document(
         counts[report.run.grid]['total'] += 1
         counts['all']['total'] += 1
     return {
-        'schema': 'tslab.study-status/1',
+        'schema': 'tslab.lab.study-status/1',
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'study_directory': context.study_directory.resolve().as_posix(),
@@ -134,7 +134,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         for name, grid in study.grids.items()
     ]
     return {
-        'schema': 'tslab.study-show/1',
+        'schema': 'tslab.lab.study-show/1',
         'study': study.name,
         'settings': {
             path: _json_setting_value(value=value) for path, value in study.settings.items()
@@ -169,7 +169,7 @@ def cancel_document(
         The versioned study-cancel document.
     """
     return {
-        'schema': 'tslab.study-cancel/1',
+        'schema': 'tslab.lab.study-cancel/1',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
         'signal': signal,
@@ -225,7 +225,7 @@ def launch_document(
     """
     jobs = _launch_jobs(report=report, groups=groups, dry_run=dry_run)
     return {
-        'schema': 'tslab.study-launch/1',
+        'schema': 'tslab.lab.study-launch/1',
         'dry_run': dry_run,
         'jobs': jobs,
         'cancelled': list(cancelled),

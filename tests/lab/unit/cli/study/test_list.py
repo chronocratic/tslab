@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.cli.common import UsageError
-from tslab.cli.study import List, Show
+from tslab.lab.cli.common import UsageError
+from tslab.lab.cli.study import List, Show
 
 
 def _write_studies(*, project: Path, package: str, missing_quick_study: bool = False) -> None:
@@ -19,8 +19,8 @@ def _write_studies(*, project: Path, package: str, missing_quick_study: bool = F
     (project / package / '__init__.py').write_text('', encoding='utf-8')
     (studies / '_private.py').write_text('', encoding='utf-8')
     (studies / 'full.py').write_text(
-        'from tests.unit.study.configs import grid\n'
-        'from tslab.study import Study\n'
+        'from tests.lab.unit.study.configs import grid\n'
+        'from tslab.lab.study import Study\n'
         "study = Study(name='loaded-full', grids={'g': grid()})\n",
         encoding='utf-8',
     )
@@ -28,8 +28,8 @@ def _write_studies(*, project: Path, package: str, missing_quick_study: bool = F
         ''
         if missing_quick_study
         else (
-            'from tests.unit.study.configs import grid\n'
-            'from tslab.study import Study\n'
+            'from tests.lab.unit.study.configs import grid\n'
+            'from tslab.lab.study import Study\n'
             "study = Study(name='loaded-quick', grids={'g': grid()})\n"
         )
     )
@@ -67,7 +67,7 @@ def test_list_json_has_schema_and_study_names(
     assert List(json=True).run() == 0
 
     assert json.loads(capsys.readouterr().out) == {
-        'schema': 'tslab.study-list/1',
+        'schema': 'tslab.lab.study-list/1',
         'studies': [
             {'short_name': 'full', 'name': 'loaded-full'},
             {'short_name': 'quick', 'name': 'loaded-quick'},

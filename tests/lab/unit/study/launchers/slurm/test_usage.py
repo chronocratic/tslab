@@ -7,13 +7,13 @@ from pathlib import Path
 
 import pytest
 
+from tests.lab.unit.study.helpers import context, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tests.unit.study.helpers import context, submit_study
-from tslab.enums import StudyState
-from tslab.jobs.slurm import SlurmJobUsage
-from tslab.study.launchers.common.types import JobUsage
-import tslab.study.launchers.slurm.usage as slurm_usage
-from tslab.study.reporting.failures import collect_failures
+from tslab.lab.enums import StudyState
+from tslab.lab.jobs.slurm import SlurmJobUsage
+from tslab.lab.study.launchers.common.types import JobUsage
+import tslab.lab.study.launchers.slurm.usage as slurm_usage
+from tslab.lab.study.reporting.failures import collect_failures
 
 
 def test_usage_queries_all_selected_job_ids(
@@ -132,7 +132,7 @@ def test_oom_hint_without_numbers_when_sacct_fails(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr('tslab.jobs.slurm.commands._sleep', lambda _: None)
+    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
     submit_study(project=project)
     fake.set_answers(
         'sacct',
@@ -147,7 +147,7 @@ def test_oom_hint_without_numbers_when_sacct_fails(
         ],
     )
     ctx = context(project=project, machine_file='cluster.toml')
-    with caplog.at_level('WARNING', logger='tslab.study.reporting.failures'):
+    with caplog.at_level('WARNING', logger='tslab.lab.study.reporting.failures'):
         failures = collect_failures(context=ctx, states=(), lines=30)
     assert 'sacct' in caplog.text
     (failure,) = failures

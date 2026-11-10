@@ -2,9 +2,9 @@
 
 from collections.abc import Iterable
 
-from tslab.enums import StudyState
-from tslab.study.context import Context
-from tslab.study.reporting.state import RunReport
+from tslab.lab.enums import StudyState
+from tslab.lab.study.context import Context
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = [
     'EXIT_DONE',

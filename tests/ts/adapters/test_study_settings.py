@@ -6,11 +6,13 @@ from typing import cast
 
 import pytest
 
-import tslab
-from tslab.adapters.chronocratic.datasets import ChronocraticDataChoice, data_settings
-from tslab.adapters.chronocratic.models import chronocratic_model_choice, model_settings
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.study import check_paths, from_presets, settings_to_args
+import tslab.lab
+from tslab.lab.study import check_paths, from_presets, settings_to_args
+import tslab.ml
+from tslab.ml.lightning.config import LightningTrainerConfig
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import ChronocraticDataChoice, data_settings
+from tslab.ts.adapters.chronocratic.models import chronocratic_model_choice, model_settings
 
 pytestmark = pytest.mark.chronocratic
 
@@ -52,7 +54,7 @@ PRESETS: dict[str, tuple[str, object]] = {
         Config(
             model=model_settings(choice=Models, name='ts2vec'),
             data=data_settings(
-                name='ett', dataset_file_path=tslab.REQUIRED, variant=tslab.REQUIRED
+                name='ett', dataset_file_path=tslab.lab.REQUIRED, variant=tslab.lab.REQUIRED
             ),
         ),
     ),
@@ -82,7 +84,7 @@ def test_recipes_times_datasets_round_trip() -> None:
         for dataset in datasets.values():
             settings = {**recipe, **dataset, 'seed': 42}
             assert check_paths(config_class=Config, settings=settings) == []
-            config = tslab.parse_config(
+            config = tslab.lab.parse_config(
                 config_class=Config, args=settings_to_args(config_class=Config, settings=settings)
             )
             preset = cast('Config', PRESETS[recipe_name][1])
@@ -95,12 +97,14 @@ def test_recipes_times_datasets_round_trip() -> None:
 def test_whole_real_preset_round_trips(name: str) -> None:
     settings = from_presets(presets=PRESETS, names=(name,), without=())[name]
     args = ['no-preset', *settings_to_args(config_class=Config, settings=settings)]
-    assert tslab.parse_config(config_class=Config, presets=PRESETS, args=args) == PRESETS[name][1]
+    assert (
+        tslab.lab.parse_config(config_class=Config, presets=PRESETS, args=args) == PRESETS[name][1]
+    )
 
 
 def test_required_marker_with_real_classes(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit):
-        tslab.parse_config(
+        tslab.lab.parse_config(
             config_class=Config,
             presets=PRESETS,
             args=['ett-any', '--data.dataset-file-path', '/d/ETTh1.csv'],

@@ -2,7 +2,7 @@
 
 Every union member is named with ``tyro.conf.subcommand(name=...)``, as a choice
 union requires. ``PRESETS`` mirrors the shape of the preset
-registry of the template, including a ``tslab.REQUIRED`` value (``ts2vec-any``).
+registry of the template, including a ``tslab.lab.REQUIRED`` value (``ts2vec-any``).
 """
 
 from dataclasses import dataclass, field
@@ -12,8 +12,8 @@ from typing import Annotated, Any
 
 import tyro
 
-import tslab
-from tslab.study import from_presets, Grid, setting_axis
+import tslab.lab
+from tslab.lab.study import from_presets, Grid, setting_axis
 
 
 class SplitMode(StrEnum):
@@ -76,7 +76,7 @@ class UCRSettings:
     dataset_folder_path: Path
     target_column_name: str = 'target'
     batch_size: int = 8
-    num_workers: Annotated[int, tslab.HardwareSetting] = 0
+    num_workers: Annotated[int, tslab.lab.HardwareSetting] = 0
     splitting_strategy: SplitMode = SplitMode.ARCHIVE
 
 
@@ -102,7 +102,7 @@ class Trainer:
     max_epochs: int = 100
     deterministic: bool = False
     max_training_time: str | None = None
-    accelerator: Annotated[str, tslab.HardwareSetting] = 'auto'
+    accelerator: Annotated[str, tslab.lab.HardwareSetting] = 'auto'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -143,7 +143,7 @@ PRESETS = {
         'TS2Vec whose dataset folder the user gives on the command line',
         ClassifyConfig(
             model=TS2VecSettings(),
-            data=UCRSettings(dataset_folder_path=tslab.REQUIRED, batch_size=4),
+            data=UCRSettings(dataset_folder_path=tslab.lab.REQUIRED, batch_size=4),
         ),
     ),
 }

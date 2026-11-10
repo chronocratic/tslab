@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from tslab.enums import LauncherKind
-from tslab.study.launchers.common.types import JobUsage, LaunchError
-from tslab.study.launchers.tables import backend_for, BACKENDS
-from tslab.study.machine import (
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.launchers.common.types import JobUsage, LaunchError
+from tslab.lab.study.launchers.tables import backend_for, BACKENDS
+from tslab.lab.study.machine import (
     load_machine,
     LocalSettings,
     MachineProfile,

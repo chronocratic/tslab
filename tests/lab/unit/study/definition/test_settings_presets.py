@@ -6,10 +6,10 @@ from typing import Annotated
 import pytest
 import tyro
 
-from tests.unit.study.configs import ClassifyConfig, PRESETS, UEASettings
-import tslab
-from tslab.core.codec import union_choices
-from tslab.study import from_presets, settings_to_args
+from tests.lab.unit.study.configs import ClassifyConfig, PRESETS, UEASettings
+import tslab.lab
+from tslab.lab.core.codec import union_choices
+from tslab.lab.study import from_presets, settings_to_args
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,7 +55,7 @@ def test_whole_preset_round_trips(name: str) -> None:
     settings = from_presets(presets=PRESETS, names=(name,), without=())[name]
     args = ['no-preset', *settings_to_args(config_class=ClassifyConfig, settings=settings)]
     assert (
-        tslab.parse_config(config_class=ClassifyConfig, presets=PRESETS, args=args)
+        tslab.lab.parse_config(config_class=ClassifyConfig, presets=PRESETS, args=args)
         == (PRESETS[name][1])
     )
 
@@ -64,7 +64,7 @@ def test_recipe_runs_on_another_data_kind() -> None:
     result = from_presets(presets=PRESETS, names=('ts2vec-paper',), without=('data',))
     recipe = result['ts2vec-paper']
     settings = {**recipe, 'data': 'uea', 'data.dataset_folder_path': '/d/UEA/BasicMotions'}
-    config = tslab.parse_config(
+    config = tslab.lab.parse_config(
         config_class=ClassifyConfig,
         args=settings_to_args(config_class=ClassifyConfig, settings=settings),
     )
@@ -75,7 +75,7 @@ def test_recipe_runs_on_another_data_kind() -> None:
 def test_forgotten_required_field_fails_at_parse() -> None:
     recipe = from_presets(presets=PRESETS, names=('ts2vec-any',), without=())['ts2vec-any']
     with pytest.raises(SystemExit):
-        tslab.parse_config(
+        tslab.lab.parse_config(
             config_class=ClassifyConfig,
             args=settings_to_args(config_class=ClassifyConfig, settings=recipe),
         )

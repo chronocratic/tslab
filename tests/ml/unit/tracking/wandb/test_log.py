@@ -5,7 +5,7 @@ import zlib
 import pytest
 from wandb.proto import wandb_internal_pb2
 
-from tslab.tracking.wandb.log import read_exit_codes, read_records
+from tslab.ml.tracking.wandb.log import read_exit_codes, read_records
 
 HEADER = struct.pack('<4sHB', b':W&B', 0xBEE1, 0)
 FULL = 1

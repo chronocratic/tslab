@@ -10,8 +10,8 @@ import time
 from types import MappingProxyType
 from typing import cast, Protocol
 
-from tslab.jobs.local.gpus import GpuLease, MPS_GPU, try_lease_gpu
-from tslab.jobs.local.process import ProcessResult, run_process
+from tslab.lab.jobs.local.gpus import GpuLease, MPS_GPU, try_lease_gpu
+from tslab.lab.jobs.local.process import ProcessResult, run_process
 
 __all__ = [
     'OnEnd',

@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 import pytest
 
-from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder
+from tslab.lab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder
 
 
 def small_figure() -> Figure:

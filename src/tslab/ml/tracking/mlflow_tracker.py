@@ -7,7 +7,7 @@ from typing import override
 
 from lightning.pytorch.loggers import Logger, MLFlowLogger
 
-from tslab.tracking.lightning_bridge import LightningLoggerTracker
+from tslab.ml.tracking.lightning_bridge import LightningLoggerTracker
 
 __all__ = ['MLflowTracker']
 

@@ -1,6 +1,6 @@
 import pytest
 
-from tslab.jobs.slurm import task_count
+from tslab.lab.jobs.slurm import task_count
 
 
 @pytest.mark.parametrize(('environment', 'expected'), [({'SLURM_NTASKS': '4'}, 4), ({}, 1)])

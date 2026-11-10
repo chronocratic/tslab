@@ -3,8 +3,8 @@
 Needs the ``analysis`` extra.
 """
 
-from tslab.analysis.cd_diagram import cd_diagram, CdDiagram, CdStyle, critical_difference
-from tslab.analysis.numbers import (
+from tslab.lab.analysis.cd_diagram import cd_diagram, CdDiagram, CdStyle, critical_difference
+from tslab.lab.analysis.numbers import (
     format_number,
     number_key,
     NumberKind,
@@ -12,16 +12,16 @@ from tslab.analysis.numbers import (
     NUMBERS_STEM,
     write_numbers,
 )
-from tslab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
-from tslab.analysis.report import Block, Caption, show
-from tslab.analysis.results import (
+from tslab.lab.analysis.output import AnalysisOutput, FigureFormat, OutputFolder, PLOTS_FOLDER
+from tslab.lab.analysis.report import Block, Caption, show
+from tslab.lab.analysis.results import (
     against_baseline,
     AnalysisMetric,
     load_results,
     method_matrix,
     missing_runs,
 )
-from tslab.analysis.stats import (
+from tslab.lab.analysis.stats import (
     annotate_tests,
     average_ranks,
     bootstrap_median,
@@ -43,7 +43,7 @@ from tslab.analysis.stats import (
     stars,
     wilcoxon_paired,
 )
-from tslab.analysis.style import FULL_WIDTH, is_dark_cell, paper_style
+from tslab.lab.analysis.style import FULL_WIDTH, is_dark_cell, paper_style
 
 __all__ = [
     'DEFAULT_ALPHA',

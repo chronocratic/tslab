@@ -15,7 +15,7 @@ import pkgutil
 import sys
 import tomllib
 
-from tslab.core.text import unknown_key_message
+from tslab.lab.core.text import unknown_key_message
 
 __all__ = [
     'PROJECT_FILE',

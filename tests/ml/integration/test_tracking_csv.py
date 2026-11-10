@@ -2,8 +2,8 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-from tslab.core.run import Run
-from tslab.core.tracker import LocalTracker
+from tslab.lab.core.run import Run
+from tslab.lab.core.tracker import LocalTracker
 
 
 @dataclass(frozen=True, kw_only=True)

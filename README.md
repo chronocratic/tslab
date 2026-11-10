@@ -22,14 +22,14 @@ settings of each step, stores its result, and on the next run loads finished
 results, resumes unfinished training, and reruns only what changed or failed.
 
 ```python
-import tslab
+import tslab.lab
 
 
-@tslab.stage(name='smooth', output=tslab.Tensors)
-def smooth(*, run: tslab.Run, data: tslab.Tensors, window: int) -> tslab.Tensors: ...
+@tslab.lab.stage(name='smooth', output=tslab.lab.Tensors)
+def smooth(*, run: tslab.lab.Run, data: tslab.lab.Tensors, window: int) -> tslab.lab.Tensors: ...
 
 
-with tslab.Run(config=config, root=Path('runs'), relative_path=Path('minimal')) as run:
+with tslab.lab.Run(config=config, root=Path('runs'), relative_path=Path('minimal')) as run:
     data = make_series(run=run, series=8, length=256)
     smoothed = smooth(run=run, data=data, window=9)  # loaded, not computed, on the next run
 ```

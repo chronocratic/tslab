@@ -2,7 +2,7 @@
 
 from typing import Any, TYPE_CHECKING
 
-from tslab.adapters.chronocratic.models import chronocratic_model_choice
+from tslab.ts.adapters.chronocratic.models import chronocratic_model_choice
 
 from {{package_name}}.augmentations import JitterThenScaleRecipe
 

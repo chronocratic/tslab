@@ -1,32 +1,39 @@
 import dataclasses
 from pathlib import Path
 
-from integration_helpers import run_in
-from lightning_toy import FAST
 import pytest
 import torch
-from ts_toy import SineClassification, SineForecasting, ToySequenceModel, ToyVectorModel
 
-import tslab
-from tslab.enums import InstanceState
-from tslab.lightning import LightningTrainer
-from tslab.probes import RidgeProbe, SVMProbe
-from tslab.tasks import forecasting_representations
+from tests.ml.integration.lightning_toy import FAST
+from tests.support.integration_helpers import run_in
+from tests.ts.integration.ts_toy import (
+    SineClassification,
+    SineForecasting,
+    ToySequenceModel,
+    ToyVectorModel,
+)
+import tslab.lab
+from tslab.lab.enums import InstanceState
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer
+import tslab.ts
+from tslab.ts.probes import RidgeProbe, SVMProbe
+from tslab.ts.tasks import forecasting_representations
 
-ENCODER = tslab.ModelAsEncoder(device='cpu')
+ENCODER = tslab.ts.ModelAsEncoder(device='cpu')
 
 
 pytestmark = pytest.mark.slow
 
 
 def test_classification_runs_end_to_end_and_reloads(tmp_path: Path) -> None:
-    def pipeline() -> tslab.Metrics:
+    def pipeline() -> tslab.lab.Metrics:
         trainer = LightningTrainer(config=FAST)
         model = ToySequenceModel(in_channels=1, num_classes=2)
         data = SineClassification()
         with run_in(root=tmp_path) as run:
-            checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-            representations = tslab.stages.encode(
+            checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
+            representations = tslab.ts.stages.encode(
                 run=run,
                 trainer=trainer,
                 model=model,
@@ -34,7 +41,7 @@ def test_classification_runs_end_to_end_and_reloads(tmp_path: Path) -> None:
                 data=data,
                 encoder=ENCODER,
             )
-            return tslab.stages.evaluate(
+            return tslab.ts.stages.evaluate(
                 run=run, representations=representations, downstream_model=SVMProbe(n_jobs=1)
             )
 
@@ -51,7 +58,7 @@ def forecast(*, root: Path, model: ToyVectorModel, window_length: int | None) ->
     trainer = LightningTrainer(config=FAST)
     data = SineForecasting()
     with run_in(root=root) as run:
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
         by_horizon = forecasting_representations(
             run=run,
             trainer=trainer,
@@ -64,7 +71,7 @@ def forecast(*, root: Path, model: ToyVectorModel, window_length: int | None) ->
             stride=4,
         )
         return {
-            horizon: tslab.stages.evaluate(
+            horizon: tslab.ts.stages.evaluate(
                 run=run,
                 name=('forecasting', f'h{horizon}'),
                 representations=representations,
@@ -93,7 +100,7 @@ def test_forecasting_runs_end_to_end_on_both_paths(tmp_path: Path) -> None:
 def test_job_time_share_interrupts_train_and_the_rerun_resumes(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    def pipeline() -> tuple[tslab.Metrics, dict[str, InstanceState]]:
+    def pipeline() -> tuple[tslab.lab.Metrics, dict[str, InstanceState]]:
         trainer = LightningTrainer(
             config=dataclasses.replace(
                 FAST, job_time_share=0.5, max_epochs=500, early_stopping_patience=300
@@ -102,8 +109,8 @@ def test_job_time_share_interrupts_train_and_the_rerun_resumes(
         model = ToySequenceModel(in_channels=1, num_classes=2)
         data = SineClassification()
         with run_in(root=tmp_path) as run:
-            checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
-            representations = tslab.stages.encode(
+            checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
+            representations = tslab.ts.stages.encode(
                 run=run,
                 trainer=trainer,
                 model=model,
@@ -111,7 +118,7 @@ def test_job_time_share_interrupts_train_and_the_rerun_resumes(
                 data=data,
                 encoder=ENCODER,
             )
-            metrics = tslab.stages.evaluate(
+            metrics = tslab.ts.stages.evaluate(
                 run=run, representations=representations, downstream_model=SVMProbe(n_jobs=1)
             )
             states = {key: record.state for key, record in run.status().instances.items()}

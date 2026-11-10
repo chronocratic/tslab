@@ -12,9 +12,9 @@ from typing import Annotated
 
 import tyro
 
-from tslab.cli.common import print_json, UsageError
-from tslab.core.text import log_table
-from tslab.study.machine import (
+from tslab.lab.cli.common import print_json, UsageError
+from tslab.lab.core.text import log_table
+from tslab.lab.study.machine import (
     load_machine,
     MachineProfileError,
     read_register,

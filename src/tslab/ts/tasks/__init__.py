@@ -3,9 +3,9 @@
 The core never imports this package.
 """
 
-from tslab.tasks.classification import check_label_range, TSClassificationDataInfo
-from tslab.tasks.data import TSDataInfo, TSDataSource
-from tslab.tasks.forecasting import (
+from tslab.ts.tasks.classification import check_label_range, TSClassificationDataInfo
+from tslab.ts.tasks.data import TSDataInfo, TSDataSource
+from tslab.ts.tasks.forecasting import (
     checked_split_slices,
     encode_series,
     encode_windows,

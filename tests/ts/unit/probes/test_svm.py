@@ -2,8 +2,8 @@ import numpy as np
 from sklearn.metrics import f1_score
 import torch
 
-from tests.unit.probes.helpers import blobs, fitted_svm
-from tslab.probes import SVMProbe
+from tests.ts.unit.probes.helpers import blobs, fitted_svm
+from tslab.ts.probes import SVMProbe
 
 
 def test_small_datasets_use_a_near_hard_margin_svc() -> None:

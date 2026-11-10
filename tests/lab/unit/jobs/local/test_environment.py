@@ -1,6 +1,6 @@
 """Tests for the environment of local tasks."""
 
-from tslab.jobs.local.environment import without_scheduler_variables
+from tslab.lab.jobs.local.environment import without_scheduler_variables
 
 
 def test_scheduler_variables_are_dropped() -> None:

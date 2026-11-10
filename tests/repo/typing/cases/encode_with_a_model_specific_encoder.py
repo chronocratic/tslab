@@ -3,8 +3,11 @@ from typing import cast
 
 import torch
 
-import tslab
-from tslab.interfaces import Encoder, LabeledSplits, Trainer
+import tslab.lab
+import tslab.ml
+import tslab.ts
+from tslab.ts.interfaces import Encoder
+from tslab.ml.interfaces import LabeledSplits, Trainer
 
 
 class LinearModel(torch.nn.Linear):
@@ -19,12 +22,12 @@ def linear_encoder(model: LinearModel) -> Encoder:
 
 def encode_with_a_general_trainer(
     *,
-    run: tslab.Run,
+    run: tslab.lab.Run,
     trainer: Trainer[torch.nn.Module],
-    checkpoint: tslab.Checkpoint,
+    checkpoint: tslab.lab.Checkpoint,
     data: LabeledSplits,
-) -> tslab.Tensors:
-    return tslab.stages.encode(
+) -> tslab.lab.Tensors:
+    return tslab.ts.stages.encode(
         run=run,
         trainer=trainer,
         model=LinearModel(in_features=2, out_features=2),

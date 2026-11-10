@@ -5,8 +5,8 @@ import subprocess
 
 import pytest
 
-from tests.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.jobs.slurm import (
+from tests.lab.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
+from tslab.lab.jobs.slurm import (
     commands,
     gres_gpus,
     query_cluster_config,
@@ -25,7 +25,7 @@ from tslab.jobs.slurm import (
     SlurmQueueEntry,
     submission_environment,
 )
-from tslab.jobs.slurm.commands import _expand_array_key, _run, QOS_WAIT_CAP_SECONDS
+from tslab.lab.jobs.slurm.commands import _expand_array_key, _run, QOS_WAIT_CAP_SECONDS
 
 
 @pytest.fixture

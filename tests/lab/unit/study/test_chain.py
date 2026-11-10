@@ -3,8 +3,8 @@
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 
-from tslab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
-from tslab.enums import (
+from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
+from tslab.lab.enums import (
     AfterCondition,
     AfterVerdict,
     ChainedRetry,
@@ -14,12 +14,12 @@ from tslab.enums import (
     Satisfy,
     StudyState,
 )
-from tslab.study import After, Grid, Study
-from tslab.study.chain import _VERDICT_BY_CONDITION, after_verdict, retry_left, upstream_verdict
-from tslab.study.definition import expand_runs, StudyRun
-from tslab.study.machine.profile import FollowupSettings
-from tslab.study.records import ProgressSnapshot, TaskRecord
-from tslab.study.reporting.state import FolderFacts, RunReport
+from tslab.lab.study import After, Grid, Study
+from tslab.lab.study.chain import _VERDICT_BY_CONDITION, after_verdict, retry_left, upstream_verdict
+from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.records import ProgressSnapshot, TaskRecord
+from tslab.lab.study.reporting.state import FolderFacts, RunReport
 
 
 @dataclass(frozen=True, kw_only=True)

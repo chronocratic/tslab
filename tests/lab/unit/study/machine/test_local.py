@@ -4,21 +4,21 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.study.machine.helpers import (
+from tests.lab.unit.study.machine.helpers import (
     BASE_SLURM,
     load_profile as load_machine,
     LOCAL,
     SLURM_TABLE,
     write,
 )
-from tslab.jobs.local import GpuDiscovery
-from tslab.study.machine import (
+from tslab.lab.jobs.local import GpuDiscovery
+from tslab.lab.study.machine import (
     FollowupSettings,
     LocalSettings,
     MachineProfileError,
     timeout_seconds,
 )
-import tslab.study.machine.local as local_machine
+import tslab.lab.study.machine.local as local_machine
 
 
 def test_local_settings_from_loads_its_profile_table(tmp_path: Path) -> None:

@@ -4,12 +4,12 @@ import logging
 import os
 import signal as signal_module
 
-from tslab.core.meta import hostname
-from tslab.enums import LocalTaskState
-from tslab.jobs.local import boot_id
-from tslab.study.context import Context
-from tslab.study.launchers.local.pid_file import launch_is_live, LocalLaunch, read_launch
-from tslab.study.paths import study_folder
+from tslab.lab.core.meta import hostname
+from tslab.lab.enums import LocalTaskState
+from tslab.lab.jobs.local import boot_id
+from tslab.lab.study.context import Context
+from tslab.lab.study.launchers.local.pid_file import launch_is_live, LocalLaunch, read_launch
+from tslab.lab.study.paths import study_folder
 
 __all__ = ['cancel_local']
 

@@ -3,9 +3,9 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from tslab.core.artifact import Checkpoint
-from tslab.core.run import Run
-from tslab.interfaces.data import DataSource
+from tslab.lab.core.artifact import Checkpoint
+from tslab.lab.core.run import Run
+from tslab.ml.interfaces.data import DataSource
 
 __all__ = ['Trainer']
 
@@ -16,7 +16,7 @@ class Trainer[M](ABC):
     ``M`` ties a trainer to the models it understands, so a type checker
     rejects passing a model the trainer cannot train. A trainer is also an
     argument of the ready ``train`` stage, so implementations provide
-    ``fingerprint_settings()`` (see ``tslab.Fingerprintable``).
+    ``fingerprint_settings()`` (see ``tslab.lab.Fingerprintable``).
     """
 
     @abstractmethod

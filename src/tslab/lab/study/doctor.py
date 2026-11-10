@@ -9,11 +9,11 @@ from pathlib import Path
 import shutil
 import tempfile
 
-from tslab.core.paths import require_path
-from tslab.enums import CheckStatus
-from tslab.study.definition import load_study
-from tslab.study.machine import load_machine, MachineProfile, MachineProfileError
-from tslab.study.plan import check_machine
+from tslab.lab.core.paths import require_path
+from tslab.lab.enums import CheckStatus
+from tslab.lab.study.definition import load_study
+from tslab.lab.study.machine import load_machine, MachineProfile, MachineProfileError
+from tslab.lab.study.plan import check_machine
 
 __all__ = ['DoctorCheck', 'run_checks']
 
@@ -69,7 +69,7 @@ def run_checks(
 
     if machine is not None:
         # why: the launcher package imports DoctorCheck from this module
-        from tslab.study.launchers.tables import backend_for  # noqa: PLC0415
+        from tslab.lab.study.launchers.tables import backend_for  # noqa: PLC0415
 
         checks.extend(backend_for(machine=machine).doctor_checks(machine=machine))
         output_check, disk_path = _output_root_check(machine=machine)

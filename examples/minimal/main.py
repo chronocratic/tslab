@@ -18,7 +18,7 @@ from pathlib import Path
 
 import torch
 
-import tslab
+import tslab.lab
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -43,49 +43,53 @@ class MinimalConfig:
     root: Path = Path('runs')
     relative_path: Path = Path('minimal')
     seed: int = 0
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
 
 
-@tslab.stage(name='make_series', output=tslab.Tensors)
-def make_series(*, run: tslab.Run, series: int, length: int, noise: float) -> tslab.Tensors:
+@tslab.lab.stage(name='make_series', output=tslab.lab.Tensors)
+def make_series(*, run: tslab.lab.Run, series: int, length: int, noise: float) -> tslab.lab.Tensors:
     """Draw ``series`` sine waves with random phases, and a noisy copy of each."""
     generator = torch.Generator().manual_seed(run.seed)
     steps = torch.arange(length, dtype=torch.float32)
     phases = 2 * math.pi * torch.rand(series, 1, generator=generator)
     clean = torch.sin(2 * math.pi * steps / 32 + phases)
     noisy = clean + noise * torch.randn(clean.shape, generator=generator)
-    return tslab.Tensors(tensors={'clean': clean, 'noisy': noisy})
+    return tslab.lab.Tensors(tensors={'clean': clean, 'noisy': noisy})
 
 
-@tslab.stage(name='smooth', output=tslab.Tensors)
+@tslab.lab.stage(name='smooth', output=tslab.lab.Tensors)
 def smooth(
-    *, run: tslab.Run, name: tslab.InstanceName | None = None, data: tslab.Tensors, window: int
-) -> tslab.Tensors:
+    *,
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,
+    data: tslab.lab.Tensors,
+    window: int,
+) -> tslab.lab.Tensors:
     """Smooth the noisy series with a centered moving average of ``window`` steps."""
     del run, name
     kernel = torch.full((1, 1, window), 1.0 / window)
     noisy = data.tensors['noisy'].unsqueeze(1)
     smoothed = torch.nn.functional.conv1d(noisy, kernel, padding=window // 2)
-    return tslab.Tensors(tensors={'smoothed': smoothed.squeeze(1)[:, : noisy.shape[-1]]})
+    return tslab.lab.Tensors(tensors={'smoothed': smoothed.squeeze(1)[:, : noisy.shape[-1]]})
 
 
-@tslab.stage(name='score', output=tslab.Metrics)
+@tslab.lab.stage(name='score', output=tslab.lab.Metrics)
 def score(
     *,
-    run: tslab.Run,
-    name: tslab.InstanceName | None = None,
-    data: tslab.Tensors,
-    smoothed: tslab.Tensors,
-) -> tslab.Metrics:
+    run: tslab.lab.Run,
+    name: tslab.lab.InstanceName | None = None,
+    data: tslab.lab.Tensors,
+    smoothed: tslab.lab.Tensors,
+) -> tslab.lab.Metrics:
     """Return the mean squared error between the smoothed and the clean series."""
     del run, name
     error = (smoothed.tensors['smoothed'] - data.tensors['clean']).pow(2).mean()
-    return tslab.Metrics(data={'mse': float(error)})
+    return tslab.lab.Metrics(data={'mse': float(error)})
 
 
 def main(*, config: MinimalConfig) -> dict[int, float]:
     """Run the pipeline and return the error per window length."""
-    with tslab.Run(config=config, root=config.root, relative_path=config.relative_path) as run:
+    with tslab.lab.Run(config=config, root=config.root, relative_path=config.relative_path) as run:
         data = make_series(run=run, series=config.series, length=config.length, noise=config.noise)
         errors: dict[int, float] = {}
         for window in config.windows:
@@ -96,5 +100,5 @@ def main(*, config: MinimalConfig) -> dict[int, float]:
 
 
 if __name__ == '__main__':
-    for window, error in main(config=tslab.parse_config(config_class=MinimalConfig)).items():
+    for window, error in main(config=tslab.lab.parse_config(config_class=MinimalConfig)).items():
         print(f'window {window}: mse {error:.4f}')

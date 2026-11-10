@@ -9,8 +9,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tslab.analysis.cd_diagram import cd_diagram, cd_groups, CdDiagram, CdStyle, critical_difference
-from tslab.analysis.stats import Direction
+from tslab.lab.analysis.cd_diagram import (
+    cd_diagram,
+    cd_groups,
+    CdDiagram,
+    CdStyle,
+    critical_difference,
+)
+from tslab.lab.analysis.stats import Direction
 
 
 @pytest.mark.parametrize(('k', 'q'), [(2, 1.960), (5, 2.728), (10, 3.164)])
@@ -82,8 +88,8 @@ def test_cd_diagram_uses_no_pyplot(tmp_path: Path) -> None:
             import sys
             import numpy as np
             import pandas as pd
-            from tslab.analysis.cd_diagram import cd_diagram
-            from tslab.analysis.stats import Direction
+            from tslab.lab.analysis.cd_diagram import cd_diagram
+            from tslab.lab.analysis.stats import Direction
 
             rng = np.random.default_rng(0)
             matrix = pd.DataFrame(

@@ -11,22 +11,24 @@ CoST) encode each series once for all horizons. The others encode windows of
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import tslab
-from tslab.adapters.chronocratic.datasets import (
+import tslab.lab
+import tslab.ml
+from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+from tslab.ml.tracking import build_trackers, TrackingOptions
+import tslab.ts
+from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticDataChoice,
     ChronocraticForecastingData,
     data_settings,
 )
-from tslab.adapters.chronocratic.models import (
+from tslab.ts.adapters.chronocratic.models import (
     build_chronocratic_model,
     ChronocraticEncoder,
     model_settings,
 )
-from tslab.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.probes import RidgeProbe
-from tslab.tasks import forecasting_representations
-from tslab.tracking import build_trackers, TrackingOptions
+from tslab.ts.probes import RidgeProbe
+from tslab.ts.tasks import forecasting_representations
 
 from {{package_name}}.models import Models
 
@@ -56,7 +58,7 @@ class ForecastConfig:
     trainer: LightningTrainerConfig = field(default_factory=LightningTrainerConfig)
     encoder: ChronocraticEncoder = field(default_factory=ChronocraticEncoder)
     tracking: TrackingOptions = field(default_factory=TrackingOptions)
-    run: tslab.RunOptions = field(default_factory=tslab.RunOptions)
+    run: tslab.lab.RunOptions = field(default_factory=tslab.lab.RunOptions)
     run_path: Path = Path('forecasting')
     output_root: Path = Path('runs')
     seed: int = 0
@@ -95,7 +97,7 @@ def main(*, config: ForecastConfig) -> None:
         TypeError: If ``config.data`` is not a forecasting dataset.
     """
     trackers = build_trackers(options=config.tracking)
-    with tslab.Run(
+    with tslab.lab.Run(
         config=config, root=config.output_root, relative_path=config.run_path, trackers=trackers
     ) as run:
         data = build_chronocratic_data_source(config=config.data)
@@ -106,7 +108,7 @@ def main(*, config: ForecastConfig) -> None:
             raise TypeError(message)
         model = build_chronocratic_model(config=config.model, data_info=data.info)
         trainer = LightningTrainer(config=config.trainer)
-        checkpoint = tslab.stages.train(run=run, trainer=trainer, model=model, data=data)
+        checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=data)
         by_horizon = forecasting_representations(
             run=run,
             trainer=trainer,
@@ -118,7 +120,7 @@ def main(*, config: ForecastConfig) -> None:
             window_length=config.window_length,
         )
         for horizon, representations in by_horizon.items():
-            tslab.stages.evaluate(
+            tslab.ts.stages.evaluate(
                 run=run,
                 name=f'h{horizon}',
                 representations=representations,
@@ -127,4 +129,4 @@ def main(*, config: ForecastConfig) -> None:
 
 
 if __name__ == '__main__':
-    main(config=tslab.parse_config(config_class=ForecastConfig, presets=PRESETS))
+    main(config=tslab.lab.parse_config(config_class=ForecastConfig, presets=PRESETS))

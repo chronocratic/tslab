@@ -12,16 +12,16 @@ from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, Mode
 import pytest
 import torch
 
-from tslab.core.run import JobTimeLimitSignal, Run
-from tslab.lightning.callbacks import (
+from tslab.lab.core.run import JobTimeLimitSignal, Run
+from tslab.ml.lightning.callbacks import (
     _SignalStop,
     AccumulatingTimerCallback,
     build_callbacks,
     resolve_early_stopping_patience,
 )
-from tslab.lightning.config import LightningTrainerConfig
-from tslab.lightning.exceptions import TrainingPaused
-from tslab.lightning.trainer import _defer_time_limit_signals
+from tslab.ml.lightning.config import LightningTrainerConfig
+from tslab.ml.lightning.exceptions import TrainingPaused
+from tslab.ml.lightning.trainer import _defer_time_limit_signals
 
 
 @pytest.mark.parametrize(
@@ -192,7 +192,7 @@ def test_job_deadline_on_one_rank_stops_all_ranks(
     trainer = _FakeTrainer(strategy=strategy)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
     callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=100.0)
-    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+    monkeypatch.setattr('tslab.ml.lightning.callbacks.time.time', lambda: 101.0)
 
     with pytest.raises(TrainingPaused, match='resubmit'):
         callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)
@@ -209,7 +209,7 @@ def test_job_deadline_stops_non_writer_rank(
     trainer = _FakeTrainer(strategy=strategy)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
     callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=100.0)
-    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+    monkeypatch.setattr('tslab.ml.lightning.callbacks.time.time', lambda: 101.0)
 
     with pytest.raises(SystemExit) as error:
         callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)
@@ -226,7 +226,7 @@ def test_signal_wins_over_job_deadline(monkeypatch: pytest.MonkeyPatch, tmp_path
     callback = _SignalStop(
         run=run, checkpoint_directory=tmp_path, signal_received=True, deadline=100.0
     )
-    monkeypatch.setattr('tslab.lightning.callbacks.time.time', lambda: 101.0)
+    monkeypatch.setattr('tslab.ml.lightning.callbacks.time.time', lambda: 101.0)
 
     with pytest.raises(JobTimeLimitSignal):
         callback.on_train_batch_end(cast('Trainer', trainer), LightningModule(), None, None, 0)

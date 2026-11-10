@@ -15,13 +15,13 @@ import re
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from tslab.core.paths import NAME_PART_PATTERN, validate_name_part
-from tslab.study.definition.expansion import PLACEHOLDERS
-from tslab.study.definition.settings import check_paths, Settings, SettingValue
+from tslab.lab.core.paths import NAME_PART_PATTERN, validate_name_part
+from tslab.lab.study.definition.expansion import PLACEHOLDERS
+from tslab.lab.study.definition.settings import check_paths, Settings, SettingValue
 
 if TYPE_CHECKING:
-    from tslab.study.definition.after import After
-    from tslab.study.reporting.result_table import ResultRow
+    from tslab.lab.study.definition.after import After
+    from tslab.lab.study.reporting.result_table import ResultRow
 
 __all__ = [
     'DEFAULT_RUN_SETTINGS',
@@ -318,7 +318,7 @@ class Grid:
 
     def _check_after_shapes(self) -> None:
         """Type-check the dependency tuple; the usual slip is a missing trailing comma."""
-        from tslab.study.definition.after import After  # noqa: PLC0415 # why: breaks the import cycle
+        from tslab.lab.study.definition.after import After  # noqa: PLC0415 # why: breaks the import cycle
 
         if isinstance(self.after, After):
             message = 'grid after must be a tuple of After; trailing comma: after=(After(...),)?'
@@ -403,7 +403,7 @@ class Study:
         self._check_settings()
         self._check_job_names()
         self._check_run_paths()
-        from tslab.study.definition.after import after_problems  # noqa: PLC0415 # why: breaks the import cycle
+        from tslab.lab.study.definition.after import after_problems  # noqa: PLC0415 # why: breaks the import cycle
 
         problems = after_problems(study=self)
         if problems:
@@ -510,7 +510,7 @@ class Study:
             instances; the runs of every grid, in expansion order.
         """
         # why: imported here, not at the top, because the result table imports this module
-        from tslab.study.reporting.result_table import study_results  # noqa: PLC0415
+        from tslab.lab.study.reporting.result_table import study_results  # noqa: PLC0415
 
         return study_results(study=self, machine=machine, environment=environment)
 

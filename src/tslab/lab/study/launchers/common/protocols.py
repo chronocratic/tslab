@@ -5,21 +5,21 @@ from datetime import timedelta
 from pathlib import Path, PurePosixPath
 from typing import Protocol, TextIO
 
-from tslab.enums import LauncherKind
-from tslab.study.context import Context
-from tslab.study.definition import Study
-from tslab.study.doctor import DoctorCheck
-from tslab.study.launchers.common.types import (
+from tslab.lab.enums import LauncherKind
+from tslab.lab.study.context import Context
+from tslab.lab.study.definition import Study
+from tslab.lab.study.doctor import DoctorCheck
+from tslab.lab.study.launchers.common.types import (
     JobStates,
     JobUsage,
     LaunchReport,
     QueuedJob,
     Resources,
 )
-from tslab.study.machine import MachineOverride, MachineProfile
-from tslab.study.plan import JobGroup
-from tslab.study.records import JobRecord
-from tslab.study.reporting.state import RunReport
+from tslab.lab.study.machine import MachineOverride, MachineProfile
+from tslab.lab.study.plan import JobGroup
+from tslab.lab.study.records import JobRecord
+from tslab.lab.study.reporting.state import RunReport
 
 __all__ = ['Backend', 'Launcher', 'RecordJob', 'WriteJobFiles']
 

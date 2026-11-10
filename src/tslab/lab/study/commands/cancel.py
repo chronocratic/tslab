@@ -2,12 +2,12 @@
 
 import logging
 
-from tslab.enums import StudyState
-from tslab.study.chain import downstream_of
-from tslab.study.context import Context, study_reports, widen_context
-from tslab.study.definition import chained_grids
-from tslab.study.launchers.common.types import LaunchError
-from tslab.study.launchers.tables import backend_for
+from tslab.lab.enums import StudyState
+from tslab.lab.study.chain import downstream_of
+from tslab.lab.study.context import Context, study_reports, widen_context
+from tslab.lab.study.definition import chained_grids
+from tslab.lab.study.launchers.common.types import LaunchError
+from tslab.lab.study.launchers.tables import backend_for
 
 __all__ = ['cancel']
 
