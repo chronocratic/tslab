@@ -22,6 +22,7 @@ __all__ = [
     'collect_git_state',
     'collect_hardware',
     'collect_versions',
+    'collectors_generation',
     'hostname',
     'package_version',
     'register_hardware',
@@ -50,18 +51,28 @@ def package_version(*, distribution: str) -> str | None:
 
 _version_collectors: list[Callable[[], Mapping[str, str | None]]] = []
 _hardware_collectors: list[Callable[[], Mapping[str, object]]] = []
+_generation = 0
+
+
+def collectors_generation() -> int:
+    """A number that changes whenever a collector is added, to tell a cached result is stale."""
+    return _generation
 
 
 def register_versions(collector: Callable[[], Mapping[str, str | None]]) -> None:
     """Add a function returning more package versions; registering it twice is a no-op."""
+    global _generation  # noqa: PLW0603 # why: counts the registrations of the process
     if collector not in _version_collectors:
         _version_collectors.append(collector)
+        _generation += 1
 
 
 def register_hardware(collector: Callable[[], Mapping[str, object]]) -> None:
     """Add a function returning more hardware facts; registering it twice is a no-op."""
+    global _generation  # noqa: PLW0603 # why: counts the registrations of the process
     if collector not in _hardware_collectors:
         _hardware_collectors.append(collector)
+        _generation += 1
 
 
 def collect_versions() -> dict[str, str | None]:

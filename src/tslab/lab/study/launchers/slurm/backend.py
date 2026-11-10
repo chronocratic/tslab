@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
 from functools import partial
+import importlib.util
 import logging
 from pathlib import Path
 from types import MappingProxyType
@@ -224,17 +225,20 @@ class SlurmBackend:
         return expected_starts(context=context)
 
     def launch_blocker(self, *, context: Context) -> str | None:
-        """Block a launch whose queued W&B sync job would call a command this tool lacks.
+        """Block a launch whose queued W&B sync job could not run from this install.
 
-        There is no local pid file to block a SLURM launch otherwise.
+        The check is local and a hint: the cluster side environment is not inspected.
         """
-        # why: the cli package reads the study commands, which read the backends
-        from tslab.lab.cli.parser import command_available  # noqa: PLC0415
-
-        if context.machine.followup.wandb_sync and not command_available(name='wandb-sync'):
+        if not context.machine.followup.wandb_sync:
+            return None
+        if (
+            importlib.util.find_spec('tslab.ml') is None
+            or importlib.util.find_spec('wandb') is None
+        ):
             return (
-                'followup.wandb_sync is set but this tslab has no wandb-sync command '
-                '(it comes with tslab.ml); remove the setting or use the full tslab command'
+                'followup.wandb_sync is set but wandb is not installed here; '
+                'install tslab[wandb] or the lighter tslab[wandb-sync], '
+                'or remove the setting'
             )
         return None
 

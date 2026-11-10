@@ -1,7 +1,7 @@
 """Follow-up jobs: the automatic retry and the W&B sync behind the jobs of the study."""
 
-from collections.abc import Iterator
 import dataclasses
+import importlib.util
 import os
 from pathlib import Path, PurePosixPath
 import sys
@@ -10,8 +10,6 @@ import pytest
 
 from tests.lab.unit.study.helpers import context, jobs_of, no_sleep, submit_study
 from tests.support.fake_slurm import FakeSlurm
-from tslab.lab.cli import parser
-from tslab.lab.cli.parser import command_scope, register_lazy_command
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, LauncherKind, RunState
 from tslab.lab.study.commands import resubmit, submit
@@ -98,11 +96,15 @@ def bump_attempts(
 
 
 @pytest.fixture(autouse=True)
-def wandb_sync_command() -> Iterator[None]:
-    """The command line offers wandb-sync, as the full tslab does."""
-    with command_scope():
-        register_lazy_command(name='wandb-sync', summary='sync', target='unused:Unused')
-        yield
+def wandb_installed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The submitting environment has tslab.ml and wandb, as tslab[wandb] does."""
+    real = importlib.util.find_spec
+    present = importlib.util.spec_from_loader('present', loader=None)
+    monkeypatch.setattr(
+        importlib.util,
+        'find_spec',
+        lambda name, *args: present if name in {'tslab.ml', 'wandb'} else real(name, *args),
+    )
 
 
 @pytest.fixture
@@ -403,11 +405,21 @@ def test_followup_gets_the_absolute_path_of_a_machine_resolved_by_name(
     assert resolved.is_absolute()
 
 
-def test_wandb_sync_followup_blocks_the_launch_without_the_command(
-    project: Path, fake: FakeSlurm, caplog: pytest.LogCaptureFixture
+@pytest.mark.parametrize('missing', ['tslab.ml', 'wandb'])
+def test_wandb_sync_followup_blocks_the_launch_without_wandb(
+    project: Path,
+    fake: FakeSlurm,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    missing: str,
 ) -> None:
     with_followups(project=project)
-    parser._LAZY_COMMANDS.pop('wandb-sync')  # noqa: SLF001 # why: undone by the autouse scope
+    present = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        'find_spec',
+        lambda name, *args: None if name == missing else present(name, *args),
+    )
     code = submit(
         context=context(project=project, machine_file='cluster.toml'),
         include_done=False,
@@ -416,5 +428,5 @@ def test_wandb_sync_followup_blocks_the_launch_without_the_command(
         sleep=no_sleep,
     )
     assert code == 1
-    assert 'no wandb-sync command' in caplog.text
+    assert 'tslab[wandb]' in caplog.text
     assert fake.calls('sbatch') == []

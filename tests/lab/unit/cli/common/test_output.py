@@ -70,8 +70,8 @@ def test_json_command_exception_prints_error_document(
             message = 'unexpected command failure'
             raise RuntimeError(message)
 
-    def parse_command(*, argv: Sequence[str]) -> FailingCommand:
-        del argv
+    def parse_command(*, argv: Sequence[str], extra_commands: object) -> FailingCommand:
+        del argv, extra_commands
         return FailingCommand()
 
     monkeypatch.setattr('tslab.lab.cli.entrypoint._parse', parse_command)

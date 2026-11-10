@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from tslab.ml.stages import train
     from tslab.ml.tracking.wandb_mode import WandbMode
 
-register_seeder(seed_torch)
+register_seeder(seed_torch, name='torch')
 register_versions(torch_versions)
 register_hardware(torch_hardware)
 
@@ -54,14 +54,21 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     if name not in _LAZY:
-        try:
-            return import_module(f'{__name__}.{name}')  # a submodule, as after an eager import
-        except ModuleNotFoundError:
-            message = f'module {__name__!r} has no attribute {name!r}'
-            raise AttributeError(message) from None
+        return _submodule(name=name)
     value = getattr(import_module(_LAZY[name]), name)
     globals()[name] = value
     return value
+
+
+def _submodule(*, name: str) -> object:
+    """A submodule, as after an eager import; a missing dependency of it is not hidden."""
+    try:
+        return import_module(f'{__name__}.{name}')
+    except ModuleNotFoundError as error:
+        if error.name != f'{__name__}.{name}':
+            raise
+        message = f'module {__name__!r} has no attribute {name!r}'
+        raise AttributeError(message) from None
 
 
 def __dir__() -> list[str]:

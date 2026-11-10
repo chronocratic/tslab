@@ -29,6 +29,7 @@ from tslab.lab.core.meta import (
     collect_git_state,
     collect_hardware,
     collect_versions,
+    collectors_generation,
     hostname,
     META_FORMAT_VERSION,
 )
@@ -45,7 +46,7 @@ from tslab.lab.core.paths import (
     validate_stage_name,
 )
 from tslab.lab.core.ranks import is_writer_process
-from tslab.lab.core.seeding import seed_everything
+from tslab.lab.core.seeding import seed_everything, warn_if_torch_unseeded
 from tslab.lab.core.status import (
     format_instance_id,
     InstanceRecord,
@@ -177,6 +178,7 @@ class Run:
         self._entered = False
         self._meta: dict[str, object] = {}
         self._environment: dict[str, object] | None = None
+        self._environment_generation = -1
 
     @property
     def directory(self) -> Path:
@@ -253,7 +255,8 @@ class Run:
     def environment(self) -> dict[str, object]:
         """Return the package versions, git state and hardware of this run.
 
-        Computed once per ``Run``. Stages record it in the ``meta.json`` of every
+        Computed once per ``Run`` and again when a layer registers a new collector
+        (``tslab.ml`` imported in a later stage). Stages record it in the ``meta.json`` of every
         instance they execute, so a result keeps the commit that produced it even
         after a later execution rewrites the ``meta.json`` of the run.
 
@@ -262,7 +265,10 @@ class Run:
             state is read from the folder of the main script, not from the
             working directory, because ``sbatch`` may start the script from elsewhere.
         """
-        if self._environment is None:
+        warn_if_torch_unseeded()
+        generation = collectors_generation()
+        if self._environment is None or generation != self._environment_generation:
+            self._environment_generation = generation
             self._environment = {
                 'versions': collect_versions(),
                 'git': collect_git_state(directory=_project_directory()),

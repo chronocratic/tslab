@@ -36,6 +36,8 @@ chronocratic-datasets = ["tslab[ts]", "chronocratic-datasets==0.1.0rc1"]
 # the private x_* settings of wandb are version-unstable; the range is pinned to the version the
 # settings were verified against (see tslab/ml/tracking/wandb_tracker.py).
 wandb = ["tslab[ml]", "wandb>=0.30,<0.31"]
+# only `tslab wandb-sync`, for a login node without torch
+wandb-sync = ["wandb>=0.30,<0.31"]
 mlflow = ["tslab[ml]", "mlflow>=3.0,<4"]
 tensorboard = ["tslab[ml]", "tensorboard>=2.18"]
 analysis = ["pandas>=3.1,<4", "scipy>=1.18,<2", "matplotlib>=3.11,<4"]
@@ -48,6 +50,11 @@ tslab = "tslab.cli:main"
 Repository = "https://github.com/skafai/tslab"
 
 [dependency-groups]
+# the lab tests on the bare base install, outside the dev group
+lab-test = [
+    "pytest>=8.2",
+    "pytest-xdist>=3.6",
+]
 dev = [
     "ipython>=9.18",
     "matplotlib>=3.11",

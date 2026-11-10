@@ -4005,6 +4005,9 @@ wandb = [
     { name = "torch" },
     { name = "wandb" },
 ]
+wandb-sync = [
+    { name = "wandb" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -4026,6 +4029,10 @@ docs = [
     { name = "myst-parser" },
     { name = "pydata-sphinx-theme" },
     { name = "sphinx" },
+]
+lab-test = [
+    { name = "pytest" },
+    { name = "pytest-xdist" },
 ]
 
 [package.metadata]
@@ -4075,8 +4082,9 @@ requires-dist = [
     { name = "torch", marker = "extra == 'wandb'", specifier = ">=2.4,<3" },
     { name = "tyro", specifier = ">=1.0,<2" },
     { name = "wandb", marker = "extra == 'wandb'", specifier = ">=0.30,<0.31" },
+    { name = "wandb", marker = "extra == 'wandb-sync'", specifier = ">=0.30,<0.31" },
 ]
-provides-extras = ["analysis", "chronocratic-datasets", "chronocratic-models", "full", "ml", "mlflow", "tensorboard", "ts", "wandb"]
+provides-extras = ["analysis", "chronocratic-datasets", "chronocratic-models", "full", "ml", "mlflow", "tensorboard", "ts", "wandb", "wandb-sync"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -4098,6 +4106,10 @@ docs = [
     { name = "myst-parser", specifier = ">=4.0" },
     { name = "pydata-sphinx-theme", specifier = ">=0.16" },
     { name = "sphinx", specifier = ">=8.2" },
+]
+lab-test = [
+    { name = "pytest", specifier = ">=8.2" },
+    { name = "pytest-xdist", specifier = ">=3.6" },
 ]
 
 [[package]]
