@@ -1,13 +1,15 @@
 """Exit status for chained SLURM tasks after their run command completes."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import dataclasses
 import logging
+import os
 from pathlib import Path
 from types import MappingProxyType
 
 from tslab.core.status import utc_now_iso
 from tslab.enums import ChainedRetry, JobPhase, StudyState
+from tslab.jobs.slurm import query_cluster_config, SlurmError
 from tslab.study.commands.resubmit import may_retry
 from tslab.study.context import Context
 from tslab.study.definition import expand_runs
@@ -69,6 +71,7 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
         submitted=task,
         requeues=len(matches) - 1,
         jobs_path=jobs_path,
+        environment=os.environ,
     ):
         return 0
     return 1
@@ -82,6 +85,7 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
     submitted: TaskRecord,
     requeues: int,
     jobs_path: Path,
+    environment: Mapping[str, str],
 ) -> bool:
     """Requeue the task in place when the mode and the retry rules allow it.
 
@@ -95,16 +99,17 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
     latest = report.task
     if latest is None or report.job_id is None:
         return False
-    restarts = restarted_attempt(attempt=0)
+    restart_count = int(environment.get('SLURM_RESTART_COUNT', '0'))
+    restarts = restarted_attempt(attempt=0, restart_count=restart_count)
     current = dataclasses.replace(
         latest,
-        attempt=restarted_attempt(attempt=submitted.attempt),
+        attempt=restarted_attempt(attempt=submitted.attempt, restart_count=restart_count),
         uncounted_attempts=submitted.uncounted_attempts + max(restarts - requeues, 0),
     )
     counted = dataclasses.replace(report, attempt=current.attempt, task=current)
     if not may_retry(report=counted, context=context):
         return False
-    if at_requeue_limit():
+    if at_requeue_limit(restart_count=restart_count, max_requeues=_max_batch_requeue()):
         _LOGGER.warning(
             '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', report.job_id
         )
@@ -127,6 +132,20 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
         return False
     _LOGGER.info('requeued %s (attempt %d)', report.job_id, following.attempt)
     return True
+
+
+def _max_batch_requeue() -> int | None:
+    """Read and parse the scheduler requeue limit, logging failures at the launcher edge."""
+    try:
+        value = query_cluster_config().get('MaxBatchRequeue', '')
+    except SlurmError as error:
+        _LOGGER.warning('could not read MaxBatchRequeue from SLURM: %s', error)
+        return None
+    try:
+        return int(value)
+    except ValueError as error:
+        _LOGGER.warning('could not parse MaxBatchRequeue from SLURM: %s', error)
+        return None
 
 
 def _job_tasks_of(

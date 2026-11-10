@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.enums import (
@@ -13,7 +14,7 @@ from tslab.enums import (
     Satisfy,
     StudyState,
 )
-from tslab.study.chain import after_verdict, upstream_verdict
+from tslab.study.chain import after_verdict, retry_left, upstream_verdict
 from tslab.study.definition import grid_order, match_axes, upstream_runs
 from tslab.study.records import latest_tasks
 
@@ -36,7 +37,7 @@ _LIVE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
 class AfterTarget:
     """The upstream work one downstream job must wait for.
 
-    Args:
+    Attributes:
         condition: The condition applied to each target.
         delay_minutes: The delay after an upstream starts, for ``STARTED``.
         satisfy: Whether all targets or any target must meet the condition.
@@ -59,7 +60,12 @@ class AfterTarget:
 
 @dataclass(frozen=True, kw_only=True)
 class _TargetReference:
-    """One existing task id or one run path from the current launch."""
+    """One existing task id or one run path from the current launch.
+
+    Attributes:
+        job_task: The existing SLURM job task id, when available.
+        run_path: The run path submitted in this launch, when available.
+    """
 
     job_task: str | None = None
     run_path: PurePosixPath | None = None
@@ -67,15 +73,28 @@ class _TargetReference:
 
 @dataclass(frozen=True, kw_only=True)
 class _TargetState:
-    """The shared inputs used while resolving all selected runs."""
+    """The shared inputs used while resolving all selected runs.
+
+    Attributes:
+        study: The study whose grid dependencies are being planned.
+        reports: The known state of selected and upstream runs.
+        latest: The latest recorded job and task for each run.
+        followup: Retry settings used to keep retryable runs open.
+        defer_failed_targets: Whether SLURM retries hold failed dependencies open.
+        now: The current time in UTC Unix seconds, when known.
+    """
 
     study: Study
     reports: Mapping[PurePosixPath, RunReport]
-    submitting: set[PurePosixPath]
     latest: Mapping[PurePosixPath, tuple[JobRecord, TaskRecord]]
     followup: FollowupSettings | None
     defer_failed_targets: bool
     now: float | None
+
+    def __post_init__(self) -> None:
+        """Copy collection inputs so the planning snapshot cannot change."""
+        object.__setattr__(self, 'reports', MappingProxyType(dict(self.reports)))
+        object.__setattr__(self, 'latest', MappingProxyType(dict(self.latest)))
 
 
 def order_runs(*, study: Study, runs: Sequence[StudyRun]) -> list[StudyRun]:
@@ -146,7 +165,6 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     state = _TargetState(
         study=study,
         reports=reports,
-        submitting=pending,
         latest=latest_tasks(jobs=jobs),
         followup=followup,
         defer_failed_targets=launcher is LauncherKind.SLURM,
@@ -156,7 +174,7 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     blocked: set[PurePosixPath] = set()
     for run in order_runs(study=study, runs=runs):
         path = run.run_path
-        run_targets, is_blocked = _run_targets(state=state, run=run)
+        run_targets, is_blocked = _run_targets(state=state, run=run, submitting=frozenset(pending))
         if is_blocked:
             blocked.add(path)
             pending.discard(path)
@@ -165,18 +183,23 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     return targets, frozenset(blocked)
 
 
-def _run_targets(*, state: _TargetState, run: StudyRun) -> tuple[tuple[AfterTarget, ...], bool]:
+def _run_targets(
+    *, state: _TargetState, run: StudyRun, submitting: frozenset[PurePosixPath]
+) -> tuple[tuple[AfterTarget, ...], bool]:
     """Resolve one run's conditions and invalidate targets for impossible work."""
     grid = state.study.grids[run.grid]
     if not grid.after:
         return (), False
-    verdict_reports = _reports_for_launch(reports=state.reports, submitting=state.submitting)
+    verdict_reports = _reports_for_launch(reports=state.reports, submitting=submitting)
     verdict = after_verdict(
         study=state.study, run=run, reports=verdict_reports, followup=state.followup, now=state.now
     )
     if verdict is AfterVerdict.NEVER:
         return (), True
-    entries = [_entry_target(state=state, run=run, after=after) for after in grid.after]
+    entries = [
+        _entry_target(state=state, run=run, after=after, submitting=submitting)
+        for after in grid.after
+    ]
     if any(is_blocked for _, is_blocked in entries):
         return (), True
     found = tuple(target for target, _ in entries if target is not None)
@@ -202,7 +225,7 @@ def _mark_corr_candidate(
 
 
 def _reports_for_launch(
-    *, reports: Mapping[PurePosixPath, RunReport], submitting: set[PurePosixPath]
+    *, reports: Mapping[PurePosixPath, RunReport], submitting: frozenset[PurePosixPath]
 ) -> dict[PurePosixPath, RunReport]:
     """Treat selected upstream runs as open because this launch starts a new attempt."""
     return {
@@ -212,7 +235,7 @@ def _reports_for_launch(
 
 
 def _entry_target(
-    *, state: _TargetState, run: StudyRun, after: After
+    *, state: _TargetState, run: StudyRun, after: After, submitting: frozenset[PurePosixPath]
 ) -> tuple[AfterTarget | None, bool]:
     """Build one entry's target, enforcing its all/any rule."""
     upstream = upstream_runs(study=state.study, run=run, after=after)
@@ -224,17 +247,25 @@ def _entry_target(
             condition=after.condition,
             delay_minutes=after.delay_minutes,
             state=state,
+            submitting=submitting,
         )
         for upstream_run in upstream
     ]
-    return _satisfy_target(upstream=upstream, verdicts=verdicts, after=after, state=state)
+    return _satisfy_target(
+        upstream=upstream, verdicts=verdicts, after=after, state=state, submitting=submitting
+    )
 
 
 def _run_verdict(
-    *, state: _TargetState, run: StudyRun, condition: AfterCondition, delay_minutes: int
+    *,
+    state: _TargetState,
+    run: StudyRun,
+    condition: AfterCondition,
+    delay_minutes: int,
+    submitting: frozenset[PurePosixPath],
 ) -> AfterVerdict:
     """Judge one upstream, with an in-launch rerun treated as open."""
-    if run.run_path in state.submitting:
+    if run.run_path in submitting:
         return AfterVerdict.OPEN
     report = state.reports.get(run.run_path)
     if report is None:
@@ -242,7 +273,7 @@ def _run_verdict(
     return upstream_verdict(
         condition=condition,
         state=report.state,
-        retry_left=_retry_left(report=report, followup=state.followup),
+        retry_left=retry_left(report=report, followup=state.followup),
         delay_minutes=delay_minutes,
         started_at=report.job_started_at,
         now=state.now,
@@ -255,6 +286,7 @@ def _satisfy_target(
     upstream: Sequence[StudyRun],
     verdicts: Sequence[AfterVerdict],
     after: After,
+    submitting: frozenset[PurePosixPath],
 ) -> tuple[AfterTarget | None, bool]:
     """Choose which open targets make one dependency entry safe to schedule."""
     if after.satisfy is Satisfy.ANY and AfterVerdict.MET in verdicts:
@@ -268,7 +300,9 @@ def _satisfy_target(
     ]
     if not open_runs:
         return None, AfterVerdict.NEVER in verdicts
-    references = [_target_reference(state=state, run=run) for run in open_runs]
+    references = [
+        _target_reference(state=state, run=run, submitting=submitting) for run in open_runs
+    ]
     if after.satisfy is Satisfy.ALL and any(reference is None for reference in references):
         return None, True
     usable = [reference for reference in references if reference is not None]
@@ -301,9 +335,11 @@ def _defer_failed_target(
     )
 
 
-def _target_reference(*, state: _TargetState, run: StudyRun) -> _TargetReference | None:
+def _target_reference(
+    *, state: _TargetState, run: StudyRun, submitting: frozenset[PurePosixPath]
+) -> _TargetReference | None:
     """Return the scheduled path or live job task for one open upstream."""
-    if run.run_path in state.submitting:
+    if run.run_path in submitting:
         return _TargetReference(run_path=run.run_path)
     report = state.reports.get(run.run_path)
     if report is None or report.state not in _LIVE_STATES:
@@ -313,15 +349,6 @@ def _target_reference(*, state: _TargetState, run: StudyRun) -> _TargetReference
         return None
     job, task = record
     return _TargetReference(job_task=f'{job.job_id}_{task.index}')
-
-
-def _retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool:
-    """Whether configured chained retries leave another attempt for a report."""
-    if followup is None:
-        return False
-    # why: attempts that ended preempted or node failed do not count, as in the follow-up
-    counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
-    return followup.chained_retry is not ChainedRetry.MANUAL and counted < followup.max_attempts
 
 
 def merge_corr_groups(

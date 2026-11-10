@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Protocol, TYPE_CHECKING
 
 from tslab.enums import AfterCondition, AfterVerdict, ChainedRetry, Satisfy, StudyState
 from tslab.study.definition import upstream_runs
@@ -15,7 +18,30 @@ if TYPE_CHECKING:
     from tslab.study.machine.profile import FollowupSettings
     from tslab.study.reporting.state import RunReport
 
-__all__ = ['after_verdict', 'downstream_of', 'upstream_verdict']
+__all__ = ['after_verdict', 'downstream_of', 'retry_left', 'upstream_verdict']
+
+
+@dataclass(frozen=True, kw_only=True)
+class _VerdictFacts:
+    """State and timing facts used by one dependency verdict.
+
+    Attributes:
+        state: The current upstream run state.
+        retry_left: Whether the upstream run can still be retried.
+        delay_minutes: The required delay after the upstream starts.
+        started_at: The upstream start time in UTC Unix seconds, when known.
+        now: The current time in UTC Unix seconds, when known.
+    """
+
+    state: StudyState
+    retry_left: bool
+    delay_minutes: int
+    started_at: float | None
+    now: float | None
+
+
+class _VerdictStrategy(Protocol):
+    def __call__(self, *, facts: _VerdictFacts) -> AfterVerdict: ...
 
 
 def upstream_verdict(  # noqa: PLR0913 # why: state and retry timing facts are explicit inputs
@@ -40,15 +66,14 @@ def upstream_verdict(  # noqa: PLR0913 # why: state and retry timing facts are e
     Returns:
         Whether the condition is met, impossible or still open.
     """
-    if condition is AfterCondition.OK:
-        return _ok_verdict(state=state, retry_left=retry_left)
-    if condition is AfterCondition.ANY:
-        return _any_verdict(state=state)
-    if condition is AfterCondition.FAILED:
-        return _failed_verdict(state=state, retry_left=retry_left)
-    return _started_verdict(
-        state=state, delay_minutes=delay_minutes, started_at=started_at, now=now
+    facts = _VerdictFacts(
+        state=state,
+        retry_left=retry_left,
+        delay_minutes=delay_minutes,
+        started_at=started_at,
+        now=now,
     )
+    return _VERDICT_BY_CONDITION[condition](facts=facts)
 
 
 def after_verdict(
@@ -198,15 +223,23 @@ def _report_verdict(
     return upstream_verdict(
         condition=condition,
         state=report.state,
-        retry_left=_retry_left(report=report, followup=followup),
+        retry_left=retry_left(report=report, followup=followup),
         delay_minutes=delay_minutes,
         started_at=report.job_started_at,
         now=now,
     )
 
 
-def _retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool:
-    """Whether chained retry settings permit another attempt for this report."""
+def retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool:
+    """Whether chained retry settings permit another attempt for this report.
+
+    Args:
+        report: The upstream run report.
+        followup: The retry settings, or ``None`` when follow-up is disabled.
+
+    Returns:
+        Whether another attempt remains.
+    """
     if followup is None:
         return False
     # why: attempts that ended preempted or node failed do not count, as in the follow-up
@@ -214,20 +247,20 @@ def _retry_left(*, report: RunReport, followup: FollowupSettings | None) -> bool
     return followup.chained_retry is not ChainedRetry.MANUAL and counted < followup.max_attempts
 
 
-def _ok_verdict(*, state: StudyState, retry_left: bool) -> AfterVerdict:
+def _ok_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
     """The verdict for an ``OK`` dependency."""
-    if state is StudyState.DONE:
+    if facts.state is StudyState.DONE:
         return AfterVerdict.MET
-    if state in (StudyState.FAILED, StudyState.DEPENDENCY_FAILED):
+    if facts.state in (StudyState.FAILED, StudyState.DEPENDENCY_FAILED):
         return AfterVerdict.NEVER
-    if state is StudyState.INTERRUPTED:
-        return AfterVerdict.OPEN if retry_left else AfterVerdict.NEVER
+    if facts.state is StudyState.INTERRUPTED:
+        return AfterVerdict.OPEN if facts.retry_left else AfterVerdict.NEVER
     return AfterVerdict.OPEN
 
 
-def _any_verdict(*, state: StudyState) -> AfterVerdict:
+def _any_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
     """The verdict for an ``ANY`` dependency."""
-    if state in (
+    if facts.state in (
         StudyState.DONE,
         StudyState.FAILED,
         StudyState.INTERRUPTED,
@@ -237,24 +270,22 @@ def _any_verdict(*, state: StudyState) -> AfterVerdict:
     return AfterVerdict.OPEN
 
 
-def _failed_verdict(*, state: StudyState, retry_left: bool) -> AfterVerdict:
+def _failed_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
     """The verdict for a ``FAILED`` dependency."""
-    if state is StudyState.DONE:
+    if facts.state is StudyState.DONE:
         return AfterVerdict.NEVER
-    if state in (StudyState.FAILED, StudyState.DEPENDENCY_FAILED):
+    if facts.state in (StudyState.FAILED, StudyState.DEPENDENCY_FAILED):
         return AfterVerdict.MET
-    if state is StudyState.INTERRUPTED:
-        return AfterVerdict.OPEN if retry_left else AfterVerdict.MET
+    if facts.state is StudyState.INTERRUPTED:
+        return AfterVerdict.OPEN if facts.retry_left else AfterVerdict.MET
     return AfterVerdict.OPEN
 
 
-def _started_verdict(
-    *, state: StudyState, delay_minutes: int, started_at: float | None, now: float | None
-) -> AfterVerdict:
+def _started_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
     """The verdict for a ``STARTED`` dependency and its elapsed delay."""
-    if state is StudyState.DEPENDENCY_FAILED:
+    if facts.state is StudyState.DEPENDENCY_FAILED:
         return AfterVerdict.NEVER
-    started = state in (
+    started = facts.state in (
         StudyState.RUNNING,
         StudyState.DONE,
         StudyState.INTERRUPTED,
@@ -262,11 +293,21 @@ def _started_verdict(
     )
     if not started:
         return AfterVerdict.OPEN
-    if delay_minutes == 0:
+    if facts.delay_minutes == 0:
         return AfterVerdict.MET
-    if started_at is None:
+    if facts.started_at is None:
         return AfterVerdict.OPEN
-    if now is None:
+    if facts.now is None:
         return AfterVerdict.OPEN
-    delay_seconds = delay_minutes * 60
-    return AfterVerdict.MET if now - started_at >= delay_seconds else AfterVerdict.OPEN
+    delay_seconds = facts.delay_minutes * 60
+    return AfterVerdict.MET if facts.now - facts.started_at >= delay_seconds else AfterVerdict.OPEN
+
+
+_VERDICT_BY_CONDITION: Mapping[AfterCondition, _VerdictStrategy] = MappingProxyType(
+    {
+        AfterCondition.OK: _ok_verdict,
+        AfterCondition.ANY: _any_verdict,
+        AfterCondition.FAILED: _failed_verdict,
+        AfterCondition.STARTED: _started_verdict,
+    }
+)

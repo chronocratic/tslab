@@ -15,7 +15,7 @@ from tslab.enums import (
     StudyState,
 )
 from tslab.study import After, Grid, Study
-from tslab.study.chain import after_verdict, upstream_verdict
+from tslab.study.chain import _VERDICT_BY_CONDITION, after_verdict, retry_left, upstream_verdict
 from tslab.study.definition import expand_runs, StudyRun
 from tslab.study.machine.profile import FollowupSettings
 from tslab.study.records import ProgressSnapshot, TaskRecord
@@ -87,6 +87,23 @@ def test_upstream_verdict_table() -> None:
     ] == [expected for _, _, _, expected in cases]
 
 
+def test_every_after_condition_has_a_verdict_strategy() -> None:
+    assert set(_VERDICT_BY_CONDITION) == set(AfterCondition)
+
+
+def test_retry_left_obeys_the_attempt_limit() -> None:
+    study = _study()
+    run = next(run for run in expand_runs(study=study) if run.grid == 'pretrain')
+    followup = FollowupSettings(chained_retry=ChainedRetry.RESUBMIT, max_attempts=3)
+
+    assert retry_left(
+        report=_report(run=run, state=StudyState.INTERRUPTED, attempt=2), followup=followup
+    )
+    assert not retry_left(
+        report=_report(run=run, state=StudyState.INTERRUPTED, attempt=3), followup=followup
+    )
+
+
 def test_started_condition_uses_recorded_start_time() -> None:
     assert (
         upstream_verdict(
@@ -114,18 +131,12 @@ def test_started_condition_uses_recorded_start_time() -> None:
 def test_started_condition_with_zero_delay_needs_no_recorded_start_time() -> None:
     assert (
         upstream_verdict(
-            condition=AfterCondition.STARTED,
-            state=StudyState.RUNNING,
-            retry_left=False,
+            condition=AfterCondition.STARTED, state=StudyState.RUNNING, retry_left=False
         )
         is AfterVerdict.MET
     )
     assert (
-        upstream_verdict(
-            condition=AfterCondition.STARTED,
-            state=StudyState.DONE,
-            retry_left=False,
-        )
+        upstream_verdict(condition=AfterCondition.STARTED, state=StudyState.DONE, retry_left=False)
         is AfterVerdict.MET
     )
 

@@ -44,7 +44,7 @@ __all__ = [
 class Selection:
     """Which runs of a study a command takes.
 
-    Args:
+    Attributes:
         grids: The grid names to keep; all of them when empty.
         only: ``axis=value`` matches, comma separated per flag.
     """
@@ -57,7 +57,7 @@ class Selection:
 class Context:
     """What one study command reads before it does anything.
 
-    Args:
+    Attributes:
         study: The study the command runs on.
         reference: The ``module:attribute`` reference the study came from.
         machine: The machine the runs run on.
@@ -80,12 +80,17 @@ class Context:
     machine_path: Path
     project_root: Path
     runs: list[StudyRun]
-    resolved: dict[PurePosixPath, ResolvedRun]
+    resolved: Mapping[PurePosixPath, ResolvedRun]
     jobs: list[JobRecord]
     reports: list[RunReport]
     upstream_reports: Mapping[PurePosixPath, RunReport]
     job_states: 'JobStates'
     submission_in_progress: bool = False
+
+    def __post_init__(self) -> None:
+        """Copy read-only mappings so callers cannot change this snapshot."""
+        object.__setattr__(self, 'resolved', MappingProxyType(dict(self.resolved)))
+        object.__setattr__(self, 'upstream_reports', MappingProxyType(dict(self.upstream_reports)))
 
     @property
     def study_directory(self) -> Path:

@@ -977,9 +977,10 @@ def test_chain_exit_at_max_batch_requeue_ends_the_job_and_the_followup_resubmits
     task = next(task for task in job.tasks if task.run_path.as_posix() == 'pretrain/a')
     _time_limited(project=project, run_path='pretrain/a')
     requeue = importlib.import_module('tslab.study.launchers.slurm.requeue')
+    chain_exit_module = importlib.import_module('tslab.study.launchers.slurm.chain_exit')
     requeued: list[str] = []
     monkeypatch.setattr(requeue, 'scontrol_requeue', lambda *, task_id: requeued.append(task_id))
-    monkeypatch.setattr(requeue, 'query_cluster_config', lambda: {'MaxBatchRequeue': '5'})
+    monkeypatch.setattr(chain_exit_module, 'query_cluster_config', lambda: {'MaxBatchRequeue': '5'})
     # why: four restarts so far; the next requeue would reach MaxBatchRequeue
     monkeypatch.setenv('SLURM_RESTART_COUNT', '4')
     in_job = chained_context(project=project, study=chained_study(), machine_file='cluster.toml')

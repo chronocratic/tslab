@@ -1,8 +1,10 @@
 """Study context selection keeps every chained ancestor available."""
 
+import dataclasses
 from dataclasses import dataclass
 import json
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 
 import pytest
 
@@ -75,6 +77,19 @@ def test_grid_selection_derives_failures_from_unselected_ancestors(
         environment={},
     )
 
+    assert isinstance(context.resolved, MappingProxyType)
+    assert isinstance(context.upstream_reports, MappingProxyType)
+    resolved = dict(context.resolved)
+    upstream_reports = dict(context.upstream_reports)
+    snapshot = dataclasses.replace(context, resolved=resolved, upstream_reports=upstream_reports)
+    resolved.clear()
+    upstream_reports.clear()
+    assert snapshot.resolved
+    assert snapshot.upstream_reports
+    resolved_backing = dict(context.resolved)
+    wrapped = dataclasses.replace(context, resolved=MappingProxyType(resolved_backing))
+    resolved_backing.clear()
+    assert wrapped.resolved
     assert {report.run.grid for report in context.reports} == {selected_grid}
     assert {report.run.grid for report in context.upstream_reports.values()} == upstream_grids
     assert {report.state for report in context.reports} == {StudyState.DEPENDENCY_FAILED}

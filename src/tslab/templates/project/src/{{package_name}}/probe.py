@@ -122,7 +122,10 @@ _METRICS: Mapping[ProbeHead, Callable[..., Sequence[Metric] | None]] = {
 
 
 def main(*, config: ProbeConfig) -> None:
-    """Load the checkpoint, encode every split and score the SVM probe.
+    """Load the checkpoint, encode every split and score the selected probe.
+
+    Args:
+        config: The model, data, checkpoint and probe-head settings for this run.
 
     Raises:
         TypeError: If ``config.data`` is not a classification dataset.

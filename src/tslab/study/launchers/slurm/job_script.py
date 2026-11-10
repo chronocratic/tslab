@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 import shlex
+from types import MappingProxyType
 
 from tslab.jobs.slurm import (
     array_spec,
@@ -14,9 +15,25 @@ from tslab.jobs.slurm import (
     wait_for_file_line,
 )
 from tslab.study.code_snapshot import CodeSnapshot, SRC_FOLDER
+from tslab.study.launchers.slurm.requeue_mode import RequeueMode
 from tslab.study.machine import SlurmSettings
 
 __all__ = ['foreground_script', 'job_script']
+
+_REQUEUE_OPTIONS: Mapping[RequeueMode, tuple[str, object]] = MappingProxyType(
+    {
+        RequeueMode.DISABLED: ('no_requeue', True),
+        RequeueMode.ENABLED: ('requeue', True),
+        RequeueMode.EXPEDITE: ('requeue', 'expedite'),
+    }
+)
+_REQUEUE_ATTEMPTS: Mapping[RequeueMode, str] = MappingProxyType(
+    {
+        RequeueMode.DISABLED: '${ATTEMPT}',
+        RequeueMode.ENABLED: '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))',
+        RequeueMode.EXPEDITE: '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))',
+    }
+)
 
 
 def foreground_script(
@@ -62,10 +79,10 @@ def _wait_section(*, tasks_file: Path) -> str:
 
 
 def _array_section(
-    *, tasks_file: Path, chain_check: Sequence[str] | None, requeue: bool | str
+    *, tasks_file: Path, chain_check: Sequence[str] | None, requeue_mode: RequeueMode
 ) -> str:
     # why: a requeued task starts again with the same line, so the restart count adds to the attempt
-    attempt = '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))' if requeue else '${ATTEMPT}'
+    attempt = _REQUEUE_ATTEMPTS[requeue_mode]
     section = _wait_section(tasks_file=tasks_file) + (
         'TASK_LINE=$(sed -n "s/^${SLURM_ARRAY_TASK_ID} //p" ' + shlex.quote(str(tasks_file)) + ')\n'
         'if [ -z "$TASK_LINE" ]; then\n'
@@ -148,7 +165,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
     dependency: str | None = None,
     begin: str | None = None,
     chain_check: Sequence[str] | None = None,
-    requeue: bool | str = False,
+    requeue_mode: RequeueMode = RequeueMode.DISABLED,
     code_snapshot: CodeSnapshot | None = None,
 ) -> str:
     """The full ``.sbatch`` script of one study job.
@@ -164,8 +181,8 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         dependency: A ``--dependency`` value, when given.
         begin: A ``--begin`` value, when given.
         chain_check: The run-state check after ``srun``; the array index is added.
-        requeue: ``False`` writes ``--no-requeue``; ``True`` writes ``--requeue``; the
-            string ``'expedite'`` writes ``--requeue=expedite``.
+        requeue_mode: Whether to write ``--no-requeue``, ``--requeue`` or
+            ``--requeue=expedite``.
         code_snapshot: The code snapshot the job runs from; the script checks
             its ``src`` folder, exports its variables and puts it first on
             ``PYTHONPATH``. ``None`` runs the live code.
@@ -190,7 +207,7 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         dependency=dependency,
         begin=begin,
         chain_check=chain_check,
-        requeue=requeue,
+        requeue_mode=requeue_mode,
     )
     lines = ['#!/bin/bash', *sbatch_directives(options=options)]
     lines += [
@@ -218,7 +235,9 @@ def job_script(  # noqa: PLR0913 # why: keyword-only public API; one option per 
         lines.append(_single_section(tasks_file=tasks_file))
     else:
         lines.append(
-            _array_section(tasks_file=tasks_file, chain_check=chain_check, requeue=requeue)
+            _array_section(
+                tasks_file=tasks_file, chain_check=chain_check, requeue_mode=requeue_mode
+            )
         )
     return '\n'.join(lines) + '\n'
 
@@ -232,7 +251,7 @@ def _job_options(  # noqa: PLR0913 # why: options depend on seven independent sc
     dependency: str | None,
     begin: str | None,
     chain_check: Sequence[str] | None,
-    requeue: bool | str,
+    requeue_mode: RequeueMode,
 ) -> dict[str, object]:
     """The sbatch options shared by array groups and helper jobs."""
     options: dict[str, object] = {'job_name': job_name, 'partition': slurm.partition}
@@ -252,10 +271,8 @@ def _job_options(  # noqa: PLR0913 # why: options depend on seven independent sc
         spec = f'{array_spec(indices=indices)}%{slurm.max_concurrent}'
         options['array'] = spec
     options.update(output=log_pattern, open_mode='append')
-    if requeue:
-        options['requeue'] = requeue
-    else:
-        options['no_requeue'] = True
+    requeue_option, requeue_value = _REQUEUE_OPTIONS[requeue_mode]
+    options[requeue_option] = requeue_value
     if slurm.signal_seconds > 0:
         options['signal'] = f'USR2@{slurm.signal_seconds}'
     if dependency is not None:

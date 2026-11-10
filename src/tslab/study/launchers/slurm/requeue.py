@@ -1,27 +1,40 @@
 """Requeue of a chained SLURM task in place."""
 
 import logging
-import os
 
-from tslab.jobs.slurm import query_cluster_config, scontrol_requeue, SlurmError
+from tslab.jobs.slurm import scontrol_requeue, SlurmError
 
 __all__ = ['at_requeue_limit', 'requeue_task', 'restarted_attempt']
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def restarted_attempt(*, attempt: int) -> int:
-    """The attempt number of a requeued task: the recorded one plus the restarts."""
-    return attempt + int(os.environ.get('SLURM_RESTART_COUNT', '0'))
+def restarted_attempt(*, attempt: int, restart_count: int) -> int:
+    """The attempt number of a requeued task: its record plus scheduler restarts.
+
+    Args:
+        attempt: The attempt number in the latest task record.
+        restart_count: The ``SLURM_RESTART_COUNT`` value read by the caller.
+
+    Returns:
+        The attempt number including unrecorded scheduler restarts.
+    """
+    return attempt + restart_count
 
 
-def at_requeue_limit() -> bool:
-    """Whether one more requeue would reach ``MaxBatchRequeue``, where SLURM holds the job."""
-    try:
-        limit = int(query_cluster_config().get('MaxBatchRequeue', ''))
-    except (SlurmError, ValueError):
+def at_requeue_limit(*, restart_count: int, max_requeues: int | None) -> bool:
+    """Whether one more requeue would reach ``MaxBatchRequeue``.
+
+    Args:
+        restart_count: The restart count read by the caller.
+        max_requeues: The parsed scheduler limit, or ``None`` when unavailable.
+
+    Returns:
+        Whether the scheduler will hold the job after another requeue.
+    """
+    if max_requeues is None:
         return False
-    return restarted_attempt(attempt=0) + 1 >= limit
+    return restart_count + 1 >= max_requeues
 
 
 def requeue_task(*, task_id: str) -> bool:
