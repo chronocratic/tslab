@@ -12,9 +12,9 @@ import sys
 
 import pytest
 
+from tslab.cli import TS_TEMPLATE
 from tslab.lab.cli.new import create_project, LAB_TEMPLATE
 from tslab.lab.study.project import load_project_settings
-from tslab.ts.project_template import TS_TEMPLATE
 
 REPOSITORY = Path(__file__).parents[3]
 RELEASED_TSLAB = '>=0.1.0a1,<0.2"]'

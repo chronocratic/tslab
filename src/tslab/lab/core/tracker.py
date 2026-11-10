@@ -30,7 +30,7 @@ class _ParamsDumper(yaml.SafeDumper):
     """A safe dumper that writes any value it cannot represent as its text."""
 
 
-# Lightning passes the raw init arguments of a model, which can hold enums, paths
+# A trainer passes the raw init arguments of a model, which can hold enums, paths
 # or classes; safe_dump refuses those, and the whole hparams.yaml would be lost.
 _ParamsDumper.add_multi_representer(object, lambda dumper, value: dumper.represent_str(str(value)))
 
@@ -107,7 +107,7 @@ class LocalTracker(Tracker):
 
     This is the record that survives when every remote tracker is down, so
     ``Run`` always adds it. It uses only the standard library and PyYAML, which
-    keeps ``tslab.lab.core`` free of Lightning.
+    keeps ``tslab.lab.core`` free of heavy dependencies.
 
     Each execution of the run gets the next ``version_<n>`` folder, so a resumed
     run never overwrites the metrics of the interrupted one. Columns are
