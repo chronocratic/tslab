@@ -199,7 +199,8 @@ def _wait_and_escalate(  # noqa: PLR0913 # why: one keyword per escalation setti
     )
 
 
-# why: ru_maxrss is in bytes on macOS and in kilobytes elsewhere
+# why: ru_maxrss is in bytes on macOS and in kilobytes elsewhere; on Linux it
+# also keeps the peak of the parent from before exec
 _RSS_BYTES_PER_UNIT: Mapping[str, int] = {'darwin': 1}
 
 

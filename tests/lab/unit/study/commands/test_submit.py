@@ -980,7 +980,7 @@ def test_keep_awake_missing_tool_still_runs(
             sleep=no_sleep,
         )
     assert code == 0
-    assert 'no caffeinate found' in caplog.text
+    assert 'the machine may sleep' in caplog.text
 
 
 def test_keep_awake_false_starts_no_helper(

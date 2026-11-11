@@ -709,8 +709,9 @@ def test_local_usage_file_and_footer(machine: MachineProfile, tmp_path: Path) ->
     )
     assert len(usages) == 2
     assert all(usage['elapsed_seconds'] >= 1 for usage in usages)
+    # why: on Linux a child keeps the peak of its parent across exec, so the
+    # small task can report the same peak as the big one
     assert usages[1]['max_rss_bytes'] >= 100 * 1024 * 1024
-    assert usages[1]['max_rss_bytes'] > usages[0]['max_rss_bytes']
     for log in (folder / 'logs').glob('*.out'):
         assert log.read_text().strip().splitlines()[-1].startswith('=== task')
 
