@@ -290,3 +290,31 @@ def test_run_process_returns_when_a_leftover_left_the_group(*, tmp_path: Path) -
     )
     assert result.exit_code == 0
     assert time.monotonic() - start < 20
+
+
+def test_run_process_stops_the_child_when_waiting_is_interrupted(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def interrupted(**_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr('tslab.lab.jobs.local.process._wait_and_escalate', interrupted)
+    pids: list[int] = []
+    with pytest.raises(KeyboardInterrupt):
+        run_process(
+            command=[sys.executable, '-c', 'import time; time.sleep(60)'],
+            cwd=tmp_path,
+            environment=os.environ,
+            on_line=lambda _line: None,
+            on_event=lambda _text: None,
+            stop=threading.Event(),
+            timeout_seconds=None,
+            signal_seconds=0,
+            on_spawn=pids.append,
+        )
+    assert not process_alive(pid=pids[0])
+
+
+@pytest.mark.parametrize('pid', [0, -1])
+def test_process_alive_is_false_for_a_non_positive_pid(*, pid: int) -> None:
+    assert not process_alive(pid=pid)

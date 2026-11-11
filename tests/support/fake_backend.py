@@ -285,6 +285,7 @@ class FakeBackend:
         pid: int,
         host: str,
         now: Callable[[], str],
+        release_submission_lock: Callable[[], None] | None = None,  # why: the Backend signature
     ) -> LaunchReport | None:
         """Submit the groups through the shared launch helper, with a private launcher.
 

@@ -21,7 +21,7 @@ export TMPDIR
 export WANDB_CACHE_DIR=$TMPDIR/wandb-cache
 export WANDB_CONFIG_DIR=$TMPDIR/wandb-config
 if [ ! -d /snapshots/ab12cd34/src ]; then
-    echo "tslab: code snapshot /snapshots/ab12cd34/src is missing; not running the live code" >&2
+    echo 'tslab: code snapshot /snapshots/ab12cd34/src is missing; not running the live code' >&2
     exit 1
 fi
 export TSLAB_CODE_SNAPSHOT=/snapshots/ab12cd34

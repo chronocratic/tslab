@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -59,7 +60,8 @@ def upstream_verdict(  # noqa: PLR0913 # why: state and retry timing facts are e
         condition: The condition declared by the downstream grid.
         state: The current upstream run state.
         retry_left: Whether the upstream run can still be retried.
-        delay_minutes: Minutes since the upstream job started, for ``STARTED``.
+        delay_minutes: Minutes that must pass after the upstream job started before
+            ``STARTED`` is met.
         started_at: The upstream job start time in UTC Unix seconds, when known.
         now: The current time in UTC Unix seconds, passed by the caller.
 
@@ -132,37 +134,27 @@ def downstream_of(
         if report.state in (StudyState.WAITING, StudyState.DEPENDENCY_FAILED, StudyState.MISSING)
         and report.run.run_path not in given
     ]
+    dependents: dict[PurePosixPath, list[PurePosixPath]] = defaultdict(list)
+    for report in candidates:
+        for upstream_path in _upstream_paths(study=study, run=report.run):
+            dependents[upstream_path].append(report.run.run_path)
     found: set[PurePosixPath] = set()
-    reached = set(given)
-    while added := _reachable(study=study, candidates=candidates, reached=reached, found=found):
-        found |= added
-        reached |= added
+    queue = deque(given)
+    while queue:
+        for path in dependents[queue.popleft()]:
+            if path not in found:
+                found.add(path)
+                queue.append(path)
     return [report for report in candidates if report.run.run_path in found]
 
 
-def _reachable(
-    *,
-    study: Study,
-    candidates: Sequence[RunReport],
-    reached: Collection[PurePosixPath],
-    found: Collection[PurePosixPath],
-) -> set[PurePosixPath]:
-    """The candidate run paths not yet found that depend on a reached run."""
+def _upstream_paths(*, study: Study, run: StudyRun) -> set[PurePosixPath]:
+    """The run paths of every upstream run of ``run``."""
     return {
-        report.run.run_path
-        for report in candidates
-        if report.run.run_path not in found
-        and _depends_on(study=study, run=report.run, paths=reached)
-    }
-
-
-def _depends_on(*, study: Study, run: StudyRun, paths: Collection[PurePosixPath]) -> bool:
-    """Whether any upstream run of ``run`` is in ``paths``."""
-    return any(
-        upstream.run_path in paths
+        upstream.run_path
         for after in study.grids[run.grid].after
         for upstream in upstream_runs(study=study, run=run, after=after)
-    )
+    }
 
 
 def _entry_verdict(  # noqa: PLR0913 # why: one input per dependency decision fact
@@ -260,13 +252,10 @@ def _ok_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
 
 def _any_verdict(*, facts: _VerdictFacts) -> AfterVerdict:
     """The verdict for an ``ANY`` dependency."""
-    if facts.state in (
-        StudyState.DONE,
-        StudyState.FAILED,
-        StudyState.INTERRUPTED,
-        StudyState.DEPENDENCY_FAILED,
-    ):
+    if facts.state in (StudyState.DONE, StudyState.FAILED, StudyState.DEPENDENCY_FAILED):
         return AfterVerdict.MET
+    if facts.state is StudyState.INTERRUPTED:
+        return AfterVerdict.OPEN if facts.retry_left else AfterVerdict.MET
     return AfterVerdict.OPEN
 
 
