@@ -46,19 +46,19 @@ The common package can build a grid from shared axes and recipes:
 # my_paper/studies/common/grids.py
 from tslab.lab.study import Grid, setting_axis
 
-from my_paper import classify
-from my_paper.studies.common.datasets import TOY_UCR
-from my_paper.studies.common.recipes import classification_recipes
+from my_paper import experiment
+from my_paper.studies.common.datasets import TOY_DATASETS
+from my_paper.studies.common.recipes import sweep_recipes
 
 
-def classification_grid(*, seeds: tuple[int, ...]) -> Grid:
+def sweep_grid(*, seeds: tuple[int, ...]) -> Grid:
     return Grid(
-        short_name='cls',
-        command=('uv', 'run', 'python', '-m', 'my_paper.classify', 'no-preset'),
-        config=classify.ClassifyConfig,
+        short_name='sweep',
+        command=('uv', 'run', 'python', '-m', 'my_paper.experiment', 'no-preset'),
+        config=experiment.ExperimentConfig,
         axes={
-            'recipe': classification_recipes(),
-            'dataset': TOY_UCR,
+            'recipe': sweep_recipes(),
+            'dataset': TOY_DATASETS,
             'seed': setting_axis(path='seed', values=seeds),
         },
     )
@@ -71,12 +71,12 @@ that study, while machine profiles set only machine settings:
 # my_paper/studies/example/study.py
 from tslab.lab.study import Study
 
-from my_paper.studies.common import classification_grid
+from my_paper.studies.common import sweep_grid
 
 study = Study(
     name='example',
     settings={'trainer.max_epochs': 500, 'trainer.max_training_time': '6:00:00'},
-    grids={'classification': classification_grid(seeds=(0, 1))},
+    grids={'sweep': sweep_grid(seeds=(0, 1))},
 )
 ```
 
@@ -385,7 +385,7 @@ name its jobs from axis values with `job_name`, a template of `{short_name}`,
 `{study}` and axis names, written with single braces:
 
 ```python
-Grid(short_name='ucr', job_name='{recipe}_{short_name}', ...)  # s11_ucr, b1_ucr, ...
+Grid(short_name='sweep', job_name='{recipe}_{short_name}', ...)  # s11_sweep, b1_sweep, ...
 ```
 
 The axes the template names split the grid into one array per value
@@ -522,7 +522,7 @@ evaluate = Grid(
     short_name='evaluate',
     command=('uv', 'run', 'python', '-m', 'my_paper.evaluate'),
     config=EvaluateConfig,
-    axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'head': heads},
+    axes={'recipe': recipes, 'dataset': datasets, 'seed': seeds, 'variant': variants},
     after=(After(grid='pretrain'),),
     run_settings={'checkpoint': '{after}/train/default'},
 )
@@ -775,7 +775,7 @@ how many tasks the job would start.
 
 ```bash
 uv run tslab study run example --machine cluster \
-    --grid classification --only dataset=Coffee --only seed=42
+    --grid sweep --only dataset=small --only seed=42
 ```
 
 Inside an interactive `salloc` allocation the machine still applies

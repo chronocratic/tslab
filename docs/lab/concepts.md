@@ -50,7 +50,7 @@ A stage returns an **artifact**, saved atomically in the instance folder:
 | `tslab.ml.Checkpoint` | the best and last Lightning checkpoints of `train`; defined in `tslab.ml` |
 
 `SomeArtifact.external(path=...)` brings an outside file into the pipeline,
-fingerprinted by its content, for example a pretrained checkpoint.
+fingerprinted by its content, for example a checkpoint from an earlier stage.
 
 ## The run folder
 

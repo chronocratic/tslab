@@ -60,7 +60,7 @@ PRESETS = {
 
 Fields not given keep their defaults. For models and datasets that come from
 a package with generated settings classes, see the helper functions of that
-package, for example [chronocratic](../ts/chronocratic.md).
+package, such as the [ts layer](../ts/index.md).
 
 ### `tslab.lab.REQUIRED`
 
