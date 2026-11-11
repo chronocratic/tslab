@@ -83,6 +83,10 @@ class LocalResources:
         return None
 
 
+def _keep_lock() -> None:
+    """Release nothing: the caller gave no way to give the submission lock up."""
+
+
 @functools.cache
 def _auto_gpu_count(*, cuda_visible_devices: str | None) -> int | None:
     """The number of visible GPUs, looked up once per value of ``CUDA_VISIBLE_DEVICES``.
@@ -281,8 +285,7 @@ class LocalBackend:
             with hold_launch(
                 study_folder=folder, task_ids=task_ids, pid=pid, host=host, now=now()
             ) as on_task_state:
-                if release_submission_lock is not None:
-                    release_submission_lock()
+                (release_submission_lock or _keep_lock)()
                 return _launch_local_groups(
                     context=context,
                     groups=groups,

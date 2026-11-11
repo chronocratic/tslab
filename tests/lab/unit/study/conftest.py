@@ -3,12 +3,12 @@
 from collections.abc import Iterator
 from pathlib import Path
 import sys
-from types import SimpleNamespace
 
 import pytest
 
 from tests.lab.unit.study.project import write_toy_project
 from tests.support.fake_backend import FakeBackend, install_fake_backend
+from tslab.lab.study.reporting.state import collect_states
 
 _TOY_MODULES = (
     'toy_studies',
@@ -32,10 +32,10 @@ def _clean_study_imports() -> Iterator[None]:
 
 @pytest.fixture(autouse=True)
 def _no_grace_wait(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make the wait for a late ``status.json`` instant; only ``reporting.state`` sees it."""
-    monkeypatch.setattr(
-        'tslab.lab.study.reporting.state.time', SimpleNamespace(sleep=lambda _seconds: None)
-    )
+    """Make the wait for a late ``status.json`` instant for callers that pass no ``sleep``."""
+    defaults = collect_states.__kwdefaults__
+    assert defaults is not None
+    monkeypatch.setitem(defaults, 'sleep', lambda _seconds: None)
 
 
 @pytest.fixture
