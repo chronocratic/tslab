@@ -228,6 +228,30 @@ def test_a_finished_run_that_runs_again_is_shown_running(
     assert f'{(tmp_path / "a").as_posix()}: running' in text
 
 
+@pytest.mark.parametrize('saved_state', ['failed', 'crashed'])
+def test_a_failed_or_crashed_run_with_a_live_lock_is_shown_running(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    saved_state: str,
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    status_file = tmp_path / 'a' / 'status.json'
+    document = json.loads(status_file.read_text(encoding='utf-8'))
+    document['run_state'] = saved_state
+    status_file.write_text(json.dumps(document), encoding='utf-8')
+
+    def live(*, directory: Path) -> bool:
+        del directory
+        return True
+
+    monkeypatch.setattr(status_module, 'is_run_active', live)
+    _, text = shown(caplog=caplog, path=tmp_path)
+    assert '1 run: 1 running' in text
+    _, text = shown(caplog=caplog, path=tmp_path / 'a')
+    assert f'{(tmp_path / "a").as_posix()}: running' in text
+
+
 def test_the_scan_does_not_descend_below_a_run(tmp_path: Path) -> None:
     make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
     nested = tmp_path / 'a' / 'scale' / 'inner'

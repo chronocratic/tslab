@@ -32,7 +32,7 @@ from tslab.lab.core.status import (
     StatusFileError,
 )
 from tslab.lab.core.text import log_table
-from tslab.lab.enums import InstanceState, JobPhase, RunState, ShownRunState, StudyState
+from tslab.lab.enums import InstanceState, JobPhase, ShownRunState, StudyState
 from tslab.lab.study.project import load_project_settings
 from tslab.lab.study.reporting.outcome import states_exit_code
 from tslab.lab.study.reporting.state import FolderFacts, study_state
@@ -167,7 +167,8 @@ class _RunView:
         directory: The run folder.
         snapshot: Its ``status.json``.
         folder: The facts of the folder, for the study state.
-        run_state: The state to show, ``interrupted`` for a dead ``running`` run.
+        run_state: The state to show: ``running`` for a live lock, ``interrupted`` for a dead
+            ``running`` run, else the saved state.
     """
 
     directory: Path
@@ -181,14 +182,11 @@ def _view_of(*, directory: Path, snapshot: RunStatusSnapshot) -> _RunView:
     # why: a resumed run, or a finished run that runs again to add stages, holds the lock while
     # its saved state is still failed, crashed or finished, so the lock is read for every state
     lock_live = is_run_active(directory=directory)
-    shown = shown_state_of(run_state=snapshot.run_state, lock_live=lock_live)
     return _RunView(
         directory=directory,
         snapshot=snapshot,
         folder=FolderFacts(snapshot=snapshot, read_error=None, lock_live=lock_live),
-        run_state=ShownRunState.RUNNING
-        if lock_live and snapshot.run_state is RunState.FINISHED
-        else shown,
+        run_state=shown_state_of(run_state=snapshot.run_state, lock_live=lock_live),
     )
 
 

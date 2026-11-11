@@ -1,17 +1,15 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
 
-from tslab.lab.core.meta import hostname
 from tslab.lab.core.status import (
     format_instance_id,
     InstanceRecord,
     parse_instance_id,
     read_status,
     RunStatusSnapshot,
-    shown_run_state,
+    shown_state_of,
     StatusFileError,
     write_status,
 )
@@ -86,21 +84,18 @@ def test_every_bad_status_file_is_one_error_naming_the_file(tmp_path: Path, cont
         read_status(path=tmp_path / 'status.json')
 
 
-def test_shown_run_state_shows_interrupted_for_a_dead_running_run(tmp_path: Path) -> None:
-    snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t')
-    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'interrupted'
+def test_shown_state_shows_interrupted_for_a_dead_running_run() -> None:
+    assert shown_state_of(run_state=RunState.RUNNING, lock_live=False) == 'interrupted'
 
 
-def test_shown_run_state_shows_running_for_a_live_run(tmp_path: Path) -> None:
-    lock = tmp_path / '.lock'
-    lock.write_text(json.dumps({'pid': os.getpid(), 'host': hostname()}), encoding='utf-8')
-    snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t')
-    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'running'
+@pytest.mark.parametrize('run_state', list(RunState))
+def test_shown_state_shows_running_for_a_live_lock_in_any_saved_state(run_state: RunState) -> None:
+    assert shown_state_of(run_state=run_state, lock_live=True) == 'running'
 
 
-def test_shown_run_state_keeps_the_state_of_a_finished_run(tmp_path: Path) -> None:
-    snapshot = RunStatusSnapshot(run_state=RunState.FINISHED, updated_at='t')
-    assert shown_run_state(directory=tmp_path, snapshot=snapshot) == 'finished'
+@pytest.mark.parametrize('run_state', [RunState.FINISHED, RunState.FAILED, RunState.CRASHED])
+def test_shown_state_keeps_the_saved_state_without_a_live_lock(run_state: RunState) -> None:
+    assert shown_state_of(run_state=run_state, lock_live=False) == run_state.value
 
 
 def test_traceback_file_is_saved_as_posix_text_and_read_back_as_a_path() -> None:
