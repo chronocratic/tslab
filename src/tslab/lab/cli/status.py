@@ -32,7 +32,7 @@ from tslab.lab.core.status import (
     StatusFileError,
 )
 from tslab.lab.core.text import log_table
-from tslab.lab.enums import InstanceState, JobPhase, ShownRunState, StudyState
+from tslab.lab.enums import InstanceState, JobPhase, RunState, ShownRunState, StudyState
 from tslab.lab.study.project import load_project_settings
 from tslab.lab.study.reporting.outcome import states_exit_code
 from tslab.lab.study.reporting.state import FolderFacts, study_state
@@ -178,7 +178,8 @@ class _RunView:
 
 def _view_of(*, directory: Path, snapshot: RunStatusSnapshot) -> _RunView:
     """Read the lock of the folder once and decide the state to show."""
-    lock_live = is_run_active(directory=directory)
+    # why: only a run saved as running can be live; the lock of any other run is not read
+    lock_live = snapshot.run_state is RunState.RUNNING and is_run_active(directory=directory)
     return _RunView(
         directory=directory,
         snapshot=snapshot,
