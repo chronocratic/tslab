@@ -164,6 +164,24 @@ def test_a_new_horizon_reuses_the_cached_encoding(tmp_path: Path) -> None:
     assert model.sequence_calls == 0
 
 
+class _InPlaceEncoder(CausalEncoder):
+    """Zeroes its inputs in place, as an encoder that clears NaN values may."""
+
+    def encode_sequence(self, *, inputs: torch.Tensor) -> torch.Tensor:
+        encoded = super().encode_sequence(inputs=inputs)
+        inputs.zero_()
+        return encoded
+
+
+def test_an_encoder_that_edits_its_inputs_does_not_change_the_targets(tmp_path: Path) -> None:
+    with run_in(root=tmp_path / 'plain') as run:
+        plain = representations(run=run, model=CausalEncoder(), horizons=(2,))[2]
+    with run_in(root=tmp_path / 'edited') as run:
+        edited = representations(run=run, model=_InPlaceEncoder(), horizons=(2,))[2]
+    for split in SLICES:
+        assert torch.equal(edited.tensors[f'{split}_targets'], plain.tensors[f'{split}_targets'])
+
+
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
     shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})

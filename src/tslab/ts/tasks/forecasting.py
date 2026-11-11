@@ -257,6 +257,9 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
     slices = checked_split_slices(data=data)
     full = data.full_series()
     inputs = _input_series(full=full, series=series)
+    # why: list indexing copies, and the copy is taken before the encoder runs, because
+    # float32 data is not copied by the cast and an encoder may edit its inputs in place
+    targets = full.to(dtype=torch.float32)[..., list(data.info.target_channels)]
     sequence_encoder = load_encoder(
         trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
     )
@@ -271,7 +274,6 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
             f'{tuple(inputs.shape)}; expected (N, T, D)'
         )
         raise ValueError(message)
-    targets = full.to(dtype=torch.float32)[..., list(data.info.target_channels)]
     tensors: dict[str, torch.Tensor] = {}
     for split in SPLITS:
         tensors[f'{split}_sequence'] = sequences[:, slices[split]]

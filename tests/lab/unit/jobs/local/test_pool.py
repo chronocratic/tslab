@@ -6,10 +6,11 @@ import subprocess
 import sys
 import threading
 import time
+from typing import cast
 
 import pytest
 
-from tslab.lab.jobs.local import PoolCommand, process_alive, ProcessResult, run_commands
+from tslab.lab.jobs.local import GpuLease, PoolCommand, process_alive, ProcessResult, run_commands
 from tslab.lab.jobs.local.pool import _environment_of, _GpuLeaseGate
 
 _LOCK_CHILD = (
@@ -631,3 +632,22 @@ def test_a_slow_free_check_does_not_block_another_gpu(*, tmp_path: Path) -> None
     slow.join(timeout=10)
     assert other is not None
     other.release()
+
+
+def test_free_answer_from_before_the_last_release_is_not_kept(*, tmp_path: Path) -> None:
+    checks: list[str] = []
+
+    def gpu_free(gpu_id: str) -> bool:
+        checks.append(gpu_id)
+        if len(checks) == 1:
+            # why: a lease started and ended on the GPU while the first check was running
+            gate._counts[gpu_id] = 1  # noqa: SLF001 # why: stands in for a concurrent lease
+            gate.drop(lease=cast('GpuLease', object()), gpu_id=gpu_id)
+        return True
+
+    gate = _GpuLeaseGate(
+        lock_folder=tmp_path, tasks_per_gpu=1, gpu_free=gpu_free, busy_recheck_seconds=60.0
+    )
+    assert gate._is_busy(slot='0') is False  # noqa: SLF001 # why: the free check is the unit
+    assert gate._is_busy(slot='0') is False  # noqa: SLF001 # why: the free check is the unit
+    assert checks == ['0', '0']

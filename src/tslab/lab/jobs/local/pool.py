@@ -180,6 +180,7 @@ class _GpuLeaseGate:
         self._busy_recheck_seconds = busy_recheck_seconds
         self._counts: dict[str, int] = {}
         self._answers: dict[str, tuple[float, bool]] = {}
+        self._generations: dict[str, int] = {}
         self._gpu_locks: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
@@ -212,9 +213,14 @@ class _GpuLeaseGate:
             fresh = self._fresh_answer(slot=slot)
             if fresh is not None:
                 return not fresh
+            with self._lock:
+                generation = self._generations.get(slot, 0)
             free = self._gpu_free(slot)
             with self._lock:
-                self._answers[slot] = (time.monotonic(), free)
+                # why: the call can take 30 seconds; when the last lease ended meanwhile, the
+                # answer is from before the release and must not be trusted for a new lease
+                if self._generations.get(slot, 0) == generation:
+                    self._answers[slot] = (time.monotonic(), free)
             return not free
 
     def try_lease(self, *, slot: str) -> GpuLease | None:
@@ -242,6 +248,7 @@ class _GpuLeaseGate:
             if self._counts[gpu_id] == 0:
                 # why: a free answer from before the release must not lease the GPU again
                 self._answers.pop(gpu_id, None)
+                self._generations[gpu_id] = self._generations.get(gpu_id, 0) + 1
 
 
 def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and limit setting
