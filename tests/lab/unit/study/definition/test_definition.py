@@ -56,7 +56,7 @@ def test_grid_with_every_run_excluded_raises_even_when_another_grid_has_runs() -
 
 
 @pytest.mark.parametrize(
-    'axis', ['grid', 'run_path', 'study_state', 'instance', 'instance_state', 'error']
+    'axis', ['grid', 'run_path', 'study_state', 'instance', 'instance_state', 'seconds', 'error']
 )
 def test_axis_names_that_are_result_columns_are_reserved(axis: str) -> None:
     with pytest.raises(ValueError, match='reserved'):
