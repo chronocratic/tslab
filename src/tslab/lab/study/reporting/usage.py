@@ -49,6 +49,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         for report, usage_item in selected
     ]
     return {
+        # When API is stable: version this id (tslab.study-usage/1); bump on a breaking change.
         'schema': 'tslab.study-usage',
         'launcher': context.machine.launcher,
         'study': context.reference or context.study.name,

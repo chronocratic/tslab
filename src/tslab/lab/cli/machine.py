@@ -78,6 +78,7 @@ class MachineList:
         _LOGGER.info('no machines: none in machines/ above this folder, none registered')
         _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
         if self.json:
+            # When API is stable: version this id (tslab.machine-list/1); bump on a breaking change.
             print_json(document={'schema': 'tslab.machine-list', 'machines': []})
         return 0
 
@@ -109,6 +110,7 @@ class MachineList:
                 }
                 for name, file in sorted(registered.items())
             )
+            # When API is stable: version this id (tslab.machine-list/1); bump on a breaking change.
             print_json(document={'schema': 'tslab.machine-list', 'machines': machines})
             _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
             return 0

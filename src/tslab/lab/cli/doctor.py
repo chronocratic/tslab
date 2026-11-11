@@ -61,6 +61,8 @@ class Doctor:
         if self.json:
             print_json(
                 document={
+                    # When API is stable: version this id (tslab.doctor/1); bump on a breaking
+                    # change.
                     'schema': 'tslab.doctor',
                     'machine': location.path.resolve().as_posix(),
                     'project_settings': _project_settings_document(

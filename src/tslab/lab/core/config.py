@@ -42,9 +42,6 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
-
 # An optional marker for a preset value the preset author cannot know; the
 # user must give it on the command line (tyro stops with "Missing ...").
 REQUIRED: Any = tyro.MISSING  # why: tyro.MISSING has no public type
@@ -72,6 +69,8 @@ def config_to_yaml(*, config: object) -> str:
     # so a module-level import back would cycle
     from tslab.lab.core.codec import config_to_data  # noqa: PLC0415
 
+    # When API is stable: add 'format_version': 1 here and check it in config_from_yaml,
+    # so a config file from another TSLab version fails with a clear message.
     document = {
         'config_type': qualified_name(cls=type(config)),
         'config': config_to_data(config=config),
@@ -97,6 +96,8 @@ def config_from_yaml[C](*, config_class: type[C], text: str) -> C:
     from tslab.lab.core.codec import decode_dataclass  # noqa: PLC0415
 
     document = yaml.safe_load(text)
+    # When API is stable: check 'format_version' here (see config_to_yaml) and raise ConfigFileError
+    # when it differs.
     if not isinstance(document, dict) or not {'config_type', 'config'} <= document.keys():
         message = 'not a TSLab config file (config_type and config keys expected)'
         raise ConfigFileError(message)

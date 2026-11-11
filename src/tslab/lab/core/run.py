@@ -551,6 +551,8 @@ class Run:
                 else canonical_config
             )
             environment = self.environment()
+            # When API is stable: add 'format_version': 1 here, so a meta.json from another TSLab
+            # version can be told apart; check it wherever meta.json is read.
             self._meta = {
                 'relative_path': self._relative_path.as_posix(),
                 'seed': self._seed,

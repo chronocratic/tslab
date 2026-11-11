@@ -41,6 +41,8 @@ uv run tslab study submit example --json
 | `tslab.study-results` | `rows`, the same rows as the CSV. |
 | `tslab.doctor` | `machine`, `project_settings` (`path`, `values`: each key with `value` and `source` as `flag`, `file`, or `default`), `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
 
+Schema ids are unversioned while TSLab is alpha; they will gain a `/N` suffix once the API is stable.
+
 ## Exit codes
 
 Use these codes for `tslab status --exit-code`,

@@ -35,9 +35,6 @@ __all__ = [
     'take_progress',
 ]
 
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
-
 _LOGGER = logging.getLogger(__name__)
 
 _LOCK_POLL_SECONDS = 0.1
@@ -240,6 +237,8 @@ class JobRecord:
 
     def to_json(self) -> dict[str, object]:
         """The JSON form of the record."""
+        # When API is stable: add 'format_version': 1 here and check it in read_jobs,
+        # so a submissions.jsonl from another TSLab version fails with a clear message.
         document: dict[str, object] = {
             'kind': self.kind.value,
             'submission_id': self.submission_id,
@@ -399,6 +398,8 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
         except json.JSONDecodeError as error:
             _LOGGER.warning('%s: skipping line %d: %s', path, line_number, error)
             continue
+        # When API is stable: check 'format_version' of each line here (see to_json) and raise a
+        # clear error when it differs.
         try:
             records.append(JobRecord.from_json(document=document))
         except (ValueError, KeyError, TypeError) as error:

@@ -46,6 +46,7 @@ class List:
                 study = load_study(reference=reference)
             studies.append({'short_name': short_name, 'name': study.name})
         if self.json:
+            # When API is stable: version this id (tslab.study-list/1); bump on a breaking change.
             print_json(document={'schema': 'tslab.study-list', 'studies': studies})
             return 0
         for study in studies:

@@ -32,7 +32,7 @@ def error_document(*, exit_code: int, message: str) -> dict[str, object]:
     Returns:
         The error document.
     """
-    # When the API is stable, version the schema ids (for example tslab.study-status/1).
+    # When API is stable: version this id (tslab.error/1); bump on a breaking change.
     return {'schema': 'tslab.error', 'exit_code': exit_code, 'message': message}
 
 
