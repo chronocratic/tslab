@@ -34,6 +34,10 @@ __all__ = ['chain_exit']
 
 _LOGGER = logging.getLogger(__name__)
 
+# The SLURM time-limit signal comes shortly before the kill; waiting longer for the
+# submission lock would lose the requeue anyway.
+_LOCK_WAIT_SECONDS = 30
+
 
 def chain_exit(*, context: Context, job_file: int, index: int) -> int:
     """Return success only when the recorded task run finished successfully.
@@ -47,17 +51,49 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
         ``0`` when the run is ``DONE`` or was requeued in place; otherwise ``1``.
     """
     jobs_path = study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
-    matches = _job_tasks_of(jobs=context.jobs, job_file=job_file, index=index)
-    if not matches:
-        matches = _job_tasks_of(jobs=read_jobs(path=jobs_path), job_file=job_file, index=index)
-    if not matches:
+    loaded = _load_report(context=context, jobs=context.jobs, job_file=job_file, index=index)
+    if loaded is None:
+        loaded = _load_report(
+            context=context, jobs=read_jobs(path=jobs_path), job_file=job_file, index=index
+        )
+    if loaded is None:
         return 1
+    report = loaded.report
+    if report.state is StudyState.DONE:
+        return 0
+    if report.state is StudyState.INTERRUPTED and _requeued(
+        context=context, job_file=job_file, index=index, jobs_path=jobs_path, environment=os.environ
+    ):
+        return 0
+    return 1
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _TaskReport:
+    """The records of one task and its report after the task command ended.
+
+    Attributes:
+        matches: Every record and task of the job file and index, the submission first.
+        report: The report of the run, with the task counted as completed.
+    """
+
+    matches: list[tuple[JobRecord, TaskRecord]]
+    report: RunReport
+
+
+def _load_report(
+    *, context: Context, jobs: Sequence[JobRecord], job_file: int, index: int
+) -> _TaskReport | None:
+    """The report of one task from the given records, or ``None`` when it is unknown."""
+    matches = _job_tasks_of(jobs=jobs, job_file=job_file, index=index)
+    if not matches:
+        return None
     job, task = matches[0]
     run = next(
         (run for run in expand_runs(study=context.study) if run.run_path == task.run_path), None
     )
     if run is None:
-        return 1
+        return None
     task_id = f'{job.job_id}_{task.index}'
     reports = collect_states(
         study_directory=context.study_directory,
@@ -72,31 +108,11 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
             followup_live_job_ids=(),
         ),
     )
-    report = reports[0]
-    if report.state is StudyState.DONE:
-        return 0
-    if report.state is StudyState.INTERRUPTED and _requeued(
-        context=context,
-        report=report,
-        job=job,
-        submitted=task,
-        requeues=len(matches) - 1,
-        jobs_path=jobs_path,
-        environment=os.environ,
-    ):
-        return 0
-    return 1
+    return _TaskReport(matches=matches, report=reports[0])
 
 
-def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per recorded fact
-    *,
-    context: Context,
-    report: RunReport,
-    job: JobRecord,
-    submitted: TaskRecord,
-    requeues: int,
-    jobs_path: Path,
-    environment: Mapping[str, str],
+def _requeued(
+    *, context: Context, job_file: int, index: int, jobs_path: Path, environment: Mapping[str, str]
 ) -> bool:
     """Requeue the task in place when the mode and the retry rules allow it.
 
@@ -104,9 +120,45 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
     fresh progress snapshot, so ``status``, the progress rule and the follow-up see
     it. Restarts beyond those records were requeues by SLURM itself (preemption,
     node failure) and count as uncounted attempts.
+
+    The lock is held from reading the records to writing the next attempt, so a
+    concurrent resubmit never creates the same attempt twice. A busy lock is
+    waited for at most ``_LOCK_WAIT_SECONDS``: this process is inside the window
+    between the time-limit signal and the kill, so a long wait would lose the
+    requeue anyway; the follow-up resubmits the run instead.
     """
     if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
         return False
+    try:
+        with submission_lock(study_folder=jobs_path.parent, timeout_seconds=_LOCK_WAIT_SECONDS):
+            return _requeue_locked(
+                context=context,
+                job_file=job_file,
+                index=index,
+                jobs_path=jobs_path,
+                environment=environment,
+            )
+    except TimeoutError:
+        _LOGGER.warning(
+            'the submission lock stayed busy for %d s; skipping the requeue so the '
+            'follow-up resubmits the task',
+            _LOCK_WAIT_SECONDS,
+        )
+        return False
+
+
+def _requeue_locked(
+    *, context: Context, job_file: int, index: int, jobs_path: Path, environment: Mapping[str, str]
+) -> bool:
+    """Read the records again, decide and write the next attempt; the lock is held."""
+    loaded = _load_report(
+        context=context, jobs=read_jobs(path=jobs_path), job_file=job_file, index=index
+    )
+    if loaded is None or loaded.report.state is not StudyState.INTERRUPTED:
+        return False
+    report = loaded.report
+    job, submitted = loaded.matches[0]
+    requeues = len(loaded.matches) - 1
     latest = report.task
     if latest is None or report.job_id is None:
         return False
@@ -132,18 +184,14 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
         uncounted_in_row=0,
     )
     # why: the scheduler ends this process soon after the requeue call, so the record
-    # of the next attempt is written first and taken back when the call fails; the
-    # lock keeps the appends from interleaving with a submission of the follow-up
-    with submission_lock(study_folder=jobs_path.parent):
+    # of the next attempt is written first and taken back when the call fails
+    append_job(
+        path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(following,))
+    )
+    if not requeue_task(task_id=report.job_id):
         append_job(
-            path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(following,))
+            path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(latest,))
         )
-        requeued = requeue_task(task_id=report.job_id)
-        if not requeued:
-            append_job(
-                path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(latest,))
-            )
-    if not requeued:
         return False
     _LOGGER.info('requeued %s (attempt %d)', report.job_id, following.attempt)
     return True
