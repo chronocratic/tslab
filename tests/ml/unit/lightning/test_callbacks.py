@@ -199,9 +199,8 @@ def test_signal_stop_saves_at_validation_safe_points(tmp_path: Path, hook_name: 
             self.saved.append(filepath)
 
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
-    callback = _SignalStop(
-        run=run, checkpoint_directory=tmp_path, signal_received=True, deadline=None
-    )
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
+    callback.request_stop()
     trainer = FakeTrainer()
 
     with pytest.raises(JobTimeLimitSignal):
@@ -247,9 +246,8 @@ def test_signal_wins_over_job_deadline(monkeypatch: pytest.MonkeyPatch, tmp_path
     strategy = _FakeStrategy(result=True)
     trainer = _FakeTrainer(strategy=strategy)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
-    callback = _SignalStop(
-        run=run, checkpoint_directory=tmp_path, signal_received=True, deadline=100.0
-    )
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=100.0)
+    callback.request_stop()
     monkeypatch.setattr('tslab.ml.lightning.callbacks.time.time', lambda: 101.0)
 
     with pytest.raises(JobTimeLimitSignal):

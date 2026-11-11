@@ -169,10 +169,7 @@ class LightningTrainer(Trainer[LightningModule]):
             val_loader = data.val_loader()
             has_validation = val_loader is not None
         signal_stop = _SignalStop(
-            run=run,
-            checkpoint_directory=checkpoint_directory,
-            signal_received=run.time_limit_signalled,
-            deadline=deadline,
+            run=run, checkpoint_directory=checkpoint_directory, deadline=deadline
         )
         with _defer_time_limit_signals(signal_stop=signal_stop):
             trainer = self._build_trainer(

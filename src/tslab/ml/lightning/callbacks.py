@@ -65,18 +65,11 @@ def _deferred_sigterm(*, stopping: Callable[[], bool]) -> Generator[None]:
 
 
 class _SignalStop(Callback):
-    def __init__(
-        self,
-        *,
-        run: Run,
-        checkpoint_directory: Path,
-        deadline: float | None,
-        signal_received: bool = False,
-    ) -> None:
+    def __init__(self, *, run: Run, checkpoint_directory: Path, deadline: float | None) -> None:
         super().__init__()
         self._run = run
         self._writer = run.writes_files
-        self._signal_received = signal_received
+        self._signal_received = False
         self._checkpoint_directory = checkpoint_directory
         self._deadline = deadline
         self._sigterm_filter = ExitStack()
