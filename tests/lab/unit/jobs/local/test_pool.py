@@ -802,3 +802,28 @@ def test_a_failing_wait_callback_gives_the_slot_back(*, tmp_path: Path) -> None:
     held.release()
     assert not thread.is_alive()
     assert len(errors) == 1
+
+
+def test_no_gpu_check_runs_after_stop(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    asked: list[str] = []
+
+    def gpu_free(gpu_id: str) -> bool:
+        asked.append(gpu_id)
+        return True
+
+    stop = threading.Event()
+    stop.set()
+    never_started, starts, _waits, _ends = _run_pool(
+        tmp_path=tmp_path,
+        keys=('k0', 'k1'),
+        slots=1,
+        gpu_ids=('0',),
+        lock_folder=folder,
+        stop=stop,
+        gpu_free=gpu_free,
+    )
+    assert tuple(sorted(never_started)) == ('k0', 'k1')
+    assert starts == []
+    assert asked == []

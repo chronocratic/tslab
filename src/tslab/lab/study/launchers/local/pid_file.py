@@ -317,6 +317,10 @@ def detach_launch(
             _LOGGER.info('next: %s', wait_command)
             return 0
         code = process.poll()
+        if code == 0:
+            # why: a launch that finished cleanly before it wrote the pid file is no error
+            _LOGGER.info('the launch ended with exit code 0 before it wrote the pid file')
+            return 0
         if code is not None:
             _LOGGER.error('the launch ended with exit code %s:\n%s', code, _log_tail(path=log_path))
             return code
