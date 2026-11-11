@@ -13,7 +13,7 @@ from tslab.lab.core.meta.run import hostname
 from tslab.lab.enums import JobPhase, LauncherKind, LocalTaskState
 from tslab.lab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.launch import launch
 from tslab.lab.study.launchers.common.types import (

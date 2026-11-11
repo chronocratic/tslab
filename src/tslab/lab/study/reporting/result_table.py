@@ -27,7 +27,7 @@ from tslab.lab.study.definition.columns import (
     SECONDS_COLUMN,
     STUDY_STATE_COLUMN,
 )
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.launchers.cpus import available_cpus
 from tslab.lab.study.paths import instance_directory
 from tslab.lab.study.reporting.state import RunReport

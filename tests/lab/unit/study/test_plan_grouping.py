@@ -10,7 +10,8 @@ from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study import from_presets, Study, StudyRun
 from tslab.lab.study.code_snapshot import CodeSnapshot
-from tslab.lab.study.definition.definition import expand_runs, setting_axis
+from tslab.lab.study.definition.grid import setting_axis
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.launchers.tables import JOB_RECORDS
 from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
 from tslab.lab.study.machine.slurm import SlurmSettings

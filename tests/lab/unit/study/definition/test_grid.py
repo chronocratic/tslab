@@ -4,7 +4,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Override, setting_axis, Study
-from tslab.lab.study.definition.definition import merge_overrides
+from tslab.lab.study.definition.runs import merge_overrides
 
 
 def test_setting_axis() -> None:

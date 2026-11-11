@@ -2,7 +2,7 @@
 
 from tslab.lab.core.meta.run import hostname
 from tslab.lab.enums import LocalTaskState
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.launchers.local.pid_file import local_job_states
 from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import study_folder

@@ -10,14 +10,8 @@ profiles and job records live in the submodules (``tslab.lab.study.commands``,
 """
 
 from tslab.lab.study.definition.after import After
-from tslab.lab.study.definition.definition import (
-    DEFAULT_RUN_SETTINGS,
-    Grid,
-    Override,
-    setting_axis,
-    Study,
-    StudyRun,
-)
+from tslab.lab.study.definition.grid import DEFAULT_RUN_SETTINGS, Grid, Override, setting_axis
+from tslab.lab.study.definition.runs import StudyRun
 from tslab.lab.study.definition.settings import (
     check_paths,
     from_presets,
@@ -25,6 +19,7 @@ from tslab.lab.study.definition.settings import (
     settings_to_args,
     SettingValue,
 )
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.slurm import slurm_output
 
 __all__ = [

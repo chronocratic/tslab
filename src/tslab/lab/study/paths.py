@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from tslab.lab.core.paths import require_path
 
 if TYPE_CHECKING:
-    from tslab.lab.study.definition.definition import Study
+    from tslab.lab.study.definition.study import Study
     from tslab.lab.study.machine.profile import MachineProfile
 
 __all__ = ['instance_directory', 'log_file_of', 'next_job_file', 'study_folder', 'usage_file']

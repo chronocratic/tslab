@@ -27,7 +27,7 @@ from tslab.lab.study.commands.submit import submit_runs
 from tslab.lab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
 from tslab.lab.study.context import Context, study_reports, widen_context
 from tslab.lab.study.definition.after import chained_grids, upstream_runs
-from tslab.lab.study.definition.definition import StudyRun
+from tslab.lab.study.definition.runs import StudyRun
 from tslab.lab.study.launchers.common.types import OnLaunch
 from tslab.lab.study.launchers.tables import backend_for
 from tslab.lab.study.machine.profile import FollowupSettings

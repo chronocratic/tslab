@@ -10,8 +10,9 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.lab.study.definition.after import chained_grids, upstream_runs
-from tslab.lab.study.definition.definition import expand_runs, select_runs, Study, StudyRun
 from tslab.lab.study.definition.loading import load_study
+from tslab.lab.study.definition.runs import expand_runs, select_runs, StudyRun
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.machine.load import load_machine
 from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import log_file_of, study_folder

@@ -14,7 +14,7 @@ from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.lab.enums import AfterCondition, LauncherKind, Satisfy
 from tslab.lab.study import Study
 from tslab.lab.study.commands.submit import submit
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.launchers.common.launch import launch as _launch
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport
 from tslab.lab.study.launchers.slurm.backend import SlurmBackend

@@ -35,7 +35,7 @@ from tslab.lab.jobs.slurm import (
 from tslab.lab.study.command_names import CHAIN_EXIT_COMMAND
 from tslab.lab.study.context import Context
 from tslab.lab.study.definition.after import chained_grids
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.launch import launch
 from tslab.lab.study.launchers.common.types import (

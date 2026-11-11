@@ -22,7 +22,7 @@ from tests.lab.unit.study.helpers import study_directory
 from tslab.lab.enums import LauncherKind
 from tslab.lab.jobs.local import PoolCommand, process_alive, TaskOutputState, Watchdog
 from tslab.lab.study import setting_axis, Study
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.launchers.common.launch import launch as _launch
 from tslab.lab.study.launchers.common.types import LaunchReport, OnTaskState
 from tslab.lab.study.launchers.local import run as _local_run
@@ -548,7 +548,7 @@ def test_local_two_launchers_never_share_a_gpu(
     worker = (
         'import sys\n'
         'from pathlib import Path\n'
-        'from tslab.lab.study.definition.definition import StudyRun\n'
+        'from tslab.lab.study.definition.runs import StudyRun\n'
         'from tslab.lab.study.launchers.local.run import LocalLauncher\n'
         'from tslab.lab.study.launchers.local.backend import LocalResources\n'
         'from tslab.lab.study.machine.local import LocalSettings\n'

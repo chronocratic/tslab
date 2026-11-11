@@ -19,7 +19,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from tslab.lab.study.context import Context
-    from tslab.lab.study.definition.definition import Study, StudyRun
+    from tslab.lab.study.definition.runs import StudyRun
+    from tslab.lab.study.definition.study import Study
     from tslab.lab.study.plan import JobGroup
     from tslab.lab.study.records import JobRecord
 

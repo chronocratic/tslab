@@ -4,7 +4,7 @@ import importlib
 from pathlib import Path
 import sys
 
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.project import _drop_foreign_modules
 
 __all__ = ['load_study']

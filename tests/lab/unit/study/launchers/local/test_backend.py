@@ -28,7 +28,7 @@ from tslab.lab.enums import JobPhase, LocalTaskState, Retry
 from tslab.lab.jobs.local import GpuDiscovery
 from tslab.lab.study.code_snapshot import CodeSnapshot
 from tslab.lab.study.commands.submit import submit, submit_runs
-from tslab.lab.study.definition.definition import StudyRun
+from tslab.lab.study.definition.runs import StudyRun
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, Resources
 import tslab.lab.study.launchers.local.backend as local_backend
 from tslab.lab.study.launchers.local.backend import _phase_of, LocalBackend, LocalResources

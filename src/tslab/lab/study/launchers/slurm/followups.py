@@ -10,7 +10,7 @@ import time
 
 from tslab.lab.jobs.slurm import SlurmError
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition.definition import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
+from tslab.lab.study.definition.study import followup_job_name, RETRY_JOB, WANDB_SYNC_JOB
 from tslab.lab.study.launchers.slurm.submit import submit_helper_job
 from tslab.lab.study.machine.profile import wants_retry_followup
 from tslab.lab.study.machine.slurm import SlurmSettings

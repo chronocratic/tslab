@@ -6,7 +6,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Override, Study
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 
 
 def test_run_path_follows_axis_order() -> None:

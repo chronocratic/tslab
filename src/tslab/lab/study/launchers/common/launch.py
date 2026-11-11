@@ -5,7 +5,7 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from uuid import uuid4
 
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.launchers.common.protocols import Launcher, WriteJobFiles
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, LaunchStopped
 from tslab.lab.study.machine.profile import MachineProfile

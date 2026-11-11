@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pathlib import PurePosixPath
 
     from tslab.lab.study.context import Context
-    from tslab.lab.study.definition.definition import Study
+    from tslab.lab.study.definition.study import Study
     from tslab.lab.study.machine.profile import FollowupSettings
     from tslab.lab.study.reporting.state import RunReport
 
