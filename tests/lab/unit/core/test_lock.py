@@ -7,7 +7,8 @@ import time
 
 import pytest
 
-from tslab.lab.core.lock import acquire_lock, is_run_active, release_lock, RunLockedError
+from tslab.lab.core import lock as lock_module
+from tslab.lab.core.lock import acquire_lock, Heartbeat, is_run_active, release_lock, RunLockedError
 from tslab.lab.core.run import Run, RunOptions
 
 
@@ -72,3 +73,24 @@ def test_release_only_removes_the_lock_of_the_owner(tmp_path: Path) -> None:
     assert lock.exists()
     release_lock(path=lock, nonce='theirs')
     assert not lock.exists()
+
+
+def test_heartbeat_survives_one_unreadable_lock(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(lock_module, '_HEARTBEAT_SECONDS', 0.02)
+    path = tmp_path / 'lock'
+    nonce = acquire_lock(path=path)
+    good = path.read_text(encoding='utf-8')
+    path.write_text('{broken', encoding='utf-8')
+    beat = Heartbeat(path=path, nonce=nonce)
+    try:
+        time.sleep(0.2)
+        path.write_text(good, encoding='utf-8')
+        _age_file(path=path, seconds=1000)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline and time.time() - path.stat().st_mtime > 100:
+            time.sleep(0.02)
+        assert time.time() - path.stat().st_mtime < 100
+    finally:
+        beat.stop()

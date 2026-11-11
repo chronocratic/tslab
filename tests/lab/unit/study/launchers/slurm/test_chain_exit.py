@@ -699,3 +699,22 @@ def test_chain_exit_skips_the_scheduler_when_no_retry_is_possible(
     assert queries == []
     assert requeued == []
     assert 'MaxBatchRequeue' not in caplog.text
+
+
+def test_failed_requeue_records_do_not_hide_later_scheduler_requeues(
+    project: Path, fake_backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+
+    def fail(*, task_id: str) -> None:
+        raise SlurmError(task_id)
+
+    monkeypatch.setattr(_REQUEUE_MODULE, 'scontrol_requeue', fail)
+    ctx = _requeue_context(project=project, max_attempts=3)
+    _interrupted(ctx=ctx, progress=True)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    monkeypatch.setattr(_REQUEUE_MODULE, 'scontrol_requeue', lambda **_kwargs: None)
+    # why: two restarts with no successful TSLab requeue record were preemptions
+    monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
+    assert chain_exit(context=_reloaded(ctx=ctx), job_file=3, index=17) == 0
+    assert _latest_task(ctx=ctx).uncounted_attempts == 2
