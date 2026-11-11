@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 # Slow tests (real training, example and template runs) only run on PRs into
-# main and on manual runs; dev pushes and other PRs run the fast suite.
+# dev or main and on manual runs; pushes and other PRs run the fast suite.
 env:
-  RUN_SLOW: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'main' }}
+  RUN_SLOW: ${{ github.event_name == 'workflow_dispatch' || github.base_ref == 'dev' || github.base_ref == 'main' }}
 
 # Cancel an older run of the same branch when a new commit arrives.
 concurrency:
