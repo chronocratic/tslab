@@ -171,7 +171,7 @@ def test_failures_json_shape(
         main(args=['study', 'failures', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
-    assert document['schema'] == 'tslab.lab.study-failures/1'
+    assert document['schema'] == 'tslab.study-failures/1'
     assert len(document['runs']) == 1
 
 

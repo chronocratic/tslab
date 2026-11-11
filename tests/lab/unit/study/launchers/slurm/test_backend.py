@@ -562,7 +562,7 @@ def test_cancel_json_shape(
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
     assert document == {
-        'schema': 'tslab.lab.study-cancel/1',
+        'schema': 'tslab.study-cancel/1',
         'cancelled': ['1000_0', '1000_1'],
         'dry_run': True,
         'signal': None,

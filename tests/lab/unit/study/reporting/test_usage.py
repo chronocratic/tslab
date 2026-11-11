@@ -122,7 +122,7 @@ def test_usage_cli_json_schema(
         main(args=['study', 'usage', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
-    assert document['schema'] == 'tslab.lab.study-usage/1'
+    assert document['schema'] == 'tslab.study-usage/1'
 
 
 def test_usage_backend_failure_exits_1(project: Path, fake_backend: FakeBackend) -> None:

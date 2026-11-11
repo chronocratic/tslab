@@ -41,12 +41,12 @@ class Tensors(Artifact):
     def save(self, *, directory: Path) -> None:
         """Write ``tensors.safetensors``.
 
-        Tensors are detached, moved to CPU, made contiguous and cloned, because
+        Tensors are detached, moved to CPU, made contiguous and copied once, because
         safetensors refuses non-contiguous tensors and tensors sharing memory.
         """
         require_path(value=directory, parameter='directory')
         prepared = {
-            key: tensor.detach().to(device='cpu').clone(memory_format=torch.contiguous_format)
+            key: tensor.detach().to(device='cpu', memory_format=torch.contiguous_format, copy=True)
             for key, tensor in self.tensors.items()
         }
         save_file(

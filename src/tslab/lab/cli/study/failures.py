@@ -65,7 +65,7 @@ class Failures:
             context=context, states=_states_of(values=self.states), lines=self.lines
         )
         if self.json:
-            print_json(document={'schema': 'tslab.lab.study-failures/1', 'runs': failures})
+            print_json(document={'schema': 'tslab.study-failures/1', 'runs': failures})
         elif failures:
             log_failures(failures=failures)
         else:

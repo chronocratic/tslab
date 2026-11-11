@@ -34,7 +34,7 @@ class _Formatter(Protocol):
 
 
 def _format_json(*, rows: Sequence[ResultRow]) -> str:
-    return json.dumps({'schema': 'tslab.lab.study-results/1', 'rows': rows}, indent=2)
+    return json.dumps({'schema': 'tslab.study-results/1', 'rows': rows}, indent=2)
 
 
 _FORMATTERS: Mapping[ResultsFormat, _Formatter] = {

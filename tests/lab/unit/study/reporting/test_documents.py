@@ -135,7 +135,7 @@ def test_show_document_lists_axes_and_counts(project: Path) -> None:
     study = load_study(reference='toy_studies:study')
     document = show_document(study=study)
     grids = cast('list[dict[str, object]]', document['grids'])
-    assert document['schema'] == 'tslab.lab.study-show/1'
+    assert document['schema'] == 'tslab.study-show/1'
     assert grids[0]['axes'] == {'model': ['small', 'large'], 'seed': ['1', '2']}
     assert grids[0]['runs'] == len(expand_runs(study=study))
     assert document['total_runs'] == len(expand_runs(study=study))
@@ -160,4 +160,4 @@ def test_show_cli_prints_json(project: Path, capsys: pytest.CaptureFixture[str])
     with pytest.raises(SystemExit) as raised:
         main(args=['study', 'show', 'toy_studies:study', '--json'])
     assert raised.value.code == 0
-    assert json.loads(capsys.readouterr().out)['schema'] == 'tslab.lab.study-show/1'
+    assert json.loads(capsys.readouterr().out)['schema'] == 'tslab.study-show/1'

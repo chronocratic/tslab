@@ -14,6 +14,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 import logging
+import os
 from pathlib import Path
 import shlex
 from typing import Annotated
@@ -21,19 +22,20 @@ from typing import Annotated
 import tyro
 
 from tslab.lab.cli.common import print_json, UsageError, watch
+from tslab.lab.core.lock import is_run_active
 from tslab.lab.core.paths import STATUS_FILE
 from tslab.lab.core.status import (
     InstanceRecord,
     read_status,
     RunStatusSnapshot,
-    shown_run_state,
+    shown_state_of,
     StatusFileError,
 )
 from tslab.lab.core.text import log_table
 from tslab.lab.enums import InstanceState, JobPhase, ShownRunState, StudyState
 from tslab.lab.study.project import load_project_settings
 from tslab.lab.study.reporting.outcome import states_exit_code
-from tslab.lab.study.reporting.state import read_folder, study_state
+from tslab.lab.study.reporting.state import FolderFacts, study_state
 
 __all__ = ['Status']
 
@@ -125,55 +127,95 @@ class Status:
         return self._show_runs(path=path)
 
     def _show_run(self, *, path: Path, snapshot: RunStatusSnapshot) -> int:
-        _print_run(directory=path, snapshot=snapshot, stage=self.stage)
+        view = _view_of(directory=path, snapshot=snapshot)
+        _print_run(view=view, stage=self.stage)
         if not (self.json or self.exit_code):
             return 0
-        entry, state = _run_status_entry(directory=path, snapshot=snapshot, stage=self.stage)
+        entry, state = _run_status_entry(view=view, stage=self.stage)
         code = states_exit_code(states=[state], live=False)
         if self.json:
             print_json(document=_status_document(entries=[entry], states=[state]))
         return code if self.exit_code else 0
 
     def _show_runs(self, *, path: Path) -> int:
-        runs = sorted(status_file.parent for status_file in path.rglob(STATUS_FILE))
-        if not runs:
+        folders = _run_folders(root=path)
+        if not folders:
             _LOGGER.warning('no runs below %s', path.as_posix())
             _LOGGER.info('a run folder holds status.json; pass it, or a folder above runs')
             return 1
-        _print_runs(root=path, runs=runs, stage=self.stage)
+        views = _views_of(folders=folders)
+        _print_runs(root=path, views=views, stage=self.stage)
         if not (self.json or self.exit_code):
             return 0
-        entries, states = _run_status_entries(runs=runs, stage=self.stage)
+        entries: list[dict[str, object]] = []
+        states: list[StudyState] = []
+        for view in views:
+            entry, state = _run_status_entry(view=view, stage=self.stage)
+            entries.append(entry)
+            states.append(state)
         code = states_exit_code(states=states, live=False)
         if self.json:
             print_json(document=_status_document(entries=entries, states=states))
         return code if self.exit_code else 0
 
 
-def _run_status_entries(
-    *, runs: Sequence[Path], stage: str | None
-) -> tuple[list[dict[str, object]], list[StudyState]]:
-    entries: list[dict[str, object]] = []
-    states: list[StudyState] = []
-    for directory in runs:
+@dataclass(frozen=True, kw_only=True)
+class _RunView:
+    """One run folder read once: the snapshot, the lock and the state to show.
+
+    Attributes:
+        directory: The run folder.
+        snapshot: Its ``status.json``.
+        folder: The facts of the folder, for the study state.
+        run_state: The state to show, ``interrupted`` for a dead ``running`` run.
+    """
+
+    directory: Path
+    snapshot: RunStatusSnapshot
+    folder: FolderFacts
+    run_state: ShownRunState
+
+
+def _view_of(*, directory: Path, snapshot: RunStatusSnapshot) -> _RunView:
+    """Read the lock of the folder once and decide the state to show."""
+    lock_live = is_run_active(directory=directory)
+    return _RunView(
+        directory=directory,
+        snapshot=snapshot,
+        folder=FolderFacts(snapshot=snapshot, read_error=None, lock_live=lock_live),
+        run_state=shown_state_of(run_state=snapshot.run_state, lock_live=lock_live),
+    )
+
+
+def _run_folders(*, root: Path) -> list[Path]:
+    """The run folders below ``root``, sorted; a folder is not searched below a run."""
+    found: list[Path] = []
+    for current, names, files in os.walk(root):
+        if STATUS_FILE in files:
+            found.append(Path(current))
+            # why: the folders below a run hold its artifacts, which can be many
+            names.clear()
+    return sorted(found)
+
+
+def _views_of(*, folders: Sequence[Path]) -> list[_RunView]:
+    """Read every run folder once; an unreadable or vanished one is skipped."""
+    views: list[_RunView] = []
+    for directory in folders:
         try:
             snapshot = read_status(path=directory / STATUS_FILE)
-        except StatusFileError:
+        except StatusFileError as error:
+            _LOGGER.warning('skipping an unreadable run: %s', error)
             continue
-        if snapshot is None:
-            continue
-        entry, state = _run_status_entry(directory=directory, snapshot=snapshot, stage=stage)
-        entries.append(entry)
-        states.append(state)
-    return entries, states
+        if snapshot is not None:  # None: removed while scanning
+            views.append(_view_of(directory=directory, snapshot=snapshot))
+    return views
 
 
-def _run_status_entry(
-    *, directory: Path, snapshot: RunStatusSnapshot, stage: str | None
-) -> tuple[dict[str, object], StudyState]:
-    folder = read_folder(run_directory=directory)
-    state, _ = study_state(job_reason=None, job_phase=JobPhase.UNKNOWN, folder=folder)
-    run_state = shown_run_state(directory=directory, snapshot=snapshot)
+def _run_status_entry(*, view: _RunView, stage: str | None) -> tuple[dict[str, object], StudyState]:
+    directory = view.directory
+    state, _ = study_state(job_reason=None, job_phase=JobPhase.UNKNOWN, folder=view.folder)
+    run_state = view.run_state
     instances = [
         {
             'instance': instance_id,
@@ -183,7 +225,7 @@ def _run_status_entry(
             'seconds': record.seconds,
             'error': record.error,
         }
-        for instance_id, record in _selected(snapshot=snapshot, stage=stage)
+        for instance_id, record in _selected(snapshot=view.snapshot, stage=stage)
     ]
     return (
         {'directory': directory.resolve().as_posix(), 'state': state.value, 'instances': instances},
@@ -238,9 +280,10 @@ def _note(*, record: InstanceRecord) -> str:
     return text.splitlines()[0] if text else ''
 
 
-def _print_run(*, directory: Path, snapshot: RunStatusSnapshot, stage: str | None) -> None:
-    run_state = shown_run_state(directory=directory, snapshot=snapshot)
-    selected = _selected(snapshot=snapshot, stage=stage)
+def _print_run(*, view: _RunView, stage: str | None) -> None:
+    directory = view.directory
+    run_state = view.run_state
+    selected = _selected(snapshot=view.snapshot, stage=stage)
     rows = [
         (
             instance_id,
@@ -289,22 +332,18 @@ def _log_run_hints(
         )
 
 
-def _print_runs(*, root: Path, runs: Sequence[Path], stage: str | None) -> None:
+def _print_runs(*, root: Path, views: Sequence[_RunView], stage: str | None) -> None:
     rows: list[tuple[str, ...]] = []
     totals: Counter[ShownRunState] = Counter()
     has_failed_instances = False
-    for directory in runs:
-        try:
-            snapshot = read_status(path=directory / STATUS_FILE)
-        except StatusFileError as error:
-            _LOGGER.warning('skipping an unreadable run: %s', error)
-            continue
-        if snapshot is None:  # removed while scanning
-            continue
-        run_state = shown_run_state(directory=directory, snapshot=snapshot)
+    for view in views:
+        directory = view.directory
+        run_state = view.run_state
         totals[run_state] += 1
         # Raw instance states: a dead run still shows its in-flight instances.
-        counts = Counter(record.state for _, record in _selected(snapshot=snapshot, stage=stage))
+        counts = Counter(
+            record.state for _, record in _selected(snapshot=view.snapshot, stage=stage)
+        )
         has_failed_instances = has_failed_instances or counts[InstanceState.FAILED] > 0
         rows.append(
             (

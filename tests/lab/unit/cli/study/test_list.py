@@ -67,7 +67,7 @@ def test_list_json_has_schema_and_study_names(
     assert List(json=True).run() == 0
 
     assert json.loads(capsys.readouterr().out) == {
-        'schema': 'tslab.lab.study-list/1',
+        'schema': 'tslab.study-list/1',
         'studies': [
             {'short_name': 'full', 'name': 'loaded-full'},
             {'short_name': 'quick', 'name': 'loaded-quick'},

@@ -872,10 +872,12 @@ def select_runs(
     """The runs that pass the grid names and axis filters.
 
     An empty ``grids`` keeps every grid; a name that is not a grid raises.
-    Each ``only`` item is ``AXIS=V1,V2``: it keeps the runs of the grids that
-    have ``AXIS`` whose value for it is named; a malformed item, an axis no
-    grid has or a value the axis of no grid has raises. Filtering never changes
-    run paths.
+    Each ``only`` item is ``AXIS=V1,V2``: among the grids that have ``AXIS`` it
+    keeps the runs whose value for it is named, and it leaves the runs of the
+    grids without ``AXIS`` alone (unlike ``run_matches``, where a missing axis
+    never matches, because a filter must not empty a study that mixes grids).
+    A malformed item, an axis no grid has or a value the axis of no grid has
+    raises. Filtering never changes run paths.
 
     Args:
         study: The study the runs came from.
