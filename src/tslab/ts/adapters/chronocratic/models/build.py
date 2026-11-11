@@ -64,10 +64,9 @@ def _runtime_fields(
     *, entry: ModelEntry, values: dict[str, object], data_info: TSDataInfo
 ) -> dict[str, object]:
     runtime: dict[str, object] = {'input_dim': data_info.num_channels}
-    remaining = dict(values)
-    if 'sequence_length' not in remaining:
+    if 'sequence_length' not in values:
         return runtime
-    length = remaining.pop('sequence_length')
+    length = values.get('sequence_length')
     if length is None:
         length = data_info.length
     if length is None and _requires(

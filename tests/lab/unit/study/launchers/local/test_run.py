@@ -20,7 +20,7 @@ import pytest
 from tests.lab.unit.study.configs import grid
 from tests.lab.unit.study.helpers import study_directory
 from tslab.lab.enums import LauncherKind
-from tslab.lab.jobs.local import PoolCommand, process_alive, Watchdog
+from tslab.lab.jobs.local import PoolCommand, process_alive, TaskOutputState, Watchdog
 from tslab.lab.study import setting_axis, Study
 from tslab.lab.study.definition import expand_runs
 from tslab.lab.study.launchers.common.launch import launch as _launch
@@ -903,7 +903,7 @@ def test_on_spawn_failure_stops_and_reaps_the_run(*, tmp_path: Path) -> None:
 
     def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
         outcomes.append(outcome)
-        states.on_task_state(key, 'ended')
+        states.on_task_state(key, TaskOutputState.ENDED)
 
     never_started = _local_run.run_commands(
         commands=[

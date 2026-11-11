@@ -163,15 +163,6 @@ class Resubmit:
             include_untracked=self.code_snapshot_include_untracked,
         )
         if self.detach:
-            # why: the background launch copies the snapshot, but its checks run here so a
-            # refused snapshot fails at once instead of in a log nobody reads
-            take_requested_code_snapshot(
-                request=request,
-                context=context,
-                wanted=self.new_code_snapshot,
-                include_untracked=self.code_snapshot_include_untracked,
-                dry_run=True,
-            )
             flags = [
                 flag
                 for flag, on in (
@@ -196,7 +187,9 @@ class Resubmit:
                 options=options,
                 flags=flags,
                 extra_args=self.extra_args,
-                request=(study, machine),
+                request=request,
+                wanted=self.new_code_snapshot,
+                include_untracked=self.code_snapshot_include_untracked,
             )
         # why: a detached launch repeats this command in the background, and that child
         # takes the snapshot, so taking it here too would copy src/ twice

@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 import shlex
+from typing import cast
 
 from tslab.lab.cli.common import Request, UsageError
 from tslab.lab.enums import StudyState
@@ -190,10 +191,22 @@ def _detach(  # noqa: PLR0913 # why: keyword-only private helper; one keyword pe
     options: Sequence[str],
     flags: Sequence[str],
     extra_args: Sequence[str],
-    request: tuple[str, str],
+    request: Request,
+    wanted: bool,
+    include_untracked: bool,
 ) -> int:
     """Start the command again in the background; the arguments are the original ones."""
-    study, machine = request
+    # why: the background launch copies the snapshot, but its checks run here so a
+    # refused snapshot fails at once instead of in a log nobody reads
+    take_requested_code_snapshot(
+        request=request,
+        context=context,
+        wanted=wanted,
+        include_untracked=include_untracked,
+        dry_run=True,
+    )
+    study = cast('str', request.study)
+    machine = cast('str', request.machine)
     arguments = [
         'study',
         command,

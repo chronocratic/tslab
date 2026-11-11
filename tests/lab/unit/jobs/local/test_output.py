@@ -2,7 +2,7 @@ import io
 import json
 from pathlib import Path
 
-from tslab.lab.jobs.local import ProcessResult, tail_lines, TaskInfo, TaskOutput
+from tslab.lab.jobs.local import ProcessResult, tail_lines, TaskInfo, TaskOutput, TaskOutputState
 
 
 def test_tail_lines_returns_last_lines(*, tmp_path: Path) -> None:
@@ -20,7 +20,7 @@ def test_task_output_writes_header_and_lines(*, tmp_path: Path) -> None:
     stream = io.StringIO()
     log_file = tmp_path / 'logs' / '0.out'
     usage_file = tmp_path / 'logs' / '0.out.usage.json'
-    states: list[tuple[str, str]] = []
+    states: list[tuple[str, TaskOutputState]] = []
     output = TaskOutput(
         stream=stream,
         single_slot=True,
@@ -60,7 +60,7 @@ def test_task_output_writes_header_and_lines(*, tmp_path: Path) -> None:
         'gpu_id': None,
         'timed_out': False,
     }
-    assert states == [('k_0', 'running'), ('k_0', 'ended')]
+    assert states == [('k_0', TaskOutputState.RUNNING), ('k_0', TaskOutputState.ENDED)]
     console = stream.getvalue()
     assert console.startswith('hello\n')
     assert console.endswith('=== task 0: exit 0 | elapsed 0:00:01 | peak memory 1.0 KiB ===\n')
