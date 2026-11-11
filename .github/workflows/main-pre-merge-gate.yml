@@ -7,7 +7,7 @@ on:
 
 jobs:
   gate:
-    uses: chronocratic/.github/.github/workflows/main-pre-merge-gate.yml@v0.1.1
+    uses: chronocratic/.github/.github/workflows/main-pre-merge-gate.yml@v0.1.2
     with:
       # The shared default plus planning/.
       forbidden: |

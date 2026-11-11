@@ -22,7 +22,7 @@ jobs:
 
   build:
     needs: on-main
-    uses: chronocratic/.github/.github/workflows/python-build.yml@v0.1.1
+    uses: chronocratic/.github/.github/workflows/python-build.yml@v0.1.2
 
   # PyPI trusted publishing does not support reusable workflows, so the upload
   # stays here; this file is the trusted publisher on PyPI.
