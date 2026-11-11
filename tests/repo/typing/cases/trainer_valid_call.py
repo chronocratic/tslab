@@ -5,7 +5,8 @@ import torch
 
 import tslab.lab
 import tslab.ml
-from tslab.ml.interfaces import DataSource, Trainer
+from tslab.ml.interfaces.data import DataSource
+from tslab.ml.interfaces.trainer import Trainer
 
 
 def fit_a_linear_model(

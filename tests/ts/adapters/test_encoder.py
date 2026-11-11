@@ -10,7 +10,7 @@ from tslab.ts.adapters.chronocratic.models import (
     ChronocraticEncoder,
     ChronocraticModelChoice,
 )
-from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.interfaces.encoder import Encoder, SequenceEncoder
 from tslab.ts.tasks import TSClassificationDataInfo
 
 pytestmark = pytest.mark.chronocratic

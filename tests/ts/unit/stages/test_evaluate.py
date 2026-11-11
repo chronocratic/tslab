@@ -10,6 +10,7 @@ import tslab.lab
 import tslab.ml
 import tslab.ts
 from tslab.ts.probes import SVMProbe
+import tslab.ts.stages
 
 
 def test_evaluate_fits_the_probe_and_logs_its_metrics(tmp_path: Path) -> None:

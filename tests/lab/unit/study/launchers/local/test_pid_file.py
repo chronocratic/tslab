@@ -20,9 +20,9 @@ from tests.lab.unit.study.helpers import (
     study_directory,
     write_launch,
 )
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.core.files import atomic_write_json
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, LocalTaskState, RunState, StudyState

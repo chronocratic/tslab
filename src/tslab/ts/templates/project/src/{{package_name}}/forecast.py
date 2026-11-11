@@ -14,6 +14,7 @@ from pathlib import Path
 import tslab.lab
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+import tslab.ml.stages
 from tslab.ml.tracking import build_trackers, TrackingOptions
 import tslab.ts
 from tslab.ts.adapters.chronocratic.datasets import (
@@ -28,6 +29,7 @@ from tslab.ts.adapters.chronocratic.models import (
     model_settings,
 )
 from tslab.ts.probes import RidgeProbe
+import tslab.ts.stages
 from tslab.ts.tasks import forecasting_representations
 
 from {{package_name}}.models import Models

@@ -3,7 +3,7 @@ import re
 
 import pytest
 
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.cli.new import create_project, LAB_TEMPLATE, New
 from tslab.lab.study.project import load_project_settings
 

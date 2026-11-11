@@ -9,7 +9,8 @@ import types
 import numpy as np
 import pytest
 
-from tslab.lab.core import meta, seeding
+from tslab.lab.core import seeding
+from tslab.lab.core.meta import run as meta_run
 from tslab.lab.core.run import Run
 from tslab.lab.core.seeding import register_seeder, seed_everything
 
@@ -119,8 +120,8 @@ def test_collecting_run_metadata_warns_when_torch_arrives_unseeded(
 ) -> None:
     monkeypatch.setattr(seeding, '_warned', False)
     monkeypatch.setattr(seeding, '_seeders', {})
-    monkeypatch.setattr(meta.run, '_version_collectors', {})
-    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
+    monkeypatch.setattr(meta_run, '_version_collectors', {})
+    monkeypatch.setattr(meta_run, '_hardware_collectors', {})
     run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
     monkeypatch.setitem(sys.modules, 'torch', types.ModuleType('torch'))
     with caplog.at_level(logging.WARNING, logger=seeding.__name__):

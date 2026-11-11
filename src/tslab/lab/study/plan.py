@@ -15,25 +15,24 @@ from typing import TYPE_CHECKING
 import tslab.lab
 from tslab.lab.enums import AfterCondition, Satisfy
 from tslab.lab.study.code_snapshot import CodeSnapshot
-from tslab.lab.study.definition import (
-    chained_grids,
-    check_paths,
+from tslab.lab.study.definition.after import chained_grids, grid_order, match_axes, upstream_runs
+from tslab.lab.study.definition.definition import (
     expand_runs,
-    expand_setting,
     Grid,
-    grid_order,
-    match_axes,
     match_problems,
     merge_overrides,
     merge_settings,
-    settings_to_args,
-    SettingValue,
     Study,
     StudyRun,
-    upstream_runs,
 )
-from tslab.lab.study.definition.settings import non_machine_paths
-from tslab.lab.study.machine import MachineOverride, MachineProfile
+from tslab.lab.study.definition.expansion import expand_setting
+from tslab.lab.study.definition.settings import (
+    check_paths,
+    non_machine_paths,
+    settings_to_args,
+    SettingValue,
+)
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
 from tslab.lab.study.paths import log_file_of, study_folder
 from tslab.lab.study.plan_after import merge_corr_groups
 from tslab.lab.study.records import JobRecord, latest_tasks, TaskRecord

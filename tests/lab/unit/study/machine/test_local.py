@@ -12,13 +12,10 @@ from tests.lab.unit.study.machine.helpers import (
     write,
 )
 from tslab.lab.jobs.local import GpuDiscovery
-from tslab.lab.study.machine import (
-    FollowupSettings,
-    LocalSettings,
-    MachineProfileError,
-    timeout_seconds,
-)
 import tslab.lab.study.machine.local as local_machine
+from tslab.lab.study.machine.local import LocalSettings, timeout_seconds
+from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.machine.tables import MachineProfileError
 
 
 def test_local_settings_from_loads_its_profile_table(tmp_path: Path) -> None:

@@ -7,7 +7,7 @@ from typing import Protocol, TextIO
 
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition import Study
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.types import (
     JobStates,
@@ -16,7 +16,7 @@ from tslab.lab.study.launchers.common.types import (
     QueuedJob,
     Resources,
 )
-from tslab.lab.study.machine import MachineOverride, MachineProfile
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.records import JobRecord
 from tslab.lab.study.reporting.state import RunReport

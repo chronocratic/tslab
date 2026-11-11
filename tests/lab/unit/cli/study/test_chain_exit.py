@@ -7,7 +7,7 @@ import pytest
 
 from tests.lab.unit.cli.study.helpers import toy_project
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.study.context import Context
 
 _CLI_MODULE = import_module('tslab.lab.cli.study.chain_exit')

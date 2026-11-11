@@ -8,8 +8,10 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Study
-from tslab.lab.study.definition import expand_runs
-from tslab.lab.study.machine import load_machine, MachineProfile, SlurmSettings
+from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.profile import MachineProfile
+from tslab.lab.study.machine.slurm import SlurmSettings
 from tslab.lab.study.plan import resolve_runs
 
 BASE_TOML = (

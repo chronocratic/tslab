@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from tslab.lab.core.fingerprint import canonicalize
-from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.interfaces.encoder import Encoder, SequenceEncoder
 from tslab.ts.stages.encoders import ModelAsEncoder
 
 

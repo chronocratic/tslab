@@ -9,7 +9,7 @@ from typing import cast
 import pytest
 
 import tslab.lab
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 import tslab.lab.cli.status as status_module
 from tslab.lab.cli.status import Status
 

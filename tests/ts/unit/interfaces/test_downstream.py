@@ -3,7 +3,7 @@ from typing import override
 import pytest
 import torch
 
-from tslab.ts.interfaces import DownstreamModel
+from tslab.ts.interfaces.downstream import DownstreamModel
 
 
 class Constant(DownstreamModel):

@@ -18,7 +18,6 @@ from tslab.lab.core.status import InstanceRecord
 from tslab.lab.core.text import first_line
 from tslab.lab.enums import InstanceState
 from tslab.lab.study.context import context_for, Selection
-from tslab.lab.study.definition import Study
 from tslab.lab.study.definition.columns import (
     ERROR_COLUMN,
     GRID_COLUMN,
@@ -28,6 +27,7 @@ from tslab.lab.study.definition.columns import (
     SECONDS_COLUMN,
     STUDY_STATE_COLUMN,
 )
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.launchers.cpus import available_cpus
 from tslab.lab.study.paths import instance_directory
 from tslab.lab.study.reporting.state import RunReport

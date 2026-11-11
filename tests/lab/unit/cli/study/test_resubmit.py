@@ -9,8 +9,8 @@ import pytest
 from tests.lab.unit.cli.study.helpers import git_project
 from tests.lab.unit.study.helpers import jobs_of
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
-from tslab.lab.cli.study import Resubmit
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.cli.study.resubmit import Resubmit
 from tslab.lab.enums import JobPhase
 
 

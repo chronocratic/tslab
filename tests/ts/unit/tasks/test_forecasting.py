@@ -14,7 +14,9 @@ from tests.ts.unit.reference_protocol import (
 from tests.ts.unit.stage_fakes import CausalEncoder, ToySeries, VectorEncoder
 import tslab.lab
 import tslab.ml
+import tslab.ml.stages
 import tslab.ts
+import tslab.ts.stages
 from tslab.ts.tasks import forecasting_representations, horizon_targets, window_samples
 
 SLICES = {'train': slice(0, 24), 'val': slice(24, 32), 'test': slice(32, 40)}
@@ -38,7 +40,7 @@ def representations(  # noqa: PLR0913
         model=model,
         checkpoint=checkpoint,
         data=ToySeries(),
-        encoder=tslab.ts.ModelAsEncoder(device='cpu'),
+        encoder=tslab.ts.stages.ModelAsEncoder(device='cpu'),
         horizons=horizons,
         window_length=window_length,
         stride=stride,

@@ -7,7 +7,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Grid, Override, Study
-from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.definition.definition import expand_runs
 from tslab.lab.study.reporting.documents import show_document
 from tslab.lab.study.reporting.report import log_show
 

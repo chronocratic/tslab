@@ -1,4 +1,4 @@
-"""Torch and Lightning on top of the lab: training stage, trainer interfaces, trackers.
+"""Torch and Lightning on top of the lab: trainer interfaces, trackers.
 
 Importing this package registers torch seeding and the torch metadata with the lab, but
 does not import torch; the names below load their module on first use.
@@ -13,9 +13,10 @@ from tslab.ml.torch_environment import seed_torch, torch_hardware, torch_version
 
 if TYPE_CHECKING:
     from tslab.ml.artifacts import Checkpoint, Tensors
-    from tslab.ml.interfaces import Batch, DataSource, LabeledSplits, Metric, SPLITS, Trainer
+    from tslab.ml.interfaces.data import Batch, DataSource, LabeledSplits, SPLITS
+    from tslab.ml.interfaces.metric import Metric
+    from tslab.ml.interfaces.trainer import Trainer
     from tslab.ml.split import Split
-    from tslab.ml.stages import train
     from tslab.ml.tracking.wandb_mode import WandbMode
 
 register_seeder(seed_torch, name='torch')
@@ -24,17 +25,16 @@ register_hardware(torch_hardware, name='torch')
 
 # why: tslab wandb-sync imports a submodule of this package and must not load torch
 _LAZY = {
-    'Batch': 'tslab.ml.interfaces',
+    'Batch': 'tslab.ml.interfaces.data',
     'Checkpoint': 'tslab.ml.artifacts',
-    'DataSource': 'tslab.ml.interfaces',
-    'LabeledSplits': 'tslab.ml.interfaces',
-    'Metric': 'tslab.ml.interfaces',
-    'SPLITS': 'tslab.ml.interfaces',
+    'DataSource': 'tslab.ml.interfaces.data',
+    'LabeledSplits': 'tslab.ml.interfaces.data',
+    'Metric': 'tslab.ml.interfaces.metric',
+    'SPLITS': 'tslab.ml.interfaces.data',
     'Split': 'tslab.ml.split',
     'Tensors': 'tslab.ml.artifacts',
-    'Trainer': 'tslab.ml.interfaces',
+    'Trainer': 'tslab.ml.interfaces.trainer',
     'WandbMode': 'tslab.ml.tracking.wandb_mode',
-    'train': 'tslab.ml.stages',
 }
 
 __all__ = [
@@ -48,7 +48,6 @@ __all__ = [
     'Tensors',
     'Trainer',
     'WandbMode',
-    'train',
 ]
 
 

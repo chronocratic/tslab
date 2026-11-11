@@ -12,14 +12,15 @@ import pytest
 from tslab.lab import enums
 import tslab.lab.study as study_api
 from tslab.lab.study import Grid, setting_axis, Study
-import tslab.lab.study.definition as definition_api
-from tslab.lab.study.definition import expand_runs, Settings, StudyRun
+import tslab.lab.study.definition.after as definition_api
 from tslab.lab.study.definition.after import _visit_grid
+from tslab.lab.study.definition.definition import expand_runs, StudyRun
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from tslab.lab.study import After
+    from tslab.lab.study.definition.settings import Settings
 
 
 @dataclass(frozen=True, kw_only=True)

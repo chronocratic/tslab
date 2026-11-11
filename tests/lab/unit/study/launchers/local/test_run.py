@@ -22,14 +22,15 @@ from tests.lab.unit.study.helpers import study_directory
 from tslab.lab.enums import LauncherKind
 from tslab.lab.jobs.local import PoolCommand, process_alive, TaskOutputState, Watchdog
 from tslab.lab.study import setting_axis, Study
-from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.definition.definition import expand_runs
 from tslab.lab.study.launchers.common.launch import launch as _launch
 from tslab.lab.study.launchers.common.types import LaunchReport, OnTaskState
 from tslab.lab.study.launchers.local import run as _local_run
 from tslab.lab.study.launchers.local.pid_file import LAUNCH_FILE
 from tslab.lab.study.launchers.local.records import LocalJobRecord
 from tslab.lab.study.launchers.local.run import LocalLauncher as _LocalLauncher, write_job_files
-from tslab.lab.study.machine import LocalSettings, MachineProfile
+from tslab.lab.study.machine.local import LocalSettings
+from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
 from tslab.lab.study.records import read_jobs
@@ -547,10 +548,10 @@ def test_local_two_launchers_never_share_a_gpu(
     worker = (
         'import sys\n'
         'from pathlib import Path\n'
-        'from tslab.lab.study.definition import StudyRun\n'
+        'from tslab.lab.study.definition.definition import StudyRun\n'
         'from tslab.lab.study.launchers.local.run import LocalLauncher\n'
         'from tslab.lab.study.launchers.local.backend import LocalResources\n'
-        'from tslab.lab.study.machine import LocalSettings\n'
+        'from tslab.lab.study.machine.local import LocalSettings\n'
         'from tslab.lab.study.plan import JobGroup, PlannedTask, ResolvedRun\n'
         'root = Path(sys.argv[1])\n'
         'index = sys.argv[2]\n'

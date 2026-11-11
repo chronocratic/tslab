@@ -21,7 +21,9 @@ from typing import Annotated
 
 import tyro
 
-from tslab.lab.cli.common import print_json, UsageError, watch
+from tslab.lab.cli.common.console import watch
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import print_json
 from tslab.lab.core.lock import is_run_active
 from tslab.lab.core.paths import STATUS_FILE
 from tslab.lab.core.status import (

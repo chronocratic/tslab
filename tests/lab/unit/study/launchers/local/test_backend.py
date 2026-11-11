@@ -23,19 +23,19 @@ from tests.lab.unit.study.helpers import (
     study_directory,
     write_launch,
 )
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.enums import JobPhase, LocalTaskState, Retry
 from tslab.lab.jobs.local import GpuDiscovery
 from tslab.lab.study.code_snapshot import CodeSnapshot
-from tslab.lab.study.commands import submit
-from tslab.lab.study.commands.submit import submit_runs
-from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.commands.submit import submit, submit_runs
+from tslab.lab.study.definition.definition import StudyRun
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, Resources
 import tslab.lab.study.launchers.local.backend as local_backend
 from tslab.lab.study.launchers.local.backend import _phase_of, LocalBackend, LocalResources
 from tslab.lab.study.launchers.local.run import LocalLauncher
 from tslab.lab.study.launchers.local.states import _is_local_job_id
-from tslab.lab.study.machine import FollowupSettings, LocalSettings
+from tslab.lab.study.machine.local import LocalSettings
+from tslab.lab.study.machine.profile import FollowupSettings
 from tslab.lab.study.plan import JobGroup, plan_jobs, PlannedTask, ResolvedRun
 
 if TYPE_CHECKING:

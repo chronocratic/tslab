@@ -5,10 +5,10 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from uuid import uuid4
 
-from tslab.lab.study.definition import Study
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.launchers.common.protocols import Launcher, WriteJobFiles
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, LaunchStopped
-from tslab.lab.study.machine import MachineProfile
+from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.records import append_job, JobRecord, take_progress, TaskRecord

@@ -10,7 +10,7 @@ import time
 from typing import TextIO, TYPE_CHECKING
 
 from tslab.lab.core.lock import read_lock_owner, STALE_AFTER_SECONDS
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.enums import (
     AfterCondition,
@@ -26,7 +26,8 @@ from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, SRC_F
 from tslab.lab.study.commands.submit import submit_runs
 from tslab.lab.study.commands.support import _finish_launch, _uncounted, LIVE_STATES
 from tslab.lab.study.context import Context, study_reports, widen_context
-from tslab.lab.study.definition import chained_grids, StudyRun, upstream_runs
+from tslab.lab.study.definition.after import chained_grids, upstream_runs
+from tslab.lab.study.definition.definition import StudyRun
 from tslab.lab.study.launchers.common.types import OnLaunch
 from tslab.lab.study.launchers.tables import backend_for
 from tslab.lab.study.machine.profile import FollowupSettings

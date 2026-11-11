@@ -9,7 +9,7 @@ import pytest
 
 from tests.lab.unit.study.helpers import context, submit_study
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.enums import JobPhase, StudyState
 from tslab.lab.study.context import Context
 from tslab.lab.study.reporting.outcome import EXIT_TIMEOUT

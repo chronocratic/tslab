@@ -8,6 +8,7 @@ from tests.ts.adapters.synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY
 import tslab.lab
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
+import tslab.ml.stages
 import tslab.ts
 from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
@@ -19,6 +20,7 @@ from tslab.ts.adapters.chronocratic.models import (
     ChronocraticEncoder,
     ChronocraticModelChoice,
 )
+import tslab.ts.stages
 
 pytestmark = [pytest.mark.chronocratic, pytest.mark.slow]
 

@@ -4,7 +4,9 @@ from tests.ml.unit.stage_fakes import FakeTrainer
 from tests.ts.unit.stage_fakes import LinearEncoder, ToySplits
 import tslab.lab
 import tslab.ml
+import tslab.ml.stages
 import tslab.ts
+import tslab.ts.stages
 
 __all__ = ['encoded']
 
@@ -19,5 +21,5 @@ def encoded(*, run: tslab.lab.Run, model: LinearEncoder | None = None) -> tslab.
         model=model,
         checkpoint=checkpoint,
         data=ToySplits(),
-        encoder=tslab.ts.ModelAsEncoder(device='cpu'),
+        encoder=tslab.ts.stages.ModelAsEncoder(device='cpu'),
     )

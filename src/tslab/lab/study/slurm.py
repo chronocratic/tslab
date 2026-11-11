@@ -4,9 +4,9 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from tslab.lab.jobs.slurm import run_slurm_command, slurm_command
-from tslab.lab.study.definition import Study
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.launchers.slurm.slurm_file import command_values
-from tslab.lab.study.machine import load_machine
+from tslab.lab.study.machine.load import load_machine
 from tslab.lab.study.paths import study_folder
 
 __all__ = ['slurm_output']

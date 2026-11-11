@@ -7,7 +7,7 @@ from types import MappingProxyType
 from tslab.lab.core.text import format_index_ranges
 from tslab.lab.enums import StudyState
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition import expand_runs, Study
+from tslab.lab.study.definition.definition import expand_runs, Study
 from tslab.lab.study.definition.settings import SettingValue
 from tslab.lab.study.launchers.common.types import LaunchReport, QueuedJob
 from tslab.lab.study.plan import JobGroup

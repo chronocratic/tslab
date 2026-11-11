@@ -9,13 +9,14 @@ from types import MappingProxyType
 from typing import Protocol, TYPE_CHECKING
 
 from tslab.lab.enums import AfterCondition, AfterVerdict, ChainedRetry, Satisfy, StudyState
-from tslab.lab.study.definition import upstream_runs
+from tslab.lab.study.definition.after import upstream_runs
 
 if TYPE_CHECKING:
     from collections.abc import Collection, Mapping, Sequence
     from pathlib import PurePosixPath
 
-    from tslab.lab.study.definition import After, Study, StudyRun
+    from tslab.lab.study.definition.after import After
+    from tslab.lab.study.definition.definition import Study, StudyRun
     from tslab.lab.study.machine.profile import FollowupSettings
     from tslab.lab.study.reporting.state import RunReport
 

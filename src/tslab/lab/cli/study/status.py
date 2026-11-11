@@ -6,12 +6,15 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.lab.cli.common import print_json, resolve_request, UsageError, watch
+from tslab.lab.cli.common.console import watch
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import print_json
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import _context_of, _states_of, _status_hints, _usage_errors
-from tslab.lab.core.meta import hostname
-from tslab.lab.study.commands import status
+from tslab.lab.core.meta.run import hostname
+from tslab.lab.study.commands.status import status
 from tslab.lab.study.context import Context, expected_starts
-from tslab.lab.study.definition import load_study
+from tslab.lab.study.definition.loading import load_study
 from tslab.lab.study.reporting.documents import show_document, status_document
 from tslab.lab.study.reporting.outcome import EXIT_TIMEOUT, study_exit_code
 from tslab.lab.study.reporting.report import log_show

@@ -9,7 +9,7 @@ from typing import cast, Protocol
 
 from tslab.lab.core.text import unknown_key_message
 from tslab.lab.enums import ChainedRetry, LauncherKind
-from tslab.lab.study.definition import expand_variables
+from tslab.lab.study.definition.expansion import expand_variables
 import tslab.lab.study.machine.local as machine_local
 from tslab.lab.study.machine.local import LocalSettings
 from tslab.lab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile

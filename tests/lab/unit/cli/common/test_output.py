@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.cli import main
-from tslab.lab.cli.common import print_json
+from tslab.lab.cli.common.output import print_json
+from tslab.lab.cli.entrypoint import main
 
 
 def run_main_raw(*args: str) -> int:

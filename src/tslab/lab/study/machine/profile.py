@@ -6,7 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from tslab.lab.enums import ChainedRetry, LauncherKind, Retry
-from tslab.lab.study.definition import SettingValue
+from tslab.lab.study.definition.settings import SettingValue
 from tslab.lab.study.machine.local import LocalSettings
 from tslab.lab.study.machine.slurm import SlurmSettings
 

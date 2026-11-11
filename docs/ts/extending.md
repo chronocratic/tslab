@@ -17,13 +17,13 @@ Forecasting data offers `full_series()` and `split_slices()`
 ## An encoder
 
 `encode` takes an `encoder` argument: a callable that turns the trained model
-into an object with `encode(*, inputs)` (`tslab.ts.interfaces.Encoder`), and optionally
-`encode_sequence(*, inputs)` (`tslab.ts.interfaces.SequenceEncoder`) for the
-encode-once forecasting path. `tslab.ts.ModelAsEncoder()` uses the methods
+into an object with `encode(*, inputs)` (`tslab.ts.Encoder`), and optionally
+`encode_sequence(*, inputs)` (`tslab.ts.SequenceEncoder`) for the
+encode-once forecasting path. `tslab.ts.stages.ModelAsEncoder()` uses the methods
 of the model under those names.
 
 ## A probe or downstream model
 
-Subclass `tslab.ts.interfaces.DownstreamModel` (`fit`, `predict`, `default_metrics`) or
-`tslab.ts.interfaces.Probe`. `tslab.ts.probes.SVMProbe` and `tslab.ts.probes.RidgeProbe` follow
+Subclass `tslab.ts.DownstreamModel` (`fit`, `predict`, `default_metrics`) or
+`tslab.ts.Probe`. `tslab.ts.probes.SVMProbe` and `tslab.ts.probes.RidgeProbe` follow
 the TS2Vec evaluation protocols.

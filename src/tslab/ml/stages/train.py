@@ -4,7 +4,8 @@ from tslab.lab.core.paths import InstanceName
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
 from tslab.ml.artifacts import Checkpoint
-from tslab.ml.interfaces import DataSource, Trainer
+from tslab.ml.interfaces.data import DataSource
+from tslab.ml.interfaces.trainer import Trainer
 
 __all__ = ['train']
 

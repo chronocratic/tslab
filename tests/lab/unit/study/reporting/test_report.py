@@ -7,7 +7,7 @@ import pytest
 
 from tslab.lab.core.text import format_table
 from tslab.lab.enums import JobPhase, StudyState
-from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.definition.definition import StudyRun
 from tslab.lab.study.launchers.common.types import LaunchReport, QueuedJob
 from tslab.lab.study.launchers.local.backend import LocalResources
 from tslab.lab.study.machine import SlurmSettings

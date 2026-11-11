@@ -6,7 +6,8 @@ import sys
 
 import pytest
 
-from tslab.lab.core.meta import (
+from tslab.lab.core.meta import run as run_module
+from tslab.lab.core.meta.run import (
     collect_code_snapshot,
     collect_git_state,
     collect_hardware,
@@ -14,7 +15,6 @@ from tslab.lab.core.meta import (
     package_version,
     register_hardware,
     register_versions,
-    run as run_module,
 )
 from tslab.lab.core.run import Run
 
@@ -78,7 +78,7 @@ def _extra_hardware() -> dict[str, object]:
 
 def test_lab_metadata_has_no_torch_keys() -> None:
     code = (
-        'from tslab.lab.core.meta import collect_hardware, collect_versions\n'
+        'from tslab.lab.core.meta.run import collect_hardware, collect_versions\n'
         "assert 'torch' not in collect_versions()\n"
         "assert 'gpus' not in collect_hardware()\n"
     )

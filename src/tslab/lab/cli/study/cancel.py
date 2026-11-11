@@ -7,10 +7,11 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.lab.cli.common import print_json, resolve_request
+from tslab.lab.cli.common.output import print_json
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import _context_of, _selection_args
-from tslab.lab.core.meta import hostname
-from tslab.lab.study.commands import cancel
+from tslab.lab.core.meta.run import hostname
+from tslab.lab.study.commands.cancel import cancel
 from tslab.lab.study.reporting.documents import cancel_document
 
 __all__ = ['Cancel']

@@ -16,7 +16,7 @@ from tests.lab.unit.study.helpers import (
     write_run_status,
 )
 from tests.support.fake_backend import FakeBackend, FakeResources
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.enums import InstanceState, RunState
 from tslab.lab.study.context import Context
 from tslab.lab.study.launchers.common.types import JobUsage, LaunchError

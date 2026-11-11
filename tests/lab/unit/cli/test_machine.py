@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.cli import main
-from tslab.lab.study.machine import read_register
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.study.machine.register import read_register
 
 PROFILE = 'launcher = "local"\noutput_root = "runs"\n'
 

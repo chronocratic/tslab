@@ -4,10 +4,12 @@ from dataclasses import dataclass
 import logging
 from pathlib import Path
 
-from tslab.lab.cli.common import print_json, resolve_request, UsageError
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import print_json
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import _usage_errors
-from tslab.lab.core.meta import hostname
-from tslab.lab.study.definition import load_study
+from tslab.lab.core.meta.run import hostname
+from tslab.lab.study.definition.loading import load_study
 from tslab.lab.study.project import expand_study, find_studies
 
 __all__ = ['List']

@@ -8,7 +8,7 @@ import pytest
 from tests.lab.unit.cli.study.helpers import toy_project
 from tests.lab.unit.study.helpers import finish_run, submit_study
 from tests.support.fake_backend import FakeBackend, install_fake_backend
-from tslab.lab.cli.study import Status
+from tslab.lab.cli.study.status import Status
 from tslab.lab.enums import JobPhase
 
 

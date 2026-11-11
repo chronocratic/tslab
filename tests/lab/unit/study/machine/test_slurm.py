@@ -10,8 +10,10 @@ from tests.lab.unit.study.machine.helpers import (
     SLURM_TABLE,
     write,
 )
-from tslab.lab.study.machine import MachineOverride, MachineProfileError, SlurmSettings
+from tslab.lab.study.machine.profile import MachineOverride
 import tslab.lab.study.machine.slurm as slurm_machine
+from tslab.lab.study.machine.slurm import SlurmSettings
+from tslab.lab.study.machine.tables import MachineProfileError
 
 
 def test_slurm_settings_from_normalizes_its_profile_table(tmp_path: Path) -> None:

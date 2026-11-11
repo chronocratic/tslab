@@ -11,7 +11,7 @@ from sklearn.preprocessing import FunctionTransformer
 import torch
 
 from tslab.ml.split import Split
-from tslab.ts.interfaces import Probe
+from tslab.ts.interfaces.downstream import Probe
 
 __all__ = [
     'PROTOCOL_RANDOM_STATE',

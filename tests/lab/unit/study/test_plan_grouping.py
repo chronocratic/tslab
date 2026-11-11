@@ -10,9 +10,10 @@ from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study import from_presets, Study, StudyRun
 from tslab.lab.study.code_snapshot import CodeSnapshot
-from tslab.lab.study.definition import expand_runs, setting_axis
+from tslab.lab.study.definition.definition import expand_runs, setting_axis
 from tslab.lab.study.launchers.tables import JOB_RECORDS
-from tslab.lab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
+from tslab.lab.study.machine.slurm import SlurmSettings
 from tslab.lab.study.paths import next_job_file
 from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs, validate_jobs
 from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, TaskRecord

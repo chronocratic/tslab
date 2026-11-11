@@ -13,18 +13,19 @@ from pathlib import Path
 import torch
 import tslab.lab
 import tslab.ml
-from tslab.ml.interfaces import Metric
+from tslab.ml import Metric
 from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.ml.tracking import build_trackers, TrackingOptions
 import tslab.ts
+from tslab.ts import Probe
 from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
     ChronocraticClassificationData,
     ChronocraticDataChoice,
 )
 from tslab.ts.adapters.chronocratic.models import build_chronocratic_model, ChronocraticEncoder
-from tslab.ts.interfaces import Probe
 from tslab.ts.probes import RidgeProbe, SVMProbe
+import tslab.ts.stages
 
 from {{package_name}}.models import Models
 

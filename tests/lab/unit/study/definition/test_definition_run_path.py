@@ -8,7 +8,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Study
-from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.definition.definition import expand_runs
 
 
 def test_default_template_is_grid_then_axes() -> None:

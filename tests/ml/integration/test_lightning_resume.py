@@ -14,7 +14,7 @@ from tslab.lab.core.status import read_status
 from tslab.lab.enums import RunState
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer
-from tslab.ml.stages import train as train_stage
+from tslab.ml.stages.train import train as train_stage
 
 
 class _SignalledRegressor(ToyRegressor):

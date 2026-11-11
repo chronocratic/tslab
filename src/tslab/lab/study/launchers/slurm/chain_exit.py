@@ -14,7 +14,7 @@ from tslab.lab.enums import ChainedRetry, JobPhase, StudyState
 from tslab.lab.jobs.slurm import query_cluster_config, RESTART_COUNT_VARIABLE, SlurmError
 from tslab.lab.study.commands.resubmit import may_retry
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.definition.definition import expand_runs
 from tslab.lab.study.launchers.common.types import JobStates
 from tslab.lab.study.launchers.slurm.requeue import (
     at_requeue_limit,

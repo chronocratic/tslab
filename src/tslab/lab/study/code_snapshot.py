@@ -15,7 +15,7 @@ import subprocess
 import tempfile
 from typing import Any, NoReturn
 
-from tslab.lab.core.meta import CODE_SNAPSHOT_VARIABLE, CODE_SNAPSHOT_VARIABLES
+from tslab.lab.core.meta.run import CODE_SNAPSHOT_VARIABLE, CODE_SNAPSHOT_VARIABLES
 from tslab.lab.core.paths import require_path
 
 __all__ = [

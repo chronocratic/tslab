@@ -4,7 +4,7 @@ import logging
 import os
 import signal as signal_module
 
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.enums import LocalTaskState
 from tslab.lab.jobs.local import boot_id
 from tslab.lab.study.context import Context

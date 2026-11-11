@@ -8,8 +8,9 @@ from tslab.lab.core.paths import InstanceName
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
 from tslab.ml.artifacts import Checkpoint, Tensors
-from tslab.ml.interfaces import LabeledSplits, SPLITS, Trainer
-from tslab.ts.interfaces import Encoder
+from tslab.ml.interfaces.data import LabeledSplits, SPLITS
+from tslab.ml.interfaces.trainer import Trainer
+from tslab.ts.interfaces.encoder import Encoder
 
 __all__ = ['check_representations', 'encode', 'encode_checked', 'load_encoder']
 
@@ -109,7 +110,7 @@ def encode[M](  # noqa: PLR0913 # why: keyword-only public API; each input is fi
         checkpoint: From ``train``, or ``tslab.ml.Checkpoint.external(...)``.
         data: Provides each split as ``(inputs, targets)``.
         encoder: Builds the encoder from the loaded model, for example
-            ``tslab.ts.ModelAsEncoder()``; it must be a frozen dataclass or
+            ``tslab.ts.stages.ModelAsEncoder()``; it must be a frozen dataclass or
             otherwise fingerprintable.
 
     Returns:

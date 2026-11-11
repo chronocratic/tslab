@@ -6,7 +6,9 @@ import logging
 import sys
 from typing import Any, cast
 
-from tslab.lab.cli.common import configure_logging, output, UsageError, use_stderr
+from tslab.lab.cli.common import output
+from tslab.lab.cli.common.console import configure_logging, use_stderr
+from tslab.lab.cli.common.errors import UsageError
 from tslab.lab.cli.new import New, ProjectTemplate
 from tslab.lab.cli.parser import (
     _parse,

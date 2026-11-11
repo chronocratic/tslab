@@ -30,7 +30,8 @@ from tslab.lab.study.code_snapshot import SRC_FOLDER, without_code_snapshot
 from tslab.lab.study.launchers.common.protocols import RecordJob
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchStopped, OnTaskState
 from tslab.lab.study.launchers.local.pid_file import DETACHED_VARIABLE
-from tslab.lab.study.machine import LocalSettings, MachineProfile, timeout_seconds
+from tslab.lab.study.machine.local import LocalSettings, timeout_seconds
+from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import usage_file
 from tslab.lab.study.plan import JobGroup, PlannedTask
 

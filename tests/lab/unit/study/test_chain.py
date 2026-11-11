@@ -16,7 +16,7 @@ from tslab.lab.enums import (
 )
 from tslab.lab.study import After, Grid, Study
 from tslab.lab.study.chain import _VERDICT_BY_CONDITION, after_verdict, retry_left, upstream_verdict
-from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.definition.definition import expand_runs, StudyRun
 from tslab.lab.study.machine.profile import FollowupSettings
 from tslab.lab.study.records import ProgressSnapshot, TaskRecord
 from tslab.lab.study.reporting.state import FolderFacts, RunReport

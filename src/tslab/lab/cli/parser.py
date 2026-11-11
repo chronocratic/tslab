@@ -18,7 +18,7 @@ from tslab.lab.cli.doctor import Doctor
 from tslab.lab.cli.machine import MACHINE_COMMANDS
 from tslab.lab.cli.new import New
 from tslab.lab.cli.status import Status
-from tslab.lab.cli.study import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
+from tslab.lab.cli.study.registry import _INTERNAL_STUDY_COMMANDS, STUDY_COMMANDS
 
 __all__ = ['Command', 'LazyCommand']
 

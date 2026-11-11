@@ -29,9 +29,16 @@ Importing `tslab.ml` adds torch seeding and torch metadata to every run; see
 ## Interfaces
 
 ```{eval-rst}
-.. automodule:: tslab.ml.interfaces
+.. autodata:: tslab.ml.SPLITS
+.. autodata:: tslab.ml.Batch
+.. autoclass:: tslab.ml.DataSource
    :members:
-   :imported-members:
+.. autoclass:: tslab.ml.LabeledSplits
+   :members:
+.. autoclass:: tslab.ml.Metric
+   :members:
+.. autoclass:: tslab.ml.Trainer
+   :members:
 ```
 
 ## Ready stages

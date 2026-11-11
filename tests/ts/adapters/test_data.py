@@ -13,7 +13,7 @@ from tests.ts.adapters.synthetic_data import CLASSIFICATION_NAME, DATA_DIRECTORY
 import tslab.lab
 from tslab.lab.core.fingerprint import canonicalize
 import tslab.ml
-from tslab.ml.interfaces import SPLITS
+from tslab.ml.interfaces.data import SPLITS
 from tslab.ml.split import Split
 import tslab.ts
 from tslab.ts.adapters.chronocratic.datasets import (

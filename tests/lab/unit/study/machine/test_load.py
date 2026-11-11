@@ -14,9 +14,10 @@ from tests.lab.unit.study.machine.helpers import (
     write,
 )
 from tslab.lab.enums import LauncherKind
-from tslab.lab.study.machine import LocalSettings, MachineProfileError, SlurmSettings
+from tslab.lab.study.machine import LocalSettings, SlurmSettings
 import tslab.lab.study.machine.load as machine_load
 from tslab.lab.study.machine.load import load_machine as _load_machine
+from tslab.lab.study.machine.tables import MachineProfileError
 
 
 def test_load_machine_uses_selected_backend_settings_loader(

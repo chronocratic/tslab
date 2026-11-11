@@ -10,9 +10,9 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.lab.cli.common import resolve_request
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import _context_of
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.paths import LOGS_DIRECTORY
 from tslab.lab.study.context import Context
 from tslab.lab.study.launchers.local.pid_file import LAUNCH_LOGS

@@ -18,7 +18,8 @@ from tslab.lab.study.launchers.slurm.dependency import dependency_text
 from tslab.lab.study.launchers.slurm.job_script import job_script
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.lab.study.machine import MachineProfile, SlurmSettings
+from tslab.lab.study.machine.profile import MachineProfile
+from tslab.lab.study.machine.slurm import SlurmSettings
 from tslab.lab.study.paths import next_job_file
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.records import append_job, JobKind

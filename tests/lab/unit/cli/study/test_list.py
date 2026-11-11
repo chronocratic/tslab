@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.cli.common import UsageError
-from tslab.lab.cli.study import List, Show
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.study.list import List
+from tslab.lab.cli.study.status import Show
 
 
 def _write_studies(*, project: Path, package: str, missing_quick_study: bool = False) -> None:

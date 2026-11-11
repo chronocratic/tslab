@@ -12,7 +12,7 @@ from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
 from tslab.lab.enums import InstanceState, RunState, StudyState
 from tslab.lab.study import After, Grid, Study
 from tslab.lab.study.context import _upstream_paths, context_for, Selection
-from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.definition.definition import expand_runs, StudyRun
 
 
 @dataclass(frozen=True, kw_only=True)

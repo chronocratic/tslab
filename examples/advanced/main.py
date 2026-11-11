@@ -41,6 +41,7 @@ import tslab.lab
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
 from tslab.ml.split import Split
+import tslab.ml.stages
 import tslab.ts
 from tslab.ts.adapters.chronocratic.datasets import (
     build_chronocratic_data_source,
@@ -56,6 +57,7 @@ from tslab.ts.adapters.chronocratic.models import (
     model_settings,
 )
 from tslab.ts.probes import RidgeProbe
+import tslab.ts.stages
 from tslab.ts.tasks import forecasting_representations
 
 TOY_HOURLY = Path(__file__).parents[2] / 'tests' / 'ts' / 'adapters' / 'data' / 'toy_hourly.csv.gz'

@@ -4,7 +4,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import setting_axis, Study
-from tslab.lab.study.definition import expand_runs, select_runs
+from tslab.lab.study.definition.definition import expand_runs, select_runs
 
 
 def test_only_filters_grids_with_that_axis() -> None:
