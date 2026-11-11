@@ -666,21 +666,36 @@ def test_chain_exit_walks_the_run_folder_once_outside_the_lock(
     assert held == [False]
 
 
-def test_chain_exit_at_requeue_limit_skips_the_run_folder_walk(
+def test_chain_exit_at_requeue_limit_does_not_requeue(
     project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     del fake_backend
     ctx = _requeue_context(project=project)
     _interrupted(ctx=ctx, progress=True)
     monkeypatch.setattr(_CHAIN_EXIT_MODULE, '_max_batch_requeue', lambda: 1)
-    resubmit_module = import_module('tslab.lab.study.commands.resubmit')
-    walks: list[Path] = []
-    monkeypatch.setattr(
-        resubmit_module, 'take_progress', lambda *, run_directory: walks.append(run_directory)
-    )
-    monkeypatch.setattr(
-        _CHAIN_EXIT_MODULE, 'take_progress', lambda *, run_directory: walks.append(run_directory)
-    )
     assert chain_exit(context=ctx, job_file=3, index=17) == 1
-    assert walks == []
     assert requeued == []
+
+
+def test_chain_exit_skips_the_scheduler_when_no_retry_is_possible(
+    project: Path,
+    fake_backend: FakeBackend,
+    requeued: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=False)
+    queries: list[int] = []
+
+    def query() -> dict[str, str]:
+        queries.append(1)
+        return {}
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'query_cluster_config', query)
+
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert queries == []
+    assert requeued == []
+    assert 'MaxBatchRequeue' not in caplog.text

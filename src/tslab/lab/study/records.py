@@ -74,6 +74,15 @@ class ProgressSnapshot:
         )
 
 
+def _checkpoint_mtime(*, path: Path) -> float | None:
+    """The modification time of a checkpoint file, or ``None`` when it is gone."""
+    try:
+        return path.stat().st_mtime if path.is_file() else None
+    except OSError:
+        # why: a checkpoint can vanish or be replaced between the folder walk and the stat
+        return None
+
+
 def take_progress(*, run_directory: Path) -> ProgressSnapshot:
     """The progress of one run, for the record of its next submission.
 
@@ -96,9 +105,8 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
     # why: a stage may keep its checkpoints anywhere below the run folder (for example
     # a checkpoints folder of its own), so the whole run folder is searched, even
     # when the status file is missing
-    checkpoints = [
-        path.stat().st_mtime for path in run_directory.rglob('last.ckpt') if path.is_file()
-    ]
+    mtimes = (_checkpoint_mtime(path=path) for path in run_directory.rglob('last.ckpt'))
+    checkpoints = [mtime for mtime in mtimes if mtime is not None]
     return ProgressSnapshot(
         done_instances=done, newest_checkpoint_mtime=max(checkpoints) if checkpoints else None
     )

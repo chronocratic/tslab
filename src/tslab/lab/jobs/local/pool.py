@@ -260,12 +260,23 @@ class _GpuLeaseGate:
                 self._generations[gpu_id] = self._generations.get(gpu_id, 0) + 1
 
 
-def _wait_for_next_slot(
+_WAKE_SECONDS = 0.1
+
+
+def _wait_for_either(*, first: threading.Event, second: threading.Event, seconds: float) -> None:
+    """Wait up to ``seconds``, ending early when either event is set."""
+    deadline = time.monotonic() + seconds
+    while not (first.is_set() or second.is_set()) and (left := deadline - time.monotonic()) > 0:
+        first.wait(min(left, _WAKE_SECONDS))
+
+
+def _wait_for_next_slot(  # noqa: PLR0913 # why: one keyword per event and setting of the wait
     *,
     slot_queue: queue.Queue[str | None],
     slot: str,
     on_wait: Callable[[], None] | None,
     stop: threading.Event,
+    halt: threading.Event,
     poll_seconds: float,
 ) -> str:
     """Give the slot back, wait one poll and take the next free slot.
@@ -275,21 +286,20 @@ def _wait_for_next_slot(
         slot: The slot the caller holds.
         on_wait: Called once before the slot goes back, or ``None`` when it was called.
         stop: An event that ends the wait early.
+        halt: A second event that ends the wait early.
         poll_seconds: The seconds to wait.
 
     Returns:
         The next free slot.
     """
+    # why: a failing callback must not keep the slot token, or the other commands
+    # wait for it forever
     try:
         if on_wait is not None:
             on_wait()
-    except Exception:
-        # why: a failing callback must not keep the slot token, or the other commands
-        # wait for it forever
+    finally:
         slot_queue.put(slot)
-        raise
-    slot_queue.put(slot)
-    stop.wait(poll_seconds)
+    _wait_for_either(first=stop, second=halt, seconds=poll_seconds)
     # why: a pool with GPUs only ever puts GPU tokens into the queue
     return cast('str', slot_queue.get())
 
@@ -339,6 +349,8 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
 
     When ``stop`` is set, no command starts; the running ones are stopped by
     ``run_process``, and the pool returns after every thread has ended.
+    A failing lease check starts no new command; the running ones finish and
+    the error is raised after them.
 
     Args:
         commands: The commands, in the order they start.
@@ -376,6 +388,8 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     _check_lock_folder(gpu_ids=gpu_ids, lock_folder=lock_folder)
     slot_queue = _slot_queue_of(slots=slots, gpu_ids=gpu_ids, tasks_per_gpu=tasks_per_gpu)
     never_started: set[str] = set()
+    # why: set by a failing lease check; no new command starts, and the running ones finish
+    halt = threading.Event()
     never_started_lock = threading.Lock()
 
     gate = _GpuLeaseGate(
@@ -401,12 +415,15 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         if slot is None:
             return None, slot
         waited = False
-        while (lease := try_lease_or_return_slot(slot=slot)) is None and not stop.is_set():
+        while (lease := try_lease_or_return_slot(slot=slot)) is None and not (
+            stop.is_set() or halt.is_set()
+        ):
             slot = _wait_for_next_slot(
                 slot_queue=slot_queue,
                 slot=slot,
                 on_wait=None if waited else partial(on_wait, key=command.key),
                 stop=stop,
+                halt=halt,
                 poll_seconds=gpu_poll_seconds,
             )
             waited = True
@@ -416,12 +433,12 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         try:
             lease, slot = take_lease(command=command)
         except Exception:
-            # why: a failing lease check would otherwise show only after every other command
-            # ended; the stop makes the pool return and raise it now
-            stop.set()
+            # why: no new command starts once a lease check fails; the running ones finish and
+            # the error is raised after them
+            halt.set()
             raise
         try:
-            if stop.is_set():
+            if stop.is_set() or halt.is_set():
                 _add_locked(lock=never_started_lock, store=never_started, key=command.key)
                 return
             on_start(key=command.key, gpu_id=slot)
