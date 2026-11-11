@@ -5,31 +5,40 @@ on:
     types: [published]
 
 jobs:
+  on-main:
+    name: Confirm the release points at main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Refusing to publish: the tag does not point at a commit on main." >&2
+            exit 1
+          }
+
+  build:
+    needs: on-main
+    uses: chronocratic/.github/.github/workflows/python-build.yml@v0.1.1
+
+  # PyPI trusted publishing does not support reusable workflows, so the upload
+  # stays here; this file is the trusted publisher on PyPI.
   pypi-publish:
     name: Upload release to PyPI
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/tslab
     permissions:
-      contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Confirm the release points at main
-        run: |
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-            echo "Refusing to publish: the tag does not point at a commit on main." >&2
-            exit 1
-          }
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.2
-        with:
-          python-version: "3.12"
-      - name: Build package
-        run: uv build
+          name: dist
+          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.1
