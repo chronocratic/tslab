@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "tslab"
 dynamic = ["version"]
-description = "Resumable, cached research pipelines for time series representation learning."
+description = "A batteries-included lab for time series research."
 readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
