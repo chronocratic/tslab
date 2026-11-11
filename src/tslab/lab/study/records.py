@@ -1,7 +1,7 @@
 """The ``submissions.jsonl`` record of a study: one line per submitted job."""
 
 from collections.abc import Generator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from enum import StrEnum
 import fcntl
@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path, PurePosixPath
+import time
 from types import MappingProxyType
 from typing import Any, Self, TYPE_CHECKING
 
@@ -37,6 +38,8 @@ __all__ = [
 SUBMISSIONS_FORMAT_VERSION = 1
 
 _LOGGER = logging.getLogger(__name__)
+
+_LOCK_POLL_SECONDS = 0.1
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -278,7 +281,7 @@ class JobRecord:
 
 
 @contextmanager
-def submission_lock(*, study_folder: Path) -> Generator[None]:
+def submission_lock(*, study_folder: Path, timeout_seconds: float | None = None) -> Generator[None]:
     """Hold the submission lock of a study, so two submissions never interleave.
 
     Planning a job reads the records and the job files and ends with a
@@ -287,6 +290,10 @@ def submission_lock(*, study_folder: Path) -> Generator[None]:
 
     Args:
         study_folder: The ``.study`` folder of the study; created if missing.
+        timeout_seconds: The longest wait for a busy lock; ``None`` waits without limit.
+
+    Raises:
+        TimeoutError: If the lock stayed busy for ``timeout_seconds``.
     """
     study_folder.mkdir(parents=True, exist_ok=True)
     with (study_folder / 'submit.lock').open(mode='a') as handle:
@@ -294,11 +301,27 @@ def submission_lock(*, study_folder: Path) -> Generator[None]:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             _LOGGER.info('waiting for another submission of this study to finish')
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            _wait_for_lock(descriptor=handle.fileno(), timeout_seconds=timeout_seconds)
         try:
             yield
         finally:
             fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _wait_for_lock(*, descriptor: int, timeout_seconds: float | None) -> None:
+    """Take the exclusive lock, polling until the deadline when there is one."""
+    if timeout_seconds is None:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        return
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        with suppress(BlockingIOError):
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        if time.monotonic() >= deadline:
+            message = f'the submission lock stayed busy for {timeout_seconds} s'
+            raise TimeoutError(message)
+        time.sleep(_LOCK_POLL_SECONDS)
 
 
 def submission_in_progress(*, study_folder: Path) -> bool:

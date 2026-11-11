@@ -1,6 +1,7 @@
 """Exit status used by chained SLURM jobs after their run command ends."""
 
 from dataclasses import replace
+import fcntl
 from importlib import import_module
 import os
 from pathlib import Path, PurePosixPath
@@ -26,6 +27,7 @@ from tslab.lab.study.records import (
     latest_tasks,
     ProgressSnapshot,
     read_jobs,
+    submission_lock,
     TaskRecord,
 )
 from tslab.lab.study.reporting.state import collect_states, FolderFacts
@@ -160,8 +162,9 @@ def _requeue_context(*, project: Path, max_attempts: int = 3) -> Context:
     )
     ctx = context(project=project, machine_file='cluster.toml')
     run = ctx.runs[0]
-    job = _job_record(run=run, job_file=3, index=17)
-    return replace(ctx, jobs=[job])
+    path = study_folder(machine=ctx.machine, study=ctx.study) / 'submissions.jsonl'
+    append_job(path=path, record=_job_record(run=run, job_file=3, index=17))
+    return replace(ctx, jobs=read_jobs(path=path))
 
 
 def _interrupted(*, ctx: Context, progress: bool) -> None:
@@ -219,7 +222,10 @@ def test_chain_exit_does_not_requeue_at_max_attempts(
     (job,) = ctx.jobs
     # why: two earlier requeues by TSLab, each recorded with the next attempt
     requeues = [replace(job, tasks=(replace(job.tasks[0], attempt=attempt),)) for attempt in (2, 3)]
-    ctx = replace(ctx, jobs=[job, *requeues])
+    path = study_folder(machine=ctx.machine, study=ctx.study) / 'submissions.jsonl'
+    for record in requeues:
+        append_job(path=path, record=record)
+    ctx = _reloaded(ctx=ctx)
     monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
     assert chain_exit(context=ctx, job_file=3, index=17) == 1
     assert requeued == []
@@ -312,14 +318,6 @@ def test_chain_exit_logs_when_requeue_limit_is_invalid(
     assert requeued == ['41_17']
 
 
-def _recorded_requeue_context(*, project: Path, max_attempts: int) -> Context:
-    """A requeue context whose submission record is in ``submissions.jsonl``."""
-    ctx = _requeue_context(project=project, max_attempts=max_attempts)
-    path = study_folder(machine=ctx.machine, study=ctx.study) / 'submissions.jsonl'
-    append_job(path=path, record=ctx.jobs[0])
-    return replace(ctx, jobs=read_jobs(path=path))
-
-
 def _reloaded(*, ctx: Context) -> Context:
     """The context with the job records read again, as the next chain-exit sees them."""
     path = study_folder(machine=ctx.machine, study=ctx.study) / 'submissions.jsonl'
@@ -342,7 +340,7 @@ def test_chain_exit_records_the_requeued_attempt_with_fresh_progress(
     project: Path, fake_backend: FakeBackend, requeued: list[str]
 ) -> None:
     del fake_backend
-    ctx = _recorded_requeue_context(project=project, max_attempts=3)
+    ctx = _requeue_context(project=project, max_attempts=3)
     _interrupted(ctx=ctx, progress=False)
     _checkpoint(ctx=ctx, mtime=1000.0)
     assert chain_exit(context=ctx, job_file=3, index=17) == 0
@@ -363,7 +361,7 @@ def test_requeues_and_followup_stay_within_max_attempts(
     project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     del fake_backend
-    ctx = _recorded_requeue_context(project=project, max_attempts=3)
+    ctx = _requeue_context(project=project, max_attempts=3)
     _interrupted(ctx=ctx, progress=False)
     for restarts, mtime in ((0, 1000.0), (1, 2000.0)):
         monkeypatch.setenv('SLURM_RESTART_COUNT', str(restarts))
@@ -387,7 +385,7 @@ def test_chain_exit_compares_progress_against_the_last_requeue(
     project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     del fake_backend
-    ctx = _recorded_requeue_context(project=project, max_attempts=9)
+    ctx = _requeue_context(project=project, max_attempts=9)
     _interrupted(ctx=ctx, progress=False)
     _checkpoint(ctx=ctx, mtime=1000.0)
     assert chain_exit(context=_reloaded(ctx=ctx), job_file=3, index=17) == 0
@@ -401,7 +399,7 @@ def test_scheduler_requeues_do_not_count_as_attempts(
     project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     del fake_backend
-    ctx = _recorded_requeue_context(project=project, max_attempts=3)
+    ctx = _requeue_context(project=project, max_attempts=3)
     _interrupted(ctx=ctx, progress=True)
     # why: two restarts with no TSLab requeue record were preemptions requeued by SLURM
     monkeypatch.setenv('SLURM_RESTART_COUNT', '2')
@@ -419,7 +417,7 @@ def test_failed_requeue_restores_the_previous_record(
         raise SlurmError(task_id)
 
     monkeypatch.setattr(_REQUEUE_MODULE, 'scontrol_requeue', fail)
-    ctx = _recorded_requeue_context(project=project, max_attempts=3)
+    ctx = _requeue_context(project=project, max_attempts=3)
     _interrupted(ctx=ctx, progress=True)
     assert chain_exit(context=ctx, job_file=3, index=17) == 1
     assert _latest_task(ctx=ctx) == ctx.jobs[0].tasks[0]
@@ -478,3 +476,53 @@ def test_chain_exit_reads_records_only_without_scheduler_or_other_runs(
     assert light.jobs == [job]
     assert chain_exit(context=light, job_file=3, index=17) == 0
     assert read == [ctx.study_directory / run.run_path]
+
+
+def test_chain_exit_skips_the_requeue_when_the_lock_stays_busy(
+    project: Path,
+    fake_backend: FakeBackend,
+    requeued: list[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del fake_backend
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, '_LOCK_WAIT_SECONDS', 0.2)
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    folder = study_folder(machine=ctx.machine, study=ctx.study)
+    with caplog.at_level('WARNING'), submission_lock(study_folder=folder):
+        # why: another process holds the lock, so the wait must end by the timeout
+        other = (folder / 'submit.lock').open('a')
+        try:
+            result = chain_exit(context=ctx, job_file=3, index=17)
+        finally:
+            other.close()
+    assert result == 1
+    assert requeued == []
+    assert 'skipping the requeue' in caplog.text
+
+
+def test_chain_exit_reads_the_records_under_the_lock(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    lock_path = study_folder(machine=ctx.machine, study=ctx.study) / 'submit.lock'
+    held: list[bool] = []
+    real_read = _CHAIN_EXIT_MODULE.read_jobs
+
+    def read_and_probe(*, path: Path) -> list[SlurmJobRecord]:
+        with lock_path.open('a') as probe:
+            try:
+                fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                held.append(True)
+            else:
+                held.append(False)
+        return real_read(path=path)
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'read_jobs', read_and_probe)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 0
+    assert requeued == ['41_17']
+    assert held[-1] is True

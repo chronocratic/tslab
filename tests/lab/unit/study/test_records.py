@@ -225,6 +225,16 @@ def test_submission_lock_says_when_it_waits(
     assert caplog.text.count('waiting for another submission of this study to finish') == 1
 
 
+def test_submission_lock_times_out_when_the_lock_stays_busy(tmp_path: Path) -> None:
+    with (tmp_path / 'submit.lock').open('a') as other:
+        fcntl.flock(other.fileno(), fcntl.LOCK_EX)
+        with (
+            pytest.raises(TimeoutError, match='stayed busy'),
+            submission_lock(study_folder=tmp_path, timeout_seconds=0.2),
+        ):
+            pass
+
+
 def test_job_record_without_code_snapshot_serializes_as_before(tmp_path: Path) -> None:
     document = job().to_json()
     assert 'code_snapshot' not in document
