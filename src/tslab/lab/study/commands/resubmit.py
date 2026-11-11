@@ -9,7 +9,7 @@ import subprocess
 import time
 from typing import TextIO, TYPE_CHECKING
 
-from tslab.lab.core.lock import read_lock_owner
+from tslab.lab.core.lock import read_lock_owner, STALE_AFTER_SECONDS
 from tslab.lab.core.meta import hostname
 from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.enums import (
@@ -45,8 +45,8 @@ __all__ = ['may_retry', 'resubmit', 'run_one']
 _SELECTION_SHOWN = 20
 
 # why: a cancelled job leaves its lock until the heartbeat is stale; the restart
-# waits this many seconds (the stale-lock limit of the run engine plus a minute)
-_RESTART_DELAY_SECONDS = 660
+# waits the stale-lock limit of the run engine plus a minute
+_RESTART_DELAY_SECONDS = int(STALE_AFTER_SECONDS) + 60
 
 #: Preempted or node-failed attempts in a row after which the run is left alone.
 _MAX_UNCOUNTED_IN_ROW = 20
@@ -72,6 +72,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     on_launch: OnLaunch | None = None,
     task_stream: TextIO | None = None,
     ignore_after: bool = False,
+    on_cancel: Callable[[Sequence[str]], None] | None = None,
 ) -> int:
     """Submit the runs in the given states again, one attempt further on.
 
@@ -111,6 +112,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
         ignore_after: Submit without dependency targets or the local dependency filter.
+        on_cancel: Called once with the job ids the first step cancels, the selected live
+            runs, the held ones and the waiting downstream ones; not called without any.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -168,6 +171,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         live=live,
         selected=selected,
         dry_run=dry_run,
+        on_cancel=on_cancel,
     )
 
     code, submitted = submit_runs(
@@ -209,14 +213,7 @@ def _auto_selection(*, reports: Sequence[RunReport], context: Context) -> list[R
         for report in reports
         if report.state is StudyState.DEPENDENCY_FAILED
         and report.run.grid in chained
-        and after_verdict(
-            study=context.study,
-            run=report.run,
-            reports=everything,
-            followup=followup,
-            now=time.time(),
-        )
-        is AfterVerdict.MET
+        and _verdict_met(context=context, run=report.run, reports=everything)
     ]
     taken += [
         report
@@ -227,14 +224,7 @@ def _auto_selection(*, reports: Sequence[RunReport], context: Context) -> list[R
             after.condition is AfterCondition.FAILED
             for after in context.study.grids[report.run.grid].after
         )
-        and after_verdict(
-            study=context.study,
-            run=report.run,
-            reports=everything,
-            followup=followup,
-            now=time.time(),
-        )
-        is AfterVerdict.MET
+        and _verdict_met(context=context, run=report.run, reports=everything)
     ]
     return taken
 
@@ -419,15 +409,18 @@ def _live_reports(*, reports: Sequence[RunReport], cancel_live: bool) -> list[Ru
     ]
 
 
-def _before_resubmit(
+def _before_resubmit(  # noqa: PLR0913 # why: keyword-only private helper, one per fact of the launch
     *,
     backend: 'Backend',
     context: Context,
     live: Sequence[RunReport],
     selected: Sequence[RunReport],
     dry_run: bool,
+    on_cancel: Callable[[Sequence[str]], None] | None,
 ) -> tuple[int | None, Callable[[], int]]:
     cancellable = backend.cancellable_job_ids(reports=live)
+    if cancellable and on_cancel is not None:
+        on_cancel(cancellable)
     if dry_run and cancellable:
         _LOGGER.info('would cancel %s', ', '.join(cancellable))
 

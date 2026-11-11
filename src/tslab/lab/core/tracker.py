@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 import csv
 from enum import StrEnum
+import io
 from pathlib import Path
 import re
 import shutil
@@ -154,10 +155,11 @@ class LocalTracker(Tracker):
                 csv.DictWriter(handle, fieldnames=self._columns).writerow(row)
             return
         self._columns = ['step', *sorted((known | set(columns)) - {'step'})]
-        with path.open(mode='w', encoding='utf-8', newline='') as handle:
-            writer = csv.DictWriter(handle, fieldnames=self._columns)
-            writer.writeheader()
-            writer.writerows(self._rows)
+        buffer = io.StringIO(newline='')
+        writer = csv.DictWriter(buffer, fieldnames=self._columns)
+        writer.writeheader()
+        writer.writerows(self._rows)
+        atomic_write_text(path=path, text=buffer.getvalue())
 
     @override
     def log_file(self, *, path: Path) -> None:

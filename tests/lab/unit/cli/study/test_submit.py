@@ -155,6 +155,17 @@ def test_detach_forwards_code_snapshot_flags(
     assert '--no-code-snapshot' not in arguments
 
 
+def test_detach_leaves_the_code_snapshot_to_the_background_launch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
+) -> None:
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+
+    code = Submit(study='toy_studies:study', machine='local', detach=True, code_snapshot=True).run()
+
+    assert code == 0
+    assert not (project / 'runs' / '.tslab-code-snapshots').exists()
+
+
 def test_cli_parses_ignore_after(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[bool] = []
 

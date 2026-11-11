@@ -162,12 +162,7 @@ def _states_of(*, values: tuple[str, ...]) -> tuple[StudyState, ...]:
 def _selection_args(
     *, study: str, machine: str, grid: tuple[str, ...], only: tuple[str, ...]
 ) -> str:
-    arguments = [study, '--machine', machine]
-    for grid_name in grid:
-        arguments.extend(('--grid', grid_name))
-    for selection in only:
-        arguments.extend(('--only', selection))
-    return shlex.join(arguments)
+    return shlex.join([study, '--machine', machine, *_selection_options(grid=grid, only=only)])
 
 
 def _log_next_step(*, dry_run: bool, selection: str) -> None:
