@@ -179,6 +179,23 @@ def test_take_progress_finds_checkpoints_outside_the_stage_folders(tmp_path: Pat
     assert take_progress(run_directory=tmp_path).newest_checkpoint_mtime is not None
 
 
+def test_take_progress_skips_a_checkpoint_that_vanishes_before_its_stat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / 'a').mkdir()
+    (tmp_path / 'a' / 'last.ckpt').write_text('ckpt')
+    original_stat = Path.stat
+
+    def vanishing_stat(self: Path, **kwargs: Any) -> os.stat_result:  # noqa: ANN401 # why: mirrors Path.stat
+        if self.name == 'last.ckpt':
+            raise FileNotFoundError(self.name)
+        return original_stat(self, **kwargs)
+
+    monkeypatch.setattr(Path, 'is_file', lambda self: self.name == 'last.ckpt')
+    monkeypatch.setattr(Path, 'stat', vanishing_stat)
+    assert take_progress(run_directory=tmp_path).newest_checkpoint_mtime is None
+
+
 def test_take_progress_counts_an_unreadable_status_as_no_finished_instances(tmp_path: Path) -> None:
     (tmp_path / 'status.json').write_text('{')
     progress = take_progress(run_directory=tmp_path)

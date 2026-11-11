@@ -719,28 +719,41 @@ def test_a_failing_lease_check_returns_the_slot_so_other_commands_finish(
     assert len(errors) == 1
 
 
-def test_a_failing_lease_check_stops_the_pool_at_once(*, tmp_path: Path) -> None:
+def test_a_failing_lease_check_starts_nothing_new_but_lets_running_commands_finish(
+    *, tmp_path: Path
+) -> None:
     folder = tmp_path / 'locks'
     folder.mkdir()
 
     def gpu_free(gpu_id: str) -> bool:
         if gpu_id == '1':
+            deadline = time.monotonic() + 10
+            while not list(tmp_path.glob('k*.times')) and time.monotonic() < deadline:
+                time.sleep(0.05)  # the command on GPU 0 must be running before this one fails
             message = 'cannot ask the GPU'
             raise RuntimeError(message)
         return True
 
-    start = time.monotonic()
+    stop = threading.Event()
     with pytest.raises(RuntimeError, match='cannot ask'):
         _run_pool(
             tmp_path=tmp_path,
-            keys=('k0', 'k1'),
+            keys=('k0', 'k1', 'k2'),
             slots=2,
             gpu_ids=('0', '1'),
             lock_folder=folder,
-            sleep_seconds=30,
+            sleep_seconds=2,
             gpu_free=gpu_free,
+            stop=stop,
         )
-    assert time.monotonic() - start < 10
+    assert not stop.is_set()
+    finished = [
+        path
+        for path in tmp_path.glob('k*.times')
+        if path.read_text().splitlines()[-1].endswith('end')
+    ]
+    assert len(finished) == 1
+    assert len(list(tmp_path.glob('k*.times'))) == 1
 
 
 def test_a_failing_wait_callback_gives_the_slot_back(*, tmp_path: Path) -> None:
