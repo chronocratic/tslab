@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 import logging
 
 from tslab.lab.core.paths import ERROR_FILE, LOGS_DIRECTORY
+from tslab.lab.core.status import TIME_LIMIT_ERROR_PREFIX, TRAINING_PAUSED_ERROR_PREFIX
 from tslab.lab.enums import InstanceState, StudyState
 from tslab.lab.jobs.local import tail_lines
 from tslab.lab.study.context import Context
@@ -49,9 +50,12 @@ def collect_failures(
 
 
 _REASON_HINTS = (
-    ('JobTimeLimitSignal:', 'stopped before the time limit; resubmit continues it, or raise time'),
     (
-        'TrainingPaused:',
+        TIME_LIMIT_ERROR_PREFIX,
+        'stopped before the time limit; resubmit continues it, or raise time',
+    ),
+    (
+        TRAINING_PAUSED_ERROR_PREFIX,
         (
             'training used its share of the job (job_time_share); '
             'resubmit continues it, or raise time to train longer per job'

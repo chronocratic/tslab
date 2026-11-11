@@ -6,7 +6,7 @@ __all__ = ['JobPhase']
 
 
 class JobPhase(StrEnum):
-    """The phase of a job state; the scheduler's words stay in ``JobStates.states``.
+    """The phase of a job state; the words of the scheduler stay in ``JobStates.states``.
 
     ``ENDED`` is over with the cause unknown; ``UNKNOWN`` was not queried.
     """

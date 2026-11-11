@@ -46,7 +46,7 @@ class LocalLaunchError(RuntimeError):
 class LocalLaunch:
     """The launch recorded in the pid file.
 
-    Args:
+    Attributes:
         pid: The process that runs the launch.
         hostname: The host of that process.
         started: The start time, UTC ISO.
@@ -66,17 +66,10 @@ class LocalLaunch:
 
 
 def _run_pids_of(*, document: Mapping[str, object]) -> tuple[tuple[str, int], ...]:
-    """The task id and pid pairs of one launch document.
-
-    Newer files hold ``{task_id: pid}``; files written before that hold a
-    list of ``[task_id, pid]`` pairs.
-    """
+    """The task id and pid pairs of one launch document, saved as ``{task_id: pid}``."""
     value = document.get('run_pids')
     if value is None:
         return ()
-    if isinstance(value, list):
-        # why: old launch files of this branch hold a list of pairs
-        return tuple((str(key), int(str(pid))) for key, pid in cast('list[list[object]]', value))
     return tuple(
         (str(key), int(str(pid))) for key, pid in cast('Mapping[str, object]', value).items()
     )
@@ -269,7 +262,7 @@ def _stop_detached(*, process: subprocess.Popen[bytes]) -> None:
     process.wait()
 
 
-def detach_launch(  # why: keyword-only public API; each option is documented below
+def detach_launch(
     *,
     study_folder: Path,
     arguments: Sequence[str],

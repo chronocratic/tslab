@@ -4,12 +4,15 @@ from collections.abc import Mapping
 import dataclasses
 from pathlib import Path
 import re
-from typing import cast
+from typing import cast, TYPE_CHECKING
 
 from tslab.lab.core.codec import decode_dataclass
 from tslab.lab.core.config import ConfigFileError
 from tslab.lab.core.text import unknown_key_message
 from tslab.lab.study.definition import expand_variables, SettingValue
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 __all__ = [
     'MachineProfileError',
@@ -93,7 +96,8 @@ def check_keys(*, cls: type, table: dict[str, object], location: str, path: Path
         location: The dotted name of the table, for the error.
         path: The profile file, named in the error.
     """
-    known = {item.name for item in dataclasses.fields(cls)}  # ty: ignore[invalid-argument-type]
+    # why: callers pass data classes only; a plain type has no fields to list
+    known = {item.name for item in dataclasses.fields(cast('type[DataclassInstance]', cls))}
     unknown = [name for name in table if name not in known]
     if unknown:
         problem = unknown_key_message(location=location, key=unknown[0], valid=known)

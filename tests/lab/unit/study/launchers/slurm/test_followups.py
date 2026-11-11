@@ -191,8 +191,16 @@ def test_auto_retries_only_interrupted_runs_with_progress_under_the_cap(
     )
     # b: a checkpoint newer than its snapshot
     folder_b = project / 'runs' / 's' / 'g/small/2'
-    folder_b.mkdir(parents=True)
-    (folder_b / 'last.ckpt').write_text('ckpt')
+    (folder_b / 'train' / 'default').mkdir(parents=True)
+    (folder_b / 'train' / 'default' / 'last.ckpt').write_text('ckpt')
+    write_status(
+        path=folder_b / 'status.json',
+        snapshot=RunStatusSnapshot(
+            run_state=RunState.RUNNING,
+            updated_at=utc_now_iso(),
+            instances={'train[default]': InstanceRecord(state=InstanceState.RUNNING)},
+        ),
+    )
     # d: progress would count, but it already used all three attempts
     folder_d = project / 'runs' / 's' / 'g/large/2'
     folder_d.mkdir(parents=True)

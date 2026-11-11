@@ -69,7 +69,7 @@ def timeout_seconds(*, local: LocalSettings) -> float | None:
 
 
 def settings_from(*, table: Mapping[str, object], path: Path) -> LocalSettings:
-    """Read and validate this profile's local settings table."""
+    """Read and validate the local settings table of this profile."""
     local_table = table.get(TABLE)
     if isinstance(local_table, dict) and 'gpus' in local_table:
         local_gpus(value=local_table['gpus'], location='local.gpus', path=path)

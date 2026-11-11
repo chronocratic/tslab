@@ -75,9 +75,8 @@ def main(
         )
         raise SystemExit(2)
     if extra_args:
-        # ty: ignore[unsound-assignment]
-        # — the check above guarantees a dataclass with the extra_args field
-        command = dataclasses.replace(cast('Any', command), extra_args=extra_args)
+        # why: the check above guarantees a dataclass with the extra_args field
+        command = cast('Command', dataclasses.replace(cast('Any', command), extra_args=extra_args))
     try:
         code = _run(command=command, templates=templates, default_template=default_template)
     except SystemExit as error:

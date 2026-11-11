@@ -513,7 +513,7 @@ def _after_placeholders(
 
 
 def _absolute_output_root(*, output_root: Path, project_root: Path | None) -> Path:
-    """Resolve a relative output root against the project's directory."""
+    """Resolve a relative output root against the directory of the project."""
     if output_root.is_absolute():
         return output_root
     if project_root is None:
@@ -737,13 +737,13 @@ def _task_problems(
     """The problems of the tasks of one group; tasks that were checked consume ``errors``."""
     problems = []
     for task in group.tasks:
-        message = task.error if task.error is not None else _stripped(next(errors))
+        message = task.error if task.error is not None else _stripped(error=next(errors))
         if message is not None:
             problems.append((task.resolved.run.run_path, message))
     return problems
 
 
-def _stripped(error: str | None) -> str | None:
+def _stripped(*, error: str | None) -> str | None:
     """The error without surrounding whitespace, or ``None``."""
     return None if error is None else error.strip()
 

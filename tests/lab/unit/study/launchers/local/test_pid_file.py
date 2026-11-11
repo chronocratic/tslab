@@ -196,17 +196,6 @@ def test_run_pids_are_written_as_an_object(tmp_path: Path) -> None:
     assert document['run_pids'] == {'j_0': 4242}
 
 
-def test_list_of_pairs_run_pids_still_loads(tmp_path: Path) -> None:
-    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
-    path = tmp_path / LAUNCH_FILE
-    document = json.loads(path.read_text())
-    document['run_pids'] = [['j_0', 4242]]
-    atomic_write_json(path=path, document=document)
-    launch = read_launch(study_folder=tmp_path)
-    assert launch is not None
-    assert launch.run_pids == (('j_0', 4242),)
-
-
 def test_scalar_run_pids_are_rejected(tmp_path: Path) -> None:
     write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
     path = tmp_path / LAUNCH_FILE

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from tslab.lab.core.lock import is_run_active
 from tslab.lab.core.paths import STATUS_FILE
-from tslab.lab.core.status import read_status, RunStatusSnapshot
+from tslab.lab.core.status import PAUSED_ERROR_PREFIXES, read_status, RunStatusSnapshot
 from tslab.lab.core.text import first_line
 from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.lab.study.definition import StudyRun
@@ -18,8 +18,6 @@ if TYPE_CHECKING:
     from tslab.lab.study.launchers.common.types import JobStates
 
 __all__ = ['FolderFacts', 'RunReport', 'collect_states', 'read_folder', 'study_state']
-
-_INTERRUPTED_ERROR_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -149,7 +147,7 @@ def study_state(
     # if the lock is live, the function already returned RUNNING
     time_limited = snapshot is not None and any(
         record.state is InstanceState.FAILED
-        and (record.error or '').startswith(_INTERRUPTED_ERROR_PREFIXES)
+        and (record.error or '').startswith(PAUSED_ERROR_PREFIXES)
         for record in snapshot.instances.values()
     )
     stale_running = snapshot is not None and snapshot.run_state in (

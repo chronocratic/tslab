@@ -130,7 +130,7 @@ class WandbTracker(LightningLoggerTracker):
         """Build the logger in one mode; ``None`` with a warning when W&B fails."""
         try:
             return self._build(run_directory=run_directory, run_name=run_name, tags=tags, mode=mode)
-        except Exception:  # wandb raises version-unstable private exception types
+        except Exception:  # why: wandb raises version-unstable private exception types
             if last:
                 _LOGGER.warning(
                     'W&B initialization failed, including offline. Continuing without W&B; '
@@ -180,7 +180,7 @@ class WandbTracker(LightningLoggerTracker):
         if self._shell_log_path is not None and self._shell_log_path.is_file():
             try:
                 _upload_file(run=run, path=self._shell_log_path)
-            except Exception:  # best-effort: the upload must never fail the run
+            except Exception:  # why: best-effort; the upload must never fail the run
                 _LOGGER.warning('could not upload the shell log to W&B', exc_info=True)
         # exit_code alone decides the final state (0 finished, otherwise failed). In wandb
         # 0.30, Run.status is a method; assigning to it has no effect.

@@ -1,6 +1,6 @@
 """TSLab studies: one saved definition of a round of experiments.
 
-A study turns every run into the flags of the user's own ``no-preset``
+A study turns every run into the flags of the ``no-preset``
 command and hands them to a launcher; TSLab never runs experiment code.
 
 This package exports the authoring surface, what a study module imports to

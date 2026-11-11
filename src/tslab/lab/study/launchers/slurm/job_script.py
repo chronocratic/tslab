@@ -122,7 +122,7 @@ def _single_section(*, tasks_file: Path) -> str:
     )
 
 
-def _check_job_values(  # why: keyword-only private helper, one per checked value
+def _check_job_values(
     *,
     job_name: str,
     slurm: SlurmSettings,
