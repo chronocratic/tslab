@@ -22,10 +22,10 @@ from tslab.lab.core.files import atomic_write_text
 from tslab.lab.core.paths import TRACKERS_DIRECTORY
 from tslab.lab.enums import RunState
 
-__all__ = ['LocalTracker', 'RunStatus', 'Tracker']
+__all__ = ['STEP_COLUMN', 'LocalTracker', 'RunStatus', 'Tracker']
 
 _VERSION_PATTERN = re.compile(r'version_(\d+)')
-_STEP_COLUMN = 'step'
+STEP_COLUMN = 'step'
 
 
 class _ParamsDumper(yaml.SafeDumper):
@@ -146,21 +146,21 @@ class LocalTracker(Tracker):
     def log_metrics(self, *, metrics: Mapping[str, float], step: int | None = None) -> None:
         if self._directory is None:
             return
-        if _STEP_COLUMN in metrics:
+        if STEP_COLUMN in metrics:
             message = (
-                f'a metric cannot be named {_STEP_COLUMN!r}: it is the step column of metrics.csv'
+                f'a metric cannot be named {STEP_COLUMN!r}: it is the step column of metrics.csv'
             )
             raise ValueError(message)
-        row: dict[str, float | int | None] = {_STEP_COLUMN: step, **metrics}
+        row: dict[str, float | int | None] = {STEP_COLUMN: step, **metrics}
         self._rows.append(row)
-        columns = [_STEP_COLUMN, *sorted(metrics)]
+        columns = [STEP_COLUMN, *sorted(metrics)]
         known = set(self._columns)
         path = self._directory / 'metrics.csv'
         if known.issuperset(columns):
             with path.open(mode='a', encoding='utf-8', newline='') as handle:
                 csv.DictWriter(handle, fieldnames=self._columns).writerow(row)
             return
-        self._columns = [_STEP_COLUMN, *sorted((known | set(columns)) - {_STEP_COLUMN})]
+        self._columns = [STEP_COLUMN, *sorted((known | set(columns)) - {STEP_COLUMN})]
         buffer = io.StringIO(newline='')
         writer = csv.DictWriter(buffer, fieldnames=self._columns)
         writer.writeheader()

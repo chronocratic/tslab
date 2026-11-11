@@ -228,6 +228,15 @@ def test_broken_tracker_never_stops_the_run(
     assert tracker.events[-1] == ('finish', RunStatus.FINISHED)
 
 
+def test_a_metric_named_step_is_rejected_loudly(tmp_path: Path) -> None:
+    tracker = BrokenTracker()
+    with (
+        Run(config=Config(), root=tmp_path, relative_path=Path('a'), trackers=[tracker]) as run,
+        pytest.raises(ValueError, match="cannot be named 'step'"),
+    ):
+        run.log_metrics(metrics={'step': 1.0, 'loss': 0.5}, step=1)
+
+
 def test_second_live_process_is_locked_out(tmp_path: Path) -> None:
     second = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
     with (

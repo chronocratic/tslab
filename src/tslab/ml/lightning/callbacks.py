@@ -74,6 +74,7 @@ class _SignalStop(Callback):
         signal_received: bool = False,
     ) -> None:
         super().__init__()
+        self._run = run
         self._writer = run.writes_files
         self._signal_received = signal_received
         self._checkpoint_directory = checkpoint_directory
@@ -83,7 +84,7 @@ class _SignalStop(Callback):
 
     @property
     def signalled(self) -> bool:
-        return self._signal_received
+        return self._signal_received or self._run.time_limit_signalled
 
     def request_stop(self) -> None:
         self._signal_received = True

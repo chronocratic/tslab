@@ -1,11 +1,12 @@
 """Exit status for chained SLURM tasks after their run command completes."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 import dataclasses
 import logging
 import os
 from pathlib import Path
+import time
 from types import MappingProxyType
 
 from tslab.lab.core.status import utc_now_iso
@@ -24,6 +25,7 @@ from tslab.lab.study.paths import study_folder
 from tslab.lab.study.records import (
     append_job,
     JobRecord,
+    ProgressSnapshot,
     read_jobs,
     submission_lock,
     SubmissionLockTimeoutError,
@@ -54,7 +56,7 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
     """
     jobs_path = study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
     loaded = _load_report(
-        context=context, jobs=context.jobs, job_file=job_file, index=index, grace_wait=True
+        context=context, jobs=context.jobs, job_file=job_file, index=index, sleep=time.sleep
     )
     if loaded is None:
         loaded = _load_report(
@@ -62,7 +64,7 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
             jobs=read_jobs(path=jobs_path),
             job_file=job_file,
             index=index,
-            grace_wait=True,
+            sleep=time.sleep,
         )
     if loaded is None:
         return 1
@@ -70,7 +72,12 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
     if report.state is StudyState.DONE:
         return 0
     if report.state is StudyState.INTERRUPTED and _requeued(
-        context=context, job_file=job_file, index=index, jobs_path=jobs_path, environment=os.environ
+        context=context,
+        loaded=loaded,
+        job_file=job_file,
+        index=index,
+        jobs_path=jobs_path,
+        environment=os.environ,
     ):
         return 0
     return 1
@@ -94,7 +101,12 @@ def _no_wait(_seconds: float) -> None:
 
 
 def _load_report(
-    *, context: Context, jobs: Sequence[JobRecord], job_file: int, index: int, grace_wait: bool
+    *,
+    context: Context,
+    jobs: Sequence[JobRecord],
+    job_file: int,
+    index: int,
+    sleep: Callable[[float], None],
 ) -> _TaskReport | None:
     """The report of one task from the given records, or ``None`` when it is unknown."""
     matches = _job_tasks_of(jobs=jobs, job_file=job_file, index=index)
@@ -119,13 +131,19 @@ def _load_report(
             flags=MappingProxyType({}),
             followup_live_job_ids=(),
         ),
-        **({} if grace_wait else {'sleep': _no_wait}),
+        sleep=sleep,
     )
     return _TaskReport(matches=matches, report=reports[0])
 
 
-def _requeued(
-    *, context: Context, job_file: int, index: int, jobs_path: Path, environment: Mapping[str, str]
+def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per fact of the requeue
+    *,
+    context: Context,
+    loaded: _TaskReport,
+    job_file: int,
+    index: int,
+    jobs_path: Path,
+    environment: Mapping[str, str],
 ) -> bool:
     """Requeue the task in place when the mode and the retry rules allow it.
 
@@ -142,8 +160,12 @@ def _requeued(
     """
     if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
         return False
-    # why: the scheduler query can take 30 s, so it runs before the lock is held
+    # why: the scheduler query can take 30 s and the checkpoint search walks the run folder,
+    # so both run before the lock is held, and only when a retry is possible at all
+    if _retryable_task(context=context, loaded=loaded, environment=environment) is None:
+        return False
     max_requeues = _max_batch_requeue()
+    progress = take_progress(run_directory=context.study_directory / loaded.report.run.run_path)
     with ExitStack() as stack:
         try:
             stack.enter_context(
@@ -163,7 +185,29 @@ def _requeued(
             jobs_path=jobs_path,
             environment=environment,
             max_requeues=max_requeues,
+            progress=progress,
         )
+
+
+def _retryable_task(
+    *, context: Context, loaded: _TaskReport, environment: Mapping[str, str]
+) -> TaskRecord | None:
+    """The task of the interrupted attempt with its attempts counted, or ``None`` at the limit."""
+    report = loaded.report
+    _, submitted = loaded.matches[0]
+    latest = report.task
+    if latest is None or report.job_id is None:
+        return None
+    restart_count = int(environment.get(RESTART_COUNT_VARIABLE, '0'))
+    restarts = restarted_attempt(attempt=0, restart_count=restart_count)
+    current = dataclasses.replace(
+        latest,
+        attempt=restarted_attempt(attempt=submitted.attempt, restart_count=restart_count),
+        uncounted_attempts=submitted.uncounted_attempts
+        + max(restarts - (len(loaded.matches) - 1), 0),
+    )
+    counted = dataclasses.replace(report, attempt=current.attempt, task=current)
+    return current if may_retry(report=counted, context=context) else None
 
 
 def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one per fact of the requeue
@@ -174,6 +218,7 @@ def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one pe
     jobs_path: Path,
     environment: Mapping[str, str],
     max_requeues: int | None,
+    progress: ProgressSnapshot,
 ) -> bool:
     """Read the records again, decide and write the next attempt; the lock is held."""
     # why: the grace wait for the run folder already ran before the lock; waiting again
@@ -183,36 +228,24 @@ def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one pe
         jobs=read_jobs(path=jobs_path),
         job_file=job_file,
         index=index,
-        grace_wait=False,
+        sleep=_no_wait,
     )
     if loaded is None or loaded.report.state is not StudyState.INTERRUPTED:
         return False
     report = loaded.report
-    job, submitted = loaded.matches[0]
-    requeues = len(loaded.matches) - 1
+    job, _ = loaded.matches[0]
     latest = report.task
-    if latest is None or report.job_id is None:
+    current = _retryable_task(context=context, loaded=loaded, environment=environment)
+    if current is None or latest is None or report.job_id is None:
         return False
     restart_count = int(environment.get(RESTART_COUNT_VARIABLE, '0'))
-    restarts = restarted_attempt(attempt=0, restart_count=restart_count)
-    current = dataclasses.replace(
-        latest,
-        attempt=restarted_attempt(attempt=submitted.attempt, restart_count=restart_count),
-        uncounted_attempts=submitted.uncounted_attempts + max(restarts - requeues, 0),
-    )
-    counted = dataclasses.replace(report, attempt=current.attempt, task=current)
-    if not may_retry(report=counted, context=context):
-        return False
     if at_requeue_limit(restart_count=restart_count, max_requeues=max_requeues):
         _LOGGER.warning(
             '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', report.job_id
         )
         return False
     following = dataclasses.replace(
-        current,
-        attempt=current.attempt + 1,
-        progress=take_progress(run_directory=context.study_directory / report.run.run_path),
-        uncounted_in_row=0,
+        current, attempt=current.attempt + 1, progress=progress, uncounted_in_row=0
     )
     # why: the scheduler ends this process soon after the requeue call, so the record
     # of the next attempt is written first and taken back when the call fails

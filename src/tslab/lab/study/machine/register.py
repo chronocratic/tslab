@@ -36,7 +36,9 @@ def register_file(*, environment: Mapping[str, str]) -> Path:
         return Path(override)
     config = environment.get('XDG_CONFIG_HOME', '')
     home = environment.get('HOME')
-    base = Path(config) if config != '' else Path(home or '~') / '.config'
+    base = (
+        Path(config) if config != '' else (Path.home() if home is None else Path(home)) / '.config'
+    )
     return base / 'tslab' / 'machines.toml'
 
 

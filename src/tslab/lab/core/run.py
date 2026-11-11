@@ -55,7 +55,7 @@ from tslab.lab.core.status import (
     utc_now_iso,
     write_status,
 )
-from tslab.lab.core.tracker import LocalTracker, RunStatus, Tracker
+from tslab.lab.core.tracker import LocalTracker, RunStatus, STEP_COLUMN, Tracker
 from tslab.lab.enums import InstanceState, LogLevel, RunState
 
 __all__ = ['JobTimeLimitSignal', 'Run', 'RunOptions']
@@ -294,7 +294,13 @@ class Run:
         Args:
             metrics: Name to value.
             step: Optional step for time series of metrics.
+
+        Raises:
+            ValueError: If a metric is named ``step``; pass the step with ``step=``.
         """
+        if STEP_COLUMN in metrics:
+            message = f'a metric cannot be named {STEP_COLUMN!r}; pass the step with step='
+            raise ValueError(message)
         for tracker in self._trackers:
             _call_tracker(
                 tracker=tracker,

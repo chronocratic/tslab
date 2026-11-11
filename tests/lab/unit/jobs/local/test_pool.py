@@ -651,3 +651,62 @@ def test_free_answer_from_before_the_last_release_is_not_kept(*, tmp_path: Path)
     assert gate._is_busy(slot='0') is False  # noqa: SLF001 # why: the free check is the unit
     assert gate._is_busy(slot='0') is False  # noqa: SLF001 # why: the free check is the unit
     assert checks == ['0', '0']
+
+
+def test_a_failing_lease_check_returns_the_slot_so_other_commands_finish(
+    *, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def failing_lease(self: _GpuLeaseGate, *, slot: str) -> GpuLease | None:
+        raise OSError(slot)
+
+    monkeypatch.setattr(_GpuLeaseGate, 'try_lease', failing_lease)
+    errors: list[BaseException] = []
+
+    def on_start(*, key: str, gpu_id: str | None) -> None:
+        pass
+
+    def on_line(*, key: str, line: str) -> None:
+        pass
+
+    def on_event(*, key: str, text: str) -> None:
+        pass
+
+    def on_wait(*, key: str) -> None:
+        pass
+
+    def on_end(*, key: str, gpu_id: str | None, outcome: object) -> None:
+        pass
+
+    def run() -> None:
+        try:
+            run_commands(
+                commands=[
+                    PoolCommand(
+                        key=key,
+                        command=(sys.executable, '-c', 'pass'),
+                        cwd=tmp_path,
+                        environment=os.environ,
+                    )
+                    for key in ('a', 'b')
+                ],
+                slots=2,
+                gpu_ids=('0',),
+                tasks_per_gpu=1,
+                lock_folder=tmp_path,
+                stop=threading.Event(),
+                timeout_seconds=None,
+                signal_seconds=0,
+                on_start=on_start,
+                on_line=on_line,
+                on_event=on_event,
+                on_wait=on_wait,
+                on_end=on_end,
+            )
+        except OSError as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert len(errors) == 1

@@ -189,6 +189,27 @@ def test_json_over_a_folder_reads_each_status_once_and_the_lock_of_running_runs_
     assert locks == [tmp_path / 'b']
 
 
+def test_the_lock_is_read_for_a_failed_run_that_is_being_resumed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    make_run(root=tmp_path, relative_path=Path('b'), factors=(1,))
+    status_file = tmp_path / 'b' / 'status.json'
+    document = json.loads(status_file.read_text(encoding='utf-8'))
+    document['run_state'] = 'failed'
+    status_file.write_text(json.dumps(document), encoding='utf-8')
+    locks: list[Path] = []
+
+    def live(*, directory: Path) -> bool:
+        locks.append(directory)
+        return True
+
+    monkeypatch.setattr(status_module, 'is_run_active', live)
+    Status(path=tmp_path, json=True).run()
+    capsys.readouterr()
+    assert locks == [tmp_path / 'b']
+
+
 def test_the_scan_does_not_descend_below_a_run(tmp_path: Path) -> None:
     make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
     nested = tmp_path / 'a' / 'scale' / 'inner'

@@ -49,6 +49,13 @@ def test_register_file_falls_back_to_dot_config(tmp_path: Path) -> None:
     )
 
 
+def test_register_file_without_home_is_under_the_expanded_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('HOME', str(tmp_path))
+    assert register_file(environment={}) == tmp_path / '.config' / 'tslab' / 'machines.toml'
+
+
 def test_missing_register_is_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv('TSLAB_MACHINES_FILE', str(tmp_path / 'none.toml'))
     assert read_register(environment=os.environ) == {}
