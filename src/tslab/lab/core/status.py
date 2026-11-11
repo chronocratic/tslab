@@ -26,7 +26,6 @@ __all__ = [
     'format_instance_id',
     'parse_instance_id',
     'read_status',
-    'shown_run_state',
     'shown_state_of',
     'utc_now_iso',
     'write_status',
@@ -254,23 +253,6 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
     atomic_write_json(path=path, document=document)
 
 
-def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> ShownRunState:
-    """Return the run state to display: ``interrupted`` for a dead ``running`` run.
-
-    Args:
-        directory: The run folder.
-        snapshot: Its ``status.json``.
-    """
-    # why: core.meta.instance imports core.status at module level and core.lock
-    # imports core.meta, so a module-level import back would cycle
-    from tslab.lab.core.lock import is_run_active  # noqa: PLC0415
-
-    return shown_state_of(
-        run_state=snapshot.run_state,
-        lock_live=snapshot.run_state is not RunState.RUNNING or is_run_active(directory=directory),
-    )
-
-
 def shown_state_of(*, run_state: RunState, lock_live: bool) -> ShownRunState:
     """Return the run state to display from the saved state and the lock.
 
@@ -279,8 +261,12 @@ def shown_state_of(*, run_state: RunState, lock_live: bool) -> ShownRunState:
         lock_live: Whether the lock of the run folder has a recent heartbeat.
 
     Returns:
-        ``interrupted`` for a ``running`` run without a live lock, else the saved state.
+        ``running`` for any saved state while the lock is live (a resumed run, or a
+        finished run that runs again), ``interrupted`` for a ``running`` run without a
+        live lock, else the saved state.
     """
-    if run_state is RunState.RUNNING and not lock_live:
+    if lock_live:
+        return ShownRunState.RUNNING
+    if run_state is RunState.RUNNING:
         return ShownRunState.INTERRUPTED
     return ShownRunState(run_state.value)

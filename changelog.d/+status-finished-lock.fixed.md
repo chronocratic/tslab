@@ -1,1 +1,1 @@
-tslab status reads the run lock for finished runs too, so a finished run that runs again to add stages shows as running.
+tslab status shows a run with a live lock as running whatever its saved state is, including failed and crashed runs that are being resumed.
