@@ -187,14 +187,16 @@ def check_command_clash(*, extra: Mapping[str, type | LazyCommand]) -> None:
 def _top_level_commands(
     *, typed: str | None, extra: Mapping[str, type | LazyCommand]
 ) -> dict[str, type]:
-    """The top-level commands; a lazy one is imported only when it is the one typed."""
+    """The top-level commands; a lazy one is imported only when it is the one typed.
+
+    The caller has checked the names for a clash with `check_command_clash`.
+    """
     added = {
         name: (entry.load() if name == typed else entry.listing())
         if isinstance(entry, LazyCommand)
         else entry
         for name, entry in extra.items()
     }
-    check_command_clash(extra=extra)
     return dict(sorted({**_COMMANDS, **added}.items()))
 
 

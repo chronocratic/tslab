@@ -46,7 +46,7 @@ class IdScope(StrEnum):
 class SlurmCommand:
     """One catalogue entry.
 
-    Args:
+    Attributes:
         name: ``<tool>-<variant>``.
         description: One line for the docs and ``slurm.sh``.
         tool: The SLURM executable.

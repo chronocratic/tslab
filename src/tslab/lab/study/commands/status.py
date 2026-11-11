@@ -50,7 +50,7 @@ def status(
             start time and pending reason.
 
     Returns:
-        ``0``; the command only reads (spec §7).
+        ``0``; the command only reads, so it never fails on the state of a run.
     """
     log_status(context=context, states=states, starts=starts)
     return 0

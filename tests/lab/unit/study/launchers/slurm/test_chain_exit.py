@@ -24,6 +24,7 @@ from tslab.lab.study.paths import study_folder
 from tslab.lab.study.records import (
     append_job,
     JobKind,
+    JobRecord,
     latest_tasks,
     ProgressSnapshot,
     read_jobs,
@@ -512,7 +513,7 @@ def test_chain_exit_reads_the_records_under_the_lock(
     held: list[bool] = []
     real_read = _CHAIN_EXIT_MODULE.read_jobs
 
-    def read_and_probe(*, path: Path) -> list[SlurmJobRecord]:
+    def read_and_probe(*, path: Path) -> list[JobRecord]:
         with lock_path.open('a') as probe:
             try:
                 fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

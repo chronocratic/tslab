@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import override
 
 import pytest
 import torch
@@ -167,6 +168,7 @@ def test_a_new_horizon_reuses_the_cached_encoding(tmp_path: Path) -> None:
 class _InPlaceEncoder(CausalEncoder):
     """Zeroes its inputs in place, as an encoder that clears NaN values may."""
 
+    @override
     def encode_sequence(self, *, inputs: torch.Tensor) -> torch.Tensor:
         encoded = super().encode_sequence(inputs=inputs)
         inputs.zero_()
