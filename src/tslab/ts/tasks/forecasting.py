@@ -362,10 +362,8 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         description = f'the {split} split, horizon {horizon}'
         try:
             # Windows from the encoded series, targets from the data.
-            # why: the encoded series may be shared by the windows of a split, so an encoder
-            # that writes into its input must not reach the other splits
             windows, _ = window_samples(
-                series=encoded_series[:, slices[split]].clone(),
+                series=encoded_series[:, slices[split]],
                 window_length=window_length,
                 horizon=horizon,
                 stride=stride,
@@ -383,7 +381,12 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         # series when it is the same float32 tensor, so an encoder that writes into its
         # input would change them
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
-        flat_windows = windows.reshape(-1, *windows.shape[-2:])
+        # why: the reshape copies the windows, except when it can stay a view of the encoded
+        # series (one series, or a window of one step); overlapping windows of such a view
+        # would share memory, and an encoder may write into its input
+        flat_windows = _unshared(
+            tensor=windows.reshape(-1, *windows.shape[-2:]), sources=(encoded_series,)
+        )
         tensors[f'{split}_representations'] = encode_checked(
             encoder=window_encoder, inputs=flat_windows, description=description
         )
