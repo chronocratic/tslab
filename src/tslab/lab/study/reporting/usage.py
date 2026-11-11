@@ -30,7 +30,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         context: The context of the selected study runs.
 
     Returns:
-        The versioned study-usage document.
+        The study-usage document.
 
     Raises:
         LaunchError: If the usage query fails on the scheduler.
@@ -49,7 +49,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         for report, usage_item in selected
     ]
     return {
-        'schema': 'tslab.study-usage/1',
+        'schema': 'tslab.study-usage',
         'launcher': context.machine.launcher,
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),

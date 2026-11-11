@@ -185,7 +185,7 @@ class Wait:
         )
         if self.json:
             document = status_document(context=context, exit_code=code)
-            document['schema'] = 'tslab.study-wait/1'
+            document['schema'] = 'tslab.study-wait'
             document['waited_seconds'] = waited
             document['timed_out'] = code == EXIT_TIMEOUT
             print_json(document=document)

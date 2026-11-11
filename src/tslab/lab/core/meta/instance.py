@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from tslab.lab.core.stage import _Execution, Stage
 
 __all__ = [
-    'INSTANCE_META_FORMAT_VERSION',
     'can_resume',
     'describe_external_inputs',
     'describe_inputs',
@@ -36,7 +35,8 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-INSTANCE_META_FORMAT_VERSION = 1
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 
 
 def instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fact
@@ -50,7 +50,6 @@ def instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fac
 ) -> dict[str, object]:
     """Return the content of the ``meta.json`` of one executed instance."""
     return {
-        'format_version': INSTANCE_META_FORMAT_VERSION,
         'instance_id': execution.instance_id,
         'stage_version': stage.version,
         'fingerprint': execution.fingerprint,
@@ -93,8 +92,6 @@ def _metadata_reason(*, directory: Path, inputs: Mapping[str, Artifact]) -> str 
     document = read_instance_meta(path=meta_path)
     if document is None:
         return 'cannot read result metadata'
-    if document.get('format_version') != INSTANCE_META_FORMAT_VERSION:
-        return 'unsupported result metadata format'
     return _changed_input_reason(document=document, inputs=inputs)
 
 
@@ -127,12 +124,12 @@ def identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentity
 
     Raises:
         StatusFileError: If the file is missing or does not name a fingerprint
-            and an execution id of the supported format.
+            and an execution id.
     """
     document = read_instance_meta(path=directory / META_FILE)
     fingerprint: object = None
     execution_id: object = None
-    if document is not None and document.get('format_version') == INSTANCE_META_FORMAT_VERSION:
+    if document is not None:
         fingerprint = document.get('fingerprint')
         execution_id = document.get('execution_id')
     if not isinstance(fingerprint, str) or not isinstance(execution_id, str):

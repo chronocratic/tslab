@@ -1,6 +1,6 @@
 """Run metadata written to ``meta.json`` at the run root.
 
-``meta.json`` is a public, versioned format (``format_version``): it lets a
+``meta.json`` is a public format: it lets a
 later study layer group runs (``config_hash_without_seed``) and lets a reader
 reproduce a run (versions, git commit).
 """
@@ -18,7 +18,6 @@ import subprocess
 __all__ = [
     'CODE_SNAPSHOT_VARIABLE',
     'CODE_SNAPSHOT_VARIABLES',
-    'META_FORMAT_VERSION',
     'collect_code_snapshot',
     'collect_git_state',
     'collect_hardware',
@@ -31,7 +30,8 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-META_FORMAT_VERSION = 1
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 _GIT_TIMEOUT_SECONDS = 10
 CODE_SNAPSHOT_VARIABLE = 'TSLAB_CODE_SNAPSHOT'
 _HASH_VARIABLE = 'TSLAB_CODE_SNAPSHOT_HASH'

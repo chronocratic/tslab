@@ -6,7 +6,7 @@ description: Run, follow, debug and collect TSLab studies of this project from t
 # TSLab study workflow
 
 Any coding agent with shell access can use this workflow to run or inspect a study. The
-commands return versioned JSON so you can make decisions from fields, not tables.
+commands return JSON so you can make decisions from fields, not tables.
 
 The study argument is the short name `example`; `tslab.toml` at the project
 root expands it to `<package>.studies.example:study`. Each package defines its

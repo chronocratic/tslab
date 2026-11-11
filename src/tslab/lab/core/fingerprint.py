@@ -33,7 +33,6 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
 __all__ = [
-    'FINGERPRINT_FORMAT_VERSION',
     'CarriesFingerprint',
     'Fingerprintable',
     'NotFingerprinted',
@@ -43,7 +42,8 @@ __all__ = [
     'is_not_fingerprinted',
 ]
 
-FINGERPRINT_FORMAT_VERSION = 3
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 _FINGERPRINT_LENGTH = 16
 _CHUNK_SIZE = 1024 * 1024
 

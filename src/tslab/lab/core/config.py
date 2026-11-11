@@ -31,7 +31,6 @@ from tslab.lab.core.paths import require_path
 from tslab.lab.core.text import qualified_name
 
 __all__ = [
-    'CONFIG_FORMAT_VERSION',
     'NO_PRESET',
     'REQUIRED',
     'ConfigFileError',
@@ -43,7 +42,8 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-CONFIG_FORMAT_VERSION = 1
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 
 # An optional marker for a preset value the preset author cannot know; the
 # user must give it on the command line (tyro stops with "Missing ...").
@@ -62,7 +62,7 @@ def config_to_yaml(*, config: object) -> str:
         config: A dataclass instance.
 
     Returns:
-        YAML text with ``format_version``, ``config_type`` and ``config`` keys.
+        YAML text with ``config_type`` and ``config`` keys.
 
     Raises:
         TypeError: If ``config`` is not a dataclass instance or holds a value
@@ -73,7 +73,6 @@ def config_to_yaml(*, config: object) -> str:
     from tslab.lab.core.codec import config_to_data  # noqa: PLC0415
 
     document = {
-        'format_version': CONFIG_FORMAT_VERSION,
         'config_type': qualified_name(cls=type(config)),
         'config': config_to_data(config=config),
     }
@@ -98,8 +97,8 @@ def config_from_yaml[C](*, config_class: type[C], text: str) -> C:
     from tslab.lab.core.codec import decode_dataclass  # noqa: PLC0415
 
     document = yaml.safe_load(text)
-    if not isinstance(document, dict) or document.get('format_version') != CONFIG_FORMAT_VERSION:
-        message = f'not a TSLab config file (format_version {CONFIG_FORMAT_VERSION} expected)'
+    if not isinstance(document, dict) or not {'config_type', 'config'} <= document.keys():
+        message = 'not a TSLab config file (config_type and config keys expected)'
         raise ConfigFileError(message)
     if document.get('config_type') != qualified_name(cls=config_class):
         _LOGGER.warning(

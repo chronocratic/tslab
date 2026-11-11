@@ -151,7 +151,7 @@ def test_folder_status_json_lists_instances(
     assert Status(path=tmp_path / 'failed', json=True).run() == 0
     document = json.loads(capsys.readouterr().out)
     runs = cast('list[dict[str, object]]', document['runs'])
-    assert document['schema'] == 'tslab.run-status/1'
+    assert document['schema'] == 'tslab.run-status'
     assert document['exit_code'] == 4
     assert runs[0]['directory'] == (tmp_path / 'failed').resolve().as_posix()
     assert runs[0]['state'] == 'failed'

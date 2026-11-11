@@ -122,7 +122,7 @@ def test_usage_cli_json_schema(
         main(args=['study', 'usage', 'toy_studies:study', '--machine', 'cluster.toml', '--json'])
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
-    assert document['schema'] == 'tslab.study-usage/1'
+    assert document['schema'] == 'tslab.study-usage'
 
 
 def test_usage_backend_failure_exits_1(project: Path, fake_backend: FakeBackend) -> None:
@@ -142,7 +142,7 @@ def _write_local_usage(
     (logs / f'{logs.parent.parent.name}_g1_{index}.out.usage.json').write_text(
         json.dumps(
             {
-                'schema': 'tslab.local-usage/1',
+                'schema': 'tslab.local-usage',
                 'attempt': 1,
                 'job_id': 'local-1-1',
                 'exit_code': 0,

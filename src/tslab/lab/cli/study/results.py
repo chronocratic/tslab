@@ -32,7 +32,7 @@ class Results:
         only: Keep only the runs that match axis=value; comma separated for
             several values of one axis.
         out: The CSV file to write.
-        json: Write rows as a versioned JSON document.
+        json: Write rows as a JSON document.
     """
 
     study: Annotated[str, tyro.conf.arg(metavar='STUDY'), tyro.conf.Positional]

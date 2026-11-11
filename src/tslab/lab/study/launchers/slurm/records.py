@@ -58,7 +58,7 @@ class SlurmJobRecord(JobRecord):
     @override
     @classmethod
     def from_document(cls, *, document: Mapping[str, Any]) -> Self:
-        """A record from its JSON form, without the version check."""
+        """A record from its JSON form."""
         job_name = document.get('job_name')
         return replace(
             super().from_document(document=document),

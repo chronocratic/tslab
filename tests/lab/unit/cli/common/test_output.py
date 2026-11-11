@@ -20,8 +20,8 @@ def run_main_raw(*args: str) -> int:
 
 
 def test_print_json_writes_one_document(capsys: pytest.CaptureFixture[str]) -> None:
-    print_json(document={'schema': 'tslab.x/1', 'a': 1})
-    assert json.loads(capsys.readouterr().out) == {'schema': 'tslab.x/1', 'a': 1}
+    print_json(document={'schema': 'tslab.x', 'a': 1})
+    assert json.loads(capsys.readouterr().out) == {'schema': 'tslab.x', 'a': 1}
 
 
 def test_json_mode_sends_logs_to_stderr(
@@ -41,7 +41,7 @@ def test_json_mode_sends_logs_to_stderr(
         root.setLevel(level)
     captured = capsys.readouterr()
     assert code == 0
-    assert json.loads(captured.out) == {'schema': 'tslab.machine-list/1', 'machines': []}
+    assert json.loads(captured.out) == {'schema': 'tslab.machine-list', 'machines': []}
     assert 'no machines' in captured.err
 
 
@@ -49,7 +49,7 @@ def test_json_parse_error_prints_error_document(capsys: pytest.CaptureFixture[st
     code = run_main_raw('machine', 'list', '--json', '--bogus')
     document = json.loads(capsys.readouterr().out)
     assert code == 2
-    assert document['schema'] == 'tslab.error/1'
+    assert document['schema'] == 'tslab.error'
     assert document['exit_code'] == 2
 
 
@@ -86,7 +86,7 @@ def test_json_command_exception_prints_error_document(
 
     document = json.loads(capsys.readouterr().out)
     assert document == {
-        'schema': 'tslab.error/1',
+        'schema': 'tslab.error',
         'exit_code': 1,
         'message': 'unexpected command failure',
     }

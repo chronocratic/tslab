@@ -30,9 +30,10 @@ def error_document(*, exit_code: int, message: str) -> dict[str, object]:
         message: Human-readable error message.
 
     Returns:
-        The versioned error document.
+        The error document.
     """
-    return {'schema': 'tslab.error/1', 'exit_code': exit_code, 'message': message}
+    # When the API is stable, version the schema ids (for example tslab.study-status/1).
+    return {'schema': 'tslab.error', 'exit_code': exit_code, 'message': message}
 
 
 def reset_document_state() -> None:

@@ -91,7 +91,6 @@ def test_meta_and_hashes(tmp_path: Path) -> None:
         pass
     first = json.loads((tmp_path / 'a' / 'seed_1' / 'meta.json').read_text(encoding='utf-8'))
     second = json.loads((tmp_path / 'a' / 'seed_2' / 'meta.json').read_text(encoding='utf-8'))
-    assert first['format_version'] == 1
     assert first['relative_path'] == 'a/seed_1'
     assert first['config_hash'] != second['config_hash']
     assert first['config_hash_without_seed'] == second['config_hash_without_seed']
