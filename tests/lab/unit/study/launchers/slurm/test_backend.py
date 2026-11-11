@@ -14,6 +14,7 @@ from typing import cast, TYPE_CHECKING
 import pytest
 
 from tests.lab.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
+from tests.lab.unit.study.launchers.slurm.helpers import skip_query_waits
 from tests.support.fake_slurm import FakeSlurm
 from tslab.lab.cli import main
 from tslab.lab.enums import AfterCondition, CheckStatus, JobFlag, JobPhase, LauncherKind
@@ -236,7 +237,7 @@ def test_job_states_returns_unknown_when_scheduler_is_unavailable(
 def test_job_states_returns_unknown_after_scheduler_error(
     *, project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
+    skip_query_waits(monkeypatch=monkeypatch)
     submit_study(project=project)
     ctx = _context(project=project, fake=fake)
     fake.set_answers('squeue', [{'exit': 1, 'stderr': 'squeue: cannot access scheduler'}])
@@ -592,7 +593,7 @@ def test_wait_stops_asking_slurm_about_ended_tasks(project: Path, fake: FakeSlur
 def test_failed_query_leaves_the_cache_unchanged(
     project: Path, fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
+    skip_query_waits(monkeypatch=monkeypatch)
     submit_study(project=project)
     fake.set_answers('sacct', [{'exit': 1, 'stderr': 'down'}])
     ended: dict[str, str] = {}

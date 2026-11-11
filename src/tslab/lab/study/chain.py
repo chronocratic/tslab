@@ -134,18 +134,25 @@ def downstream_of(
         if report.state in (StudyState.WAITING, StudyState.DEPENDENCY_FAILED, StudyState.MISSING)
         and report.run.run_path not in given
     ]
-    dependents: dict[PurePosixPath, list[PurePosixPath]] = defaultdict(list)
-    for report in candidates:
-        for upstream_path in _upstream_paths(study=study, run=report.run):
-            dependents[upstream_path].append(report.run.run_path)
+    dependents = _dependents(study=study, candidates=candidates)
     found: set[PurePosixPath] = set()
     queue = deque(given)
     while queue:
-        for path in dependents[queue.popleft()]:
-            if path not in found:
-                found.add(path)
-                queue.append(path)
+        new = [path for path in dependents[queue.popleft()] if path not in found]
+        found.update(new)
+        queue.extend(new)
     return [report for report in candidates if report.run.run_path in found]
+
+
+def _dependents(
+    *, study: Study, candidates: Sequence[RunReport]
+) -> defaultdict[PurePosixPath, list[PurePosixPath]]:
+    """The run paths that directly depend on each upstream run path, built once."""
+    dependents: defaultdict[PurePosixPath, list[PurePosixPath]] = defaultdict(list)
+    for report in candidates:
+        for upstream_path in _upstream_paths(study=study, run=report.run):
+            dependents[upstream_path].append(report.run.run_path)
+    return dependents
 
 
 def _upstream_paths(*, study: Study, run: StudyRun) -> set[PurePosixPath]:

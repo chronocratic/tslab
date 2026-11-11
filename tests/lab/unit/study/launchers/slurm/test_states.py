@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 import pytest
 
 from tests.lab.unit.study.helpers import context, submit_study
+from tests.lab.unit.study.launchers.slurm.helpers import skip_query_waits
 from tests.support.fake_slurm import FakeSlurm
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import LauncherKind
@@ -156,7 +157,7 @@ def test_expected_starts_logs_and_gives_none_when_squeue_fails(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
+    skip_query_waits(monkeypatch=monkeypatch)
     submit_study(project=project)
     fake.set_answers(
         'squeue',

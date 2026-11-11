@@ -1,8 +1,9 @@
 """``LightningTrainer``: the ready ``Trainer`` for ``LightningModule`` models."""
 
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from datetime import timedelta
+from enum import StrEnum
 import logging
 import os
 from pathlib import Path
@@ -26,7 +27,7 @@ from tslab.lab.jobs.slurm import parse_slurm_duration, task_count
 from tslab.ml.artifacts import Checkpoint
 from tslab.ml.interfaces.data import DataSource
 from tslab.ml.interfaces.trainer import Trainer
-from tslab.ml.lightning.callbacks import _SignalStop, build_callbacks
+from tslab.ml.lightning.callbacks import _deferred_sigterm, _SignalStop, build_callbacks
 from tslab.ml.lightning.config import LightningTrainerConfig
 from tslab.ml.lightning.data import LightningDataSource
 from tslab.ml.lightning.ranks import agree
@@ -44,13 +45,12 @@ _RESERVED_TRAINER_KWARGS = frozenset(
 
 
 @contextmanager
-def _defer_time_limit_signals(*, run: Run, signal_stop: _SignalStop) -> Generator[None, None, None]:
+def _defer_time_limit_signals(*, signal_stop: _SignalStop) -> Generator[None]:
     sigusr2 = getattr(signal, 'SIGUSR2', None)
     if sigusr2 is None or current_thread() is not main_thread():
         yield
         return
     previous_sigusr2 = signal.getsignal(sigusr2)
-    previous_sigterm = signal.getsignal(signal.SIGTERM)
 
     def defer_sigusr2(signal_number: int, frame: FrameType | None) -> None:
         signal_stop.request_stop()
@@ -60,22 +60,16 @@ def _defer_time_limit_signals(*, run: Run, signal_stop: _SignalStop) -> Generato
             except JobTimeLimitSignal:
                 return
 
-    def defer_sigterm(signal_number: int, frame: FrameType | None) -> None:
-        if signal_stop.signalled or run.time_limit_signalled:
-            _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
-            return
-        if callable(previous_sigterm):
-            previous_sigterm(signal_number, frame)
-        elif previous_sigterm is not signal.SIG_IGN:
-            raise SystemExit(128 + signal_number)
-
-    signal.signal(sigusr2, defer_sigusr2)
-    try:
-        signal.signal(signal.SIGTERM, defer_sigterm)
+    with ExitStack() as restore:
+        # why: the last registered callback runs first on exit, so the filter that the
+        # callback put over the handler of Lightning goes before this one, then SIGUSR2
+        restore.callback(
+            signal.signal, sigusr2, signal.SIG_DFL if previous_sigusr2 is None else previous_sigusr2
+        )
+        signal.signal(sigusr2, defer_sigusr2)
+        restore.enter_context(_deferred_sigterm(stopping=lambda: signal_stop.signalled))
+        restore.callback(signal_stop.restore_sigterm)
         yield
-    finally:
-        signal.signal(signal.SIGTERM, previous_sigterm)
-        signal.signal(sigusr2, previous_sigusr2)
 
 
 class LightningTrainer(Trainer[LightningModule]):
@@ -178,7 +172,7 @@ class LightningTrainer(Trainer[LightningModule]):
             signal_received=run.time_limit_signalled,
             deadline=deadline,
         )
-        with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+        with _defer_time_limit_signals(signal_stop=signal_stop):
             trainer = self._build_trainer(
                 run=run,
                 checkpoint_directory=checkpoint_directory,
@@ -293,26 +287,34 @@ class _TrainerCallbacks(Protocol):
     callbacks: list[Callback]
 
 
-def _training_stop_reason(*, trainer: lightning.Trainer) -> str:
+class _StopReason(StrEnum):
+    """Why a normal training stopped; the value is saved in ``training.json``."""
+
+    MAX_TRAINING_TIME = 'max_training_time'
+    EARLY_STOPPING = 'early_stopping'
+    MAX_EPOCHS = 'max_epochs'
+
+
+def _training_stop_reason(*, trainer: lightning.Trainer) -> _StopReason:
     """Name the rule that stopped a normal training.
 
     Args:
         trainer: The trainer after ``fit`` returned normally.
 
     Returns:
-        ``'max_training_time'`` if the training timer ran out, ``'early_stopping'`` if an
-        early-stopping callback stopped the training, otherwise ``'max_epochs'``.
+        ``MAX_TRAINING_TIME`` if the training timer ran out, ``EARLY_STOPPING`` if an
+        early-stopping callback stopped the training, otherwise ``MAX_EPOCHS``.
     """
     callbacks = cast('_TrainerCallbacks', trainer).callbacks
     if any(
         isinstance(callback, Timer) and _timer_ran_out(timer=callback) for callback in callbacks
     ):
-        return 'max_training_time'
+        return _StopReason.MAX_TRAINING_TIME
     if any(
         isinstance(callback, EarlyStopping) and callback.stopped_epoch > 0 for callback in callbacks
     ):
-        return 'early_stopping'
-    return 'max_epochs'
+        return _StopReason.EARLY_STOPPING
+    return _StopReason.MAX_EPOCHS
 
 
 def _timer_ran_out(*, timer: Timer) -> bool:
@@ -329,7 +331,7 @@ def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> No
         directory: The checkpoint directory that receives the record.
     """
     stop_reason = _training_stop_reason(trainer=trainer)
-    if stop_reason == 'max_training_time':
+    if stop_reason is _StopReason.MAX_TRAINING_TIME:
         _LOGGER.warning(
             'training stopped at max_training_time after %d epochs; the result depends on '
             'hardware speed and is not reproducible from the seed; use max_epochs for '
@@ -340,7 +342,7 @@ def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> No
         path=directory / 'training.json',
         document={
             'schema': 'tslab.training/1',
-            'stop_reason': stop_reason,
+            'stop_reason': stop_reason.value,
             'epochs': trainer.current_epoch,
             'steps': trainer.global_step,
         },

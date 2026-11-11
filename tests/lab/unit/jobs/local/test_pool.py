@@ -608,3 +608,26 @@ def test_pool_stop_starts_nothing_new(*, tmp_path: Path) -> None:
     assert tuple(sorted(never_started)) == ('k1', 'k2')
     assert [key for key, _gpu_id in starts] == ['k0']
     assert [key for key, _gpu_id, _outcome in ends] == ['k0']
+
+
+def test_a_slow_free_check_does_not_block_another_gpu(*, tmp_path: Path) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    def gpu_free(gpu_id: str) -> bool:
+        if gpu_id == '0':
+            entered.set()
+            release.wait(timeout=10)
+        return True
+
+    gate = _GpuLeaseGate(
+        lock_folder=tmp_path, tasks_per_gpu=1, gpu_free=gpu_free, busy_recheck_seconds=60.0
+    )
+    slow = threading.Thread(target=lambda: gate.try_lease(slot='0'))
+    slow.start()
+    assert entered.wait(timeout=10)
+    other = gate.try_lease(slot='1')
+    release.set()
+    slow.join(timeout=10)
+    assert other is not None
+    other.release()

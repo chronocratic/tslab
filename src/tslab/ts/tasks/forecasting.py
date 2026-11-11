@@ -207,8 +207,7 @@ def window_samples(
     return inputs.permute(0, 1, 3, 2), targets.permute(0, 1, 3, 2)
 
 
-def _input_series(*, data: ForecastingSeries, series: Tensors | None) -> torch.Tensor:
-    full = data.full_series()
+def _input_series(*, full: torch.Tensor, series: Tensors | None) -> torch.Tensor:
     if series is None:
         return full.to(dtype=torch.float32)
     replacement = series.tensors['series']
@@ -256,7 +255,8 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
     """
     del run, name
     slices = checked_split_slices(data=data)
-    inputs = _input_series(data=data, series=series)
+    full = data.full_series()
+    inputs = _input_series(full=full, series=series)
     sequence_encoder = load_encoder(
         trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
     )
@@ -271,7 +271,7 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
             f'{tuple(inputs.shape)}; expected (N, T, D)'
         )
         raise ValueError(message)
-    targets = data.full_series().to(dtype=torch.float32)[..., list(data.info.target_channels)]
+    targets = full.to(dtype=torch.float32)[..., list(data.info.target_channels)]
     tensors: dict[str, torch.Tensor] = {}
     for split in SPLITS:
         tensors[f'{split}_sequence'] = sequences[:, slices[split]]
@@ -283,7 +283,7 @@ def encode_series[M](  # noqa: PLR0913 # why: keyword-only public API; each inpu
 def horizon_samples(
     *, run: Run, name: InstanceName | None = None, sequences: Tensors, horizon: int
 ) -> Tensors:
-    """Cut the forecasting samples of one horizon out of ``encode_series``'s result.
+    """Cut the forecasting samples of one horizon out of the result of ``encode_series``.
 
     The features at a position are its representation; the targets are the
     next ``horizon`` steps of the target channels. Every position with a full
@@ -336,8 +336,9 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
     """
     del run, name
     slices = checked_split_slices(data=data)
-    encoded_series = _input_series(data=data, series=series)
-    clean = data.full_series().to(dtype=torch.float32)
+    full = data.full_series()
+    encoded_series = _input_series(full=full, series=series)
+    clean = full.to(dtype=torch.float32)
     window_encoder = load_encoder(
         trainer=trainer, model=model, checkpoint=checkpoint, encoder=encoder
     )

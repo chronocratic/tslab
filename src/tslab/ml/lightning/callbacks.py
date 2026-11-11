@@ -1,5 +1,7 @@
 """Training callbacks: checkpoints, early stopping, learning rate and total training time."""
 
+from collections.abc import Callable, Generator
+from contextlib import contextmanager, ExitStack
 import logging
 from pathlib import Path
 import signal
@@ -31,6 +33,37 @@ _LOGGER = logging.getLogger(__name__)
 _STATE_KEY = 'timer_callback_state'
 
 
+@contextmanager
+def _deferred_sigterm(*, stopping: Callable[[], bool]) -> Generator[None]:
+    """Ignore ``SIGTERM`` while a stop is saving; the previous handler comes back on exit.
+
+    Args:
+        stopping: Whether a stop is saving, so a ``SIGTERM`` must not interrupt it.
+
+    Yields:
+        Nothing; off the main thread no handler can be installed and nothing changes.
+    """
+    if current_thread() is not main_thread():
+        yield
+        return
+    previous = signal.getsignal(signal.SIGTERM)
+
+    def defer(signal_number: int, frame: FrameType | None) -> None:
+        if stopping():
+            _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
+            return
+        if callable(previous):
+            previous(signal_number, frame)
+        elif previous is not signal.SIG_IGN:
+            raise SystemExit(128 + signal_number)
+
+    signal.signal(signal.SIGTERM, defer)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL if previous is None else previous)
+
+
 class _SignalStop(Callback):
     def __init__(
         self,
@@ -45,6 +78,7 @@ class _SignalStop(Callback):
         self._signal_received = signal_received
         self._checkpoint_directory = checkpoint_directory
         self._deadline = deadline
+        self._sigterm_filter = ExitStack()
         self._sigterm_filter_installed = False
 
     @property
@@ -65,25 +99,15 @@ class _SignalStop(Callback):
         self._install_sigterm_filter()
 
     def _install_sigterm_filter(self) -> None:
-        if (
-            self._sigterm_filter_installed
-            or getattr(signal, 'SIGUSR2', None) is None
-            or current_thread() is not main_thread()
-        ):
+        if self._sigterm_filter_installed or getattr(signal, 'SIGUSR2', None) is None:
             return
-        previous = signal.getsignal(signal.SIGTERM)
-
-        def defer_after_usr2(signal_number: int, frame: FrameType | None) -> None:
-            if self.signalled:
-                _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
-                return
-            if callable(previous):
-                previous(signal_number, frame)
-            elif previous is not signal.SIG_IGN:
-                raise SystemExit(128 + signal_number)
-
-        signal.signal(signal.SIGTERM, defer_after_usr2)
+        self._sigterm_filter.enter_context(_deferred_sigterm(stopping=lambda: self.signalled))
         self._sigterm_filter_installed = True
+
+    def restore_sigterm(self) -> None:
+        """Put back the ``SIGTERM`` handler that was in place before the filter."""
+        self._sigterm_filter.close()
+        self._sigterm_filter_installed = False
 
     @override
     def on_train_batch_end(
