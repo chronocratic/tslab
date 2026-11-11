@@ -3,6 +3,7 @@
 from collections import deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,7 @@ import uuid
 
 from tslab.lab.jobs.local.process import ProcessResult
 
-__all__ = ['TaskInfo', 'TaskOutput', 'tail_lines']
+__all__ = ['TaskInfo', 'TaskOutput', 'TaskOutputState', 'tail_lines']
 
 
 def tail_lines(*, path: Path, lines: int) -> list[str] | None:
@@ -30,6 +31,13 @@ def tail_lines(*, path: Path, lines: int) -> list[str] | None:
             return [line.rstrip('\r\n') for line in deque(file, maxlen=lines)]
     except FileNotFoundError:
         return None
+
+
+class TaskOutputState(StrEnum):
+    """The state of a task that the output reports to its callback."""
+
+    RUNNING = 'running'
+    ENDED = 'ended'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -64,7 +72,7 @@ class TaskOutput:
         single_slot: bool,
         tasks: Mapping[str, TaskInfo],
         header: Callable[[str], str],
-        on_task_state: Callable[[str, str], None] | None,
+        on_task_state: Callable[[str, TaskOutputState], None] | None,
     ) -> None:
         """Set up the output.
 
@@ -75,8 +83,8 @@ class TaskOutput:
             tasks: The task info per key.
             header: The header line of the log of a task, given its key; called
                 when the task starts.
-            on_task_state: Called with the key and ``'running'`` or
-                ``'ended'``, or ``None``.
+            on_task_state: Called with the key and a ``TaskOutputState``, or
+                ``None``.
         """
         self._stream = stream
         self._single_slot = single_slot
@@ -106,7 +114,7 @@ class TaskOutput:
                 )
                 self._console(line=started)
         if self._on_task_state is not None:
-            self._on_task_state(key, 'running')
+            self._on_task_state(key, TaskOutputState.RUNNING)
 
     def on_line(self, key: str, line: str) -> None:
         """One output line of a task: to the log, and to the console on one slot."""
@@ -157,7 +165,7 @@ class TaskOutput:
                 },
             )
         if self._on_task_state is not None:
-            self._on_task_state(key, 'ended')
+            self._on_task_state(key, TaskOutputState.ENDED)
 
     def _footer(self, *, task: TaskInfo, outcome: ProcessResult) -> str:
         """The line the log of the finished task ends with."""

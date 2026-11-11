@@ -22,6 +22,7 @@ from tslab.lab.jobs.local import (
     stop_on_signals,
     TaskInfo,
     TaskOutput,
+    TaskOutputState,
     Watchdog,
     without_scheduler_variables,
 )
@@ -116,8 +117,8 @@ class _LaunchStates:
         if self._on_task_state is not None:
             self._on_task_state(task_id=key, state=state, pid=pid)
 
-    def on_task_state(self, key: str, state: str) -> None:
-        # why: the job helpers report the state as text; it becomes a member here
+    def on_task_state(self, key: str, state: TaskOutputState) -> None:
+        # why: the state enum of the job helpers and the saved one share their text
         task_state = LocalTaskState(state)
         if task_state is not LocalTaskState.ENDED:
             self._report(key=key, state=task_state)

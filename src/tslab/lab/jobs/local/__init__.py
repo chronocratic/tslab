@@ -12,7 +12,7 @@ from tslab.lab.jobs.local.gpus import (
     try_lease_gpu,
     visible_gpus,
 )
-from tslab.lab.jobs.local.output import tail_lines, TaskInfo, TaskOutput
+from tslab.lab.jobs.local.output import tail_lines, TaskInfo, TaskOutput, TaskOutputState
 from tslab.lab.jobs.local.pool import (
     OnEnd,
     OnEvent,
@@ -49,6 +49,7 @@ __all__ = [
     'StopRequest',
     'TaskInfo',
     'TaskOutput',
+    'TaskOutputState',
     'Watchdog',
     'boot_id',
     'busy_gpus',
