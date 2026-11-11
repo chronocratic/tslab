@@ -95,7 +95,7 @@ recipe value with `from_presets(..., without=(...))` when the study owns it.
 With `studies = "my_paper.studies"` in `tslab.toml`, the short name `example`
 resolves to `my_paper.studies.example:study`. Put each study in its own module
 or package; shared definitions belong in `common`. Run `tslab study list` to
-discover the available names; `--json` emits the `tslab.study-list/1` schema.
+discover the available names; `--json` emits the `tslab.study-list` schema.
 Importing a study imports the user's scripts, so a few seconds on a login node
 is normal.
 
@@ -355,7 +355,7 @@ uv run tslab study submit example --machine cluster \
 - The study folder `<output_root>/<study>/.study/` holds everything the
   layer writes: `jobs/` (one `.sbatch` and one `.tasks` file per submission),
   `logs/` (one file per run, every attempt) and `submissions.jsonl` — the
-  public record, `format_version: 1`, one JSON object per line: submission
+  public record, one JSON object per line: submission
   id, time, launcher, job id, and per task the array index, grid, run path,
   full command, resolved resources, attempt number and progress snapshot.
 
@@ -692,7 +692,7 @@ TSLab writes the CSV with the standard library and adds no analysis;
 Python: `Study.results(*, machine)` returns the rows).
 
 Use `--out -` to write CSV to standard output. Add `--json` to write the
-versioned `tslab.study-results/1` document to a file or standard output:
+`tslab.study-results` document to a file or standard output:
 
 ```bash
 uv run tslab study results example --machine cluster --out -
@@ -704,7 +704,7 @@ uv run tslab study results example --machine cluster --out - --json
 `tslab study show` lists each grid, its command, axis value names, and run
 counts without needing a machine profile. Use those names to form `--grid` and
 `--only axis=value` selections. Add `--json` for the
-`tslab.study-show/1` document. See the [Agent guide](agents.md).
+`tslab.study-show` document. See the [Agent guide](agents.md).
 
 ```bash
 uv run tslab study show example --json
@@ -794,7 +794,7 @@ of the time suggestion, their memory still counting.
 One line per resource group (the runs that share the resolved `[slurm]`
 settings) suggests a `time` and a `mem_per_cpu` that fit the largest run of
 the group with a 20 percent margin; that is the value to put in the machine
-profile. `--json` prints the `tslab.study-usage/1` document. On a local machine
+profile. `--json` prints the `tslab.study-usage` document. On a local machine
 it reads the usage files of the tasks instead of `sacct` (see
 [Local machines](#local-machines)).
 
