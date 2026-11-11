@@ -23,6 +23,7 @@ def run_two_ranks(*, run_root: Path, logs_root: Path) -> tuple[list[int], list[s
         'SLURM_JOB_NAME': 'tslab-test',
         'SLURM_NTASKS': '2',
         'SLURM_NTASKS_PER_NODE': '2',
+        'SLURM_JOB_NODELIST': 'localhost',
         'SLURM_NODELIST': 'localhost',
         'SLURM_NNODES': '1',
         'SLURM_NODEID': '0',

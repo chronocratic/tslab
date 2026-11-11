@@ -184,7 +184,7 @@ def window_samples(
 
     Returns:
         Inputs ``(N, W, window_length, C)`` and targets ``(N, W, horizon, C)``.
-        Both are views on ``series``; reshaping them copies.
+        Both are views on ``series``; reshaping them copies only when ``N`` is not 1.
 
     Raises:
         ValueError: If a setting is below 1 or the series is too short.
@@ -370,7 +370,9 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         # series when it is the same float32 tensor, so an encoder that writes into its
         # input would change them
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
-        flat_windows = windows.reshape(-1, *windows.shape[-2:])
+        # why: with one series the reshape is a view of the encoded series, which is the data
+        # itself for float32; an encoder that writes into its input would corrupt later splits
+        flat_windows = windows.reshape(-1, *windows.shape[-2:]).clone()
         tensors[f'{split}_representations'] = encode_checked(
             encoder=window_encoder, inputs=flat_windows, description=description
         )

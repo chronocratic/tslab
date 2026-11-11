@@ -1,13 +1,29 @@
-"""Share stage cache decisions between tasks on one SLURM node."""
+"""Share stage cache decisions between the tasks of one SLURM job."""
 
 from collections.abc import Mapping
 from datetime import timedelta
 
+from lightning.fabric.plugins.environments import SLURMEnvironment
 from torch._C._distributed_c10d import TCPStore
 
 __all__ = ['agree']
 
 _STORE: TCPStore | None = None
+
+
+def store_host(*, environment: Mapping[str, str]) -> str:
+    """The host of the store: ``MASTER_ADDR`` when set, else the first node of the job.
+
+    Args:
+        environment: SLURM job and process variables.
+
+    Returns:
+        The host name that every task of the job can reach, and rank zero runs on.
+    """
+    master = environment.get('MASTER_ADDR', '')
+    if master != '':
+        return master
+    return SLURMEnvironment.resolve_root_node_address(environment['SLURM_JOB_NODELIST'])
 
 
 def agree(*, key: str, value: bool, environment: Mapping[str, str]) -> bool:
@@ -26,7 +42,7 @@ def agree(*, key: str, value: bool, environment: Mapping[str, str]) -> bool:
     if _STORE is None:
         # why: job ids separated by 10000 can collide on the same node; revisit the port if needed
         _STORE = TCPStore(
-            host_name='127.0.0.1',
+            host_name=store_host(environment=environment),
             port=25000 + int(environment['SLURM_JOB_ID']) % 10000,
             world_size=int(environment['SLURM_NTASKS']),
             is_master=rank == 0,

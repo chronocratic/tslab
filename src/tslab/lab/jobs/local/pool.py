@@ -213,10 +213,14 @@ class _GpuLeaseGate:
             fresh = self._fresh_answer(slot=slot)
             if fresh is not None:
                 return not fresh
-            return not self._ask(slot=slot, gpu_free=self._gpu_free)
+            return not self._ask(slot=slot)
 
-    def _ask(self, *, slot: str, gpu_free: Callable[[str], bool]) -> bool:
+    def _ask(self, *, slot: str) -> bool:
         """Call ``gpu_free`` for the slot; keep the answer unless the last lease ended meanwhile."""
+        gpu_free = self._gpu_free
+        if gpu_free is None:
+            message = 'gpu_free is required to ask about a GPU'
+            raise ValueError(message)
         with self._lock:
             generation = self._generations.get(slot, 0)
         free = gpu_free(slot)
@@ -346,13 +350,23 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
         busy_recheck_seconds=busy_recheck_seconds,
     )
 
+    def try_lease_or_return_slot(*, slot: str) -> GpuLease | None:
+        """Try to lease the GPU of the slot; a failing check gives the slot back."""
+        try:
+            return gate.try_lease(slot=slot)
+        except Exception:
+            # why: a failing lease check must not keep the slot token, or the other commands
+            # wait for it forever
+            slot_queue.put(slot)
+            raise
+
     def take_lease(*, command: PoolCommand) -> tuple[GpuLease | None, str | None]:
         """Take one free slot, and the GPU lock of its id, for the command."""
         slot = slot_queue.get()
         if slot is None:
             return None, slot
         waited = False
-        while (lease := gate.try_lease(slot=slot)) is None and not stop.is_set():
+        while (lease := try_lease_or_return_slot(slot=slot)) is None and not stop.is_set():
             if not waited:
                 on_wait(key=command.key)
                 waited = True

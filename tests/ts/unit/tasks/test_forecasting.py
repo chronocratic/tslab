@@ -210,6 +210,22 @@ def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_targets(
         assert torch.equal(edited.tensors[f'{split}_targets'], plain.tensors[f'{split}_targets'])
 
 
+def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_data_for_later_horizons(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    full_series = ToySeries.full_series
+    monkeypatch.setattr(ToySeries, 'full_series', lambda self: full_series(self)[:1])
+    with run_in(root=tmp_path / 'plain') as run:
+        plain = representations(run=run, model=VectorEncoder(), horizons=(2, 3), window_length=4)
+    with run_in(root=tmp_path / 'edited') as run:
+        edited = representations(
+            run=run, model=_InPlaceWindowEncoder(), horizons=(2, 3), window_length=4
+        )
+    for horizon in (2, 3):
+        for key, value in plain[horizon].tensors.items():
+            assert torch.equal(edited[horizon].tensors[key], value)
+
+
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
     shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})
