@@ -67,7 +67,7 @@ def _open_lock(*, folder: Path, name: str) -> int:
 
 
 def _lock_now(*, fd: int, lock: int) -> bool:
-    """Try to take a flock without waiting; close the fd when it is held."""
+    """Try to take a flock without waiting; close the fd when another process holds it."""
     try:
         fcntl.flock(fd, lock | fcntl.LOCK_NB)
     except BlockingIOError:
