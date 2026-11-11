@@ -15,6 +15,7 @@ import dataclasses
 from enum import Enum, StrEnum
 import hashlib
 import json
+import numbers
 from pathlib import Path
 from typing import (
     Annotated,
@@ -147,8 +148,10 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
     """Convert ``value`` into a JSON-compatible form with a single spelling.
 
     Rules:
-        - ``None``, ``bool``, ``int``, ``str`` are kept as they are.
-        - ``float`` becomes its ``repr`` string, which is exact.
+        - ``None``, ``bool``, ``int``, ``str`` are kept as they are; any other integer
+          type, such as a NumPy ``int64``, becomes an ``int``.
+        - ``float`` and any other real number type, such as a NumPy ``float32``, becomes
+          the ``repr`` string of the float, which is exact.
         - ``Path`` becomes its POSIX string; the file content is *not* hashed.
         - ``StrEnum`` becomes its value, so a rename of the class or member keeps the
           fingerprint; any other ``Enum`` raises ``TypeError``.
@@ -174,9 +177,10 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
         return _enum_value(value=value)
     if value is None or isinstance(value, bool | int | str):
         return value
-    if isinstance(value, float):
-        # why: the repr of a NumPy float is not the repr of the same number as a float
-        return repr(float(value))
+    # why: NumPy scalars such as float32 and int64 are not float or int, and the repr of a
+    # NumPy float is not the repr of the same number as a float
+    if isinstance(value, numbers.Real):
+        return int(value) if isinstance(value, numbers.Integral) else repr(float(value))
     if isinstance(value, Path):
         return value.as_posix()
     if isinstance(value, CarriesFingerprint):

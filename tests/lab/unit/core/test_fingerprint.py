@@ -112,6 +112,15 @@ def test_a_numpy_float_has_the_fingerprint_of_the_same_float() -> None:
     assert fingerprint_of(numpy.float64(0.1)) == fingerprint_of(0.1)
 
 
+def test_numpy_scalars_have_the_fingerprint_of_the_same_python_number() -> None:
+    numpy = pytest.importorskip('numpy')
+    assert canonicalize(value=numpy.int64(3)) == 3
+    assert isinstance(canonicalize(value=numpy.int64(3)), int)
+    assert fingerprint_of(numpy.int32(3)) == fingerprint_of(3)
+    assert canonicalize(value=numpy.float32(0.5)) == canonicalize(value=0.5)
+    assert fingerprint_of(numpy.float32(0.5)) == fingerprint_of(0.5)
+
+
 def test_mapping_order_does_not_matter() -> None:
     assert fingerprint_of({'a': 1, 'b': 2}) == fingerprint_of({'b': 2, 'a': 1})
 

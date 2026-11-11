@@ -28,6 +28,7 @@ def representations(  # noqa: PLR0913
     window_length: int | None = None,
     name: str | None = None,
     series: tslab.ml.Tensors | None = None,
+    stride: int = 2,
 ) -> dict[int, tslab.ml.Tensors]:
     trainer = FakeTrainer()
     checkpoint = tslab.ml.stages.train(run=run, trainer=trainer, model=model, data=ToySeries())
@@ -40,7 +41,7 @@ def representations(  # noqa: PLR0913
         encoder=tslab.ts.ModelAsEncoder(device='cpu'),
         horizons=horizons,
         window_length=window_length,
-        stride=2,
+        stride=stride,
         name=name,
         series=series,
     )
@@ -192,6 +193,46 @@ class _InPlaceWindowEncoder(VectorEncoder):
         encoded = super().encode(inputs=inputs)
         inputs.zero_()
         return encoded
+
+
+class _CenteringEncoder(VectorEncoder):
+    """Subtracts the mean of each window from the window, in place or not."""
+
+    def __init__(self, *, in_place: bool) -> None:
+        super().__init__()
+        self.in_place = in_place
+
+    @override
+    def encode(self, *, inputs: torch.Tensor) -> torch.Tensor:
+        mean = inputs.mean(dim=1, keepdim=True)
+        if self.in_place:
+            inputs -= mean
+            return super().encode(inputs=inputs)
+        return super().encode(inputs=inputs - mean)
+
+
+@pytest.mark.parametrize(('window_length', 'stride'), [(4, 2), (1, 1), (4, 1)])
+def test_overlapping_windows_of_one_series_survive_an_encoder_that_edits_its_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, window_length: int, stride: int
+) -> None:
+    dataset = ToySeries().full_series()[:1].clone()
+    monkeypatch.setattr(ToySeries, 'full_series', lambda _self: dataset)
+    before = dataset.clone()
+    results = []
+    for in_place in (False, True):
+        with run_in(root=tmp_path / str(in_place)) as run:
+            results.append(
+                representations(
+                    run=run,
+                    model=_CenteringEncoder(in_place=in_place),
+                    horizons=(2,),
+                    window_length=window_length,
+                    stride=stride,
+                )[2]
+            )
+    for key, value in results[0].tensors.items():
+        assert torch.equal(results[1].tensors[key], value)
+    assert torch.equal(dataset, before)
 
 
 def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_targets(
