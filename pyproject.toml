@@ -47,7 +47,7 @@ full = ["tslab[ts,chronocratic-models,chronocratic-datasets,analysis]"]
 tslab = "tslab.cli:main"
 
 [project.urls]
-Repository = "https://github.com/skafai/tslab"
+Repository = "https://github.com/chronocratic/tslab"
 
 [dependency-groups]
 # the lab tests on the bare base install, outside the dev group
@@ -119,7 +119,7 @@ directory = "changelog.d"
 filename = "CHANGELOG.md"
 start_string = "<!-- towncrier release notes start -->\n"
 title_format = "## v{version} ({project_date})"
-issue_format = "[#{issue}](https://github.com/skafai/tslab/issues/{issue})"
+issue_format = "[#{issue}](https://github.com/chronocratic/tslab/issues/{issue})"
 underlines = ["", "", ""]
 
 [[tool.towncrier.type]]

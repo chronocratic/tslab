@@ -8,7 +8,7 @@ checks every change must pass, and how changes reach a release.
 TSLab uses [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer.
 
 ```bash
-git clone https://github.com/skafai/tslab
+git clone https://github.com/chronocratic/tslab
 cd tslab
 git switch dev
 uv sync --all-extras --group docs
@@ -72,7 +72,7 @@ pull request title for you:
 - the `skip-changelog` label opts out (for changes users never see).
 
 Edit the fragment by hand when the title is not enough. See
-[`changelog.d/README.md`](https://github.com/skafai/tslab/blob/main/changelog.d/README.md) for the file names and types.
+[`changelog.d/README.md`](https://github.com/chronocratic/tslab/blob/main/changelog.d/README.md) for the file names and types.
 
 ## Protected files
 

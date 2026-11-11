@@ -25,7 +25,7 @@ exclude_patterns = ['_build', 'superpowers']
 html_theme = 'pydata_sphinx_theme'
 html_title = 'TSLab'
 html_theme_options = {
-    'github_url': 'https://github.com/skafai/tslab',
+    'github_url': 'https://github.com/chronocratic/tslab',
     'navigation_depth': 2,
     'show_toc_level': 2,
 }
