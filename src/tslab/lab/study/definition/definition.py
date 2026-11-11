@@ -63,7 +63,7 @@ JOB_NAME_PLACEHOLDER_AXES = frozenset({'short_name', *PLACEHOLDERS})
 
 #: Axis names that are columns of the results table or the match key of a grid.
 RESERVED_AXIS_NAMES = frozenset(
-    {'grid', 'run_path', 'study_state', 'instance', 'instance_state', 'error'}
+    {'grid', 'run_path', 'study_state', 'instance', 'instance_state', 'seconds', 'error'}
 )
 
 DEFAULT_RUN_SETTINGS: Mapping[str, str] = MappingProxyType(

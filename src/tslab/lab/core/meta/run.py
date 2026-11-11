@@ -7,6 +7,7 @@ reproduce a run (versions, git commit).
 
 from collections.abc import Callable, Mapping
 from importlib.metadata import PackageNotFoundError, version
+import logging
 import os
 from pathlib import Path
 import platform
@@ -29,15 +30,20 @@ __all__ = [
     'register_versions',
 ]
 
+_LOGGER = logging.getLogger(__name__)
 META_FORMAT_VERSION = 1
 _GIT_TIMEOUT_SECONDS = 10
 CODE_SNAPSHOT_VARIABLE = 'TSLAB_CODE_SNAPSHOT'
+_HASH_VARIABLE = 'TSLAB_CODE_SNAPSHOT_HASH'
+_COMMIT_VARIABLE = 'TSLAB_CODE_SNAPSHOT_COMMIT'
+_DIRTY_VARIABLE = 'TSLAB_CODE_SNAPSHOT_DIRTY'
+_UNTRACKED_COPIED_VARIABLE = 'TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED'
 CODE_SNAPSHOT_VARIABLES = (
     CODE_SNAPSHOT_VARIABLE,
-    'TSLAB_CODE_SNAPSHOT_HASH',
-    'TSLAB_CODE_SNAPSHOT_COMMIT',
-    'TSLAB_CODE_SNAPSHOT_DIRTY',
-    'TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED',
+    _HASH_VARIABLE,
+    _COMMIT_VARIABLE,
+    _DIRTY_VARIABLE,
+    _UNTRACKED_COPIED_VARIABLE,
 )
 
 
@@ -94,8 +100,11 @@ def collect_versions() -> dict[str, str | None]:
         'python': platform.python_version(),
         'tslab': package_version(distribution='tslab'),
     }
-    for collector in _version_collectors.values():
-        versions.update(collector())
+    for name, collector in _version_collectors.items():
+        try:
+            versions.update(collector())
+        except Exception:  # noqa: BLE001 # why: metadata must never stop a run
+            _LOGGER.warning('the %s version collector failed; its entries are left out', name)
     return versions
 
 
@@ -106,8 +115,11 @@ def collect_hardware() -> dict[str, object]:
         Mapping with key ``cpu_count``, plus the keys of every registered collector.
     """
     hardware: dict[str, object] = {'cpu_count': os.cpu_count() or 0}
-    for collector in _hardware_collectors.values():
-        hardware.update(collector())
+    for name, collector in _hardware_collectors.items():
+        try:
+            hardware.update(collector())
+        except Exception:  # noqa: BLE001 # why: metadata must never stop a run
+            _LOGGER.warning('the %s hardware collector failed; its entries are left out', name)
     return hardware
 
 
@@ -132,10 +144,10 @@ def collect_code_snapshot(*, environ: Mapping[str, str]) -> dict[str, object] | 
         return None
     return {
         'folder': folder,
-        'hash': environ.get('TSLAB_CODE_SNAPSHOT_HASH', ''),
-        'commit': environ.get('TSLAB_CODE_SNAPSHOT_COMMIT', ''),
-        'dirty': _parse_flag(value=environ.get('TSLAB_CODE_SNAPSHOT_DIRTY')),
-        'untracked_copied': _parse_flag(value=environ.get('TSLAB_CODE_SNAPSHOT_UNTRACKED_COPIED')),
+        'hash': environ.get(_HASH_VARIABLE, ''),
+        'commit': environ.get(_COMMIT_VARIABLE, ''),
+        'dirty': _parse_flag(value=environ.get(_DIRTY_VARIABLE)),
+        'untracked_copied': _parse_flag(value=environ.get(_UNTRACKED_COPIED_VARIABLE)),
     }
 
 

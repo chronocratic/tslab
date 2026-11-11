@@ -173,6 +173,11 @@ def _instance_row(
     return row
 
 
+def _unreadable_cells(*, error: str) -> dict[str, str | float | None]:
+    """The cells that turn a row into an ``unreadable`` one with the error text."""
+    return {INSTANCE_STATE_COLUMN: UNREADABLE_STATE, ERROR_COLUMN: error}
+
+
 def _metrics_of(*, instance_directory: Path) -> dict[str, str | float | None]:
     """The ``metric/<name>`` cells of one instance; ``{}`` for a non-metrics one.
 
@@ -182,24 +187,15 @@ def _metrics_of(*, instance_directory: Path) -> dict[str, str | float | None]:
     try:
         meta = json.loads((instance_directory / META_FILE).read_text(encoding='utf-8'))
     except (OSError, ValueError, UnicodeDecodeError) as error:
-        return {
-            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
-            ERROR_COLUMN: f'{type(error).__name__}: {error}',
-        }
+        return _unreadable_cells(error=f'{type(error).__name__}: {error}')
     if not isinstance(meta, dict) or meta.get('artifact_type') != METRICS_TYPE:
         return {}
     try:
         data = json.loads((instance_directory / Metrics.FILE_NAME).read_text(encoding='utf-8'))
     except (OSError, ValueError, UnicodeDecodeError) as error:
-        return {
-            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
-            ERROR_COLUMN: f'{type(error).__name__}: {error}',
-        }
+        return _unreadable_cells(error=f'{type(error).__name__}: {error}')
     if not isinstance(data, dict):
-        return {
-            INSTANCE_STATE_COLUMN: UNREADABLE_STATE,
-            ERROR_COLUMN: f'{Metrics.FILE_NAME} is not a JSON object',
-        }
+        return _unreadable_cells(error=f'{Metrics.FILE_NAME} is not a JSON object')
     cells: dict[str, str | float | None] = {}
     for name, value in data.items():
         cells[f'{METRIC_PREFIX}{name}'] = (

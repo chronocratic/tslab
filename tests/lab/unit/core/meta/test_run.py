@@ -4,6 +4,8 @@ import shutil
 import subprocess
 import sys
 
+import pytest
+
 from tslab.lab.core.meta import (
     collect_code_snapshot,
     collect_git_state,
@@ -44,6 +46,30 @@ def test_registered_collectors_are_keyed_by_name() -> None:
         run_module._version_collectors.update(saved[0])  # noqa: SLF001
         run_module._hardware_collectors.clear()  # noqa: SLF001
         run_module._hardware_collectors.update(saved[1])  # noqa: SLF001
+
+
+def _raising_collector() -> dict[str, str | None]:
+    message = 'broken on purpose'
+    raise RuntimeError(message)
+
+
+def test_a_raising_collector_is_logged_and_skipped(caplog: pytest.LogCaptureFixture) -> None:
+    saved = (dict(run_module._version_collectors), dict(run_module._hardware_collectors))  # noqa: SLF001
+    try:
+        register_versions(_raising_collector, name='broken')
+        register_hardware(_raising_collector, name='broken')
+        with caplog.at_level('WARNING'):
+            versions = collect_versions()
+            hardware = collect_hardware()
+    finally:
+        run_module._version_collectors.clear()  # noqa: SLF001
+        run_module._version_collectors.update(saved[0])  # noqa: SLF001
+        run_module._hardware_collectors.clear()  # noqa: SLF001
+        run_module._hardware_collectors.update(saved[1])  # noqa: SLF001
+    assert 'python' in versions
+    assert 'cpu_count' in hardware
+    assert 'the broken version collector failed' in caplog.text
+    assert 'the broken hardware collector failed' in caplog.text
 
 
 def _extra_hardware() -> dict[str, object]:
