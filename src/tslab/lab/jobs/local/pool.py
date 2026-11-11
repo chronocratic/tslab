@@ -213,15 +213,19 @@ class _GpuLeaseGate:
             fresh = self._fresh_answer(slot=slot)
             if fresh is not None:
                 return not fresh
-            with self._lock:
-                generation = self._generations.get(slot, 0)
-            free = self._gpu_free(slot)
-            with self._lock:
-                # why: the call can take 30 seconds; when the last lease ended meanwhile, the
-                # answer is from before the release and must not be trusted for a new lease
-                if self._generations.get(slot, 0) == generation:
-                    self._answers[slot] = (time.monotonic(), free)
-            return not free
+            return not self._ask(slot=slot, gpu_free=self._gpu_free)
+
+    def _ask(self, *, slot: str, gpu_free: Callable[[str], bool]) -> bool:
+        """Call ``gpu_free`` for the slot; keep the answer unless the last lease ended meanwhile."""
+        with self._lock:
+            generation = self._generations.get(slot, 0)
+        free = gpu_free(slot)
+        with self._lock:
+            # why: the call can take 30 seconds; when the last lease ended meanwhile, the
+            # answer is from before the release and must not be trusted for a new lease
+            if self._generations.get(slot, 0) == generation:
+                self._answers[slot] = (time.monotonic(), free)
+        return free
 
     def try_lease(self, *, slot: str) -> GpuLease | None:
         """The lease of the slot, or ``None`` while the pool must wait for it."""
