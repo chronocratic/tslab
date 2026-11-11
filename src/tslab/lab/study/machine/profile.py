@@ -1,7 +1,9 @@
 """The data classes of a machine profile."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 
 from tslab.lab.enums import ChainedRetry, LauncherKind, Retry
 from tslab.lab.study.definition import SettingValue
@@ -44,23 +46,42 @@ def wants_retry_followup(*, followup: FollowupSettings) -> bool:
 
 @dataclass(frozen=True, kw_only=True)
 class MachineOverride:
-    """One ``[[overrides]]`` entry: match plus slurm and/or settings."""
+    """One ``[[overrides]]`` entry: match plus slurm and/or settings.
 
-    match: dict[str, tuple[str, ...]]
-    slurm: dict[str, object] = field(default_factory=dict)
-    settings: dict[str, SettingValue] = field(default_factory=dict)
+    Attributes:
+        match: The axis names and the values that select the runs; read-only.
+        slurm: The SLURM fields the entry changes; read-only.
+        settings: The study settings the entry changes; read-only.
+    """
+
+    match: Mapping[str, tuple[str, ...]]
+    slurm: Mapping[str, object] = field(default_factory=lambda: MappingProxyType({}))
+    settings: Mapping[str, SettingValue] = field(default_factory=lambda: MappingProxyType({}))
 
 
 @dataclass(frozen=True, kw_only=True)
 class MachineProfile:
-    """A machine profile read from TOML, fully checked."""
+    """A machine profile read from TOML, fully checked.
+
+    Attributes:
+        path: The profile file.
+        launcher: The backend that runs the study.
+        output_root: The folder that holds the study output.
+        tslab_command: The command that starts TSLab inside a job.
+        settings: The study settings every run gets; read-only.
+        env: The environment variables of the jobs; read-only.
+        slurm: The SLURM settings, for a SLURM profile.
+        local: The local settings, for a local profile.
+        followup: The follow-up job settings.
+        overrides: The entries that change the settings of selected runs.
+    """
 
     path: Path
     launcher: LauncherKind
     output_root: Path
     tslab_command: tuple[str, ...] = ('uv', 'run', 'tslab')
-    settings: dict[str, SettingValue] = field(default_factory=dict)
-    env: dict[str, str] = field(default_factory=dict)
+    settings: Mapping[str, SettingValue] = field(default_factory=lambda: MappingProxyType({}))
+    env: Mapping[str, str] = field(default_factory=lambda: MappingProxyType({}))
     slurm: SlurmSettings | None = None
     local: LocalSettings | None = None
     followup: FollowupSettings = FollowupSettings()

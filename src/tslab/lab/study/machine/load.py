@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import dataclasses
 from pathlib import Path
 import tomllib
+from types import MappingProxyType
 from typing import cast, Protocol
 
 from tslab.lab.core.text import unknown_key_message
@@ -152,8 +153,8 @@ def _machine_profile(
         launcher=backend.TABLE,
         output_root=Path(root),
         tslab_command=tslab_command,
-        settings=settings_of(table=table, location='settings', path=path),
-        env=env,
+        settings=MappingProxyType(settings_of(table=table, location='settings', path=path)),
+        env=MappingProxyType(env),
         slurm=slurm,
         local=local,
         followup=followup or FollowupSettings(),
@@ -248,9 +249,9 @@ def _override_from_table(*, table: object, location: str, path: Path) -> Machine
         message = f'{path}: {location} needs a slurm or a settings table'
         raise MachineProfileError(message)
     return MachineOverride(
-        match=_match_value(value=table['match'], location=location, path=path),
-        slurm=slurm,
-        settings=settings,
+        match=MappingProxyType(_match_value(value=table['match'], location=location, path=path)),
+        slurm=MappingProxyType(slurm),
+        settings=MappingProxyType(settings),
     )
 
 

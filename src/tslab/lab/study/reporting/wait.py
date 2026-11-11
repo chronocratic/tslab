@@ -72,7 +72,15 @@ def wait_for_study(  # noqa: PLR0913 # why: each keyword-only control is documen
 
 @dataclass(frozen=True, kw_only=True)
 class _Poll:
-    """What the wait loop remembers from one check to the next."""
+    """What the wait loop remembers from one check to the next.
+
+    Attributes:
+        gap: The seconds to sleep before the next check.
+        previous_counts: The state counts of the last check, or ``None`` before the first.
+        warned_unknown: Whether the unknown-state warning was logged since the states were known.
+        last_context: The context of the last check, or ``None`` before the first.
+        last_code: The exit code of the last check, or ``None`` before the first.
+    """
 
     gap: float
     previous_counts: tuple[int, ...] | None = None

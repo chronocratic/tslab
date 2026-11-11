@@ -36,7 +36,11 @@ _C_GRID: tuple[float, ...] = (0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000,
 
 @dataclass(frozen=True, kw_only=True)
 class SVMProbeSettings:
-    """The settings of ``SVMProbe`` that change its results."""
+    """The settings of ``SVMProbe`` that change its results.
+
+    Attributes:
+        max_train_samples: The most training rows used in the fit; ``None`` uses all of them.
+    """
 
     max_train_samples: int | None
 

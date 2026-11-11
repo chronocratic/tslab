@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -125,6 +126,19 @@ def test_full_example_loads(cluster_toml: Path) -> None:
     }
     assert profile.overrides[2].settings == {'trainer.job_time_share': 0.9}
     assert profile.tslab_command == ('uv', 'run', 'tslab')
+
+
+def test_profile_mappings_are_read_only(cluster_toml: Path) -> None:
+    profile = _load_machine(path=cluster_toml, environment={'SCRATCH': '/scratch/me'})
+    mappings = (
+        profile.settings,
+        profile.env,
+        profile.overrides[1].match,
+        profile.overrides[1].slurm,
+        profile.overrides[2].settings,
+    )
+    for mapping in mappings:
+        assert isinstance(mapping, MappingProxyType)
 
 
 def test_auto_retry_is_rejected_with_the_new_key(tmp_path: Path) -> None:

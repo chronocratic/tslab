@@ -36,7 +36,11 @@ def _rmse_plus_mae(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 @dataclass(frozen=True, kw_only=True)
 class RidgeProbeSettings:
-    """The settings of ``RidgeProbe`` that change its results."""
+    """The settings of ``RidgeProbe`` that change its results.
+
+    Attributes:
+        max_samples: The most training rows used in the fit; ``None`` uses every row.
+    """
 
     max_samples: int | None
 

@@ -59,6 +59,10 @@ def evaluate(
 
     Returns:
         The metric values.
+
+    Raises:
+        KeyError: If the representations lack a train or test key.
+        ValueError: If two of ``metrics`` share a name.
     """
     tensors = representations.tensors
     downstream_model.fit(

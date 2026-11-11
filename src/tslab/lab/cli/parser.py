@@ -82,7 +82,12 @@ _COMMANDS: dict[str, type] = {
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class LazyCommand:
-    """A command that is listed from a summary and imported only when it is typed."""
+    """A command that is listed from a summary and imported only when it is typed.
+
+    Attributes:
+        summary: The one-line description shown in the list of commands.
+        target: The command class as ``package.module:ClassName``.
+    """
 
     summary: str
     target: str  # "package.module:ClassName"
@@ -108,7 +113,14 @@ def _never_run(self: object) -> int:  # noqa: ARG001 # why: a method of the list
 
 @dataclasses.dataclass(frozen=True, kw_only=True)
 class _Group:
-    """A command group: visible and hidden commands, its program name and help."""
+    """A command group: visible and hidden commands, its program name and help.
+
+    Attributes:
+        commands: The commands the help lists, by name.
+        hidden_commands: The commands that work but are not listed, by name.
+        prog: The program name shown in the usage line.
+        description: The help text of the group.
+    """
 
     commands: Mapping[str, type]
     hidden_commands: Mapping[str, type]

@@ -16,6 +16,15 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from tslab.lab.core.paths import NAME_PART_PATTERN, validate_name_part
+from tslab.lab.study.definition.columns import (
+    ERROR_COLUMN,
+    GRID_COLUMN,
+    INSTANCE_COLUMN,
+    INSTANCE_STATE_COLUMN,
+    RUN_PATH_COLUMN,
+    SECONDS_COLUMN,
+    STUDY_STATE_COLUMN,
+)
 from tslab.lab.study.definition.expansion import PLACEHOLDERS
 from tslab.lab.study.definition.settings import check_paths, Settings, SettingValue
 
@@ -63,7 +72,15 @@ JOB_NAME_PLACEHOLDER_AXES = frozenset({'short_name', *PLACEHOLDERS})
 
 #: Axis names that are columns of the results table or the match key of a grid.
 RESERVED_AXIS_NAMES = frozenset(
-    {'grid', 'run_path', 'study_state', 'instance', 'instance_state', 'seconds', 'error'}
+    {
+        GRID_COLUMN,
+        RUN_PATH_COLUMN,
+        STUDY_STATE_COLUMN,
+        INSTANCE_COLUMN,
+        INSTANCE_STATE_COLUMN,
+        SECONDS_COLUMN,
+        ERROR_COLUMN,
+    }
 )
 
 DEFAULT_RUN_SETTINGS: Mapping[str, str] = MappingProxyType(
@@ -121,7 +138,12 @@ def setting_axis(
 
 @dataclass(frozen=True, kw_only=True)
 class Override:
-    """Settings applied to the runs whose axis values match."""
+    """Settings applied to the runs whose axis values match.
+
+    Attributes:
+        match: The axis names and the values that select the runs.
+        settings: The settings the selected runs get.
+    """
 
     match: Match
     settings: Settings
