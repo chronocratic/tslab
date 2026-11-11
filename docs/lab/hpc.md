@@ -44,7 +44,7 @@ pauses with `TrainingPaused` after one batch:
 
 ```bash
 uv run tslab study submit example --machine cluster \
-    --grid classification --only dataset=Coffee --only seed=42 \
+    --grid sweep --only dataset=small --only seed=42 \
     -- --trainer.job-time-share 0.01
 ```
 
