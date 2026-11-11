@@ -19,20 +19,22 @@ from tslab.lab.core.text import first_line
 from tslab.lab.enums import InstanceState
 from tslab.lab.study.context import context_for, Selection
 from tslab.lab.study.definition import Study
+from tslab.lab.study.definition.columns import (
+    ERROR_COLUMN,
+    GRID_COLUMN,
+    INSTANCE_COLUMN,
+    INSTANCE_STATE_COLUMN,
+    RUN_PATH_COLUMN,
+    SECONDS_COLUMN,
+    STUDY_STATE_COLUMN,
+)
 from tslab.lab.study.launchers.cpus import available_cpus
 from tslab.lab.study.paths import instance_directory
 from tslab.lab.study.reporting.state import RunReport
 
 __all__ = [
-    'ERROR_COLUMN',
-    'GRID_COLUMN',
-    'INSTANCE_COLUMN',
-    'INSTANCE_STATE_COLUMN',
     'METRICS_TYPE',
     'METRIC_PREFIX',
-    'RUN_PATH_COLUMN',
-    'SECONDS_COLUMN',
-    'STUDY_STATE_COLUMN',
     'UNREADABLE_STATE',
     'ResultRow',
     'collect_results',
@@ -44,14 +46,6 @@ __all__ = [
 #: The ``meta.json`` value of a metrics instance, ``module.Class`` of ``Metrics``.
 METRICS_TYPE = f'{Metrics.__module__}.{Metrics.__qualname__}'
 
-#: The names of the columns the table writes.
-GRID_COLUMN = 'grid'
-RUN_PATH_COLUMN = 'run_path'
-STUDY_STATE_COLUMN = 'study_state'
-INSTANCE_COLUMN = 'instance'
-INSTANCE_STATE_COLUMN = 'instance_state'
-SECONDS_COLUMN = 'seconds'
-ERROR_COLUMN = 'error'
 #: The prefix of a metric column; the rest is the metric name.
 METRIC_PREFIX = 'metric/'
 #: The ``instance_state`` of an instance whose files cannot be read.

@@ -259,7 +259,13 @@ def resolve_run_path(*, run: LocalRun, entity: str | None, project: str | None) 
 
 @dataclass(frozen=True, kw_only=True)
 class _ServerQuery:
-    """Looks up server states, with fallback coordinates for runs that crashed early."""
+    """Looks up server states, with fallback coordinates for runs that crashed early.
+
+    Attributes:
+        entity: The W&B entity to use when a run has none; ``None`` for no fallback.
+        project: The W&B project to use when a run has none; ``None`` for no fallback.
+        pool: The cache of API handles.
+    """
 
     entity: str | None
     project: str | None

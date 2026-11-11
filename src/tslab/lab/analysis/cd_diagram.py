@@ -246,25 +246,25 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
     axis.set_ylim(-depth, style.top)
     axis.set_axis_off()
 
-    def line(xs: Sequence[float], ys: Sequence[float], width: float = style.line_width) -> None:
+    def line(*, xs: Sequence[float], ys: Sequence[float], width: float = style.line_width) -> None:
         axis.plot(xs, ys, color='black', linewidth=width, solid_capstyle='butt')
 
-    line([1, count], [0, 0])
+    line(xs=[1, count], ys=[0, 0])
     for tick in range(1, count + 1):
-        line([x(tick), x(tick)], [0, style.tick])
+        line(xs=[x(tick), x(tick)], ys=[0, style.tick])
         axis.text(x(tick), style.tick + style.text_gap / 2, str(tick), ha='center', va='bottom')
     for half in range(1, count):
-        line([half + 0.5] * 2, [0, style.half_tick])
+        line(xs=[half + 0.5] * 2, ys=[0, style.half_tick])
     cd_y, cd_end = style.cd_height, 1 + cd
-    line([1, cd_end], [cd_y, cd_y])
+    line(xs=[1, cd_end], ys=[cd_y, cd_y])
     for end_x in (1, cd_end):
-        line([end_x, end_x], [cd_y - style.tick / 2, cd_y + style.tick / 2])
+        line(xs=[end_x, end_x], ys=[cd_y - style.tick / 2, cd_y + style.tick / 2])
     axis.text((1 + cd_end) / 2, cd_y + style.tick, f'CD = {cd:.2f}', ha='center', va='bottom')
     overhang = style.group_overhang / unit
     for level, (first, last) in enumerate(groups):
         y = -style.elbow_start / 2 - style.group_step * level
         low, high = sorted((x(values[first]), x(values[last])))
-        line([low - overhang, high + overhang], [y, y], width=style.group_width)
+        line(xs=[low - overhang, high + overhang], ys=[y, y], width=style.group_width)
     first_row = -(style.elbow_start + style.group_step * len(groups))
     for position, index in enumerate(screen):
         name, rank = names[index], values[index]
@@ -273,7 +273,7 @@ def _draw(  # noqa: PLR0913 # why: private helper fed by cd_diagram, all keyword
         side = -1 if on_left else 1
         y = first_row - style.label_step * row
         x_end = (1 if on_left else count) + side * style.elbow_overhang / unit
-        line([x(rank), x(rank), x_end], [0, y, y])
+        line(xs=[x(rank), x(rank), x_end], ys=[0, y, y])
         axis.text(
             x_end + side * style.text_gap / unit,
             y,

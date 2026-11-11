@@ -67,7 +67,13 @@ class SlurmCommand:
 
 @dataclass(frozen=True, kw_only=True)
 class CommandValues:
-    """What fills the placeholders: all recorded job ids, name width, sacct start date."""
+    """What fills the placeholders: all recorded job ids, name width, sacct start date.
+
+    Attributes:
+        job_ids: Every recorded job id.
+        width: The width of the name column.
+        start: The start date for ``sacct``.
+    """
 
     job_ids: tuple[str, ...]
     width: int
@@ -76,7 +82,13 @@ class CommandValues:
 
 @dataclass(frozen=True, kw_only=True)
 class CommandOutput:
-    """What a command printed and how it exited."""
+    """What a command printed and how it exited.
+
+    Attributes:
+        returncode: The exit code.
+        stdout: The standard output.
+        stderr: The standard error.
+    """
 
     returncode: int
     stdout: str

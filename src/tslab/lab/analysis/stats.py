@@ -332,6 +332,9 @@ def correlations(
 
     Returns:
         A frame with columns ``column, n, rho, p_value, p_holm, significance``.
+
+    Raises:
+        ValueError: If ``target`` is one of ``columns``.
     """
     if target in columns:
         message = f'target {target!r} must not be one of the columns'

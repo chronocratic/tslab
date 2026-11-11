@@ -17,12 +17,12 @@ from tslab.lab.analysis.stats import Direction
 from tslab.lab.core.paths import require_path
 from tslab.lab.enums import InstanceState
 from tslab.lab.study.definition import Study
-from tslab.lab.study.reporting.result_table import (
+from tslab.lab.study.definition.columns import (
     INSTANCE_COLUMN,
     INSTANCE_STATE_COLUMN,
-    METRIC_PREFIX,
     SECONDS_COLUMN,
 )
+from tslab.lab.study.reporting.result_table import METRIC_PREFIX
 
 __all__ = ['AnalysisMetric', 'against_baseline', 'load_results', 'method_matrix', 'missing_runs']
 

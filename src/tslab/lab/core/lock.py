@@ -51,6 +51,12 @@ class _LockOwner:
     ``nonce`` is random per ``Run``: it lets a process check that the lock it is
     about to touch is still its own, even if its pid was reused or a stale lock
     was taken over.
+
+    Attributes:
+        pid: The process that holds the lock.
+        host: The host of that process.
+        nonce: The random value of the ``Run`` that wrote the file; ``None`` for
+            files that have none.
     """
 
     pid: int
@@ -107,6 +113,9 @@ def is_run_active(*, directory: Path) -> bool:
 
     Args:
         directory: The run folder.
+
+    Returns:
+        Whether the lock file exists and is not stale.
     """
     path = directory / LOCK_FILE
     try:

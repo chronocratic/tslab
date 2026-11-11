@@ -65,7 +65,19 @@ _RESERVED_ARGUMENTS = frozenset({'run', 'name'})
 
 @dataclass(frozen=True, kw_only=True)
 class _Execution:
-    """What ``_invoke`` knows about one instance before executing it."""
+    """What ``_invoke`` knows about one instance before executing it.
+
+    Attributes:
+        run: The current run.
+        instance_id: The name of the instance, for example ``train[default]``.
+        directory: The folder of the instance.
+        fingerprint: The fingerprint of the stage version, settings and inputs.
+        previous_fingerprint: The fingerprint saved by an earlier execution, or ``None``.
+        agreement_key: The key under which the ranks agree on the decisions of the instance.
+        settings: The settings that enter the fingerprint.
+        inputs: The input artifacts by argument name.
+        agreement: The object that lets the ranks agree, or ``None`` when no rank is shared.
+    """
 
     run: Run
     instance_id: str
