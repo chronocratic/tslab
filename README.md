@@ -22,6 +22,9 @@
 
 </div>
 
+> [!WARNING]
+> TSLab is under active development. Expect breaking changes between releases until the API is declared stable in v1.0.0.
+
 TSLab turns a research script into a pipeline of **cached, resumable stages**.
 You keep writing a normal Python `main()`. TSLab fingerprints the inputs and
 settings of each step, stores its result, and on the next run loads finished
@@ -93,6 +96,8 @@ uv run tslab status runs                          # see what ran and what was ca
 
 Run the `classify` line again: every stage loads instead of computing. The
 generated `README.md` explains the rest.
+
+> ⭐ **Found this useful? Give it a star.** TSLab is free and open source. A star takes one click, tells us the work is worth continuing, and helps other time series researchers find the project.
 
 ## CLI
 
