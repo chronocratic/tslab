@@ -24,6 +24,8 @@ from typing import Annotated
 import tyro
 
 import tslab.lab
+from tslab.lab.core.status import InstanceRecord
+from tslab.lab.enums import InstanceState
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -59,7 +61,9 @@ def main() -> None:
     # why: the same parse config tslab.lab.parse_config uses, so the ``model:small``
     # words of the study reach the union
     config = tyro.cli(ToyConfig, config=(tyro.conf.CascadeSubcommandArgs,))
-    with tslab.lab.Run(config=config, root=config.output_root, relative_path=config.run_path):
+    with tslab.lab.Run(
+        config=config, root=config.output_root, relative_path=config.run_path
+    ) as run:
         time.sleep(float(os.environ.get('TOY_SLEEP', '0')))
         succeed_on = int(os.environ.get('TOY_SUCCEED_ON', '0'))
         if succeed_on:
@@ -67,8 +71,17 @@ def main() -> None:
             counter = folder / 'attempts'
             attempt = int(counter.read_text()) + 1 if counter.exists() else 1
             counter.write_text(str(attempt))
-            (folder / 'last.ckpt').write_text('checkpoint')
-            if attempt < succeed_on:
+            (folder / 'train' / 'default').mkdir(parents=True, exist_ok=True)
+            (folder / 'train' / 'default' / 'last.ckpt').write_text('checkpoint')
+            paused = attempt < succeed_on
+            run.record_instance(
+                instance_id='train[default]',
+                record=InstanceRecord(
+                    state=InstanceState.FAILED if paused else InstanceState.DONE,
+                    error='JobTimeLimitSignal: time limit near' if paused else None,
+                ),
+            )
+            if paused:
                 raise tslab.lab.JobTimeLimitSignal('time limit near')
 
 

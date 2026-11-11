@@ -17,6 +17,7 @@ from pathlib import Path
 import shutil
 import time
 import traceback
+from types import MappingProxyType
 from typing import Any, cast, ClassVar, get_type_hints, override
 import uuid
 
@@ -40,7 +41,13 @@ from tslab.lab.core.meta.instance import (
     instance_meta_document,
     stale_reason,
 )
-from tslab.lab.core.paths import ERROR_FILE, META_FILE, normalize_instance_name, validate_stage_name
+from tslab.lab.core.paths import (
+    _TEMPORARY_MARKER,
+    ERROR_FILE,
+    META_FILE,
+    normalize_instance_name,
+    validate_stage_name,
+)
 from tslab.lab.core.ranks import is_writer_process, RankAgreement
 from tslab.lab.core.run import JobTimeLimitSignal, Run
 from tslab.lab.core.status import format_instance_id, InstanceRecord, StatusFileError, utc_now_iso
@@ -66,7 +73,7 @@ class _Execution:
     fingerprint: str
     previous_fingerprint: str | None = None
     agreement_key: str
-    settings: dict[str, object]
+    settings: Mapping[str, object]
     inputs: Mapping[str, Artifact]
     agreement: RankAgreement | None = None
 
@@ -240,7 +247,7 @@ class Stage[Out: Artifact](ABC):
             fingerprint=fingerprint,
             previous_fingerprint=None if record is None else record.fingerprint,
             agreement_key=agreement_key,
-            settings=settings,
+            settings=MappingProxyType(settings),
             inputs=inputs,
             agreement=agreement,
         )
@@ -303,7 +310,7 @@ class Stage[Out: Artifact](ABC):
         try:
             artifact = self.output_type.load(directory=directory)
             identity = identity_from_meta(directory=directory, instance_id=instance_id)
-        except Exception:  # any load failure means "recompute", never "crash"
+        except Exception:  # why: any load failure means recompute, never crash
             _LOGGER.warning('cannot load %s; running it again', instance_id, exc_info=True)
             return None
         bind_identity(artifact=artifact, identity=identity)
@@ -410,14 +417,14 @@ class Stage[Out: Artifact](ABC):
         """Return where ``execute`` writes: the final folder, or a temporary sibling."""
         if self.in_place:
             return directory
-        return directory.with_name(f'{directory.name}.tmp-{os.getpid()}')
+        return directory.with_name(f'{directory.name}{_TEMPORARY_MARKER}{os.getpid()}')
 
     def _prepare_work_directory(
         self, *, run: Run, directory: Path, resume: bool, instance_id: str
     ) -> Path:
         if not run.writes_files:
             return directory
-        for leftover in directory.parent.glob(f'{directory.name}.tmp-*'):
+        for leftover in directory.parent.glob(f'{directory.name}{_TEMPORARY_MARKER}*'):
             shutil.rmtree(leftover, ignore_errors=True)
         work_directory = self._work_directory(directory=directory)
         if self.in_place:

@@ -58,7 +58,7 @@ class WriteJobFiles(Protocol):
         project_root: Path,
         start_delay_seconds: int | None = None,
     ) -> None:
-        """Write files needed by one backend's launch."""
+        """Write files needed by the launch of one backend."""
         ...
 
 

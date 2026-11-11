@@ -167,6 +167,21 @@ def test_take_progress(tmp_path: Path) -> None:
     )
 
 
+def test_take_progress_ignores_checkpoints_outside_the_stage_folders(tmp_path: Path) -> None:
+    (tmp_path / 'other').mkdir()
+    (tmp_path / 'other' / 'last.ckpt').write_text('ckpt')
+    snapshot = RunStatusSnapshot(
+        run_state=RunState.RUNNING,
+        updated_at=utc_now_iso(),
+        instances={'train[default]': InstanceRecord(state=InstanceState.RUNNING)},
+    )
+    write_status(path=tmp_path / 'status.json', snapshot=snapshot)
+    assert take_progress(run_directory=tmp_path).newest_checkpoint_mtime is None
+    (tmp_path / 'train' / 'default').mkdir(parents=True)
+    (tmp_path / 'train' / 'default' / 'last.ckpt').write_text('ckpt')
+    assert take_progress(run_directory=tmp_path).newest_checkpoint_mtime is not None
+
+
 def test_take_progress_counts_an_unreadable_status_as_no_progress(tmp_path: Path) -> None:
     (tmp_path / 'status.json').write_text('{')
     progress = take_progress(run_directory=tmp_path)

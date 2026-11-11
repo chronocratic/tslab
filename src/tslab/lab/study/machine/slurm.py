@@ -164,7 +164,7 @@ def slurm_for(
                 sorted((dict(base_extra) | dict(override_extra)).items())
             )
         merged.update({key: value for key, value in update.items() if key != 'sbatch_extra'})
-    return SlurmSettings(**merged)  # ty: ignore[invalid-argument-type]
+    return dataclasses.replace(base, **merged)
 
 
 def settings_from(*, table: Mapping[str, object], path: Path) -> SlurmSettings:

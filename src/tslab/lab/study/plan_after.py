@@ -186,7 +186,7 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
 def _run_targets(
     *, state: _TargetState, run: StudyRun, submitting: frozenset[PurePosixPath]
 ) -> tuple[tuple[AfterTarget, ...], bool]:
-    """Resolve one run's conditions and invalidate targets for impossible work."""
+    """Resolve the conditions of one run and invalidate targets for impossible work."""
     grid = state.study.grids[run.grid]
     if not grid.after:
         return (), False
@@ -237,7 +237,7 @@ def _reports_for_launch(
 def _entry_target(
     *, state: _TargetState, run: StudyRun, after: After, submitting: frozenset[PurePosixPath]
 ) -> tuple[AfterTarget | None, bool]:
-    """Build one entry's target, enforcing its all/any rule."""
+    """Build the target of one entry, enforcing its all/any rule."""
     upstream = upstream_runs(study=state.study, run=run, after=after)
     if not upstream:
         return None, True

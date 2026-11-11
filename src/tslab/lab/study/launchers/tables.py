@@ -31,7 +31,7 @@ JOB_RECORDS: Mapping[LauncherKind, type[JobRecord]] = {
 
 
 def backend_for(*, machine: MachineProfile) -> Backend:
-    """The backend that serves the machine's launcher.
+    """The backend that serves the launcher of the machine.
 
     Args:
         machine: The machine profile to read the launcher from.

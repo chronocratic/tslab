@@ -1,4 +1,4 @@
-"""Whether a chained grid's upstream conditions are met, impossible or pending."""
+"""Whether the upstream conditions of a chained grid are met, impossible or pending."""
 
 from enum import StrEnum
 

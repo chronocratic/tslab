@@ -298,7 +298,8 @@ def test_auto_resubmit_retries_paused_run_with_progress(
         instance=InstanceState.FAILED,
         error='TrainingPaused: job time share reached',
     )
-    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    (project / 'runs' / 's' / 'g/small/1' / 'train').mkdir()
+    (project / 'runs' / 's' / 'g/small/1' / 'train' / 'last.ckpt').write_text('ckpt')
     fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
     enable_retry(project=project)
     code = resubmit(
@@ -676,7 +677,8 @@ def test_auto_resubmit_reuses_recorded_code_snapshot(
         instance=InstanceState.FAILED,
         error='TrainingPaused: job time share reached',
     )
-    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    (project / 'runs' / 's' / 'g/small/1' / 'train').mkdir()
+    (project / 'runs' / 's' / 'g/small/1' / 'train' / 'last.ckpt').write_text('ckpt')
     fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
     enable_retry(project=project)
     code = resubmit(
@@ -791,8 +793,8 @@ def test_auto_ignores_chained_runs_when_chained_retry_manual(
         fake_backend=fake_backend,
         phases={'job-0_0': JobPhase.INTERRUPTED, 'job-0_1': JobPhase.INTERRUPTED},
     )
-    (project / 'runs' / 'chain' / 'pretrain/a').mkdir(parents=True, exist_ok=True)
-    (project / 'runs' / 'chain' / 'pretrain/a' / 'last.ckpt').write_text('x')
+    (project / 'runs' / 'chain' / 'pretrain/a' / 'train').mkdir(parents=True, exist_ok=True)
+    (project / 'runs' / 'chain' / 'pretrain/a' / 'train' / 'last.ckpt').write_text('x')
     before = len(fake_backend.calls('launch'))
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     assert len(fake_backend.calls('launch')) == before
@@ -810,7 +812,8 @@ def test_auto_ignores_unchained_runs_when_retry_manual(
         instance=InstanceState.FAILED,
         error='TrainingPaused: job time share reached',
     )
-    (project / 'runs' / 's' / 'g/small/1' / 'last.ckpt').write_text('ckpt')
+    (project / 'runs' / 's' / 'g/small/1' / 'train').mkdir()
+    (project / 'runs' / 's' / 'g/small/1' / 'train' / 'last.ckpt').write_text('ckpt')
     fake_backend.set_states(phases={'job-0_0': JobPhase.COMPLETED})
     enable_retry(project=project, text='chained_retry = "resubmit"\n')
     before = len(fake_backend.calls('launch'))
@@ -844,8 +847,8 @@ def test_auto_resubmits_time_limited_upstream_and_its_probe(
         grids=('pretrain',),
     )
     folder = project / 'runs' / 'chain' / 'pretrain/a'
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / 'last.ckpt').write_text('x')
+    (folder / 'train').mkdir(parents=True, exist_ok=True)
+    (folder / 'train' / 'last.ckpt').write_text('x')
     fake_backend.cancellable_answer = ['job-1']
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     runs = _launched_runs(fake_backend=fake_backend)
@@ -964,7 +967,8 @@ def _time_limited(*, project: Path, run_path: str) -> None:
             },
         ),
     )
-    (folder / 'last.ckpt').write_text('x')
+    (folder / 'train').mkdir(exist_ok=True)
+    (folder / 'train' / 'last.ckpt').write_text('x')
 
 
 def test_chain_exit_at_max_batch_requeue_ends_the_job_and_the_followup_resubmits(
@@ -1088,8 +1092,8 @@ def test_auto_resubmit_pulls_in_missing_downstream_of_selected_upstream(
         grids=('pretrain',),
     )
     folder = project / 'runs' / 'chain' / 'pretrain/a'
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / 'last.ckpt').write_text('x')
+    (folder / 'train').mkdir(parents=True, exist_ok=True)
+    (folder / 'train' / 'last.ckpt').write_text('x')
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     runs = _launched_runs(fake_backend=fake_backend)
     assert any(run.startswith('probe/a/') for run in runs)

@@ -160,7 +160,7 @@ class TaskOutput:
             self._on_task_state(key, 'ended')
 
     def _footer(self, *, task: TaskInfo, outcome: ProcessResult) -> str:
-        """The line the finished task's log ends with."""
+        """The line the log of the finished task ends with."""
         peak = _format_peak_memory(peak_bytes=outcome.max_rss_bytes)
         return (
             f'=== task {task.index}: exit {outcome.exit_code} '
@@ -183,13 +183,13 @@ class TaskOutput:
 
 
 def _format_elapsed(*, seconds: float) -> str:
-    """The footer's elapsed time, as ``H:MM:SS``."""
+    """The elapsed time of the footer, as ``H:MM:SS``."""
     total = int(seconds)
     return f'{total // 3600}:{(total % 3600) // 60:02d}:{total % 60:02d}'
 
 
 def _format_peak_memory(*, peak_bytes: int) -> str:
-    """The footer's peak memory: one decimal in the largest of GiB, MiB, KiB that keeps it at 1."""
+    """The peak memory of the footer, in the largest unit that keeps it at 1 or more."""
     for unit, divisor in (('GiB', 1024**3), ('MiB', 1024**2), ('KiB', 1024)):
         if peak_bytes >= divisor:
             return f'{peak_bytes / divisor:.1f} {unit}'

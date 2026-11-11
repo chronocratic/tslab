@@ -315,9 +315,9 @@ def main() -> None:
     folder = config.output_root / config.run_path
     if os.environ.get('TOY_CHAIN_TIME_LIMIT'):
         # the first attempt saves a checkpoint and stops at the time limit, the next finishes
-        limited = not (folder / 'last.ckpt').exists()
-        folder.mkdir(parents=True, exist_ok=True)
-        (folder / 'last.ckpt').write_text('checkpoint')
+        limited = not (folder / 'train' / 'last.ckpt').exists()
+        (folder / 'train').mkdir(parents=True, exist_ok=True)
+        (folder / 'train' / 'last.ckpt').write_text('checkpoint')
         record = (
             InstanceRecord(state=InstanceState.FAILED, error='JobTimeLimitSignal: time limit')
             if limited

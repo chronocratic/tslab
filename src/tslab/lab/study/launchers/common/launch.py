@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from uuid import uuid4
 
 from tslab.lab.study.definition import Study
@@ -80,7 +81,7 @@ def launch(  # noqa: PLR0913 # why: keyword-only public API; each launch input i
                 run_path=task.resolved.run.run_path,
                 command=task.command,
                 extra_args=task.extra_args,
-                resources=task.resolved.resources.as_record(),
+                resources=MappingProxyType(task.resolved.resources.as_record()),
                 attempt=task.attempt,
                 progress=take_progress(run_directory=study_directory / task.resolved.run.run_path),
                 uncounted_attempts=task.uncounted_attempts,

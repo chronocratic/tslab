@@ -6,6 +6,7 @@ import logging
 import math
 from typing import cast
 
+from tslab.lab.core.status import PAUSED_ERROR_PREFIXES
 from tslab.lab.core.text import format_bytes, format_duration, log_table
 from tslab.lab.study.context import Context
 from tslab.lab.study.launchers.common.protocols import Backend
@@ -20,9 +21,6 @@ _LOGGER = logging.getLogger(__name__)
 
 # why: the margin over the largest observed usage, so the next job fits
 _MARGIN = 1.2
-
-# why: the error prefixes that mark a run that used its share of the job by design
-_PAUSED_PREFIXES = ('TrainingPaused:', 'JobTimeLimitSignal:')
 
 
 def usage_document(*, context: Context) -> dict[str, object]:
@@ -125,7 +123,7 @@ def _run_entry(
 
 
 def _is_paused(*, report: RunReport) -> bool:
-    return (report.reason or '').startswith(_PAUSED_PREFIXES)
+    return (report.reason or '').startswith(PAUSED_ERROR_PREFIXES)
 
 
 def _duration_text(*, duration: timedelta | None) -> str | None:

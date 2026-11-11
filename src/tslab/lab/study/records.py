@@ -9,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path, PurePosixPath
+from types import MappingProxyType
 from typing import Any, Self, TYPE_CHECKING
 
 from tslab.lab.core.paths import require_path, STATUS_FILE
@@ -42,7 +43,7 @@ _LOGGER = logging.getLogger(__name__)
 class ProgressSnapshot:
     """How far a run had gotten when its job was submitted.
 
-    Args:
+    Attributes:
         done_instances: Instances in state ``done`` in ``status.json``; 0 when
             the file is missing or unreadable.
         newest_checkpoint_mtime: The newest ``last.ckpt`` below the run
@@ -82,13 +83,19 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
         snapshot = read_status(path=run_directory / STATUS_FILE)
     except (TypeError, ValueError, OSError):
         snapshot = None
-    done = 0
-    if snapshot is not None:
-        done = sum(
-            1 for record in snapshot.instances.values() if record.state is InstanceState.DONE
-        )
+    if snapshot is None:
+        return ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None)
+    done = sum(1 for record in snapshot.instances.values() if record.state is InstanceState.DONE)
+    # why: only the folders of the stages in the status file; a walk of the whole run folder
+    # would visit every artifact file of the run
+    stage_folders = {
+        run_directory / instance_id.partition('[')[0] for instance_id in snapshot.instances
+    }
     checkpoints = [
-        path.stat().st_mtime for path in run_directory.rglob('last.ckpt') if path.is_file()
+        path.stat().st_mtime
+        for folder in stage_folders
+        for path in folder.rglob('last.ckpt')
+        if path.is_file()
     ]
     return ProgressSnapshot(
         done_instances=done, newest_checkpoint_mtime=max(checkpoints) if checkpoints else None
@@ -99,7 +106,7 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
 class TaskRecord:
     """One run in one submitted job.
 
-    Args:
+    Attributes:
         index: The array index of the run, the same in every attempt.
         grid: The grid the run belongs to.
         run_path: The run path within the study.
@@ -149,7 +156,7 @@ class TaskRecord:
             run_path=PurePosixPath(str(document['run_path'])),
             command=tuple(str(item) for item in document['command']),
             extra_args=tuple(str(item) for item in document['extra_args']),
-            resources=dict(document['resources']),
+            resources=MappingProxyType(dict(document['resources'])),
             attempt=int(document['attempt']),
             progress=ProgressSnapshot.from_json(document=document['progress']),
             uncounted_attempts=int(document.get('uncounted_attempts', 0)),
@@ -171,7 +178,7 @@ class JobRecord:
     The shared fields of every launcher; only the record class of a launcher
     (``JOB_RECORDS`` of ``tslab.lab.study.launchers.tables``) is built.
 
-    Args:
+    Attributes:
         kind: Whether the job runs tasks or is a follow-up job.
         submission_id: One id per ``launch`` call.
         time: The submission time, UTC ISO.

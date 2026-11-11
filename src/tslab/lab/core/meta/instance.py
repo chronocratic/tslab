@@ -56,7 +56,7 @@ def instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fac
         'fingerprint': execution.fingerprint,
         'execution_id': execution_id,
         'artifact_type': qualified_name(cls=type(artifact)),
-        'settings': execution.settings,
+        'settings': dict(execution.settings),
         'inputs': describe_inputs(inputs=execution.inputs),
         'external_inputs': describe_external_inputs(inputs=execution.inputs),
         # The code and package versions that made this result. A resumed run

@@ -47,7 +47,7 @@ class ProfileBackend(Protocol):
     def settings_from(
         self, *, table: Mapping[str, object], path: Path
     ) -> SlurmSettings | LocalSettings:
-        """Read this backend's settings from one profile."""
+        """Read the settings of this backend from one profile."""
         ...
 
 

@@ -43,7 +43,7 @@ class CodeSnapshotError(ValueError):
 class CodeSnapshot:
     """The record of one code snapshot.
 
-    Args:
+    Attributes:
         folder: The content-addressed folder holding the copy of ``src/``.
         hash: The first 16 hex characters of the SHA-256 over the copied files.
         commit: The ``HEAD`` of the project when the snapshot was taken.

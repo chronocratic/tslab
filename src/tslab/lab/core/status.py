@@ -16,7 +16,10 @@ from tslab.lab.core.paths import require_path
 from tslab.lab.enums import InstanceState, RunState, ShownRunState
 
 __all__ = [
+    'PAUSED_ERROR_PREFIXES',
     'STATUS_FORMAT_VERSION',
+    'TIME_LIMIT_ERROR_PREFIX',
+    'TRAINING_PAUSED_ERROR_PREFIX',
     'InstanceRecord',
     'RunStatusSnapshot',
     'StatusFileError',
@@ -29,6 +32,12 @@ __all__ = [
 ]
 
 STATUS_FORMAT_VERSION = 1
+
+# why: failures are saved as "ExceptionType: message"; these prefixes mark a run that stopped
+# on purpose to be resumed (a time limit signal or the share of the job given to training)
+TIME_LIMIT_ERROR_PREFIX = 'JobTimeLimitSignal:'
+TRAINING_PAUSED_ERROR_PREFIX = 'TrainingPaused:'
+PAUSED_ERROR_PREFIXES = (TRAINING_PAUSED_ERROR_PREFIX, TIME_LIMIT_ERROR_PREFIX)
 
 
 class StatusFileError(JsonFileError):

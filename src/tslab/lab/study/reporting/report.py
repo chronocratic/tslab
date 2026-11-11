@@ -6,6 +6,7 @@ import logging
 from pathlib import PurePosixPath
 import shlex
 
+from tslab.lab.core.status import TRAINING_PAUSED_ERROR_PREFIX
 from tslab.lab.core.text import format_index_ranges, log_table
 from tslab.lab.enums import JobFlag, StudyState
 from tslab.lab.study.context import Context
@@ -70,7 +71,7 @@ def log_status(
         if report.state is StudyState.INTERRUPTED
         and (
             JobFlag.TIME_LIMIT in report.job_flags
-            or (report.reason or '').startswith('TrainingPaused:')
+            or (report.reason or '').startswith(TRAINING_PAUSED_ERROR_PREFIX)
         )
     )
     if limited:
