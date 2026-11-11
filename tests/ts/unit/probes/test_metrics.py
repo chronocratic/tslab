@@ -39,3 +39,10 @@ def test_metrics_reject_mismatched_shapes() -> None:
 def test_mape_divides_by_at_least_1e_minus_8() -> None:
     metrics = forecasting_metrics(predictions=np.array([1.0, 2.0]), targets=np.array([0.0, 2.0]))
     assert metrics == pytest.approx({'mse_loss': 0.5, 'mae_loss': 0.5, 'mape_loss': 0.5 / 1e-8})
+
+
+@pytest.mark.parametrize('labels', [(0, 2), ('a', 'b')])
+def test_binary_metrics_accept_labels_without_one(labels: tuple[object, object]) -> None:
+    targets = np.array([labels[0], labels[1], labels[1], labels[0]])
+    scores = classification_metrics(predictions=targets, targets=targets)
+    assert scores['f1'] == 1.0

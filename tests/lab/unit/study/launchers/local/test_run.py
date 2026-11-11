@@ -80,7 +80,7 @@ def study() -> Study:
 
 def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     return plan_jobs(
         study=study,
         machine=machine,
@@ -138,7 +138,7 @@ def test_local_launcher_runs_in_order_and_continues_after_failure(
         name='s', grids={'g': grid(short_name='g1', command=(sys.executable, str(script)))}
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -244,7 +244,9 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
     groups = plan_jobs(
         study=study,
         machine=machine,
-        resolved=resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1),
+        resolved=resolve_runs(
+            study=study, machine=machine, runs=runs, local_cpus=1, environment={}
+        ),
         indices=assign_indices(study=study, runs=runs, jobs=[]),
         extra_args={},
         attempts={},
@@ -268,7 +270,9 @@ def test_local_launch_records_the_job_before_tasks_run_and_survives_a_missing_co
 
 def _local_groups(study: Study, machine: MachineProfile, *, local_cpus: int = 1) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=local_cpus)
+    resolved = resolve_runs(
+        study=study, machine=machine, runs=runs, local_cpus=local_cpus, environment={}
+    )
     return plan_jobs(
         study=study,
         machine=machine,

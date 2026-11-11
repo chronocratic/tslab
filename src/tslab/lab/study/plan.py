@@ -89,12 +89,13 @@ class ResolvedRun:
     resources: 'Resources'
 
 
-def resolve_runs(
+def resolve_runs(  # noqa: PLR0913 # why: keyword-only; each input is documented below
     *,
     study: Study,
     machine: MachineProfile,
     runs: Sequence[StudyRun],
     local_cpus: int,
+    environment: Mapping[str, str],
     warned: set[str] | None = None,
 ) -> list[ResolvedRun]:
     """Every run with the settings and resources of the machine applied.
@@ -108,6 +109,8 @@ def resolve_runs(
         machine: The machine the runs run on.
         runs: The runs to resolve, e.g. ``expand_runs``' output.
         local_cpus: The CPUs available to a local launch.
+        environment: The process environment, read for ``CUDA_VISIBLE_DEVICES`` by a
+            local profile that discovers its GPUs.
         warned: Forwarded to ``check_machine`` so a command that already
             checked the machine does not hear the same warning twice.
 
@@ -139,6 +142,7 @@ def resolve_runs(
                 grid_name=run.grid,
                 values=run.values,
                 local_cpus=local_cpus,
+                environment=environment,
             ),
         )
         for run in runs

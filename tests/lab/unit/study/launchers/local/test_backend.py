@@ -1,5 +1,6 @@
 """The behavior of the local study backend."""
 
+from collections.abc import Mapping
 from dataclasses import replace
 import fcntl
 from io import StringIO
@@ -8,6 +9,7 @@ from pathlib import Path, PurePosixPath
 import subprocess
 import sys
 import threading
+from types import MappingProxyType
 from typing import cast, TYPE_CHECKING
 
 import pytest
@@ -30,12 +32,7 @@ from tslab.lab.study.commands.submit import submit_runs
 from tslab.lab.study.definition import StudyRun
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport, Resources
 import tslab.lab.study.launchers.local.backend as local_backend
-from tslab.lab.study.launchers.local.backend import (
-    _auto_gpu_count,
-    _phase_of,
-    LocalBackend,
-    LocalResources,
-)
+from tslab.lab.study.launchers.local.backend import _phase_of, LocalBackend, LocalResources
 from tslab.lab.study.launchers.local.run import LocalLauncher
 from tslab.lab.study.launchers.local.states import _is_local_job_id
 from tslab.lab.study.machine import FollowupSettings, LocalSettings
@@ -137,7 +134,7 @@ def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
 
     resources = LocalBackend().resources(
-        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=3
+        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=3, environment={}
     )
 
     assert resources.cpus == 3
@@ -146,11 +143,22 @@ def test_resources_uses_given_local_cpus(*, project: Path) -> None:
     assert resources.signal_problem() is None
 
 
-def _local_resources(*, project: Path, local: LocalSettings, local_cpus: int) -> Resources:
+def _local_resources(
+    *,
+    project: Path,
+    local: LocalSettings,
+    local_cpus: int,
+    environment: Mapping[str, str] = MappingProxyType({}),
+) -> Resources:
     ctx = context(project=project, machine_file='local.toml')
     machine = replace(ctx.machine, local=local)
     return LocalBackend().resources(
-        machine=machine, overrides=(), grid_name='g', values={}, local_cpus=local_cpus
+        machine=machine,
+        overrides=(),
+        grid_name='g',
+        values={},
+        local_cpus=local_cpus,
+        environment=environment,
     )
 
 
@@ -181,19 +189,32 @@ def test_cpus_per_run_never_drops_below_one(*, project: Path) -> None:
 def test_cpus_per_run_auto_without_nvidia_smi_uses_max_parallel(
     *, project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _auto_gpu_count.cache_clear()
-    try:
-        monkeypatch.setenv('PATH', str(tmp_path / 'no-binaries'))
-        monkeypatch.delenv('CUDA_VISIBLE_DEVICES', raising=False)
-        # why: no nvidia-smi and no Apple GPU, so the auto profile sees no GPU
-        monkeypatch.setattr('tslab.lab.jobs.local.gpus.platform.system', lambda: 'Linux')
-        resources = _local_resources(
-            project=project,
-            local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=2),
-            local_cpus=8,
-        )
-    finally:
-        _auto_gpu_count.cache_clear()
+    monkeypatch.setenv('PATH', str(tmp_path / 'no-binaries'))
+    # why: no nvidia-smi and no Apple GPU, so the auto profile sees no GPU
+    monkeypatch.setattr('tslab.lab.jobs.local.gpus.platform.system', lambda: 'Linux')
+    resources = _local_resources(
+        project=project, local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=2), local_cpus=8
+    )
+    assert resources.cpus_per_run == 4
+
+
+def test_cpus_per_run_auto_reads_the_given_environment(*, project: Path) -> None:
+    resources = _local_resources(
+        project=project,
+        local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=1),
+        local_cpus=8,
+        environment={'CUDA_VISIBLE_DEVICES': '0,1'},
+    )
+    assert resources.cpus_per_run == 4
+
+
+def test_cpus_per_run_auto_with_uuid_falls_back_to_max_parallel(*, project: Path) -> None:
+    resources = _local_resources(
+        project=project,
+        local=LocalSettings(gpus=GpuDiscovery.AUTO, max_parallel=2),
+        local_cpus=8,
+        environment={'CUDA_VISIBLE_DEVICES': 'GPU-abc'},
+    )
     assert resources.cpus_per_run == 4
 
 

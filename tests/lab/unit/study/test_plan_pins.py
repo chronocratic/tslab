@@ -51,7 +51,7 @@ def test_plan_stops_on_pin_conflict(tmp_path: Path) -> None:
     study = Study(name='s', settings={'trainer.accelerator': 'cpu'}, grids={'g': grid()})
     machine = _machine(tmp_path=tmp_path, settings={'trainer.accelerator': 'gpu'})
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
 
     with pytest.raises(
         ValueError, match=r"study 's' pins trainer\.accelerator = 'cpu', but .*\.toml sets 'gpu'"

@@ -40,7 +40,11 @@ def test_merge_order_and_slurm_precedence(study: Study, tmp_path: Path) -> None:
     resolved = {
         r.run.run_path: r
         for r in resolve_runs(
-            study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
+            study=study,
+            machine=profile,
+            runs=expand_runs(study=study),
+            local_cpus=1,
+            environment={},
         )
     }
     cost = resolved[PurePosixPath('g/cost-paper/Coffee/42')]
@@ -62,7 +66,13 @@ def test_profile_experiment_setting_rejected(study: Study, tmp_path: Path) -> No
             r'.* \(grid .*\); set it in the study instead'
         ),
     ):
-        resolve_runs(study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1)
+        resolve_runs(
+            study=study,
+            machine=profile,
+            runs=expand_runs(study=study),
+            local_cpus=1,
+            environment={},
+        )
 
 
 def test_override_experiment_setting_rejected(study: Study, tmp_path: Path) -> None:
@@ -70,7 +80,13 @@ def test_override_experiment_setting_rejected(study: Study, tmp_path: Path) -> N
         tmp_path, '[[overrides]]\nmatch = { grid = "g" }\nsettings = { "trainer.max_epochs" = 5 }\n'
     )
     with pytest.raises(ValueError, match=r'overrides\[0\]\.settings sets trainer\.max_epochs'):
-        resolve_runs(study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1)
+        resolve_runs(
+            study=study,
+            machine=profile,
+            runs=expand_runs(study=study),
+            local_cpus=1,
+            environment={},
+        )
 
 
 def test_every_bad_key_is_listed(study: Study, tmp_path: Path) -> None:
@@ -80,7 +96,13 @@ def test_every_bad_key_is_listed(study: Study, tmp_path: Path) -> None:
     with pytest.raises(
         ValueError, match=r'trainer\.max_epochs, trainer\.max_training_time'
     ) as raised:
-        resolve_runs(study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1)
+        resolve_runs(
+            study=study,
+            machine=profile,
+            runs=expand_runs(study=study),
+            local_cpus=1,
+            environment={},
+        )
     assert 'trainer.max_epochs' in str(raised.value)
     assert 'trainer.max_training_time' in str(raised.value)
 
@@ -95,7 +117,11 @@ def test_unknown_names_in_machine_overrides_warn(
     )
     with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         resolved = resolve_runs(
-            study=study, machine=profile, runs=expand_runs(study=study), local_cpus=1
+            study=study,
+            machine=profile,
+            runs=expand_runs(study=study),
+            local_cpus=1,
+            environment={},
         )
     assert 'old-recipe' in caplog.text
     assert 'variant' in caplog.text
