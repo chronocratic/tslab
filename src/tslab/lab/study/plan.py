@@ -77,7 +77,7 @@ _CHUNKS_PER_WORKER = 4
 class ResolvedRun:
     """One run with the settings and resources of its machine applied.
 
-    Args:
+    Attributes:
         run: The study run this resolves.
         settings: The settings of the run, then the machine settings, then the
             settings of the matching machine overrides; not yet expanded.
@@ -359,7 +359,7 @@ def expansion_env(*, machine: MachineProfile, environment: Mapping[str, str]) ->
 class PlannedTask:
     """One run prepared for submission.
 
-    Args:
+    Attributes:
         resolved: The resolved run this is a task for.
         index: The array index of the run, the same in every attempt.
         log_file: The file the output of the task is appended to.
@@ -387,7 +387,7 @@ class PlannedTask:
 class JobGroup:
     """The runs submitted as one job: runs of one grid with one job name and resources.
 
-    Args:
+    Attributes:
         grid: The grid name the runs of the group came from.
         job_name: The name of the job, the grid ``job_name`` template filled in.
         resources: The resources of the job, as declared by its backend.

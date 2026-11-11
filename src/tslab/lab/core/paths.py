@@ -18,6 +18,7 @@ __all__ = [
     'NAME_PART_PATTERN',
     'RESERVED_STAGE_NAMES',
     'STATUS_FILE',
+    'TEMPORARY_MARKER',
     'TRACKERS_DIRECTORY',
     'InstanceName',
     'normalize_instance_name',
@@ -50,7 +51,7 @@ RESERVED_STAGE_NAMES = frozenset(
 _FORBIDDEN_PARTS = frozenset({'.', '..'})
 # Marks the temporary siblings of an instance folder; a real name containing it
 # could be deleted as a leftover.
-_TEMPORARY_MARKER = '.tmp-'
+TEMPORARY_MARKER = '.tmp-'
 
 
 def require_path(*, value: object, parameter: str) -> Path:
@@ -98,7 +99,7 @@ def validate_name_part(*, part: str) -> str:
         part in _FORBIDDEN_PARTS
         or NAME_PART_PATTERN.fullmatch(part) is None
         or part.startswith('.')
-        or _TEMPORARY_MARKER in part
+        or TEMPORARY_MARKER in part
     ):
         message = (
             f'invalid name part {part!r}: use only letters, digits, ".", "_" and "-", '

@@ -12,7 +12,7 @@ import threading
 from typing import cast
 import uuid
 
-from tslab.lab.core.paths import _TEMPORARY_MARKER, require_path
+from tslab.lab.core.paths import require_path, TEMPORARY_MARKER
 
 __all__ = [
     'JsonFileError',
@@ -58,7 +58,7 @@ def _atomic_write(*, path: Path, data: bytes) -> None:
     require_path(value=path, parameter='path')
     path.parent.mkdir(parents=True, exist_ok=True)
     unique = f'{os.getpid()}-{threading.get_ident()}-{uuid.uuid4().hex[:8]}'
-    temporary_path = path.with_name(f'{path.name}{_TEMPORARY_MARKER}{unique}')
+    temporary_path = path.with_name(f'{path.name}{TEMPORARY_MARKER}{unique}')
     try:
         with temporary_path.open(mode='wb') as file_handle:
             file_handle.write(data)
@@ -140,7 +140,7 @@ def replace_directory(*, source: Path, destination: Path) -> None:
     previous: Path | None = None
     if destination.exists():
         previous = destination.with_name(
-            f'{destination.name}{_TEMPORARY_MARKER}old-{uuid.uuid4().hex[:8]}'
+            f'{destination.name}{TEMPORARY_MARKER}old-{uuid.uuid4().hex[:8]}'
         )
         destination.rename(previous)
     try:

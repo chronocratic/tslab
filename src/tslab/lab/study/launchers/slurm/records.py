@@ -17,7 +17,7 @@ __all__ = ['SlurmJobRecord']
 class SlurmJobRecord(JobRecord):
     """One job submitted to SLURM.
 
-    Args:
+    Attributes:
         job_name: The ``--job-name`` of the job; ``None`` in lines written
             before this field.
     """

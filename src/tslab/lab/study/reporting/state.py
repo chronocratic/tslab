@@ -24,7 +24,7 @@ __all__ = ['FolderFacts', 'RunReport', 'collect_states', 'read_folder', 'study_s
 class FolderFacts:
     """What one run folder reports; a bad ``status.json`` is reported, not raised.
 
-    Args:
+    Attributes:
         snapshot: The ``status.json`` snapshot, ``None`` when absent or bad.
         read_error: ``"<Type>: <message>"`` when the file was unreadable.
         lock_live: Whether a live process holds the run lock.
@@ -59,7 +59,7 @@ def read_folder(*, run_directory: Path) -> FolderFacts:
 class RunReport:
     """The state of one run, for display.
 
-    Args:
+    Attributes:
         run: The run the report is for.
         state: The decided state.
         reason: A one-line reason, when the state is not obvious.
@@ -125,7 +125,8 @@ def study_state(
             the requeue limit is interrupted.
 
     Returns:
-        The state and a one-line reason, in the order of spec §7.
+        The state and a one-line reason. The first rule that holds wins, in the order queued,
+        running, done, interrupted, failed, missing.
     """
     snapshot = folder.snapshot
     if job_phase is JobPhase.QUEUED:
@@ -155,7 +156,7 @@ def study_state(
         RunState.CRASHED,
     )
     # why: a job that ended out of memory or cancelled left a stale ``running`` file;
-    # it failed, so the automatic retry must not restart it (spec section 8)
+    # it failed, so the automatic retry must not restart it
     killed = stale_running and job_phase is JobPhase.FAILED and not time_limited
     interrupted = (stale_running and not killed) or job_phase is JobPhase.INTERRUPTED
     interrupted = interrupted or time_limited
@@ -176,15 +177,6 @@ def study_state(
     if failed:
         return StudyState.FAILED, _reason(folder=folder, job_reason=job_reason)
     return StudyState.MISSING, None
-
-
-def _pause(*, seconds: float) -> None:
-    time.sleep(seconds)
-
-
-def _sleep(seconds: float) -> None:
-    # why: the sleep of collect_states is called with one positional argument
-    _pause(seconds=seconds)
 
 
 def _needs_grace(*, job_phase: 'JobPhase', folder: FolderFacts) -> bool:
@@ -251,7 +243,7 @@ def collect_states(
     runs: Sequence[StudyRun],
     jobs: Sequence[JobRecord],
     job_states: 'JobStates',
-    sleep: Callable[[float], None] = _sleep,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[RunReport]:
     """The state report of every run of one study.
 

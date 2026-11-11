@@ -41,3 +41,12 @@ def test_only_with_two_axes_in_one_item_says_to_repeat_the_flag() -> None:
     study = Study(name='s', grids={'c': grid()})
     with pytest.raises(ValueError, match='one --only per axis'):
         select_runs(study=study, runs=expand_runs(study=study), only=('dataset=Coffee,seed=42',))
+
+
+def test_study_run_mappings_are_read_only() -> None:
+    study = Study(name='s', grids={'c': grid()})
+    run = expand_runs(study=study)[0]
+    with pytest.raises(TypeError):
+        run.values['dataset'] = 'x'  # ty: ignore[invalid-assignment]
+    with pytest.raises(TypeError):
+        run.settings['seed'] = 1  # ty: ignore[invalid-assignment]

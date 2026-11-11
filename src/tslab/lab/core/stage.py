@@ -42,10 +42,10 @@ from tslab.lab.core.meta.instance import (
     stale_reason,
 )
 from tslab.lab.core.paths import (
-    _TEMPORARY_MARKER,
     ERROR_FILE,
     META_FILE,
     normalize_instance_name,
+    TEMPORARY_MARKER,
     validate_stage_name,
 )
 from tslab.lab.core.ranks import is_writer_process, RankAgreement
@@ -417,14 +417,14 @@ class Stage[Out: Artifact](ABC):
         """Return where ``execute`` writes: the final folder, or a temporary sibling."""
         if self.in_place:
             return directory
-        return directory.with_name(f'{directory.name}{_TEMPORARY_MARKER}{os.getpid()}')
+        return directory.with_name(f'{directory.name}{TEMPORARY_MARKER}{os.getpid()}')
 
     def _prepare_work_directory(
         self, *, run: Run, directory: Path, resume: bool, instance_id: str
     ) -> Path:
         if not run.writes_files:
             return directory
-        for leftover in directory.parent.glob(f'{directory.name}{_TEMPORARY_MARKER}*'):
+        for leftover in directory.parent.glob(f'{directory.name}{TEMPORARY_MARKER}*'):
             shutil.rmtree(leftover, ignore_errors=True)
         work_directory = self._work_directory(directory=directory)
         if self.in_place:

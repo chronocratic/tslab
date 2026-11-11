@@ -50,7 +50,7 @@ class LaunchStopped(RuntimeError):  # noqa: N818 # why: names the stop event, no
 class LaunchReport:
     """What one launch submitted.
 
-    Args:
+    Attributes:
         submitted: One job record per submitted group, in order.
         not_submitted: The groups the launch did not reach; all of them
             on a dry run, the rest after an error or a signal.
@@ -84,7 +84,7 @@ class OnLaunch(Protocol):
 class JobStates:
     """The states of the jobs of one study, as one backend reports them.
 
-    Args:
+    Attributes:
         known: Whether the states are real, or the scheduler could not be
             asked and the state logic works from the run folders only.
         states: The raw state text per job or task id; shown to the user.

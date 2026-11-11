@@ -140,7 +140,7 @@ class Override:
 class Grid:
     """One script command of a study, run over the product of its axes.
 
-    Args:
+    Attributes:
         short_name: Unique in the study; the default job name and the stem of
             the task log files.
         command: The no-preset command of the script, as a word tuple.
@@ -358,7 +358,7 @@ def _kind(*, value: object) -> str:
 class Study:
     """A named round of experiments with settings shared across its grids.
 
-    Args:
+    Attributes:
         name: The study name.
         grids: The grid name to grid mapping.
         settings: Settings applied to every grid that has each path.
@@ -665,12 +665,24 @@ def run_matches(*, grid_name: str, values: Mapping[str, str], match: Match) -> b
 
 @dataclass(frozen=True, kw_only=True)
 class StudyRun:
-    """One run of a grid: its axis values, run path and merged settings."""
+    """One run of a grid: its axis values, run path and merged settings.
+
+    Attributes:
+        grid: The name of the grid the run belongs to.
+        values: The axis name to value name of the run; read-only.
+        run_path: The run path within the study.
+        settings: The merged settings of the run, path to value; read-only.
+    """
 
     grid: str
     values: Mapping[str, str]
     run_path: PurePosixPath
     settings: Mapping[str, SettingValue]
+
+    def __post_init__(self) -> None:
+        """Copy the mappings read-only, so a frozen run cannot change through them."""
+        object.__setattr__(self, 'values', MappingProxyType(dict(self.values)))
+        object.__setattr__(self, 'settings', MappingProxyType(dict(self.settings)))
 
 
 def merge_settings(

@@ -35,7 +35,6 @@ class MLflowTracker(LightningLoggerTracker):
         super().__init__()
         self._experiment = experiment
         self._tracking_uri = tracking_uri
-        self._logged_keys: set[str] = set()
         self._logged_values: dict[str, object] = {}
 
     @override
@@ -83,14 +82,13 @@ class MLflowTracker(LightningLoggerTracker):
     @override
     def log_params(self, *, params: Mapping[str, object]) -> None:
         for key, value in params.items():
-            if key in self._logged_keys and self._logged_values.get(key) != value:
+            if key in self._logged_values and self._logged_values[key] != value:
                 _LOGGER.warning(
                     'MLflow parameters are immutable: %r keeps its first value, not %r', key, value
                 )
-        new_params = {key: value for key, value in params.items() if key not in self._logged_keys}
+        new_params = {key: value for key, value in params.items() if key not in self._logged_values}
         if new_params:
             super().log_params(params=new_params)
-            self._logged_keys.update(new_params)
             self._logged_values.update(new_params)
 
     @override
