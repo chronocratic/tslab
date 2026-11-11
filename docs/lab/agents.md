@@ -4,7 +4,7 @@ Use `tslab` JSON output and exit codes when a coding agent submits, follows,
 debugs, or collects a study. With `--json`, commands write one document to
 standard output, except `study results`, which writes to `--out`. Set `--out -`
 for standard output. Logs and task output go to standard error. Read the
-`schema` field first; breaking document changes need a new schema version.
+`schema` field first; it names the document type.
 
 New projects include the general skill at
 `.agents/skills/tslab/SKILL.md`, and `AGENTS.md` points to it. Compatible
@@ -27,19 +27,19 @@ uv run tslab study submit example --json
 
 | Schema | Fields |
 |---|---|
-| `tslab.error/1` | `exit_code`, `message`; used for command and usage errors. |
-| `tslab.machine-list/1` | `machines`: `name`, `source`, `profile`, `note`. |
-| `tslab.study-list/1` | `studies`: `short_name`, `name`. |
-| `tslab.run-status/1` | `exit_code`, `runs`: `directory`, `state`, `instances` (`instance`, `stage`, `state`, `fingerprint`, `seconds`, `error`). |
-| `tslab.study-status/1` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, and, when the scheduler reports a start for a queued job, `expected_start` (null when unknown), `pending_reason` (null when unknown) and `pending_stuck` (bool, false when no reason). |
-| `tslab.study-show/1` | `study`, `settings` (dotted path to value), `grids`, `total_runs`. Each grid has `name`, `short_name`, `job_name` (the template), `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
-| `tslab.study-launch/1` | `dry_run`, `jobs`, `cancelled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
-| `tslab.study-wait/1` | The `tslab.study-status/1` fields without `expected_start`, `pending_reason` and `pending_stuck` on runs, plus `waited_seconds` and `timed_out`. |
-| `tslab.study-failures/1` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null), `exit_code` (the code SLURM recorded for the job, or null). |
-| `tslab.study-cancel/1` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
-| `tslab.study-usage/1` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
-| `tslab.study-results/1` | `rows`, the same rows as the CSV. |
-| `tslab.doctor/1` | `machine`, `project_settings` (`path`, `values`: each key with `value` and `source` as `flag`, `file`, or `default`), `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
+| `tslab.error` | `exit_code`, `message`; used for command and usage errors. |
+| `tslab.machine-list` | `machines`: `name`, `source`, `profile`, `note`. |
+| `tslab.study-list` | `studies`: `short_name`, `name`. |
+| `tslab.run-status` | `exit_code`, `runs`: `directory`, `state`, `instances` (`instance`, `stage`, `state`, `fingerprint`, `seconds`, `error`). |
+| `tslab.study-status` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, and, when the scheduler reports a start for a queued job, `expected_start` (null when unknown), `pending_reason` (null when unknown) and `pending_stuck` (bool, false when no reason). |
+| `tslab.study-show` | `study`, `settings` (dotted path to value), `grids`, `total_runs`. Each grid has `name`, `short_name`, `job_name` (the template), `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
+| `tslab.study-launch` | `dry_run`, `jobs`, `cancelled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
+| `tslab.study-wait` | The `tslab.study-status` fields without `expected_start`, `pending_reason` and `pending_stuck` on runs, plus `waited_seconds` and `timed_out`. |
+| `tslab.study-failures` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null), `exit_code` (the code SLURM recorded for the job, or null). |
+| `tslab.study-cancel` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
+| `tslab.study-usage` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
+| `tslab.study-results` | `rows`, the same rows as the CSV. |
+| `tslab.doctor` | `machine`, `project_settings` (`path`, `values`: each key with `value` and `source` as `flag`, `file`, or `default`), `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
 
 ## Exit codes
 
