@@ -366,12 +366,14 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         except ValueError as error:
             message = f'{description}: {error}'
             raise ValueError(message) from error
+        # why: the channel selection copies the targets; they are views of the encoded
+        # series when it is the same float32 tensor, so an encoder that writes into its
+        # input would change them
+        tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
         flat_windows = windows.reshape(-1, *windows.shape[-2:])
-        features = encode_checked(
+        tensors[f'{split}_representations'] = encode_checked(
             encoder=window_encoder, inputs=flat_windows, description=description
         )
-        tensors[f'{split}_representations'] = features
-        tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
     return Tensors(tensors=tensors)
 
 

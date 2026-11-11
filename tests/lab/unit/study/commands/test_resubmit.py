@@ -966,6 +966,35 @@ def test_resubmit_reports_the_job_ids_it_cancels_including_held_ones(
     assert cancelled == ['job-0']
 
 
+def test_resubmit_dry_run_reports_no_cancelled_jobs(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    submit_study(project=project)
+    fake_backend.set_states(
+        phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
+    )
+    fake_backend.cancellable_answer = ['job-0']
+    ctx = context(project=project, machine_file='cluster.toml')
+    cancelled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, dry_run=True, on_cancel=cancelled.extend) == 0
+    assert cancelled == []
+
+
+def test_resubmit_reports_no_cancelled_jobs_when_the_cancel_fails(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    submit_study(project=project)
+    fake_backend.set_states(
+        phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
+    )
+    fake_backend.cancellable_answer = ['job-0']
+    fake_backend.cancel_answer = (1, [])
+    ctx = context(project=project, machine_file='cluster.toml')
+    cancelled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=cancelled.extend) != 0
+    assert cancelled == []
+
+
 def _time_limited(*, project: Path, run_path: str) -> None:
     """A run folder left at the time limit, with a checkpoint saved."""
     folder = project / 'runs' / 'chain' / run_path

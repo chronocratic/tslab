@@ -45,7 +45,7 @@ _RESERVED_TRAINER_KWARGS = frozenset(
 
 
 @contextmanager
-def _defer_time_limit_signals(*, signal_stop: _SignalStop) -> Generator[None]:
+def _defer_time_limit_signals(*, run: Run, signal_stop: _SignalStop) -> Generator[None]:
     sigusr2 = getattr(signal, 'SIGUSR2', None)
     if sigusr2 is None or current_thread() is not main_thread():
         yield
@@ -67,7 +67,11 @@ def _defer_time_limit_signals(*, signal_stop: _SignalStop) -> Generator[None]:
             signal.signal, sigusr2, signal.SIG_DFL if previous_sigusr2 is None else previous_sigusr2
         )
         signal.signal(sigusr2, defer_sigusr2)
-        restore.enter_context(_deferred_sigterm(stopping=lambda: signal_stop.signalled))
+        # why: SIGUSR2 can arrive after the callback was built and before the handler above
+        # is installed; only the run saw it then
+        restore.enter_context(
+            _deferred_sigterm(stopping=lambda: signal_stop.signalled or run.time_limit_signalled)
+        )
         restore.callback(signal_stop.restore_sigterm)
         yield
 
@@ -172,7 +176,7 @@ class LightningTrainer(Trainer[LightningModule]):
             signal_received=run.time_limit_signalled,
             deadline=deadline,
         )
-        with _defer_time_limit_signals(signal_stop=signal_stop):
+        with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
             trainer = self._build_trainer(
                 run=run,
                 checkpoint_directory=checkpoint_directory,

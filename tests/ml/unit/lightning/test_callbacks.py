@@ -133,7 +133,7 @@ def test_defer_time_limit_signals_is_safe_in_a_worker_thread(tmp_path: Path) -> 
 
     def defer() -> None:
         try:
-            with _defer_time_limit_signals(signal_stop=signal_stop):
+            with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
                 pass
         except ValueError as error:
             errors.append(error)
@@ -144,13 +144,25 @@ def test_defer_time_limit_signals_is_safe_in_a_worker_thread(tmp_path: Path) -> 
     assert errors == []
 
 
+def test_sigterm_is_ignored_when_only_the_run_saw_sigusr2(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
+    with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+        handler = signal.getsignal(signal.SIGTERM)
+        assert callable(handler)
+        monkeypatch.setattr(Run, 'time_limit_signalled', property(lambda _run: True))
+        handler(signal.SIGTERM, None)
+
+
 def test_defer_time_limit_signals_is_safe_without_sigusr2(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.delattr(signal, 'SIGUSR2', raising=False)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
     signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
-    with _defer_time_limit_signals(signal_stop=signal_stop):
+    with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
         pass
 
 

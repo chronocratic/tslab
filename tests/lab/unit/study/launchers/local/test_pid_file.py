@@ -206,6 +206,17 @@ def test_scalar_run_pids_are_rejected(tmp_path: Path) -> None:
         read_launch(study_folder=tmp_path)
 
 
+def test_a_launch_file_of_an_older_build_names_the_file_and_the_way_out(tmp_path: Path) -> None:
+    write_launch(folder=tmp_path, pid=os.getpid(), host='h', tasks={'j_0': 'running'})
+    path = tmp_path / LAUNCH_FILE
+    document = json.loads(path.read_text())
+    document['run_pids'] = [['j_0', 4242]]
+    atomic_write_json(path=path, document=document)
+    with pytest.raises(LocalLaunchError, match=r'older build.*no longer running.*remove') as info:
+        read_launch(study_folder=tmp_path)
+    assert str(path) in str(info.value)
+
+
 def test_status_reads_local_launch_states(project: Path) -> None:
     record_local_job(project=project)
     write_launch(

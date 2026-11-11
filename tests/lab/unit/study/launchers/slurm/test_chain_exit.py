@@ -31,7 +31,7 @@ from tslab.lab.study.records import (
     submission_lock,
     TaskRecord,
 )
-from tslab.lab.study.reporting.state import collect_states, FolderFacts
+from tslab.lab.study.reporting.state import collect_states, FolderFacts, RunReport
 
 _STATE_MODULE = import_module('tslab.lab.study.reporting.state')
 _CHAIN_EXIT_MODULE = import_module('tslab.lab.study.launchers.slurm.chain_exit')
@@ -527,3 +527,74 @@ def test_chain_exit_reads_the_records_under_the_lock(
     assert chain_exit(context=ctx, job_file=3, index=17) == 0
     assert requeued == ['41_17']
     assert held[-1] is True
+
+
+def _lock_is_held(*, lock_path: Path) -> bool:
+    with lock_path.open('a') as probe:
+        try:
+            fcntl.flock(probe.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        return False
+
+
+def test_chain_exit_asks_the_scheduler_before_taking_the_lock(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    lock_path = study_folder(machine=ctx.machine, study=ctx.study) / 'submit.lock'
+    held: list[bool] = []
+
+    def query() -> dict[str, str]:
+        held.append(_lock_is_held(lock_path=lock_path))
+        return {}
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'query_cluster_config', query)
+
+    assert chain_exit(context=ctx, job_file=3, index=17) == 0
+    assert held == [False]
+
+
+def test_chain_exit_does_not_wait_for_the_run_folder_under_the_lock(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    lock_path = study_folder(machine=ctx.machine, study=ctx.study) / 'submit.lock'
+    waits: list[bool] = []
+
+    def collect(**kwargs: object) -> list[RunReport]:
+        waits.append('sleep' not in kwargs)
+        assert _lock_is_held(lock_path=lock_path) == ('sleep' in kwargs)
+        return collect_states(**kwargs)  # ty: ignore[invalid-argument-type]
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'collect_states', collect)
+
+    assert chain_exit(context=ctx, job_file=3, index=17) == 0
+    assert waits == [True, False]
+
+
+def test_chain_exit_does_not_call_a_timeout_inside_the_lock_a_busy_lock(
+    project: Path,
+    fake_backend: FakeBackend,
+    requeued: list[str],
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+
+    def slow_filesystem(*, run_directory: Path) -> object:
+        del run_directory
+        message = 'NFS timed out'
+        raise TimeoutError(message)
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'take_progress', slow_filesystem)
+
+    with caplog.at_level('WARNING'), pytest.raises(TimeoutError, match='NFS'):
+        chain_exit(context=ctx, job_file=3, index=17)
+    assert 'skipping the requeue' not in caplog.text

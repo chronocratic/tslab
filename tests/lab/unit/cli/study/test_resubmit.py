@@ -71,6 +71,18 @@ def test_new_code_snapshot_takes_a_fresh_snapshot(
     )
 
 
+def test_detach_fails_at_once_on_untracked_source_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
+) -> None:
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    (project / 'src' / 'pkg' / 'new.py').write_text('NEW = 1\n', encoding='utf-8')
+
+    code = run_main('resubmit', 'study', '--machine', 'local', '--new-code-snapshot', '--detach')
+
+    assert code == 2
+    assert fake_backend.calls('detach') == []
+
+
 def test_new_code_snapshot_and_no_code_snapshot_is_usage_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
 ) -> None:

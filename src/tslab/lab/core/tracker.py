@@ -25,6 +25,7 @@ from tslab.lab.enums import RunState
 __all__ = ['LocalTracker', 'RunStatus', 'Tracker']
 
 _VERSION_PATTERN = re.compile(r'version_(\d+)')
+_STEP_COLUMN = 'step'
 
 
 class _ParamsDumper(yaml.SafeDumper):
@@ -145,16 +146,21 @@ class LocalTracker(Tracker):
     def log_metrics(self, *, metrics: Mapping[str, float], step: int | None = None) -> None:
         if self._directory is None:
             return
-        row: dict[str, float | int | None] = {'step': step, **metrics}
+        if _STEP_COLUMN in metrics:
+            message = (
+                f'a metric cannot be named {_STEP_COLUMN!r}: it is the step column of metrics.csv'
+            )
+            raise ValueError(message)
+        row: dict[str, float | int | None] = {_STEP_COLUMN: step, **metrics}
         self._rows.append(row)
-        columns = ['step', *sorted(name for name in metrics if name != 'step')]
+        columns = [_STEP_COLUMN, *sorted(metrics)]
         known = set(self._columns)
         path = self._directory / 'metrics.csv'
         if known.issuperset(columns):
             with path.open(mode='a', encoding='utf-8', newline='') as handle:
                 csv.DictWriter(handle, fieldnames=self._columns).writerow(row)
             return
-        self._columns = ['step', *sorted((known | set(columns)) - {'step'})]
+        self._columns = [_STEP_COLUMN, *sorted((known | set(columns)) - {_STEP_COLUMN})]
         buffer = io.StringIO(newline='')
         writer = csv.DictWriter(buffer, fieldnames=self._columns)
         writer.writeheader()

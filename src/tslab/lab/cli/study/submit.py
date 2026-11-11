@@ -110,6 +110,15 @@ class Submit:
             wanted=wanted,
         )
         if self.detach:
+            # why: the background launch copies the snapshot, but its checks run here so a
+            # refused snapshot fails at once instead of in a log nobody reads
+            take_requested_code_snapshot(
+                request=request,
+                context=context,
+                wanted=wanted,
+                include_untracked=self.code_snapshot_include_untracked,
+                dry_run=True,
+            )
             flags = [
                 flag
                 for flag, on in (

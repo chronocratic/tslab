@@ -31,7 +31,7 @@ from tslab.lab.jobs.slurm.commands import (
     SlurmQueueEntry,
     submission_environment,
 )
-from tslab.lab.jobs.slurm.environment import task_count
+from tslab.lab.jobs.slurm.environment import RESTART_COUNT_VARIABLE, task_count
 from tslab.lab.jobs.slurm.memory import format_slurm_memory, parse_slurm_memory
 from tslab.lab.jobs.slurm.script import (
     array_spec,
@@ -63,6 +63,7 @@ __all__ = [
     'INTERRUPTING_JOB_STATES',
     'QOS_LIMIT_MARKERS',
     'QUEUED_JOB_STATES',
+    'RESTART_COUNT_VARIABLE',
     'RUNNING_JOB_STATES',
     'SLURM_COMMANDS',
     'STUCK_PENDING_REASONS',
