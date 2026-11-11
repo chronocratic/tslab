@@ -37,4 +37,4 @@ def test_seeding_is_documented_everywhere() -> None:
 def test_old_top_level_docs_are_gone() -> None:
     names = {path.name for path in DOCS.glob('*.md')}
 
-    assert names == {'index.md', 'migration.md', 'changelog.md', 'contributing.md'}
+    assert names == {'index.md', 'changelog.md', 'contributing.md'}

@@ -25,7 +25,6 @@ README lists every extra.
 - **ML:** [ml](ml/index.md) for Lightning training, trackers and checkpoints.
 - **TS:** [ts](ts/index.md) and [Getting started with time series](ts/getting-started.md)
   for the time series project template.
-- **Moving from an older version:** [Migration](migration.md).
 
 ## How a run works
 

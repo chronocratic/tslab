@@ -16,7 +16,6 @@ ts
 :maxdepth: 1
 :caption: Project
 
-../migration
 ../changelog
 ../contributing
 ```
