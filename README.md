@@ -102,8 +102,7 @@ The generated `README.md` explains the rest.
 ## Documentation
 
 [tslab.readthedocs.io](https://tslab.readthedocs.io): three sections, one per
-layer (`tslab.lab` without torch, `tslab.ml`, `tslab.ts`), plus the API and a
-migration page for older code.
+layer (`tslab.lab` without torch, `tslab.ml`, `tslab.ts`), plus the API.
 
 ## Contributing
 

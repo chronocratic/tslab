@@ -1,1 +1,1 @@
-Fingerprints use format version 3 because every class moved module in the layer split. Caches, run results and checkpoints written by an earlier version are not reused after upgrading; every stage runs again. See the migration page.
+Fingerprints use format version 3 because every class moved module in the layer split. Caches, run results and checkpoints written by an earlier version are not reused after upgrading; every stage runs again.
