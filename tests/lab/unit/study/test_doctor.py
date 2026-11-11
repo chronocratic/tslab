@@ -13,7 +13,11 @@ from tslab.lab.study.doctor import DoctorCheck, run_checks
 
 def test_doctor_ok_on_local_toy_profile(project: Path) -> None:
     checks = run_checks(
-        machine_path=project / 'local.toml', study=None, start=project, environment=os.environ
+        machine_path=project / 'local.toml',
+        study=None,
+        start=project,
+        environment=os.environ,
+        free_bytes=lambda _path: 1024**4,
     )
     statuses = {check.name: check.status for check in checks}
     assert statuses['profile'] == 'ok'
