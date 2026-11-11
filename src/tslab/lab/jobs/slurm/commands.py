@@ -16,8 +16,11 @@ from tslab.lab.jobs.slurm.memory import parse_slurm_memory
 from tslab.lab.jobs.slurm.timing import parse_sacct_duration, parse_slurm_duration
 
 __all__ = [
+    'CONFIG_TIMEOUT_SECONDS',
     'QOS_LIMIT_MARKERS',
     'QOS_WAIT_CAP_SECONDS',
+    'QUERY_TIMEOUT_SECONDS',
+    'SUBMIT_TIMEOUT_SECONDS',
     'SlurmError',
     'SlurmJobUsage',
     'SlurmNodeGroup',
@@ -25,12 +28,14 @@ __all__ = [
     'gres_gpus',
     'query_cluster_config',
     'query_expected_starts',
+    'query_job_reasons',
     'query_job_start_times',
     'query_job_states',
     'query_job_usage',
     'query_partition',
     'sbatch',
     'scancel',
+    'scontrol_requeue',
     'slurm_available',
     'submission_environment',
 ]
@@ -59,7 +64,6 @@ CONFIG_TIMEOUT_SECONDS = 30.0
 
 #: The waits between the tries of a read-only query.
 _QUERY_RETRY_DELAYS = (5.0, 15.0)
-_sleep = time.sleep
 
 _JOB_PREFIXES = ('SLURM_', 'SLURMD_', 'SRUN_', 'SBATCH_', 'SALLOC_')
 _JOB_NAMES = frozenset(
@@ -124,13 +128,16 @@ def _query_once(*, command: list[str]) -> subprocess.CompletedProcess[str] | Non
 
 
 def _query(
-    *, command: list[str], accept: Callable[[subprocess.CompletedProcess[str]], bool]
+    *,
+    command: list[str],
+    accept: Callable[[subprocess.CompletedProcess[str]], bool],
+    sleep: Callable[[float], None],
 ) -> subprocess.CompletedProcess[str]:
     for delay in _QUERY_RETRY_DELAYS:
         last = _query_once(command=command)
         if last is not None and accept(last):
             return last
-        _sleep(delay)
+        sleep(delay)
     # why: the last try keeps the timeout error, so a hung query still raises
     return _run(command=command, timeout=QUERY_TIMEOUT_SECONDS)
 
@@ -308,11 +315,14 @@ class SlurmQueueEntry:
     reason: str | None
 
 
-def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, SlurmQueueEntry]:
+def query_expected_starts(
+    *, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+) -> dict[str, SlurmQueueEntry]:
     """Return the expected start and pending reason of each queued job.
 
     Args:
         job_ids: Array or single job ids; empty means no calls and ``{}``.
+        sleep: The wait between tries of a query; injected for the tests.
 
     Returns:
         ``{task id: SlurmQueueEntry}`` with task ids ``<job>_<index>`` or
@@ -330,6 +340,7 @@ def query_expected_starts(*, job_ids: Sequence[str]) -> dict[str, SlurmQueueEntr
     squeue = _query(
         command=['squeue', '--array', '--start', '--jobs', ids, '--noheader', '--format=%i|%S|%r'],
         accept=_squeue_accepts,
+        sleep=sleep,
     )
     if not _squeue_accepts(squeue):
         message = f'squeue --start failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
@@ -354,11 +365,14 @@ def _pipe_start_lines(*, stdout: str) -> dict[str, SlurmQueueEntry]:
     return starts
 
 
-def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
+def query_job_states(
+    *, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+) -> dict[str, str]:
     """Return the SLURM state of every task id of the given jobs.
 
     Args:
         job_ids: Array or single job ids; empty means no calls and ``{}``.
+        sleep: The wait between tries of a query; injected for the tests.
 
     Returns:
         ``{task id: state}`` with task ids ``<job>_<index>`` or ``<job>``;
@@ -376,6 +390,7 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     squeue = _query(
         command=['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%T'],
         accept=_squeue_accepts,
+        sleep=sleep,
     )
     if not _squeue_accepts(squeue):
         message = f'squeue failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
@@ -392,6 +407,7 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
             '--format=JobID,State',
         ],
         accept=_sacct_accepts,
+        sleep=sleep,
     )
     if sacct.returncode != 0:
         message = f'sacct failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'
@@ -401,11 +417,14 @@ def query_job_states(*, job_ids: Sequence[str]) -> dict[str, str]:
     return states
 
 
-def query_job_start_times(*, job_ids: Sequence[str]) -> dict[str, float]:
+def query_job_start_times(
+    *, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+) -> dict[str, float]:
     """Return the UTC start time of every started task id, as Unix seconds.
 
     Args:
         job_ids: Array or single job ids; empty means no call and ``{}``.
+        sleep: The wait between tries of a query; injected for the tests.
 
     Returns:
         ``{task id: start time}``; pending and unparseable rows are omitted.
@@ -428,6 +447,7 @@ def query_job_start_times(*, job_ids: Sequence[str]) -> dict[str, float]:
             '--format=JobID,Start',
         ],
         accept=_sacct_accepts,
+        sleep=sleep,
     )
     if result.returncode != 0:
         message = f'sacct start times failed for jobs {ids}:\n{result.stdout}{result.stderr}'
@@ -451,11 +471,14 @@ def _parse_job_start_times(*, stdout: str) -> dict[str, float]:
     return starts
 
 
-def query_job_reasons(*, job_ids: Sequence[str]) -> dict[str, str]:
+def query_job_reasons(
+    *, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+) -> dict[str, str]:
     """Return the pending or terminal reason of every task id of the given jobs.
 
     Args:
         job_ids: Array or single job ids; empty means no calls and ``{}``.
+        sleep: The wait between tries of a query; injected for the tests.
 
     Returns:
         ``{task id: reason}``; ``squeue`` wins over ``sacct`` and empty or
@@ -471,6 +494,7 @@ def query_job_reasons(*, job_ids: Sequence[str]) -> dict[str, str]:
     squeue = _query(
         command=['squeue', '--array', '--jobs', ids, '--noheader', '--format=%i|%r'],
         accept=_squeue_accepts,
+        sleep=sleep,
     )
     if not _squeue_accepts(squeue):
         message = f'squeue reasons failed for jobs {ids}:\n{squeue.stdout}{squeue.stderr}'
@@ -487,6 +511,7 @@ def query_job_reasons(*, job_ids: Sequence[str]) -> dict[str, str]:
             '--format=JobID,Reason',
         ],
         accept=_sacct_accepts,
+        sleep=sleep,
     )
     if sacct.returncode != 0:
         message = f'sacct reasons failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'
@@ -652,11 +677,14 @@ class SlurmJobUsage:
     exit_code: str | None = None
 
 
-def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
+def query_job_usage(
+    *, job_ids: Sequence[str], sleep: Callable[[float], None] = time.sleep
+) -> dict[str, SlurmJobUsage]:
     """Return what ``sacct`` reports about the usage of each task of the jobs.
 
     Args:
         job_ids: Array or single job ids; empty means no calls and ``{}``.
+        sleep: The wait between tries of a query; injected for the tests.
 
     Returns:
         ``{task id: usage}`` with task ids ``<job>_<index>`` or ``<job>``;
@@ -679,6 +707,7 @@ def query_job_usage(*, job_ids: Sequence[str]) -> dict[str, SlurmJobUsage]:
             '--format=JobID,State,Elapsed,Timelimit,TotalCPU,MaxRSS,AllocCPUS,AllocTRES,ExitCode',
         ],
         accept=_sacct_accepts,
+        sleep=sleep,
     )
     if sacct.returncode != 0:
         message = f'sacct failed for jobs {ids}:\n{sacct.stdout}{sacct.stderr}'

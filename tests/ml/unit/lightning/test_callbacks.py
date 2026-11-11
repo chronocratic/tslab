@@ -133,7 +133,7 @@ def test_defer_time_limit_signals_is_safe_in_a_worker_thread(tmp_path: Path) -> 
 
     def defer() -> None:
         try:
-            with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+            with _defer_time_limit_signals(signal_stop=signal_stop):
                 pass
         except ValueError as error:
             errors.append(error)
@@ -150,7 +150,7 @@ def test_defer_time_limit_signals_is_safe_without_sigusr2(
     monkeypatch.delattr(signal, 'SIGUSR2', raising=False)
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
     signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
-    with _defer_time_limit_signals(run=run, signal_stop=signal_stop):
+    with _defer_time_limit_signals(signal_stop=signal_stop):
         pass
 
 
@@ -253,6 +253,19 @@ def test_signal_stop_suppresses_lightning_sigterm_after_usr2(tmp_path: Path) -> 
         callback.on_sanity_check_start(cast('Trainer', object()), LightningModule())
         signal.raise_signal(signal.SIGTERM)
         assert calls == []
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
+def test_signal_stop_restores_the_sigterm_handler(tmp_path: Path) -> None:
+    previous = signal.getsignal(signal.SIGTERM)
+    run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
+    callback = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
+    try:
+        callback.on_sanity_check_start(cast('Trainer', object()), LightningModule())
+        assert signal.getsignal(signal.SIGTERM) is not previous
+        callback.restore_sigterm()
+        assert signal.getsignal(signal.SIGTERM) is previous
     finally:
         signal.signal(signal.SIGTERM, previous)
 

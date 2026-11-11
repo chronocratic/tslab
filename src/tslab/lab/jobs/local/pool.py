@@ -157,7 +157,7 @@ def _spawn_callback(*, on_spawn: OnSpawn | None, key: str) -> Callable[[int], No
 
 
 class _GpuLeaseGate:
-    """The lease of a GPU slot, gated by the pool's own leases and a free recheck.
+    """The lease of a GPU slot, gated by the own leases of the pool and a free recheck.
 
     A slot the pool holds a lease for is leased without a recheck. Otherwise
     ``gpu_free`` decides, and its answer is kept per GPU for the recheck
@@ -180,6 +180,7 @@ class _GpuLeaseGate:
         self._busy_recheck_seconds = busy_recheck_seconds
         self._counts: dict[str, int] = {}
         self._answers: dict[str, tuple[float, bool]] = {}
+        self._gpu_locks: dict[str, threading.Lock] = {}
         self._lock = threading.Lock()
 
     def _holds(self, *, gpu_id: str) -> bool:
@@ -187,19 +188,33 @@ class _GpuLeaseGate:
         with self._lock:
             return self._counts.get(gpu_id, 0) > 0
 
+    def _gpu_lock(self, *, gpu_id: str) -> threading.Lock:
+        """The lock that serializes the free checks of one GPU."""
+        with self._lock:
+            return self._gpu_locks.setdefault(gpu_id, threading.Lock())
+
+    def _fresh_answer(self, *, slot: str) -> bool | None:
+        """Whether the GPU was free at the last check, or ``None`` when the answer is stale."""
+        with self._lock:
+            answer = self._answers.get(slot)
+        if answer is None or time.monotonic() - answer[0] >= self._busy_recheck_seconds:
+            return None
+        return answer[1]
+
     def _is_busy(self, *, slot: str) -> bool:
         """Whether the pool must wait for the GPU of the slot before leasing it."""
         if self._gpu_free is None:
             return False
-        now = time.monotonic()
-        with self._lock:
-            # why: the lock stays held during the call, so a second thread on the
-            # same GPU reads the answer instead of calling again
-            answer = self._answers.get(slot)
-            if answer is not None and now - answer[0] < self._busy_recheck_seconds:
-                return not answer[1]
+        # why: the lock of this GPU stays held during the call, so a second thread on the
+        # same GPU reads the answer instead of calling again, while the shared lock stays
+        # free for the other GPUs and for the lease counts (the call can take 30 seconds)
+        with self._gpu_lock(gpu_id=slot):
+            fresh = self._fresh_answer(slot=slot)
+            if fresh is not None:
+                return not fresh
             free = self._gpu_free(slot)
-            self._answers[slot] = (time.monotonic(), free)
+            with self._lock:
+                self._answers[slot] = (time.monotonic(), free)
             return not free
 
     def try_lease(self, *, slot: str) -> GpuLease | None:

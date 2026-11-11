@@ -46,7 +46,7 @@ class Tensors(Artifact):
         """
         require_path(value=directory, parameter='directory')
         prepared = {
-            key: tensor.detach().to(device='cpu').contiguous().clone()
+            key: tensor.detach().to(device='cpu').clone(memory_format=torch.contiguous_format)
             for key, tensor in self.tensors.items()
         }
         save_file(

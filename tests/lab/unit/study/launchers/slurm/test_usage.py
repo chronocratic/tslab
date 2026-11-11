@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from tests.lab.unit.study.helpers import context, submit_study
+from tests.lab.unit.study.launchers.slurm.helpers import skip_query_waits
 from tests.support.fake_slurm import FakeSlurm
 from tslab.lab.enums import StudyState
 from tslab.lab.jobs.slurm import SlurmJobUsage
@@ -132,7 +133,7 @@ def test_oom_hint_without_numbers_when_sacct_fails(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr('tslab.lab.jobs.slurm.commands._sleep', lambda _: None)
+    skip_query_waits(monkeypatch=monkeypatch)
     submit_study(project=project)
     fake.set_answers(
         'sacct',
