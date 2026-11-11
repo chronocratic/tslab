@@ -35,8 +35,6 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
 
 
 def instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fact
@@ -49,6 +47,8 @@ def instance_meta_document(  # noqa: PLR0913 # why: one keyword per recorded fac
     seconds: float,
 ) -> dict[str, object]:
     """Return the content of the ``meta.json`` of one executed instance."""
+    # When API is stable: add 'format_version': 1 here and check it in _metadata_reason and
+    # identity_from_meta, so a meta.json from another TSLab version fails with a clear message.
     return {
         'instance_id': execution.instance_id,
         'stage_version': stage.version,
@@ -92,6 +92,8 @@ def _metadata_reason(*, directory: Path, inputs: Mapping[str, Artifact]) -> str 
     document = read_instance_meta(path=meta_path)
     if document is None:
         return 'cannot read result metadata'
+    # When API is stable: check 'format_version' here (see instance_meta_document) and return
+    # 'unsupported result metadata format'.
     return _changed_input_reason(document=document, inputs=inputs)
 
 
@@ -129,6 +131,7 @@ def identity_from_meta(*, directory: Path, instance_id: str) -> ArtifactIdentity
     document = read_instance_meta(path=directory / META_FILE)
     fingerprint: object = None
     execution_id: object = None
+    # When API is stable: also require 'format_version' here (see instance_meta_document).
     if document is not None:
         fingerprint = document.get('fingerprint')
         execution_id = document.get('execution_id')

@@ -185,6 +185,7 @@ class Wait:
         )
         if self.json:
             document = status_document(context=context, exit_code=code)
+            # When API is stable: version this id (tslab.study-wait/1); bump on a breaking change.
             document['schema'] = 'tslab.study-wait'
             document['waited_seconds'] = waited
             document['timed_out'] = code == EXIT_TIMEOUT

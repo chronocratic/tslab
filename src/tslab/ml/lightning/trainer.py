@@ -340,6 +340,7 @@ def _write_training_record(*, trainer: lightning.Trainer, directory: Path) -> No
     atomic_write_json(
         path=directory / 'training.json',
         document={
+            # When API is stable: version this id (tslab.training/1); bump on a breaking change.
             'schema': 'tslab.training',
             'stop_reason': stop_reason.value,
             'epochs': trainer.current_epoch,

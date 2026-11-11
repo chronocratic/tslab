@@ -97,6 +97,7 @@ def status_document(
         counts[report.run.grid]['total'] += 1
         counts['all']['total'] += 1
     return {
+        # When API is stable: version this id (tslab.study-status/1); bump on a breaking change.
         'schema': 'tslab.study-status',
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
@@ -134,6 +135,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         for name, grid in study.grids.items()
     ]
     return {
+        # When API is stable: version this id (tslab.study-show/1); bump on a breaking change.
         'schema': 'tslab.study-show',
         'study': study.name,
         'settings': {
@@ -169,6 +171,7 @@ def cancel_document(
         The study-cancel document.
     """
     return {
+        # When API is stable: version this id (tslab.study-cancel/1); bump on a breaking change.
         'schema': 'tslab.study-cancel',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
@@ -225,6 +228,7 @@ def launch_document(
     """
     jobs = _launch_jobs(report=report, groups=groups, dry_run=dry_run)
     return {
+        # When API is stable: version this id (tslab.study-launch/1); bump on a breaking change.
         'schema': 'tslab.study-launch',
         'dry_run': dry_run,
         'jobs': jobs,

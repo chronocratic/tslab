@@ -65,6 +65,8 @@ class Failures:
             context=context, states=_states_of(values=self.states), lines=self.lines
         )
         if self.json:
+            # When API is stable: version this id (tslab.study-failures/1); bump on a breaking
+            # change.
             print_json(document={'schema': 'tslab.study-failures', 'runs': failures})
         elif failures:
             log_failures(failures=failures)

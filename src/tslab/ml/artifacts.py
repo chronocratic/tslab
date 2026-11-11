@@ -1,8 +1,5 @@
 """Artifacts that hold tensors and training checkpoints."""
 
-# When the API is stable, version the checkpoint.json format (a format_version key checked on read)
-# so old files fail with a clear message.
-
 from collections.abc import Mapping
 from pathlib import Path
 import shutil
@@ -133,6 +130,8 @@ class Checkpoint(Artifact):
             for name in sorted({self.best, self.last}):
                 shutil.copy2(self.directory / name, directory / name)
             self.directory = directory
+        # When API is stable: add 'format_version': 1 here and check it in load,
+        # so a checkpoint.json from another TSLab version fails with a clear message.
         document = {'best': self.best, 'last': self.last, 'trusted': self.trusted}
         atomic_write_json(path=directory / self.FILE_NAME, document=document)
 
@@ -147,6 +146,8 @@ class Checkpoint(Artifact):
         """
         require_path(value=directory, parameter='directory')
         document = read_json_object(path=directory / cls.FILE_NAME)
+        # When API is stable: check 'format_version' here (see save) and raise ValueError when it
+        # differs.
         best = document.get('best')
         last = document.get('last')
         trusted = document.get('trusted')

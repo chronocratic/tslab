@@ -29,9 +29,6 @@ __all__ = [
     'write_status',
 ]
 
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
-
 # why: failures are saved as "ExceptionType: message"; these prefixes mark a run that stopped
 # on purpose to be resumed (a time limit signal or the share of the job given to training)
 TIME_LIMIT_ERROR_PREFIX = 'JobTimeLimitSignal:'
@@ -210,6 +207,8 @@ def read_status(*, path: Path) -> RunStatusSnapshot | None:
 
 
 def _snapshot_from_document(*, path: Path, document: Mapping[str, object]) -> RunStatusSnapshot:
+    # When API is stable: check 'format_version' here (see write_status) and raise StatusFileError
+    # when it differs.
     missing = [key for key in ('run_state', 'updated_at', 'instances') if key not in document]
     if missing:
         message = f'{path.as_posix()} is missing required keys: {missing}'
@@ -235,6 +234,8 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
         path: Location of ``status.json``.
         snapshot: The state to write.
     """
+    # When API is stable: add 'format_version': 1 here and check it in read_status,
+    # so a status.json from another TSLab version fails with a clear message.
     document = {
         'run_state': snapshot.run_state.value,
         'updated_at': snapshot.updated_at,

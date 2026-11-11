@@ -240,6 +240,7 @@ def _status_document(
     *, entries: list[dict[str, object]], states: Sequence[StudyState]
 ) -> dict[str, object]:
     return {
+        # When API is stable: version this id (tslab.run-status/1); bump on a breaking change.
         'schema': 'tslab.run-status',
         'exit_code': states_exit_code(states=states, live=False),
         'runs': entries,

@@ -30,8 +30,6 @@ __all__ = [
 ]
 
 _LOGGER = logging.getLogger(__name__)
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
 _GIT_TIMEOUT_SECONDS = 10
 CODE_SNAPSHOT_VARIABLE = 'TSLAB_CODE_SNAPSHOT'
 _HASH_VARIABLE = 'TSLAB_CODE_SNAPSHOT_HASH'

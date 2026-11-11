@@ -42,8 +42,6 @@ __all__ = [
     'is_not_fingerprinted',
 ]
 
-# When the API is stable, version this format (a format_version key checked on read)
-# so old files fail with a clear message.
 _FINGERPRINT_LENGTH = 16
 _CHUNK_SIZE = 1024 * 1024
 
@@ -143,6 +141,8 @@ def _enum_value(*, value: Enum) -> str:
     raise TypeError(message)
 
 
+# When API is stable: bump the fingerprint format version in Stage (core/stage.py) when these rules
+# change.
 # why: one branch per supported type keeps the rules readable
 def canonicalize(*, value: object) -> object:  # noqa: PLR0911
     """Convert ``value`` into a JSON-compatible form with a single spelling.

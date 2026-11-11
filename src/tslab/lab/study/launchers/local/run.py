@@ -251,6 +251,8 @@ class LocalLauncher:
                     name=f'run {task.resolved.run.run_path}',
                     usage_file=usage_file(log_file=task.log_file),
                     usage_document={
+                        # When API is stable: version this id (tslab.local-usage/1); bump on a
+                        # breaking change.
                         'schema': 'tslab.local-usage',
                         'attempt': task.attempt,
                         'job_id': job_id,

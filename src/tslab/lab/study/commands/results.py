@@ -34,6 +34,7 @@ class _Formatter(Protocol):
 
 
 def _format_json(*, rows: Sequence[ResultRow]) -> str:
+    # When API is stable: version this id (tslab.study-results/1); bump on a breaking change.
     return json.dumps({'schema': 'tslab.study-results', 'rows': rows}, indent=2)
 
 

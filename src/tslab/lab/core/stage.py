@@ -210,6 +210,9 @@ class Stage[Out: Artifact](ABC):
         fingerprint = compute_fingerprint(
             document={
                 'stage': stage_name,
+                # When API is stable: add a fingerprint format version to this payload and bump it
+                # whenever canonicalize or this payload changes, so old caches are not reused by
+                # mistake.
                 'stage_version': self.version,
                 'seed': run.seed,
                 'settings': settings,
