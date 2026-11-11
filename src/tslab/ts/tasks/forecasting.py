@@ -377,9 +377,8 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         except ValueError as error:
             message = f'{description}: {error}'
             raise ValueError(message) from error
-        # why: the channel selection copies the targets; they are views of the encoded
-        # series when it is the same float32 tensor, so an encoder that writes into its
-        # input would change them
+        # why: the channel selection copies the targets, so an encoder that writes into its
+        # input cannot change them
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
         # why: the reshape copies the windows, except when it can stay a view of the encoded
         # series (one series, or a window of one step); overlapping windows of such a view

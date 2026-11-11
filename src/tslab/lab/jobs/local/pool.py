@@ -412,7 +412,7 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
     def take_lease(*, command: PoolCommand) -> tuple[GpuLease | None, str | None]:
         """Take one free slot, and the GPU lock of its id, for the command."""
         slot = slot_queue.get()
-        if slot is None:
+        if slot is None or stop.is_set() or halt.is_set():
             return None, slot
         waited = False
         while (lease := try_lease_or_return_slot(slot=slot)) is None and not (

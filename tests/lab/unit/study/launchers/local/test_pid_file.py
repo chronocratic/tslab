@@ -384,6 +384,24 @@ def test_detach_stops_a_launch_that_does_not_start(
             process.wait()
 
 
+def test_detach_logs_a_clean_early_exit_as_info(
+    project: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(
+        pid_file,
+        'start_detached',
+        lambda **_kwargs: subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True),
+    )
+    folder = study_directory(project=project) / '.study'
+    with caplog.at_level(logging.INFO):
+        code = detach_launch(
+            study_folder=folder, arguments=[], project_root=project, wait_command='w'
+        )
+    assert code == 0
+    assert [record.levelno for record in caplog.records] == [logging.INFO]
+    assert 'exit code 0' in caplog.text
+
+
 def test_detach_stop_ignores_a_child_that_already_exited() -> None:
     process = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
     process.wait()

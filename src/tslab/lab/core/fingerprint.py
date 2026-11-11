@@ -149,9 +149,11 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
 
     Rules:
         - ``None``, ``bool``, ``int``, ``str`` are kept as they are; any other integer
-          type, such as a NumPy ``int64``, becomes an ``int``.
+          type of the ``numbers.Integral`` family, such as a NumPy ``int64``, becomes an
+          ``int`` (a NumPy ``bool_`` is not one of them).
         - ``float`` and any other real number type, such as a NumPy ``float32``, becomes
-          the ``repr`` string of the float, which is exact.
+          the ``repr`` string of its ``float`` value; a type that holds more precision
+          than a ``float``, such as ``Fraction``, loses it.
         - ``Path`` becomes its POSIX string; the file content is *not* hashed.
         - ``StrEnum`` becomes its value, so a rename of the class or member keeps the
           fingerprint; any other ``Enum`` raises ``TypeError``.
