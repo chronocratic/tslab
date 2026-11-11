@@ -161,11 +161,22 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per fact
     if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
         return False
     # why: the scheduler query can take 30 s and the checkpoint search walks the run folder,
-    # so both run before the lock is held, and only when a retry is possible at all
-    if _retryable_task(context=context, loaded=loaded, environment=environment) is None:
-        return False
+    # so both run once, before the lock is held; the limit needs only the environment, so it
+    # is checked before the walk
     max_requeues = _max_batch_requeue()
+    restart_count = int(environment.get(RESTART_COUNT_VARIABLE, '0'))
+    if at_requeue_limit(restart_count=restart_count, max_requeues=max_requeues):
+        _LOGGER.warning(
+            '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it',
+            loaded.report.job_id,
+        )
+        return False
     progress = take_progress(run_directory=context.study_directory / loaded.report.run.run_path)
+    if (
+        _retryable_task(context=context, loaded=loaded, environment=environment, progress=progress)
+        is None
+    ):
+        return False
     with ExitStack() as stack:
         try:
             stack.enter_context(
@@ -184,14 +195,32 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per fact
             index=index,
             jobs_path=jobs_path,
             environment=environment,
-            max_requeues=max_requeues,
             progress=progress,
         )
 
 
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class _Retry:
+    """The task of an interrupted attempt that may be requeued.
+
+    Attributes:
+        job_id: The scheduler id of the task, e.g. ``41_17``.
+        latest: The latest recorded task.
+        current: The latest task with its attempts counted.
+    """
+
+    job_id: str
+    latest: TaskRecord
+    current: TaskRecord
+
+
 def _retryable_task(
-    *, context: Context, loaded: _TaskReport, environment: Mapping[str, str]
-) -> TaskRecord | None:
+    *,
+    context: Context,
+    loaded: _TaskReport,
+    environment: Mapping[str, str],
+    progress: ProgressSnapshot,
+) -> _Retry | None:
     """The task of the interrupted attempt with its attempts counted, or ``None`` at the limit."""
     report = loaded.report
     _, submitted = loaded.matches[0]
@@ -207,7 +236,9 @@ def _retryable_task(
         + max(restarts - (len(loaded.matches) - 1), 0),
     )
     counted = dataclasses.replace(report, attempt=current.attempt, task=current)
-    return current if may_retry(report=counted, context=context) else None
+    if not may_retry(report=counted, context=context, progress=progress):
+        return None
+    return _Retry(job_id=report.job_id, latest=latest, current=current)
 
 
 def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one per fact of the requeue
@@ -217,7 +248,6 @@ def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one pe
     index: int,
     jobs_path: Path,
     environment: Mapping[str, str],
-    max_requeues: int | None,
     progress: ProgressSnapshot,
 ) -> bool:
     """Read the records again, decide and write the next attempt; the lock is held."""
@@ -232,32 +262,27 @@ def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one pe
     )
     if loaded is None or loaded.report.state is not StudyState.INTERRUPTED:
         return False
-    report = loaded.report
     job, _ = loaded.matches[0]
-    latest = report.task
-    current = _retryable_task(context=context, loaded=loaded, environment=environment)
-    if current is None or latest is None or report.job_id is None:
-        return False
-    restart_count = int(environment.get(RESTART_COUNT_VARIABLE, '0'))
-    if at_requeue_limit(restart_count=restart_count, max_requeues=max_requeues):
-        _LOGGER.warning(
-            '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', report.job_id
-        )
+    retry = _retryable_task(
+        context=context, loaded=loaded, environment=environment, progress=progress
+    )
+    if retry is None:
         return False
     following = dataclasses.replace(
-        current, attempt=current.attempt + 1, progress=progress, uncounted_in_row=0
+        retry.current, attempt=retry.current.attempt + 1, progress=progress, uncounted_in_row=0
     )
     # why: the scheduler ends this process soon after the requeue call, so the record
     # of the next attempt is written first and taken back when the call fails
     append_job(
         path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(following,))
     )
-    if not requeue_task(task_id=report.job_id):
+    if not requeue_task(task_id=retry.job_id):
         append_job(
-            path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(latest,))
+            path=jobs_path,
+            record=dataclasses.replace(job, time=utc_now_iso(), tasks=(retry.latest,)),
         )
         return False
-    _LOGGER.info('requeued %s (attempt %d)', report.job_id, following.attempt)
+    _LOGGER.info('requeued %s (attempt %d)', retry.job_id, following.attempt)
     return True
 
 
