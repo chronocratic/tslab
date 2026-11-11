@@ -30,6 +30,24 @@ def test_running_is_not_a_final_status() -> None:
         RunStatus.from_run_state(run_state=RunState.RUNNING)
 
 
+def test_a_failed_rewrite_leaves_the_previous_metrics_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    tracker = LocalTracker()
+    tracker.start(run_directory=tmp_path, run_name='a')
+    tracker.log_metrics(metrics={'loss': 0.5}, step=1)
+    path = tmp_path / 'trackers' / 'csv' / 'version_0' / 'metrics.csv'
+    before = path.read_bytes()
+
+    def fail(*, path: Path, data: bytes) -> None:
+        raise OSError(path)
+
+    monkeypatch.setattr('tslab.lab.core.files._atomic_write', fail)
+    with pytest.raises(OSError, match=r'metrics\.csv'):
+        tracker.log_metrics(metrics={'acc': 0.9}, step=2)
+    assert path.read_bytes() == before
+
+
 def test_local_tracker_writes_metrics_and_params(tmp_path: Path) -> None:
     tracker = LocalTracker()
     tracker.start(run_directory=tmp_path, run_name='a')

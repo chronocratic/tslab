@@ -952,6 +952,20 @@ def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: F
     assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)
 
 
+def test_resubmit_reports_the_job_ids_it_cancels_including_held_ones(
+    project: Path, fake_backend: FakeBackend
+) -> None:
+    submit_study(project=project)
+    fake_backend.set_states(
+        phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
+    )
+    fake_backend.cancellable_answer = ['job-0']
+    ctx = context(project=project, machine_file='cluster.toml')
+    cancelled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=cancelled.extend) == 0
+    assert cancelled == ['job-0']
+
+
 def _time_limited(*, project: Path, run_path: str) -> None:
     """A run folder left at the time limit, with a checkpoint saved."""
     folder = project / 'runs' / 'chain' / run_path

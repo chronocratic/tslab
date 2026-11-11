@@ -21,6 +21,7 @@ from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.jobs.local import process_alive
 
 __all__ = [
+    'STALE_AFTER_SECONDS',
     'Heartbeat',
     'RunLockedError',
     'acquire_lock',
@@ -32,7 +33,8 @@ __all__ = [
 
 _LOGGER = logging.getLogger(__name__)
 _HEARTBEAT_SECONDS = 60.0
-_STALE_AFTER_SECONDS = 600.0
+#: Seconds after which a lock whose heartbeat stopped counts as stale.
+STALE_AFTER_SECONDS = 600.0
 _TAKEOVER_GUARD_SECONDS = 30.0
 _LOCK_ATTEMPTS = 50
 _LOCK_RETRY_SECONDS = 0.05
@@ -115,7 +117,7 @@ def is_run_active(*, directory: Path) -> bool:
 
 
 def _lock_is_stale(*, owner: _LockOwner | None, age: float) -> bool:
-    if age > _STALE_AFTER_SECONDS:
+    if age > STALE_AFTER_SECONDS:
         return True
     return owner is not None and owner.host == hostname() and not process_alive(pid=owner.pid)
 
@@ -141,7 +143,7 @@ def acquire_lock(*, path: Path) -> str:
     """Create the lock file atomically, replacing it once if it is stale.
 
     ``O_CREAT | O_EXCL`` makes creation atomic: exactly one process succeeds.
-    A lock is stale when its heartbeat stopped more than ``_STALE_AFTER_SECONDS``
+    A lock is stale when its heartbeat stopped more than ``STALE_AFTER_SECONDS``
     ago (any host), or when its process is dead (this host). Removing a stale
     lock goes through ``remove_stale_lock``, so two processes cannot both remove
     it and then both create their own.

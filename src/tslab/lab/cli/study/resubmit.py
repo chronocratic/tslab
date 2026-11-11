@@ -24,7 +24,6 @@ from tslab.lab.core.meta import hostname
 from tslab.lab.study.code_snapshot import CodeSnapshotError
 from tslab.lab.study.commands import resubmit, run_one
 from tslab.lab.study.launchers.common.types import LaunchReport
-from tslab.lab.study.launchers.tables import backend_for
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.reporting.documents import launch_document
 
@@ -90,7 +89,7 @@ class RunOne:
 
 @dataclass(frozen=True, kw_only=True)
 class Resubmit:
-    """Submit the interrupted, missing or failed runs of a study again.
+    """Submit the interrupted, missing or dependency failed runs of a study again.
 
     For example:
         tslab study resubmit example --machine local
@@ -105,8 +104,8 @@ class Resubmit:
         grid: Keep only this grid.
         only: Keep only the runs that match axis=value; comma separated for
             several values of one axis.
-        states: The states to resubmit; comma separated. Interrupted and
-            missing when omitted.
+        states: The states to resubmit; comma separated. Interrupted, missing and
+            dependency failed when omitted.
         cancel_live: Cancel the queued and running runs first and
             resubmit them a little later.
         dry_run: Write the job files and print the plan, submit nothing.
@@ -163,13 +162,6 @@ class Resubmit:
             drop=self.no_code_snapshot,
             include_untracked=self.code_snapshot_include_untracked,
         )
-        code_snapshot = take_requested_code_snapshot(
-            request=request,
-            context=context,
-            wanted=self.new_code_snapshot,
-            include_untracked=self.code_snapshot_include_untracked,
-            dry_run=self.dry_run,
-        )
         if self.detach:
             flags = [
                 flag
@@ -197,18 +189,22 @@ class Resubmit:
                 extra_args=self.extra_args,
                 request=(study, machine),
             )
+        # why: a detached launch repeats this command in the background, and that child
+        # takes the snapshot, so taking it here too would copy src/ twice
+        code_snapshot = take_requested_code_snapshot(
+            request=request,
+            context=context,
+            wanted=self.new_code_snapshot,
+            include_untracked=self.code_snapshot_include_untracked,
+            dry_run=self.dry_run,
+        )
         _warn_no_runs(context=context)
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
 
         def remember_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
             launches.append((report, groups))
 
-        backend = backend_for(machine=context.machine)
-        cancelled = (
-            backend.cancellable_job_ids(reports=context.reports)
-            if self.cancel_live and not self.auto
-            else []
-        )
+        cancelled: list[str] = []
         try:
             code = resubmit(
                 context=context,
@@ -220,6 +216,7 @@ class Resubmit:
                 new_code_snapshot=code_snapshot,
                 drop_code_snapshot=self.no_code_snapshot,
                 ignore_after=self.ignore_after,
+                on_cancel=cancelled.extend,
                 on_launch=remember_launch if self.json else None,
                 task_stream=sys.stderr if self.json else None,
             )

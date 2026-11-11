@@ -109,13 +109,6 @@ class Submit:
             include_untracked=self.code_snapshot_include_untracked,
             wanted=wanted,
         )
-        code_snapshot = take_requested_code_snapshot(
-            request=request,
-            context=context,
-            wanted=wanted,
-            include_untracked=self.code_snapshot_include_untracked,
-            dry_run=self.dry_run,
-        )
         if self.detach:
             flags = [
                 flag
@@ -139,6 +132,15 @@ class Submit:
                 extra_args=self.extra_args,
                 request=(study, machine),
             )
+        # why: a detached launch repeats this command in the background, and that child
+        # takes the snapshot, so taking it here too would copy src/ twice
+        code_snapshot = take_requested_code_snapshot(
+            request=request,
+            context=context,
+            wanted=wanted,
+            include_untracked=self.code_snapshot_include_untracked,
+            dry_run=self.dry_run,
+        )
         _warn_no_runs(context=context)
 
         launches: list[tuple[LaunchReport, Sequence[JobGroup]]] = []
