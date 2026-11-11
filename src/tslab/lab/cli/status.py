@@ -178,14 +178,17 @@ class _RunView:
 
 def _view_of(*, directory: Path, snapshot: RunStatusSnapshot) -> _RunView:
     """Read the lock of the folder once and decide the state to show."""
-    # why: a resumed run holds the lock while its saved state is still failed or crashed; only
-    # the lock of a finished run, the common case, is not read
-    lock_live = snapshot.run_state is not RunState.FINISHED and is_run_active(directory=directory)
+    # why: a resumed run, or a finished run that runs again to add stages, holds the lock while
+    # its saved state is still failed, crashed or finished, so the lock is read for every state
+    lock_live = is_run_active(directory=directory)
+    shown = shown_state_of(run_state=snapshot.run_state, lock_live=lock_live)
     return _RunView(
         directory=directory,
         snapshot=snapshot,
         folder=FolderFacts(snapshot=snapshot, read_error=None, lock_live=lock_live),
-        run_state=shown_state_of(run_state=snapshot.run_state, lock_live=lock_live),
+        run_state=ShownRunState.RUNNING
+        if lock_live and snapshot.run_state is RunState.FINISHED
+        else shown,
     )
 
 

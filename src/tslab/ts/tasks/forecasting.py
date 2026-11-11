@@ -207,9 +207,20 @@ def window_samples(
     return inputs.permute(0, 1, 3, 2), targets.permute(0, 1, 3, 2)
 
 
+def _unshared(*, tensor: torch.Tensor, sources: Sequence[torch.Tensor]) -> torch.Tensor:
+    """The tensor, cloned when it shares storage with one of the sources."""
+    shared = any(
+        tensor.untyped_storage().data_ptr() == source.untyped_storage().data_ptr()
+        for source in sources
+    )
+    return tensor.clone() if shared else tensor
+
+
 def _input_series(*, full: torch.Tensor, series: Tensors | None) -> torch.Tensor:
+    # why: the cast does not copy float32 data, and an encoder may write into its inputs;
+    # a copy keeps the data tensor and the replacement series intact
     if series is None:
-        return full.to(dtype=torch.float32)
+        return _unshared(tensor=full.to(dtype=torch.float32), sources=(full,))
     replacement = series.tensors['series']
     if replacement.shape != full.shape:
         message = (
@@ -217,7 +228,7 @@ def _input_series(*, full: torch.Tensor, series: Tensors | None) -> torch.Tensor
             f'but the data series has shape {tuple(full.shape)}'
         )
         raise ValueError(message)
-    return replacement.to(dtype=torch.float32)
+    return _unshared(tensor=replacement.to(dtype=torch.float32), sources=(full, replacement))
 
 
 def _flatten_targets(*, targets: torch.Tensor) -> torch.Tensor:
@@ -351,8 +362,10 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         description = f'the {split} split, horizon {horizon}'
         try:
             # Windows from the encoded series, targets from the data.
+            # why: the encoded series may be shared by the windows of a split, so an encoder
+            # that writes into its input must not reach the other splits
             windows, _ = window_samples(
-                series=encoded_series[:, slices[split]],
+                series=encoded_series[:, slices[split]].clone(),
                 window_length=window_length,
                 horizon=horizon,
                 stride=stride,
@@ -370,9 +383,7 @@ def encode_windows[M](  # noqa: PLR0913 # why: keyword-only public API; each inp
         # series when it is the same float32 tensor, so an encoder that writes into its
         # input would change them
         tensors[f'{split}_targets'] = _flatten_targets(targets=targets[..., target_channels])
-        # why: with one series the reshape is a view of the encoded series, which is the data
-        # itself for float32; an encoder that writes into its input would corrupt later splits
-        flat_windows = windows.reshape(-1, *windows.shape[-2:]).clone()
+        flat_windows = windows.reshape(-1, *windows.shape[-2:])
         tensors[f'{split}_representations'] = encode_checked(
             encoder=window_encoder, inputs=flat_windows, description=description
         )

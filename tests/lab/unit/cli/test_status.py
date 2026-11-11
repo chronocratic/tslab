@@ -162,7 +162,7 @@ def test_folder_status_json_lists_instances(
     assert by_name['scale[f-1]']['error'] == 'ValueError: negative factor\nsecond line'
 
 
-def test_json_over_a_folder_reads_each_status_once_and_the_lock_of_running_runs_once(
+def test_json_over_a_folder_reads_each_status_once_and_each_lock_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
@@ -186,7 +186,7 @@ def test_json_over_a_folder_reads_each_status_once_and_the_lock_of_running_runs_
     Status(path=tmp_path, json=True).run()
     capsys.readouterr()
     assert [reads.count(tmp_path / name / 'status.json') for name in 'ab'] == [1, 1]
-    assert locks == [tmp_path / 'b']
+    assert locks == [tmp_path / 'a', tmp_path / 'b']
 
 
 def test_the_lock_is_read_for_a_failed_run_that_is_being_resumed(
@@ -206,8 +206,26 @@ def test_the_lock_is_read_for_a_failed_run_that_is_being_resumed(
 
     monkeypatch.setattr(status_module, 'is_run_active', live)
     Status(path=tmp_path, json=True).run()
-    capsys.readouterr()
-    assert locks == [tmp_path / 'b']
+    document = json.loads(capsys.readouterr().out)
+    states = {Path(run['directory']).name: run['state'] for run in document['runs']}
+    assert locks == [tmp_path / 'a', tmp_path / 'b']
+    assert states == {'a': 'running', 'b': 'running'}
+
+
+def test_a_finished_run_that_runs_again_is_shown_running(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+
+    def live(*, directory: Path) -> bool:
+        del directory
+        return True
+
+    monkeypatch.setattr(status_module, 'is_run_active', live)
+    _, text = shown(caplog=caplog, path=tmp_path)
+    assert '1 run: 1 running' in text
+    _, text = shown(caplog=caplog, path=tmp_path / 'a')
+    assert f'{(tmp_path / "a").as_posix()}: running' in text
 
 
 def test_the_scan_does_not_descend_below_a_run(tmp_path: Path) -> None:

@@ -10,7 +10,14 @@ from typing import cast
 
 import pytest
 
-from tslab.lab.jobs.local import GpuLease, PoolCommand, process_alive, ProcessResult, run_commands
+from tslab.lab.jobs.local import (
+    GpuLease,
+    PoolCommand,
+    process_alive,
+    ProcessResult,
+    run_commands,
+    try_lease_gpu,
+)
 from tslab.lab.jobs.local.pool import _environment_of, _GpuLeaseGate
 
 _LOCK_CHILD = (
@@ -708,5 +715,77 @@ def test_a_failing_lease_check_returns_the_slot_so_other_commands_finish(
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
     thread.join(timeout=10)
+    assert not thread.is_alive()
+    assert len(errors) == 1
+
+
+def test_a_failing_lease_check_stops_the_pool_at_once(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+
+    def gpu_free(gpu_id: str) -> bool:
+        if gpu_id == '1':
+            message = 'cannot ask the GPU'
+            raise RuntimeError(message)
+        return True
+
+    start = time.monotonic()
+    with pytest.raises(RuntimeError, match='cannot ask'):
+        _run_pool(
+            tmp_path=tmp_path,
+            keys=('k0', 'k1'),
+            slots=2,
+            gpu_ids=('0', '1'),
+            lock_folder=folder,
+            sleep_seconds=30,
+            gpu_free=gpu_free,
+        )
+    assert time.monotonic() - start < 10
+
+
+def test_a_failing_wait_callback_gives_the_slot_back(*, tmp_path: Path) -> None:
+    folder = tmp_path / 'locks'
+    folder.mkdir()
+    held = try_lease_gpu(folder=folder, gpu_ids=['0'], tasks_per_gpu=1)
+    assert held is not None
+
+    def on_wait(*, key: str) -> None:
+        del key
+        message = 'wait callback failed'
+        raise RuntimeError(message)
+
+    def ignore(**_kwargs: object) -> None:
+        """Take any callback call."""
+
+    def run() -> None:
+        run_commands(
+            commands=[_command_of(tmp_path=tmp_path, key=key, sleep_seconds=1) for key in 'ab'],
+            slots=1,
+            gpu_ids=['0'],
+            tasks_per_gpu=1,
+            lock_folder=folder,
+            stop=threading.Event(),
+            timeout_seconds=None,
+            signal_seconds=0,
+            on_start=ignore,
+            on_line=ignore,
+            on_event=ignore,
+            on_wait=on_wait,
+            on_end=ignore,
+            gpu_poll_seconds=0.05,
+        )
+
+    errors: list[BaseException] = []
+
+    def guarded() -> None:
+        try:
+            run()
+        except RuntimeError as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=guarded, daemon=True)
+    thread.start()
+    thread.join(timeout=10)
+    held.release()
     assert not thread.is_alive()
     assert len(errors) == 1
