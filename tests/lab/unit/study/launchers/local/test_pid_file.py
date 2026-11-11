@@ -302,11 +302,12 @@ def test_detach_returns_at_once_with_pid_file(project: Path, slow_tasks: None) -
 
 def test_detach_status_shows_running_and_queued(project: Path, slow_tasks: None) -> None:
     assert _detach() == 0
-    states = {
-        report.state for report in context(project=project, machine_file='local.toml').reports
-    }
-    assert StudyState.RUNNING in states
-    assert StudyState.QUEUED in states or StudyState.DONE in states
+    # why: the detach returns once the pid file exists, before the first task starts
+    seen: list[set[StudyState]] = []
+    _wait_until(
+        condition=lambda: StudyState.RUNNING in (seen.append(_states(project=project)) or seen[-1])
+    )
+    assert StudyState.QUEUED in seen[-1] or StudyState.DONE in seen[-1]
     _wait_until(condition=lambda: not _pid_file(project=project).exists())
 
 
