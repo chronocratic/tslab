@@ -318,3 +318,26 @@ def test_run_process_stops_the_child_when_waiting_is_interrupted(
 @pytest.mark.parametrize('pid', [0, -1])
 def test_process_alive_is_false_for_a_non_positive_pid(*, pid: int) -> None:
     assert not process_alive(pid=pid)
+
+
+def test_run_process_survives_a_failing_on_line(*, tmp_path: Path) -> None:
+    def failing(_line: str) -> None:
+        message = 'disk full'
+        raise OSError(message)
+
+    result = run_process(
+        command=[
+            sys.executable,
+            '-c',
+            'print("x" * 100 + "\\n", end="") or [print("y" * 1000) for _ in range(200)]',
+        ],
+        cwd=tmp_path,
+        environment=os.environ,
+        on_line=failing,
+        on_event=lambda _text: None,
+        stop=threading.Event(),
+        timeout_seconds=30,
+        signal_seconds=0,
+    )
+    assert result.exit_code == 0
+    assert result.timed_out is False

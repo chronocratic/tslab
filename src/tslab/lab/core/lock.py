@@ -88,7 +88,11 @@ class Heartbeat:
     def _beat(self) -> None:
         while not self._stopped.wait(timeout=_HEARTBEAT_SECONDS):
             owner = read_lock_owner(path=self._path)
-            if owner is None or owner.nonce != self._nonce:
+            if owner is None:
+                # why: one unreadable read must not end the heartbeat for good; retry next beat
+                _LOGGER.warning('could not read %s; retrying at the next beat', self._path)
+                continue
+            if owner.nonce != self._nonce:
                 _LOGGER.warning(
                     '%s is no longer owned by this run; stopped refreshing it', self._path
                 )

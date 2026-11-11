@@ -3,6 +3,7 @@
 from collections.abc import Callable, Generator, Mapping, Sequence
 import contextlib
 from dataclasses import dataclass
+import logging
 import os
 from pathlib import Path
 import signal
@@ -22,6 +23,7 @@ __all__ = [
     'stop_on_signals',
 ]
 
+_LOGGER = logging.getLogger(__name__)
 _LEFTOVER_WAIT_SECONDS = 5.0
 
 
@@ -318,8 +320,17 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
             # why: Popen is created with a pipe; the check keeps the type narrow
             message = 'the child process stdout is missing'
             raise RuntimeError(message)
+        failed = False
         for line in stdout:
-            on_line(line)
+            if failed:
+                continue
+            try:
+                on_line(line)
+            except Exception:
+                # why: a dead reader stops draining the pipe and the child blocks on a full
+                # buffer; keep reading and drop the lines until the pipe closes
+                failed = True
+                _LOGGER.exception('could not record the output of the child; dropping it')
 
     reader = threading.Thread(target=read_lines, name='process-stdout', daemon=True)
     reader.start()

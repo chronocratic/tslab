@@ -52,7 +52,9 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
         index: The array index of the task.
 
     Returns:
-        ``0`` when the run is ``DONE`` or was requeued in place; otherwise ``1``.
+        ``0`` when the run is ``DONE`` or was requeued in place; otherwise ``1``. The
+        job script still exits with a non-zero exit code of the run command first, so
+        dependent jobs see a failed task even when this returns ``0``.
     """
     jobs_path = study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
     loaded = _load_report(
@@ -211,6 +213,17 @@ class _Retry:
     current: TaskRecord
 
 
+def _kept_requeues(*, matches: Sequence[tuple[JobRecord, TaskRecord]]) -> int:
+    """Count the requeue records that were not taken back after a failed requeue call."""
+    attempts = [task.attempt for _, task in matches]
+    return sum(
+        1
+        for position in range(1, len(attempts))
+        if attempts[position] > attempts[position - 1]
+        and not (position + 1 < len(attempts) and attempts[position + 1] < attempts[position])
+    )
+
+
 def _retryable_task(
     *, context: Context, loaded: _TaskReport, restart_count: int, progress: ProgressSnapshot
 ) -> _Retry | None:
@@ -228,7 +241,7 @@ def _retryable_task(
         latest,
         attempt=restarted_attempt(attempt=submitted.attempt, restart_count=restart_count),
         uncounted_attempts=submitted.uncounted_attempts
-        + max(restarts - (len(loaded.matches) - 1), 0),
+        + max(restarts - _kept_requeues(matches=loaded.matches), 0),
     )
     counted = dataclasses.replace(report, attempt=current.attempt, task=current)
     if not may_retry(report=counted, context=context, progress=progress):
