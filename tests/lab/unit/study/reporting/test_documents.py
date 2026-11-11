@@ -16,11 +16,12 @@ from tests.lab.unit.study.helpers import (
     write_run_status,
 )
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.core.text import TextTable
 from tslab.lab.enums import InstanceState, JobPhase, LauncherKind, RunState, StudyState
-from tslab.lab.study.definition import expand_runs, load_study
+from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.loading import load_study
 from tslab.lab.study.launchers.common.types import QueuedJob
 from tslab.lab.study.launchers.tables import JOB_RECORDS
 from tslab.lab.study.records import append_job, JobKind

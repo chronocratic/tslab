@@ -7,11 +7,11 @@ from collections.abc import Mapping
 
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study.launchers.common.protocols import Backend
-from tslab.lab.study.launchers.local import LocalBackend
+from tslab.lab.study.launchers.local.backend import LocalBackend
 from tslab.lab.study.launchers.local.records import LocalJobRecord
-from tslab.lab.study.launchers.slurm import SlurmBackend
+from tslab.lab.study.launchers.slurm.backend import SlurmBackend
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.lab.study.machine import MachineProfile
+from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.records import JobRecord
 
 __all__ = ['BACKENDS', 'JOB_RECORDS', 'backend_for']

@@ -3,6 +3,7 @@ from pathlib import Path
 from tests.ml.unit.stage_fakes import EmptyData, FakeTrainer, LinearModel, run_in
 import tslab.lab
 import tslab.ml
+import tslab.ml.stages
 
 
 def test_train_writes_its_checkpoint_into_the_instance_folder(tmp_path: Path) -> None:

@@ -13,7 +13,7 @@ import torch
 
 from tslab.lab.core.fingerprint import NotFingerprinted
 from tslab.lab.core.markers import HardwareSetting
-from tslab.ts.interfaces import Encoder
+from tslab.ts.interfaces.encoder import Encoder
 from tslab.ts.stages.encoders import resolve_device
 
 __all__ = ['ChronocraticEncoder']

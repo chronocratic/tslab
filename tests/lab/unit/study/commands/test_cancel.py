@@ -8,7 +8,7 @@ import pytest
 from tests.lab.unit.study.commands.test_resubmit import _chain_states, _chain_submitted
 from tests.support.fake_backend import FakeBackend
 from tslab.lab.enums import JobFlag, JobPhase
-from tslab.lab.study.commands import cancel
+from tslab.lab.study.commands.cancel import cancel
 
 if TYPE_CHECKING:
     from tslab.lab.study.context import Context

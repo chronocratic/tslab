@@ -11,7 +11,7 @@ from tslab.lab.core.paths import STATUS_FILE
 from tslab.lab.core.status import PAUSED_ERROR_PREFIXES, read_status, RunStatusSnapshot
 from tslab.lab.core.text import first_line
 from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
-from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.definition.definition import StudyRun
 from tslab.lab.study.records import JobRecord, latest_tasks, TaskRecord
 
 if TYPE_CHECKING:

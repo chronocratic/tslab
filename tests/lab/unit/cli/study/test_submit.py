@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 from tests.lab.unit.cli.study.helpers import git_project, toy_project
 from tests.lab.unit.study.helpers import jobs_of
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
-from tslab.lab.cli.study import Submit
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.cli.study.submit import Submit
 
 
 def test_dry_run_says_nothing_was_submitted(

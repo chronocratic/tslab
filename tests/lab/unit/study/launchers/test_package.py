@@ -10,13 +10,10 @@ import pytest
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study.launchers.common.types import JobUsage, LaunchError
 from tslab.lab.study.launchers.tables import backend_for, BACKENDS
-from tslab.lab.study.machine import (
-    load_machine,
-    LocalSettings,
-    MachineProfile,
-    MachineProfileError,
-    SlurmSettings,
-)
+from tslab.lab.study.machine import LocalSettings, SlurmSettings
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.profile import MachineProfile
+from tslab.lab.study.machine.tables import MachineProfileError
 
 
 def test_backend_for_picks_by_launcher(*, tmp_path: Path) -> None:

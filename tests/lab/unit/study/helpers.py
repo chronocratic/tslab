@@ -12,7 +12,7 @@ from tslab.lab.core.files import atomic_write_json
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, LauncherKind, RunState
 from tslab.lab.study import After, Grid, Study
-from tslab.lab.study.commands import submit
+from tslab.lab.study.commands.submit import submit
 from tslab.lab.study.context import Context, context_for, load_context, Selection
 from tslab.lab.study.launchers.common.types import JobStates
 from tslab.lab.study.launchers.local.pid_file import LAUNCH_FILE

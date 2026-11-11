@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 import time
 from typing import TextIO, TYPE_CHECKING
 
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot

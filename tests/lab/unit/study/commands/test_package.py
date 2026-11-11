@@ -15,10 +15,10 @@ from tests.lab.unit.study.helpers import (
     write_run_status,
 )
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.core.text import TextTable
 from tslab.lab.enums import InstanceState, JobPhase, RunState
-from tslab.lab.study.commands import _finish_launch
+from tslab.lab.study.commands.support import _finish_launch
 from tslab.lab.study.launchers.common.types import SIGNAL_EXIT_BASE
 
 

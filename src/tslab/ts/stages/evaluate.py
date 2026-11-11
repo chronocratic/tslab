@@ -9,8 +9,8 @@ from tslab.lab.core.paths import InstanceName, normalize_instance_name
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
 from tslab.ml.artifacts import Tensors
-from tslab.ml.interfaces import Metric
-from tslab.ts.interfaces import DownstreamModel
+from tslab.ml.interfaces.metric import Metric
+from tslab.ts.interfaces.downstream import DownstreamModel
 
 __all__ = ['evaluate']
 

@@ -6,8 +6,9 @@ from typing import override
 
 import pytest
 
-from tslab.lab.cli.common import ConsoleHandler, make_console, UsageError, watch
 import tslab.lab.cli.common.console as console_module
+from tslab.lab.cli.common.console import ConsoleHandler, make_console, watch
+from tslab.lab.cli.common.errors import UsageError
 from tslab.lab.core.text import log_table
 
 

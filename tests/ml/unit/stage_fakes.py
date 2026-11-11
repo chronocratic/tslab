@@ -10,7 +10,8 @@ import torch
 
 from tslab.lab.core.run import Run, RunOptions
 from tslab.ml.artifacts import Checkpoint
-from tslab.ml.interfaces import Batch, Trainer
+from tslab.ml.interfaces.data import Batch
+from tslab.ml.interfaces.trainer import Trainer
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -6,7 +6,7 @@ import shutil
 import pytest
 
 from tslab.cli import main
-from tslab.lab.cli import main as lab_main
+from tslab.lab.cli.entrypoint import main as lab_main
 
 
 def test_default_template_is_lab_without_torch(

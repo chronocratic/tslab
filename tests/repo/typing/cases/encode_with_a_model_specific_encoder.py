@@ -6,8 +6,10 @@ import torch
 import tslab.lab
 import tslab.ml
 import tslab.ts
-from tslab.ts.interfaces import Encoder
-from tslab.ml.interfaces import LabeledSplits, Trainer
+import tslab.ts.stages
+from tslab.ts.interfaces.encoder import Encoder
+from tslab.ml.interfaces.data import LabeledSplits
+from tslab.ml.interfaces.trainer import Trainer
 
 
 class LinearModel(torch.nn.Linear):

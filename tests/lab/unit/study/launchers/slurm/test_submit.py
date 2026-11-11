@@ -13,14 +13,15 @@ from tests.lab.unit.study.helpers import context, jobs_of, no_sleep
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
 from tslab.lab.enums import AfterCondition, LauncherKind, Satisfy
 from tslab.lab.study import Study
-from tslab.lab.study.commands import submit
-from tslab.lab.study.definition import expand_runs
+from tslab.lab.study.commands.submit import submit
+from tslab.lab.study.definition.definition import expand_runs
 from tslab.lab.study.launchers.common.launch import launch as _launch
 from tslab.lab.study.launchers.common.types import LaunchError, LaunchReport
 from tslab.lab.study.launchers.slurm.backend import SlurmBackend
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.launchers.slurm.submit import _log_pattern, SlurmLauncher, write_job_files
-from tslab.lab.study.machine import MachineOverride, MachineProfile, SlurmSettings
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
+from tslab.lab.study.machine.slurm import SlurmSettings
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, resolve_runs
 from tslab.lab.study.plan_after import AfterTarget

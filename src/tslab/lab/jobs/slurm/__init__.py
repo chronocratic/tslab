@@ -1,19 +1,15 @@
 """SLURM helpers: submitting jobs and reading their states and timing."""
 
 from tslab.lab.jobs.slurm.catalogue import (
-    command_lines,
     CommandOutput,
     CommandValues,
-    IdScope,
     run_slurm_command,
-    select_ids,
     slurm_command,
     SLURM_COMMANDS,
     SlurmCommand,
 )
 from tslab.lab.jobs.slurm.commands import (
     gres_gpus,
-    QOS_LIMIT_MARKERS,
     query_cluster_config,
     query_expected_starts,
     query_job_reasons,
@@ -49,7 +45,6 @@ from tslab.lab.jobs.slurm.states import (
     pending_reason_stuck,
     QUEUED_JOB_STATES,
     RUNNING_JOB_STATES,
-    STUCK_PENDING_REASONS,
 )
 from tslab.lab.jobs.slurm.timing import (
     format_slurm_duration,
@@ -61,15 +56,12 @@ from tslab.lab.jobs.slurm.timing import (
 __all__ = [
     'FAILING_JOB_STATES',
     'INTERRUPTING_JOB_STATES',
-    'QOS_LIMIT_MARKERS',
     'QUEUED_JOB_STATES',
     'RESTART_COUNT_VARIABLE',
     'RUNNING_JOB_STATES',
     'SLURM_COMMANDS',
-    'STUCK_PENDING_REASONS',
     'CommandOutput',
     'CommandValues',
-    'IdScope',
     'SlurmCommand',
     'SlurmError',
     'SlurmJobUsage',
@@ -77,7 +69,6 @@ __all__ = [
     'SlurmQueueEntry',
     'array_spec',
     'check_script_text',
-    'command_lines',
     'export_lines',
     'format_slurm_duration',
     'format_slurm_memory',
@@ -101,7 +92,6 @@ __all__ = [
     'sbatch_directives',
     'scancel',
     'scontrol_requeue',
-    'select_ids',
     'slurm_available',
     'slurm_command',
     'srun_command',

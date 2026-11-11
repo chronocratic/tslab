@@ -3,7 +3,9 @@ import torch
 
 import tslab.lab
 import tslab.ml
-from tslab.ml.interfaces import DataSource, Trainer
+import tslab.ml.stages
+from tslab.ml.interfaces.data import DataSource
+from tslab.ml.interfaces.trainer import Trainer
 
 
 def train_a_string(

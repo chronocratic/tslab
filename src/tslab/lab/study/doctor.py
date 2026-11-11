@@ -11,8 +11,10 @@ import tempfile
 
 from tslab.lab.core.paths import require_path
 from tslab.lab.enums import CheckStatus
-from tslab.lab.study.definition import load_study
-from tslab.lab.study.machine import load_machine, MachineProfile, MachineProfileError
+from tslab.lab.study.definition.loading import load_study
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.profile import MachineProfile
+from tslab.lab.study.machine.tables import MachineProfileError
 from tslab.lab.study.plan import check_machine
 
 __all__ = ['DoctorCheck', 'run_checks']

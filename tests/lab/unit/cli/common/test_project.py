@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.cli.common import resolve_request
 from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.study.project import PROJECT_FILE
 
 

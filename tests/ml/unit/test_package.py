@@ -13,7 +13,7 @@ def test_a_missing_dependency_is_not_hidden_as_a_missing_attribute(
     real = importlib.import_module
 
     def import_module(name: str, *args: str) -> object:
-        if name == 'tslab.ml.interfaces':
+        if name == 'tslab.ml.interfaces.data':
             message = "No module named 'lightning'"
             raise ModuleNotFoundError(message, name='lightning')
         return real(name, *args)

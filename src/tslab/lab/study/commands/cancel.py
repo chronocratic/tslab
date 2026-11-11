@@ -5,7 +5,7 @@ import logging
 from tslab.lab.enums import StudyState
 from tslab.lab.study.chain import downstream_of
 from tslab.lab.study.context import Context, study_reports, widen_context
-from tslab.lab.study.definition import chained_grids
+from tslab.lab.study.definition.after import chained_grids
 from tslab.lab.study.launchers.common.types import LaunchError
 from tslab.lab.study.launchers.tables import backend_for
 

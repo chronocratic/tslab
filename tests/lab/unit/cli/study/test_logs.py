@@ -9,7 +9,8 @@ import pytest
 from tests.lab.unit.cli.study.helpers import toy_project
 from tests.lab.unit.study.helpers import context, study_directory, submit_study
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli.study import Logs, logs as logs_module
+from tslab.lab.cli.study import logs as logs_module
+from tslab.lab.cli.study.logs import Logs
 
 _ONE = ('model=small', 'seed=1')
 

@@ -9,8 +9,8 @@ from tests.support.fake_slurm import FakeSlurm
 from tslab.lab.enums import ChainedRetry
 from tslab.lab.study.doctor import DoctorCheck, run_checks
 from tslab.lab.study.launchers.slurm import doctor
-from tslab.lab.study.machine import SlurmSettings
 from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.machine.slurm import SlurmSettings
 
 
 def test_slurm_check_lists_missing_scheduler_commands(monkeypatch: pytest.MonkeyPatch) -> None:

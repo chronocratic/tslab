@@ -9,16 +9,11 @@ import time
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from tslab.lab.study.definition import (
-    chained_grids,
-    expand_runs,
-    load_study,
-    select_runs,
-    Study,
-    StudyRun,
-    upstream_runs,
-)
-from tslab.lab.study.machine import load_machine, MachineProfile
+from tslab.lab.study.definition.after import chained_grids, upstream_runs
+from tslab.lab.study.definition.definition import expand_runs, select_runs, Study, StudyRun
+from tslab.lab.study.definition.loading import load_study
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.paths import log_file_of, study_folder
 from tslab.lab.study.plan import check_machine, resolve_runs, ResolvedRun
 from tslab.lab.study.records import JobRecord, read_jobs, submission_in_progress

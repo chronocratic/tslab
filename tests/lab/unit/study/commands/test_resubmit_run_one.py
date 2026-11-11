@@ -11,9 +11,9 @@ import pytest
 
 from tests.lab.unit.study.helpers import submit_study
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.enums import JobPhase
-from tslab.lab.study.commands import run_one
+from tslab.lab.study.commands.resubmit import run_one
 from tslab.lab.study.context import Context, load_context, Selection
 
 

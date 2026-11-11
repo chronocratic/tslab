@@ -17,7 +17,7 @@ from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import LauncherKind
 from tslab.lab.jobs.slurm import CommandValues, SLURM_COMMANDS
 from tslab.lab.study import Study
-from tslab.lab.study.commands import submit
+from tslab.lab.study.commands.submit import submit
 from tslab.lab.study.launchers.slurm import backend as slurm_backend
 from tslab.lab.study.launchers.slurm.backend import SlurmBackend
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord

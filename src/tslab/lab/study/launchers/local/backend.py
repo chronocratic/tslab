@@ -9,11 +9,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
 
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.enums import JobPhase, LauncherKind, LocalTaskState
 from tslab.lab.jobs.local import GpuDiscovery, start_keep_awake, stop_keep_awake, visible_gpus
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition import Study
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.launch import launch
 from tslab.lab.study.launchers.common.types import (
@@ -35,8 +35,8 @@ from tslab.lab.study.launchers.local.run import (
     write_job_files,
 )
 from tslab.lab.study.launchers.local.states import _local_states
-from tslab.lab.study.machine import LocalSettings, MachineOverride, MachineProfile
-from tslab.lab.study.machine.profile import wants_retry_followup
+from tslab.lab.study.machine.local import LocalSettings
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile, wants_retry_followup
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.records import JobRecord

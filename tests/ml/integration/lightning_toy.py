@@ -11,7 +11,7 @@ import torch
 from torch.utils.data import TensorDataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from tslab.ml.interfaces import Batch
+from tslab.ml.interfaces.data import Batch
 from tslab.ml.lightning import LightningTrainerConfig
 
 # Three short epochs on the CPU; tests change single fields with dataclasses.replace.

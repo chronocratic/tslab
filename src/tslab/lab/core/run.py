@@ -24,7 +24,7 @@ from tslab.lab.core.config import config_to_yaml, save_config
 from tslab.lab.core.files import atomic_write_json
 from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint
 from tslab.lab.core.lock import acquire_lock, Heartbeat, release_lock
-from tslab.lab.core.meta import (
+from tslab.lab.core.meta.run import (
     collect_code_snapshot,
     collect_git_state,
     collect_hardware,

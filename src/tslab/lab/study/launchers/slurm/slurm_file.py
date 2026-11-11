@@ -12,7 +12,7 @@ from tslab.lab.jobs.slurm import (
     SLURM_COMMANDS,
     SlurmCommand,
 )
-from tslab.lab.study.definition import (
+from tslab.lab.study.definition.definition import (
     followup_job_name,
     RETRY_JOB,
     Study,

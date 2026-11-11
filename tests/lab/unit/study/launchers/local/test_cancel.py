@@ -19,10 +19,12 @@ from tests.lab.unit.study.helpers import (
     write_launch,
 )
 from tests.support.fake_slurm import FakeSlurm
-from tslab.lab.cli import main
-from tslab.lab.core.meta import hostname
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.jobs.local import boot_id
-from tslab.lab.study.commands import cancel, resubmit, submit
+from tslab.lab.study.commands.cancel import cancel
+from tslab.lab.study.commands.resubmit import resubmit
+from tslab.lab.study.commands.submit import submit
 from tslab.lab.study.context import load_context, Selection
 
 

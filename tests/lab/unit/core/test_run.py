@@ -14,11 +14,11 @@ from typing import cast, override
 import pytest
 
 import tslab.lab
-from tslab.lab.core import meta
 from tslab.lab.core.codec import decode_dataclass
 from tslab.lab.core.config import ConfigFileError
 from tslab.lab.core.lock import RunLockedError
-from tslab.lab.core.meta import hostname, register_hardware, register_versions
+from tslab.lab.core.meta import run as meta_run
+from tslab.lab.core.meta.run import hostname, register_hardware, register_versions
 from tslab.lab.core.run import Run, RunOptions
 from tslab.lab.core.status import InstanceRecord
 from tslab.lab.core.tracker import LocalTracker, RunStatus, Tracker
@@ -100,8 +100,8 @@ def test_meta_and_hashes(tmp_path: Path) -> None:
 def test_environment_includes_collectors_registered_after_the_first_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(meta.run, '_version_collectors', {})
-    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
+    monkeypatch.setattr(meta_run, '_version_collectors', {})
+    monkeypatch.setattr(meta_run, '_hardware_collectors', {})
     run = Run(config=Config(), root=tmp_path, relative_path=Path('a'))
     assert 'late' not in cast('dict[str, object]', run.environment()['versions'])
     register_versions(lambda: {'late': '1'}, name='late')
@@ -115,8 +115,8 @@ def test_environment_includes_collectors_registered_after_the_first_call(
 def test_environment_keeps_the_first_git_state_when_collectors_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(meta.run, '_version_collectors', {})
-    monkeypatch.setattr(meta.run, '_hardware_collectors', {})
+    monkeypatch.setattr(meta_run, '_version_collectors', {})
+    monkeypatch.setattr(meta_run, '_hardware_collectors', {})
     calls: list[int] = []
 
     def fake_git(*, directory: Path) -> dict[str, object]:  # why: matches the real one

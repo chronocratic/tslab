@@ -4,7 +4,9 @@ import torch
 import tslab.lab
 import tslab.ml
 import tslab.ts
-from tslab.ml.interfaces import LabeledSplits, Trainer
+import tslab.ts.stages
+from tslab.ml.interfaces.data import LabeledSplits
+from tslab.ml.interfaces.trainer import Trainer
 
 
 def encode_without_encoder(

@@ -9,8 +9,10 @@ import pytest
 from tests.lab.unit.cli.study.helpers import toy_project
 from tests.lab.unit.study.helpers import submit_study
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
-from tslab.lab.cli.study import Resubmit, Results, Submit
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.cli.study.resubmit import Resubmit
+from tslab.lab.cli.study.results import Results
+from tslab.lab.cli.study.submit import Submit
 from tslab.lab.enums import JobPhase
 
 if TYPE_CHECKING:

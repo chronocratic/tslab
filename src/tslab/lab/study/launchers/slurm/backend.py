@@ -34,7 +34,8 @@ from tslab.lab.jobs.slurm import (
 )
 from tslab.lab.study.command_names import CHAIN_EXIT_COMMAND
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition import chained_grids, Study
+from tslab.lab.study.definition.after import chained_grids
+from tslab.lab.study.definition.definition import Study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.launch import launch
 from tslab.lab.study.launchers.common.types import (
@@ -58,13 +59,9 @@ from tslab.lab.study.launchers.slurm.states import (
     slurm_task_ids,
 )
 from tslab.lab.study.launchers.slurm.submit import SlurmLauncher, write_job_files
-from tslab.lab.study.machine import (
-    MachineOverride,
-    MachineProfile,
-    MachineProfileError,
-    SlurmSettings,
-)
-from tslab.lab.study.machine.slurm import slurm_for
+from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
+from tslab.lab.study.machine.slurm import slurm_for, SlurmSettings
+from tslab.lab.study.machine.tables import MachineProfileError
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.records import JobRecord, submission_lock

@@ -19,7 +19,7 @@ from tslab.lab.enums import InstanceState, LauncherKind, RunState, StudyState
 from tslab.lab.jobs.slurm import SlurmError
 from tslab.lab.study.commands.resubmit import may_retry
 from tslab.lab.study.context import Context, records_context
-from tslab.lab.study.definition import StudyRun
+from tslab.lab.study.definition.definition import StudyRun
 from tslab.lab.study.launchers.slurm.chain_exit import chain_exit
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.launchers.slurm.requeue import at_requeue_limit, restarted_attempt

@@ -3,7 +3,8 @@ import re
 
 import pytest
 
-from tslab.lab.cli import entrypoint, main, parser
+from tslab.lab.cli import entrypoint, parser
+from tslab.lab.cli.entrypoint import main
 
 COMMANDS: list[list[str]] = [
     [],

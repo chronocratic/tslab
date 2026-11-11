@@ -6,9 +6,9 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.lab.cli.common import resolve_request
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import _records_context_of
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.study.launchers.slurm.chain_exit import chain_exit
 
 __all__ = ['ChainExit']

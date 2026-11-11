@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.jobs.local import process_alive
 

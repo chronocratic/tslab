@@ -17,7 +17,7 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 | `tslab.LogLevel` | `tslab.lab.LogLevel` |
 | `tslab.MachineSetting` | `tslab.lab.MachineSetting` |
 | `tslab.Metrics` | `tslab.lab.Metrics` |
-| `tslab.ModelAsEncoder` | `tslab.ts.ModelAsEncoder` |
+| `tslab.ModelAsEncoder` | `tslab.ts.stages.ModelAsEncoder` |
 | `tslab.NotFingerprinted` | `tslab.lab.NotFingerprinted` |
 | `tslab.Run` | `tslab.lab.Run` |
 | `tslab.RunLockedError` | `tslab.lab.RunLockedError` |
@@ -60,11 +60,11 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 | `tslab.interfaces.Probe` | `tslab.ts.Probe` |
 | `tslab.interfaces.SequenceEncoder` | `tslab.ts.SequenceEncoder` |
 | `tslab.interfaces.Trainer` | `tslab.ml.Trainer` |
-| `tslab.stages.ModelAsEncoder` | `tslab.ts.ModelAsEncoder` |
-| `tslab.stages.check_representations` | `tslab.ts.check_representations` |
-| `tslab.stages.encode` | `tslab.ts.encode` |
-| `tslab.stages.evaluate` | `tslab.ts.evaluate` |
-| `tslab.stages.train` | `tslab.ml.train` |
+| `tslab.stages.ModelAsEncoder` | `tslab.ts.stages.ModelAsEncoder` |
+| `tslab.stages.check_representations` | `tslab.ts.stages.check_representations` |
+| `tslab.stages.encode` | `tslab.ts.stages.encode` |
+| `tslab.stages.evaluate` | `tslab.ts.stages.evaluate` |
+| `tslab.stages.train` | `tslab.ml.stages.train` |
 | `tslab.enums.AfterCondition` | `tslab.lab.enums.AfterCondition` |
 | `tslab.enums.AfterVerdict` | `tslab.lab.enums.AfterVerdict` |
 | `tslab.enums.ChainedRetry` | `tslab.lab.enums.ChainedRetry` |
@@ -92,6 +92,43 @@ TSLab is now three packages in one distribution: `tslab.lab` (no torch), `tslab.
 - Torch seeding and the torch, Lightning, CUDA and GPU metadata happen only when `tslab.ml` is imported. The lab seeds Python `random` and NumPy. A stage that uses torch must import `tslab.ml`. See [Seeding](lab/run-options.md#seeding).
 - `tslab wandb-sync` and the W&B, MLflow and TensorBoard trackers are in `tslab.ml`.
 - The module paths below the packages changed too (for example `tslab.core` became `tslab.lab.core`, `tslab.study` became `tslab.lab.study`, `tslab.adapters.chronocratic` became `tslab.ts.adapters.chronocratic`).
+
+## Internal package imports
+
+The doors of internal subpackages are empty, and a few doors are trimmed. Import from `tslab.lab`, `tslab.ml` or `tslab.ts`, or from the module that defines the name.
+
+| Old import | New import |
+|---|---|
+| `tslab.lab.cli.main` | `tslab.lab.cli.entrypoint.main` |
+| `tslab.lab.cli.common.CONSOLE`, `make_console`, `watch`, ... | `tslab.lab.cli.common.console` |
+| `tslab.lab.cli.common.UsageError` | `tslab.lab.cli.common.errors.UsageError` |
+| `tslab.lab.cli.common.print_json`, `error_document`, ... | `tslab.lab.cli.common.output` |
+| `tslab.lab.cli.common.Request`, `resolve_request` | `tslab.lab.cli.common.project` |
+| `tslab.lab.cli.study.STUDY_COMMANDS` | `tslab.lab.cli.study.registry.STUDY_COMMANDS` |
+| `tslab.lab.cli.study.Submit`, `Status`, `Cancel`, ... | `tslab.lab.cli.study.submit`, `status`, `cancel`, ... |
+| `tslab.lab.core.meta.hostname`, `collect_*`, `register_*` | `tslab.lab.core.meta.run` |
+| `tslab.lab.core.meta.can_resume`, `stale_reason`, ... | `tslab.lab.core.meta.instance` |
+| `tslab.lab.study.commands.submit`, `status`, `cancel`, ... | `tslab.lab.study.commands.submit.submit`, `status.status`, `cancel.cancel`, ... |
+| `tslab.lab.study.definition.Study`, `Grid`, `expand_runs`, ... | `tslab.lab.study.definition.definition` |
+| `tslab.lab.study.definition.After`, `chained_grids`, ... | `tslab.lab.study.definition.after` |
+| `tslab.lab.study.definition.Settings`, `from_presets`, ... | `tslab.lab.study.definition.settings` |
+| `tslab.lab.study.definition.load_study` | `tslab.lab.study.definition.loading.load_study` |
+| `tslab.lab.study.machine.MachineProfile`, `FollowupSettings` | `tslab.lab.study.machine.profile` |
+| `tslab.lab.study.machine.load_machine` | `tslab.lab.study.machine.load.load_machine` |
+| `tslab.lab.study.machine.SlurmSettings`, `LocalSettings` | still exported there; also `tslab.lab.study.machine.slurm`, `local` |
+| `tslab.lab.study.launchers.local.LocalBackend` | `tslab.lab.study.launchers.local.backend.LocalBackend` |
+| `tslab.lab.study.launchers.slurm.SlurmBackend` | `tslab.lab.study.launchers.slurm.backend.SlurmBackend` |
+| `tslab.ml.train` | `tslab.ml.stages.train` |
+| `tslab.ts.encode`, `evaluate`, `check_representations`, `ModelAsEncoder` | `tslab.ts.stages.encode`, `evaluate`, `check_representations`, `ModelAsEncoder` |
+| `tslab.ml.interfaces.Trainer`, `DataSource`, ... | `tslab.ml.Trainer`, `tslab.ml.DataSource`, ... |
+| `tslab.ts.interfaces.Encoder`, `Probe`, ... | `tslab.ts.Encoder`, `tslab.ts.Probe`, ... |
+| `tslab.lab.analysis.stars`, `format_number`, `is_dark_cell`, `complete_row_count`, `DEFAULT_*`, `FULL_WIDTH`, `PLOTS_FOLDER` | `tslab.lab.analysis.stats`, `numbers`, `style`, `output` |
+| `tslab.lab.jobs.slurm.select_ids`, `command_lines`, `IdScope` | `tslab.lab.jobs.slurm.catalogue` |
+| `tslab.lab.jobs.slurm.QOS_LIMIT_MARKERS` | `tslab.lab.jobs.slurm.commands.QOS_LIMIT_MARKERS` |
+| `tslab.lab.jobs.slurm.STUCK_PENDING_REASONS` | `tslab.lab.jobs.slurm.states.STUCK_PENDING_REASONS` |
+| `tslab.ml.lightning.AccumulatingTimerCallback` | `tslab.ml.lightning.callbacks.AccumulatingTimerCallback` |
+| `tslab.ts.tasks.TSDataSource` | `tslab.ts.tasks.data.TSDataSource` |
+| `tslab.ts.tasks.encode_series`, `encode_windows`, `horizon_samples` | `tslab.ts.tasks.forecasting` |
 
 ## Install extras
 

@@ -23,13 +23,13 @@ from tests.lab.unit.study.helpers import (
     write_run_status,
 )
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.core.paths import LOCK_FILE
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import AfterCondition, InstanceState, JobFlag, JobPhase, RunState, StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError
-from tslab.lab.study.commands import resubmit, submit, submit_runs
-from tslab.lab.study.commands.resubmit import _remove_ended_locks
+from tslab.lab.study.commands.resubmit import _remove_ended_locks, resubmit
+from tslab.lab.study.commands.submit import submit, submit_runs
 from tslab.lab.study.context import Context, load_context, refresh_context, Selection, study_reports
 from tslab.lab.study.launchers.common.types import LaunchError
 from tslab.lab.study.launchers.slurm.chain_exit import chain_exit
@@ -371,7 +371,9 @@ def test_local_no_retry_after_signal(project: Path, monkeypatch: pytest.MonkeyPa
     # the door re-exports `submit` (the function), shadowing the submodule; reach it by name
     submit_module = importlib.import_module('tslab.lab.study.commands.submit')
     monkeypatch.setattr(submit_module, 'submit_runs', lambda **_: (143, []))
-    monkeypatch.setattr('tslab.lab.study.commands.resubmit', lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        'tslab.lab.study.commands.resubmit.resubmit', lambda **kwargs: calls.append(kwargs)
+    )
     code = submit(context=ctx, include_done=False, dry_run=False, extra_args=(), sleep=no_sleep)
     assert code == 143
     assert calls == []

@@ -16,7 +16,7 @@ from tests.lab.unit.study.helpers import (
     write_run_status,
 )
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.core.paths import ERROR_FILE, LOGS_DIRECTORY
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, RunState, StudyState

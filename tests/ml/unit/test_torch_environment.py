@@ -4,7 +4,7 @@ import sys
 import pytest
 import torch
 
-from tslab.lab.core.meta import collect_hardware, collect_versions
+from tslab.lab.core.meta.run import collect_hardware, collect_versions
 from tslab.lab.core.seeding import seed_everything
 from tslab.ml.torch_environment import torch_hardware
 

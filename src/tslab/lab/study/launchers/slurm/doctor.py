@@ -16,8 +16,8 @@ from tslab.lab.jobs.slurm import (
     SlurmNodeGroup,
 )
 from tslab.lab.study.doctor import DoctorCheck
-from tslab.lab.study.machine import SlurmSettings
 from tslab.lab.study.machine.profile import FollowupSettings
+from tslab.lab.study.machine.slurm import SlurmSettings
 
 __all__ = ['cluster_checks', 'slurm_check']
 

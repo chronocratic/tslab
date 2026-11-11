@@ -16,7 +16,7 @@ import pytest
 from tests.lab.unit.study.helpers import context, finish_run, jobs_of, no_sleep, submit_study
 from tests.lab.unit.study.launchers.slurm.helpers import skip_query_waits
 from tests.support.fake_slurm import FakeSlurm
-from tslab.lab.cli import main
+from tslab.lab.cli.entrypoint import main
 from tslab.lab.enums import AfterCondition, CheckStatus, JobFlag, JobPhase, LauncherKind
 from tslab.lab.jobs.slurm import (
     FAILING_JOB_STATES,
@@ -25,9 +25,10 @@ from tslab.lab.jobs.slurm import (
     RUNNING_JOB_STATES,
 )
 from tslab.lab.study import After, Study
-from tslab.lab.study.commands import cancel, resubmit, run_one
+from tslab.lab.study.commands.cancel import cancel
+from tslab.lab.study.commands.resubmit import resubmit, run_one
 from tslab.lab.study.context import Context, context_for, load_context, Selection
-from tslab.lab.study.definition import load_study
+from tslab.lab.study.definition.loading import load_study
 from tslab.lab.study.doctor import DoctorCheck
 from tslab.lab.study.launchers.common.types import JobUsage, LaunchError, LaunchReport
 import tslab.lab.study.launchers.slurm.backend as slurm_backend
@@ -35,7 +36,8 @@ from tslab.lab.study.launchers.slurm.backend import _phase_of, SlurmBackend
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
 from tslab.lab.study.launchers.slurm.states import slurm_task_ids
-from tslab.lab.study.machine import MachineOverride, MachineProfileError
+from tslab.lab.study.machine.profile import MachineOverride
+from tslab.lab.study.machine.tables import MachineProfileError
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.records import append_job, JobKind
 

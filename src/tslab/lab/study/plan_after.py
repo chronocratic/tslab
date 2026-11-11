@@ -15,14 +15,15 @@ from tslab.lab.enums import (
     StudyState,
 )
 from tslab.lab.study.chain import after_verdict, retry_left, upstream_verdict
-from tslab.lab.study.definition import grid_order, match_axes, upstream_runs
+from tslab.lab.study.definition.after import grid_order, match_axes, upstream_runs
 from tslab.lab.study.records import latest_tasks
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import PurePosixPath
 
-    from tslab.lab.study.definition import After, Study, StudyRun
+    from tslab.lab.study.definition.after import After
+    from tslab.lab.study.definition.definition import Study, StudyRun
     from tslab.lab.study.machine.profile import FollowupSettings
     from tslab.lab.study.plan import JobGroup
     from tslab.lab.study.records import JobRecord, TaskRecord

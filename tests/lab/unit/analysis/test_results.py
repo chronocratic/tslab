@@ -16,7 +16,7 @@ from tslab.lab.analysis.results import (
 )
 from tslab.lab.analysis.stats import Direction
 from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
-from tslab.lab.study.definition import load_study
+from tslab.lab.study.definition.loading import load_study
 
 
 @dataclass(frozen=True, kw_only=True)

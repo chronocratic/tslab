@@ -8,8 +8,10 @@ from tests.ts.unit.stage_fakes import LinearEncoder, ToySplits
 from tests.ts.unit.stages.helpers import encoded
 import tslab.ml
 from tslab.ml.split import Split
+import tslab.ml.stages
 import tslab.ts
-from tslab.ts.stages import check_representations
+import tslab.ts.stages
+from tslab.ts.stages.encode import check_representations
 
 
 def test_encode_never_uses_the_training_loaders(tmp_path: Path) -> None:

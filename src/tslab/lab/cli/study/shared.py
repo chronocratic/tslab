@@ -9,14 +9,15 @@ from pathlib import Path
 import shlex
 from typing import cast
 
-from tslab.lab.cli.common import Request, UsageError
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.project import Request
 from tslab.lab.enums import StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot, CodeSnapshotError, take_code_snapshot
-from tslab.lab.study.commands import parse_states
+from tslab.lab.study.commands.status import parse_states
 from tslab.lab.study.context import Context, load_context, records_context, Selection
 from tslab.lab.study.launchers.cpus import available_cpus
 from tslab.lab.study.launchers.tables import backend_for
-from tslab.lab.study.machine import resolve_machine
+from tslab.lab.study.machine.register import resolve_machine
 from tslab.lab.study.project import find_studies, load_project_settings, ProjectSettings
 
 _LOGGER = logging.getLogger('tslab.lab.cli.study')

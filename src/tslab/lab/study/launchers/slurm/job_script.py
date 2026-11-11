@@ -17,7 +17,7 @@ from tslab.lab.jobs.slurm import (
 )
 from tslab.lab.study.code_snapshot import CodeSnapshot, SRC_FOLDER
 from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.lab.study.machine import SlurmSettings
+from tslab.lab.study.machine.slurm import SlurmSettings
 
 __all__ = ['foreground_script', 'job_script']
 

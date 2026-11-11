@@ -3,9 +3,14 @@
 ## Interfaces
 
 ```{eval-rst}
-.. automodule:: tslab.ts.interfaces
+.. autoclass:: tslab.ts.Encoder
    :members:
-   :imported-members:
+.. autoclass:: tslab.ts.SequenceEncoder
+   :members:
+.. autoclass:: tslab.ts.DownstreamModel
+   :members:
+.. autoclass:: tslab.ts.Probe
+   :members:
 ```
 
 ## Ready stages

@@ -9,7 +9,8 @@ from typing import cast, TYPE_CHECKING
 from tslab.lab.core.codec import decode_dataclass
 from tslab.lab.core.config import ConfigFileError
 from tslab.lab.core.text import unknown_key_message
-from tslab.lab.study.definition import expand_variables, SettingValue
+from tslab.lab.study.definition.expansion import expand_variables
+from tslab.lab.study.definition.settings import SettingValue
 
 if TYPE_CHECKING:
     from _typeshed import DataclassInstance

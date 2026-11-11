@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from tslab.ml.interfaces import DataSource
+from tslab.ml.interfaces.data import DataSource
 
 __all__ = ['TSDataInfo', 'TSDataSource']
 

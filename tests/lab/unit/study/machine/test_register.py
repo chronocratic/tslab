@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.study.machine import (
-    MachineProfileError,
+from tslab.lab.study.machine.register import (
     read_register,
     register_file,
     resolve_machine,
     validate_machine_name,
     write_register,
 )
+from tslab.lab.study.machine.tables import MachineProfileError
 
 
 @pytest.fixture(autouse=True)

@@ -26,7 +26,7 @@ from tests.support.fake_backend import FakeBackend
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import AfterCondition, JobPhase, StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot
-from tslab.lab.study.commands import submit, submit_runs
+from tslab.lab.study.commands.submit import submit, submit_runs
 from tslab.lab.study.context import Context, load_context, Selection
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord

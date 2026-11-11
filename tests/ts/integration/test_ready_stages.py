@@ -16,11 +16,13 @@ import tslab.lab
 from tslab.lab.enums import InstanceState
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer
+import tslab.ml.stages
 import tslab.ts
 from tslab.ts.probes import RidgeProbe, SVMProbe
+import tslab.ts.stages
 from tslab.ts.tasks import forecasting_representations
 
-ENCODER = tslab.ts.ModelAsEncoder(device='cpu')
+ENCODER = tslab.ts.stages.ModelAsEncoder(device='cpu')
 
 
 pytestmark = pytest.mark.slow

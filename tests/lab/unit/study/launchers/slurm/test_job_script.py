@@ -12,7 +12,7 @@ import pytest
 from tslab.lab.study.code_snapshot import CodeSnapshot
 from tslab.lab.study.launchers.slurm.job_script import foreground_script, job_script
 from tslab.lab.study.launchers.slurm.requeue_mode import RequeueMode
-from tslab.lab.study.machine import SlurmSettings
+from tslab.lab.study.machine.slurm import SlurmSettings
 
 TASKS_LINES = [
     '3 1 ' + shlex.join(['python3', '-c', 'print(3)']),

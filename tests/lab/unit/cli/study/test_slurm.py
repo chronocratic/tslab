@@ -8,10 +8,10 @@ import pytest
 from tests.lab.unit.cli.study.helpers import toy_project
 from tests.lab.unit.study.helpers import submit_study
 from tests.support.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.lab.cli.study import Slurm
+from tslab.lab.cli.study.slurm import Slurm
 from tslab.lab.jobs.slurm import SLURM_COMMANDS
 from tslab.lab.study import slurm_output
-from tslab.lab.study.definition import load_study
+from tslab.lab.study.definition.loading import load_study
 
 
 @pytest.fixture

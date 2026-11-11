@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 
 from tslab.lab.enums import AfterVerdict, JobFlag, StudyState
 from tslab.lab.study.chain import after_verdict
-from tslab.lab.study.definition import grid_order, upstream_runs
+from tslab.lab.study.definition.after import grid_order, upstream_runs
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import PurePosixPath
 
     from tslab.lab.study.context import Context
-    from tslab.lab.study.definition import Study
+    from tslab.lab.study.definition.definition import Study
     from tslab.lab.study.machine.profile import FollowupSettings
     from tslab.lab.study.reporting.state import RunReport
 

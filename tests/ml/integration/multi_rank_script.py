@@ -9,7 +9,7 @@ from tests.support.integration_helpers import run_in
 import tslab.lab
 import tslab.ml
 from tslab.ml.lightning import LightningTrainer, LightningTrainerConfig
-from tslab.ml.stages import train
+from tslab.ml.stages.train import train
 
 
 class _MultiRankRegressor(ToyRegressor):

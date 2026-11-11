@@ -18,9 +18,10 @@ from tslab.lab.core.paths import InstanceName, normalize_instance_name
 from tslab.lab.core.run import Run
 from tslab.lab.core.stage import stage
 from tslab.ml.artifacts import Checkpoint, Tensors
-from tslab.ml.interfaces import SPLITS, Trainer
+from tslab.ml.interfaces.data import SPLITS
+from tslab.ml.interfaces.trainer import Trainer
 from tslab.ml.split import Split
-from tslab.ts.interfaces import Encoder, SequenceEncoder
+from tslab.ts.interfaces.encoder import Encoder, SequenceEncoder
 from tslab.ts.stages.encode import check_representations, encode_checked, load_encoder
 from tslab.ts.tasks.data import TSDataInfo
 

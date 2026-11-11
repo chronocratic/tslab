@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tslab.lab.enums import AfterCondition, JobFlag, JobPhase, StudyState
 from tslab.lab.study import After, Grid, Study
-from tslab.lab.study.definition import expand_runs, StudyRun
+from tslab.lab.study.definition.definition import expand_runs, StudyRun
 from tslab.lab.study.machine.profile import FollowupSettings
 from tslab.lab.study.reporting.chain import apply_chain_states
 from tslab.lab.study.reporting.state import FolderFacts, RunReport

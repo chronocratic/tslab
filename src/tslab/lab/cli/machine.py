@@ -12,15 +12,12 @@ from typing import Annotated
 
 import tyro
 
-from tslab.lab.cli.common import print_json, UsageError
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import print_json
 from tslab.lab.core.text import log_table
-from tslab.lab.study.machine import (
-    load_machine,
-    MachineProfileError,
-    read_register,
-    validate_machine_name,
-    write_register,
-)
+from tslab.lab.study.machine.load import load_machine
+from tslab.lab.study.machine.register import read_register, validate_machine_name, write_register
+from tslab.lab.study.machine.tables import MachineProfileError
 
 __all__ = ['MACHINE_COMMANDS', 'MachineAdd', 'MachineList', 'MachineRemove']
 

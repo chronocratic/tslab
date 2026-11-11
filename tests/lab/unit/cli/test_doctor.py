@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from tslab.lab.cli import main
-from tslab.lab.core.meta import hostname
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.study.project import PROJECT_FILE
 
 

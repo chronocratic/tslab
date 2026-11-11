@@ -9,13 +9,14 @@ import pytest
 
 from tests.lab.unit.study.helpers import context, finish_run, submit_study
 from tests.support.fake_backend import FakeBackend
-from tslab.lab.cli import main
-from tslab.lab.cli.study import Status
+from tslab.lab.cli.entrypoint import main
+from tslab.lab.cli.study.status import Status
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudyState
-from tslab.lab.study.commands import parse_states, status
+from tslab.lab.study.commands.status import parse_states, status
 from tslab.lab.study.context import Context, context_for, expected_starts, Selection
-from tslab.lab.study.definition import After, Grid, Study
+from tslab.lab.study.definition.after import After
+from tslab.lab.study.definition.definition import Grid, Study
 from tslab.lab.study.launchers.common.types import QueuedJob
 from tslab.lab.study.reporting.documents import status_document
 from tslab.lab.study.reporting.report import log_status

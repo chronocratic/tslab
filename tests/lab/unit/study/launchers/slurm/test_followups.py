@@ -12,10 +12,11 @@ from tests.lab.unit.study.helpers import context, jobs_of, no_sleep, submit_stud
 from tests.support.fake_slurm import FakeSlurm
 from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso, write_status
 from tslab.lab.enums import InstanceState, LauncherKind, RunState
-from tslab.lab.study.commands import resubmit, submit
+from tslab.lab.study.commands.resubmit import resubmit
+from tslab.lab.study.commands.submit import submit
 from tslab.lab.study.launchers.slurm.followups import queue_followups
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
-from tslab.lab.study.machine import resolve_machine, write_register
+from tslab.lab.study.machine.register import resolve_machine, write_register
 from tslab.lab.study.records import append_job, JobKind, ProgressSnapshot, TaskRecord
 
 # why: the shared toy project holds four runs; the auto-retry test needs six

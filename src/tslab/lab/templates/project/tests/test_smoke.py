@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import tslab.lab
-from tslab.lab.cli import main as tslab_main
+from tslab.lab.cli.entrypoint import main as tslab_main
 from tslab.lab.core.status import read_status
 
 from {{package_name}}.experiment import ExperimentConfig, main

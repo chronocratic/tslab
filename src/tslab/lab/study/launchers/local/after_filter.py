@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from tslab.lab.enums import AfterVerdict, JobPhase
 from tslab.lab.study.chain import after_verdict
-from tslab.lab.study.definition import upstream_runs
+from tslab.lab.study.definition.after import upstream_runs
 from tslab.lab.study.launchers.common.types import JobStates
 from tslab.lab.study.paths import study_folder
 from tslab.lab.study.records import latest_tasks, read_jobs
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from tslab.lab.study.context import Context
-    from tslab.lab.study.definition import Study, StudyRun
+    from tslab.lab.study.definition.definition import Study, StudyRun
     from tslab.lab.study.plan import JobGroup
     from tslab.lab.study.records import JobRecord
 

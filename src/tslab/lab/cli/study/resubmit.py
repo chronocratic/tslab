@@ -9,7 +9,9 @@ from typing import Annotated, cast
 
 import tyro
 
-from tslab.lab.cli.common import print_json, resolve_request, UsageError
+from tslab.lab.cli.common.errors import UsageError
+from tslab.lab.cli.common.output import print_json
+from tslab.lab.cli.common.project import resolve_request
 from tslab.lab.cli.study.shared import (
     _context_of,
     _detach,
@@ -20,9 +22,9 @@ from tslab.lab.cli.study.shared import (
     _warn_no_runs,
     take_requested_code_snapshot,
 )
-from tslab.lab.core.meta import hostname
+from tslab.lab.core.meta.run import hostname
 from tslab.lab.study.code_snapshot import CodeSnapshotError
-from tslab.lab.study.commands import resubmit, run_one
+from tslab.lab.study.commands.resubmit import resubmit, run_one
 from tslab.lab.study.launchers.common.types import LaunchReport
 from tslab.lab.study.plan import JobGroup
 from tslab.lab.study.reporting.documents import launch_document
