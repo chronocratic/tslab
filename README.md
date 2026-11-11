@@ -25,9 +25,37 @@
 > [!WARNING]
 > TSLab is under active development. Expect breaking changes between releases until the API is declared stable in v1.0.0.
 
-TSLab turns a research script into a pipeline of **cached, resumable stages**.
-You keep writing a normal Python `main()`. TSLab fingerprints the inputs and
-settings of each step, stores its result, and on the next run loads finished
+TSLab lets you write your time series experiments as plain Python scripts
+and takes care of the rest. Every step is cached, so a rerun picks up where the
+last one stopped instead of starting over. When one script turns into a whole
+grid of experiments, TSLab runs it on your laptop or a SLURM cluster, retries
+what crashed, and gathers the results into a single table for the paper.
+
+It ships with:
+
+- **cached, resumable stages**: finished steps load on the next run, and only
+  what changed or failed runs again (see [How it works](#how-it-works));
+- **studies**: named grids of experiments (datasets × models × seeds) that you
+  submit, follow, resubmit and collect with one command each;
+- **SLURM support**: job arrays built from machine profiles, checkpoint and
+  pause before the time limit, automatic resubmit or requeue, grids chained by
+  job dependencies, code snapshots for queued jobs, multi-GPU training through
+  `srun`, and `tslab doctor` to check a cluster;
+- **local runs** of the same study on a laptop or workstation, no scheduler needed;
+- **Lightning training** with safe resume;
+- **ready stages** for time series representation learning: train, encode, and
+  evaluate with linear probes;
+- **experiment trackers**: CSV always; Weights & Biases, MLflow and
+  TensorBoard as extras;
+- **typed command-line configs** with presets;
+- **adapters** for the chronocratic model and dataset libraries;
+- a **CLI** (`tslab`): project templates, run overviews and every study
+  command (see [CLI](#cli)).
+
+## How it works
+
+Mark each step of your `main()` as a stage. TSLab fingerprints the inputs and
+settings of each stage and stores its result. On the next run it loads finished
 results, resumes unfinished training, and reruns only what changed or failed.
 
 ```python
@@ -42,17 +70,6 @@ with tslab.lab.Run(config=config, root=Path('runs'), relative_path=Path('minimal
     data = make_series(run=run, series=8, length=256)
     smoothed = smooth(run=run, data=data, window=9)  # loaded, not computed, on the next run
 ```
-
-It also ships:
-
-- ready stages for time series representation learning: train, encode, and
-  evaluate with linear probes;
-- Lightning training with safe resume and SLURM time limits;
-- experiment trackers (CSV always; Weights & Biases, MLflow and TensorBoard as extras);
-- typed command-line configs with presets;
-- adapters for the chronocratic model and dataset libraries;
-- a **CLI** (`tslab`): project templates, run overviews, and experiment
-  grids on SLURM or locally (see [CLI](#cli)).
 
 One distribution, three layers: `tslab.lab` (runs, stages, studies, jobs; no
 torch), `tslab.ml` (torch and Lightning) and `tslab.ts` (time series). The lab
