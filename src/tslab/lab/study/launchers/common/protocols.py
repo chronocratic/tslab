@@ -144,8 +144,14 @@ class Backend(Protocol):
         pid: int,
         host: str,
         now: Callable[[], str],
+        release_submission_lock: Callable[[], None] | None = None,
     ) -> LaunchReport | None:
-        """Submit the groups; ``None`` when a problem was logged, not raised."""
+        """Submit the groups; ``None`` when a problem was logged, not raised.
+
+        ``release_submission_lock`` ends the hold of the submission lock of the
+        study. A backend whose launch runs for long calls it as soon as a second
+        launch can be refused on its own; the others leave it alone.
+        """
         ...
 
     def after_submit(

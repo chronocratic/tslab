@@ -282,7 +282,7 @@ def submission_lock(*, study_folder: Path) -> Generator[None]:
         study_folder: The ``.study`` folder of the study; created if missing.
     """
     study_folder.mkdir(parents=True, exist_ok=True)
-    with (study_folder / 'submit.lock').open('a') as handle:
+    with (study_folder / 'submit.lock').open(mode='a') as handle:
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -323,8 +323,10 @@ def submission_in_progress(*, study_folder: Path) -> bool:
 def append_job(*, path: Path, record: JobRecord) -> None:
     """Append one record as one line, flushed to disk.
 
-    The line goes out in a single write, so concurrent appenders do not
-    interleave inside a line.
+    The write loops until every byte is out, and a file that does not end in a
+    newline (a torn earlier line) gets one first, so the new record never
+    glues onto a torn line. Callers that append from several processes hold
+    ``submission_lock``.
 
     Args:
         path: The ``submissions.jsonl`` file; parent folders are created.
@@ -332,9 +334,13 @@ def append_job(*, path: Path, record: JobRecord) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     line = json.dumps(record.to_json(), sort_keys=True) + '\n'
-    descriptor = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    descriptor = os.open(path, os.O_RDWR | os.O_APPEND | os.O_CREAT, 0o644)
     try:
-        os.write(descriptor, line.encode('utf-8'))
+        size = os.fstat(descriptor).st_size
+        torn = size > 0 and os.pread(descriptor, 1, size - 1) != b'\n'
+        pending = memoryview((b'\n' if torn else b'') + line.encode('utf-8'))
+        while pending:
+            pending = pending[os.write(descriptor, pending) :]
         os.fsync(descriptor)
     finally:
         os.close(descriptor)

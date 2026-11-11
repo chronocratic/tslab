@@ -170,6 +170,7 @@ class Run:
         self._previous_sigusr2: (
             signal.Handlers | Callable[[int, FrameType | None], object] | int | None
         ) = None
+        self._sigusr2_installed = False
         self._time_limit_signalled = False
         self._executing = False
         self._called_single_rank = False
@@ -493,6 +494,7 @@ class Run:
             _LOGGER.warning('replacing an existing SIGUSR2 handler for this run')
         signal.signal(sigusr2, self._on_sigusr2)
         self._previous_sigusr2 = previous
+        self._sigusr2_installed = True
 
     def _on_sigusr2(self, signal_number: int, frame: FrameType | None) -> None:
         del signal_number, frame
@@ -619,9 +621,12 @@ class Run:
         if self._previous_sigterm is not None:
             signal.signal(signal.SIGTERM, self._previous_sigterm)
             self._previous_sigterm = None
-        if self._previous_sigusr2 is not None:
-            signal.signal(signal.SIGUSR2, self._previous_sigusr2)
+        if self._sigusr2_installed:
+            # why: getsignal returns None for a handler installed from C; none can be restored
+            previous = self._previous_sigusr2
+            signal.signal(signal.SIGUSR2, signal.SIG_DFL if previous is None else previous)
             self._previous_sigusr2 = None
+            self._sigusr2_installed = False
         root_logger = logging.getLogger()
         for handler in self._log_handlers:
             root_logger.removeHandler(handler)
@@ -707,7 +712,7 @@ def _final_run_state(*, exception: BaseException | None) -> RunState:
 def _call_tracker(*, tracker: Tracker, action: str, call: Callable[[], None]) -> None:
     try:
         call()
-    except Exception:
+    except Exception:  # why: a failing tracker is logged and skipped, never fails the run
         _LOGGER.warning(
             'tracker %s failed in %s; continuing without it for this call',
             type(tracker).__name__,

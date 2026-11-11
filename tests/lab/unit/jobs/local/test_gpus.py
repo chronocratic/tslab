@@ -140,6 +140,10 @@ def test_visible_gpus_from_cuda_visible_devices() -> None:
         visible_gpus(environment={'CUDA_VISIBLE_DEVICES': 'GPU-abc'})
 
 
+def test_visible_gpus_strips_spaces_around_ids() -> None:
+    assert visible_gpus(environment={'CUDA_VISIBLE_DEVICES': ' 1, 3 '}) == ('1', '3')
+
+
 def test_visible_gpus_from_nvidia_smi(*, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _fake_binary(tmp_path=tmp_path, name='nvidia-smi', body='#!/bin/sh\necho 0\necho 1\n')
     monkeypatch.setenv('PATH', f'{tmp_path / "bin"}:{os.environ["PATH"]}')

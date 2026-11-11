@@ -187,10 +187,7 @@ def _wait_and_escalate(  # noqa: PLR0913 # why: one keyword per escalation setti
             send(signum=signal.SIGKILL, name='KILL')
         time.sleep(0.2)
     _, state, usage = result
-    if sys.platform == 'darwin':
-        max_rss_bytes = usage.ru_maxrss
-    else:
-        max_rss_bytes = usage.ru_maxrss * 1024
+    max_rss_bytes = usage.ru_maxrss * _RSS_BYTES_PER_UNIT.get(sys.platform, 1024)
     return ProcessResult(
         exit_code=os.waitstatus_to_exitcode(state),
         elapsed_seconds=time.monotonic() - start,
@@ -198,6 +195,10 @@ def _wait_and_escalate(  # noqa: PLR0913 # why: one keyword per escalation setti
         max_rss_bytes=max_rss_bytes,
         timed_out=timed_out,
     )
+
+
+# why: ru_maxrss is in bytes on macOS and in kilobytes elsewhere
+_RSS_BYTES_PER_UNIT: Mapping[str, int] = {'darwin': 1}
 
 
 def _stop_group_and_reap(*, pid: int, process: subprocess.Popen[Any]) -> None:
@@ -322,14 +323,18 @@ def run_process(  # noqa: PLR0913 # why: keyword-only public API; each option is
 
     reader = threading.Thread(target=read_lines, name='process-stdout', daemon=True)
     reader.start()
-    result = _wait_and_escalate(
-        pid=pid,
-        stop=stop,
-        timeout_seconds=timeout_seconds,
-        signal_seconds=signal_seconds,
-        grace_seconds=grace_seconds,
-        on_event=on_event,
-    )
+    try:
+        result = _wait_and_escalate(
+            pid=pid,
+            stop=stop,
+            timeout_seconds=timeout_seconds,
+            signal_seconds=signal_seconds,
+            grace_seconds=grace_seconds,
+            on_event=on_event,
+        )
+    except BaseException:  # why: KeyboardInterrupt too; no child may outlive the lease
+        _stop_group_and_reap(pid=pid, process=process)
+        raise
     reader.join(timeout=_LEFTOVER_WAIT_SECONDS)
     if reader.is_alive():
         # why: the process group may exit before the kill reaches it
@@ -397,8 +402,10 @@ def process_alive(*, pid: int) -> bool:
     user, so it counts as alive.
 
     Args:
-        pid: The process id to check.
+        pid: The process id to check; zero or a negative id is never a process.
     """
+    if pid <= 0:
+        return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

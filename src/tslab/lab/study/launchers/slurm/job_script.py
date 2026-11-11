@@ -288,9 +288,10 @@ def _job_options(  # noqa: PLR0913 # why: options depend on seven independent sc
 def _code_snapshot_lines(*, code_snapshot: CodeSnapshot) -> list[str]:
     # why: the job must not silently fall back to the live code if the snapshot was removed
     source = str(code_snapshot.folder / SRC_FOLDER)
+    missing = f'tslab: code snapshot {source} is missing; not running the live code'
     return [
         f'if [ ! -d {shlex.quote(source)} ]; then',
-        f'    echo "tslab: code snapshot {source} is missing; not running the live code" >&2',
+        f'    echo {shlex.quote(missing)} >&2',
         '    exit 1',
         'fi',
         *export_lines(env=code_snapshot.variables()),

@@ -358,6 +358,37 @@ def test_launch_delegates_to_shared_launch(
     assert report is expected
 
 
+def test_launch_releases_the_submission_lock_before_the_tasks_run(
+    *, project: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ctx = context(project=project, machine_file='local.toml')
+    ctx = replace(ctx, machine=replace(ctx.machine, local=LocalSettings(keep_awake=False)))
+    events: list[str] = []
+
+    def run_tasks(**_kwargs: object) -> LaunchReport:
+        events.append('tasks')
+        return LaunchReport(submitted=(), not_submitted=(), error=None)
+
+    monkeypatch.setattr(local_backend, 'launch', run_tasks)
+
+    LocalBackend().launch(
+        context=ctx,
+        groups=(),
+        folder=ctx.study_directory / '.study',
+        dry_run=False,
+        start_delay_seconds=None,
+        sleep=lambda _seconds: None,
+        task_stream=None,
+        environment={},
+        pid=os.getpid(),
+        host='test-host',
+        now=lambda: '2026-01-02T03:04:05+00:00',
+        release_submission_lock=lambda: events.append('released'),
+    )
+
+    assert events == ['released', 'tasks']
+
+
 def test_launch_resolves_gpus_from_given_environment(*, project: Path) -> None:
     ctx = context(project=project, machine_file='local.toml')
     run = ctx.runs[0]

@@ -105,6 +105,28 @@ def test_partial_last_line_is_skipped(tmp_path: Path, caplog: pytest.LogCaptureF
     assert 'line 2' in caplog.text
 
 
+def test_append_after_torn_line_keeps_the_new_record_readable(tmp_path: Path) -> None:
+    path = tmp_path / 'submissions.jsonl'
+    append_job(path=path, record=job(job_id='100'))
+    with path.open('a') as handle:
+        handle.write('{"format_version": 1, "kind": "ru')
+    append_job(path=path, record=job(job_id='101'))
+    assert [record.job_id for record in read_jobs(path=path)] == ['100', '101']
+
+
+def test_append_loops_over_short_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / 'submissions.jsonl'
+    real_write = os.write
+
+    def short_write(descriptor: int, data: bytes | memoryview) -> int:
+        return real_write(descriptor, bytes(data)[:7])
+
+    monkeypatch.setattr(os, 'write', short_write)
+    append_job(path=path, record=job(job_id='100'))
+    monkeypatch.undo()
+    assert [record.job_id for record in read_jobs(path=path)] == ['100']
+
+
 def test_followups_are_not_latest_tasks(tmp_path: Path) -> None:
     jobs = [
         job(job_id='1', tasks=(task(run_path=PurePosixPath('g/a/1')),)),

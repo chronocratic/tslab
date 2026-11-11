@@ -222,8 +222,13 @@ class LocalBackend:
         pid: int,
         host: str,
         now: Callable[[], str],
+        release_submission_lock: Callable[[], None] | None = None,
     ) -> LaunchReport | None:
-        """Run the groups in this process; ``None`` when a problem was logged."""
+        """Run the groups in this process; ``None`` when a problem was logged.
+
+        The submission lock is released once the pid file is held, so the tasks
+        do not hold it for hours; a second launch then fails on the pid file.
+        """
         machine = context.machine
         local = machine.local or LocalSettings()
         gpu_ids: tuple[str, ...] = ()
@@ -260,6 +265,8 @@ class LocalBackend:
             with hold_launch(
                 study_folder=folder, task_ids=task_ids, pid=pid, host=host, now=now()
             ) as on_task_state:
+                if release_submission_lock is not None:
+                    release_submission_lock()
                 return _launch_local_groups(
                     context=context,
                     groups=groups,

@@ -20,7 +20,14 @@ from tslab.lab.study.launchers.slurm.requeue import (
     restarted_attempt,
 )
 from tslab.lab.study.paths import study_folder
-from tslab.lab.study.records import append_job, JobRecord, read_jobs, take_progress, TaskRecord
+from tslab.lab.study.records import (
+    append_job,
+    JobRecord,
+    read_jobs,
+    submission_lock,
+    take_progress,
+    TaskRecord,
+)
 from tslab.lab.study.reporting.state import collect_states, RunReport
 
 __all__ = ['chain_exit']
@@ -125,14 +132,18 @@ def _requeued(  # noqa: PLR0913 # why: keyword-only private helper, one per reco
         uncounted_in_row=0,
     )
     # why: the scheduler ends this process soon after the requeue call, so the record
-    # of the next attempt is written first and taken back when the call fails
-    append_job(
-        path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(following,))
-    )
-    if not requeue_task(task_id=report.job_id):
+    # of the next attempt is written first and taken back when the call fails; the
+    # lock keeps the appends from interleaving with a submission of the follow-up
+    with submission_lock(study_folder=jobs_path.parent):
         append_job(
-            path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(latest,))
+            path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(following,))
         )
+        requeued = requeue_task(task_id=report.job_id)
+        if not requeued:
+            append_job(
+                path=jobs_path, record=dataclasses.replace(job, time=utc_now_iso(), tasks=(latest,))
+            )
+    if not requeued:
         return False
     _LOGGER.info('requeued %s (attempt %d)', report.job_id, following.attempt)
     return True

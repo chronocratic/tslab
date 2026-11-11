@@ -72,6 +72,8 @@ def test_upstream_verdict_table() -> None:
         (AfterCondition.OK, StudyState.INTERRUPTED, True, AfterVerdict.OPEN),
         (AfterCondition.OK, StudyState.INTERRUPTED, False, AfterVerdict.NEVER),
         (AfterCondition.ANY, StudyState.FAILED, False, AfterVerdict.MET),
+        (AfterCondition.ANY, StudyState.INTERRUPTED, True, AfterVerdict.OPEN),
+        (AfterCondition.ANY, StudyState.INTERRUPTED, False, AfterVerdict.MET),
         (AfterCondition.FAILED, StudyState.DONE, False, AfterVerdict.NEVER),
         (AfterCondition.FAILED, StudyState.FAILED, True, AfterVerdict.MET),
         (AfterCondition.FAILED, StudyState.INTERRUPTED, True, AfterVerdict.OPEN),

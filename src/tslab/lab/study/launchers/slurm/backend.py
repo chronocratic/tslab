@@ -259,6 +259,7 @@ class SlurmBackend:
         pid: int,  # noqa: ARG002 # why: the Backend launch signature
         host: str,  # noqa: ARG002 # why: the Backend launch signature
         now: Callable[[], str],
+        release_submission_lock: Callable[[], None] | None = None,  # noqa: ARG002 # why: a submission is short; the lock stays held
     ) -> LaunchReport | None:
         """Submit the groups with sbatch; ``None`` when a problem was logged."""
         chain_check = _chain_check(context=context, groups=groups)

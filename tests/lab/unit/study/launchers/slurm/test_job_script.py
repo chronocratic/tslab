@@ -1,5 +1,6 @@
 """SLURM study job scripts."""
 
+from dataclasses import replace
 import os
 from pathlib import Path
 import shlex
@@ -174,6 +175,25 @@ def test_job_script_with_code_snapshot_matches_golden() -> None:
     )
     expected = Path(__file__).with_name('job_scripts') / 'code-snapshot.sbatch'
     assert actual == expected.read_text()
+
+
+def test_job_script_quotes_a_snapshot_path_in_the_missing_message() -> None:
+    snapshot = replace(_golden_code_snapshot(), folder=Path('/snap shots/a"$(id)'))
+    lines = job_script(
+        job_name='train',
+        slurm=SlurmSettings(partition='p'),
+        indices=(0,),
+        tasks_file=Path('/project/jobs/0.tasks'),
+        log_pattern=Path('/project/logs/train_%a.out'),
+        project_root=Path('/project'),
+        env={},
+        code_snapshot=snapshot,
+    ).splitlines()
+    echo = next(line for line in lines if 'is missing' in line)
+    assert shlex.split(echo)[1:] == [
+        'tslab: code snapshot /snap shots/a"$(id)/src is missing; not running the live code',
+        '>&2',
+    ]
 
 
 def test_job_script_code_snapshot_comes_after_setup() -> None:

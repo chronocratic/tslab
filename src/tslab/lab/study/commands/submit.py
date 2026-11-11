@@ -1,13 +1,14 @@
 """The submit command: plan, validate and launch the runs that need submitting."""
 
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import ExitStack
 import logging
 import os
 from pathlib import PurePosixPath
-import socket
 import time
 from typing import TextIO, TYPE_CHECKING
 
+from tslab.lab.core.meta import hostname
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot
@@ -122,7 +123,9 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
 
     A run keeps the array index of its first submission; its attempt is one
     past its latest recorded attempt. The planning and the launch hold the
-    submission lock of the study, and read the job records again under it.
+    submission lock of the study, and read the job records again under it; a
+    local launch gives the lock up once it holds the pid file, so its tasks
+    do not hold it while they run.
 
     Args:
         context: The context to submit from.
@@ -150,7 +153,8 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
     if preflight_error is not None:
         return preflight_error, []
     folder = study_folder(machine=machine, study=context.study)
-    with submission_lock(study_folder=folder):
+    with ExitStack() as held:
+        held.enter_context(submission_lock(study_folder=folder))
         jobs = read_jobs(path=folder / 'submissions.jsonl')
         ordered_reports, after_targets, planning_error = _plan_after(
             context=context, reports=reports, jobs=jobs, ignore_after=ignore_after
@@ -191,8 +195,9 @@ def submit_runs(  # noqa: PLR0913 # why: keyword-only public API; each option is
             task_stream=task_stream,
             environment=os.environ,
             pid=os.getpid(),
-            host=socket.gethostname(),
+            host=hostname(),
             now=utc_now_iso,
+            release_submission_lock=held.close,
         )
         if report is None:
             return 1, []

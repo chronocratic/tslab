@@ -156,7 +156,8 @@ def _cuda_visible_devices(*, value: str) -> tuple[str, ...]:
     if value == '':
         return ()
     ids: list[str] = []
-    for entry in value.split(','):
+    for raw_entry in value.split(','):
+        entry = raw_entry.strip()
         try:
             int(entry)
         except ValueError as error:
