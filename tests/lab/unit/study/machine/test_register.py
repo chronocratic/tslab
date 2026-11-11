@@ -178,3 +178,12 @@ def test_registered_name_with_a_missing_file_has_its_own_error(tmp_path: Path) -
     assert 'cluster' in text
     assert str(missing) in text
     assert 'tslab machine remove cluster' in text
+
+
+def test_register_file_with_empty_home_is_under_the_expanded_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv('HOME', str(tmp_path))
+    path = register_file(environment={'HOME': ''})
+    assert path == tmp_path / '.config' / 'tslab' / 'machines.toml'
+    assert path.is_absolute()

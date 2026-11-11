@@ -226,6 +226,53 @@ def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_data_for_lat
             assert torch.equal(edited[horizon].tensors[key], value)
 
 
+def _keep_one_dataset_tensor(*, monkeypatch: pytest.MonkeyPatch) -> torch.Tensor:
+    """Make ``ToySeries`` return the same float32 tensor on every call."""
+    dataset = ToySeries().full_series().to(dtype=torch.float32)
+
+    def same_tensor(self: ToySeries) -> torch.Tensor:
+        del self
+        return dataset
+
+    monkeypatch.setattr(ToySeries, 'full_series', same_tensor)
+    return dataset
+
+
+def test_a_sequence_encoder_that_edits_its_inputs_does_not_change_the_dataset_tensor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = _keep_one_dataset_tensor(monkeypatch=monkeypatch)
+    before = dataset.clone()
+    with run_in(root=tmp_path) as run:
+        representations(run=run, model=_InPlaceEncoder(), horizons=(2,))
+    assert torch.equal(dataset, before)
+
+
+def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_dataset_tensor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset = _keep_one_dataset_tensor(monkeypatch=monkeypatch)
+    before = dataset.clone()
+    with run_in(root=tmp_path) as run:
+        representations(run=run, model=_InPlaceWindowEncoder(), horizons=(2,), window_length=4)
+    assert torch.equal(dataset, before)
+
+
+def test_a_sequence_encoder_that_edits_its_inputs_does_not_change_the_replacement_series(
+    tmp_path: Path,
+) -> None:
+    replacement = ToySeries().full_series().to(dtype=torch.float32) + 1.0
+    before = replacement.clone()
+    with run_in(root=tmp_path) as run:
+        representations(
+            run=run,
+            model=_InPlaceEncoder(),
+            horizons=(2,),
+            series=tslab.ml.Tensors(tensors={'series': replacement}),
+        )
+    assert torch.equal(replacement, before)
+
+
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
     shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})

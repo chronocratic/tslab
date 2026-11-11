@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 import queue
 import threading
@@ -259,6 +260,40 @@ class _GpuLeaseGate:
                 self._generations[gpu_id] = self._generations.get(gpu_id, 0) + 1
 
 
+def _wait_for_next_slot(
+    *,
+    slot_queue: queue.Queue[str | None],
+    slot: str,
+    on_wait: Callable[[], None] | None,
+    stop: threading.Event,
+    poll_seconds: float,
+) -> str:
+    """Give the slot back, wait one poll and take the next free slot.
+
+    Args:
+        slot_queue: The queue of free slots.
+        slot: The slot the caller holds.
+        on_wait: Called once before the slot goes back, or ``None`` when it was called.
+        stop: An event that ends the wait early.
+        poll_seconds: The seconds to wait.
+
+    Returns:
+        The next free slot.
+    """
+    try:
+        if on_wait is not None:
+            on_wait()
+    except Exception:
+        # why: a failing callback must not keep the slot token, or the other commands
+        # wait for it forever
+        slot_queue.put(slot)
+        raise
+    slot_queue.put(slot)
+    stop.wait(poll_seconds)
+    # why: a pool with GPUs only ever puts GPU tokens into the queue
+    return cast('str', slot_queue.get())
+
+
 def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and limit setting
     *,
     commands: Sequence[PoolCommand],
@@ -367,17 +402,24 @@ def run_commands(  # noqa: PLR0913 # why: one keyword per slot, callback and lim
             return None, slot
         waited = False
         while (lease := try_lease_or_return_slot(slot=slot)) is None and not stop.is_set():
-            if not waited:
-                on_wait(key=command.key)
-                waited = True
-            slot_queue.put(slot)
-            stop.wait(gpu_poll_seconds)
-            # why: a pool with GPUs only ever puts GPU tokens into the queue
-            slot = cast('str', slot_queue.get())
+            slot = _wait_for_next_slot(
+                slot_queue=slot_queue,
+                slot=slot,
+                on_wait=None if waited else partial(on_wait, key=command.key),
+                stop=stop,
+                poll_seconds=gpu_poll_seconds,
+            )
+            waited = True
         return lease, slot
 
     def run_one(*, command: PoolCommand) -> None:
-        lease, slot = take_lease(command=command)
+        try:
+            lease, slot = take_lease(command=command)
+        except Exception:
+            # why: a failing lease check would otherwise show only after every other command
+            # ended; the stop makes the pool return and raise it now
+            stop.set()
+            raise
         try:
             if stop.is_set():
                 _add_locked(lock=never_started_lock, store=never_started, key=command.key)

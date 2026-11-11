@@ -101,6 +101,17 @@ def test_int_and_float_differ() -> None:
     assert fingerprint_of(1) != fingerprint_of(1.0)
 
 
+def test_plain_floats_keep_their_repr() -> None:
+    assert canonicalize(value=0.1) == '0.1'
+    assert canonicalize(value=1e-07) == '1e-07'
+
+
+def test_a_numpy_float_has_the_fingerprint_of_the_same_float() -> None:
+    numpy = pytest.importorskip('numpy')
+    assert canonicalize(value=numpy.float64(0.1)) == canonicalize(value=0.1)
+    assert fingerprint_of(numpy.float64(0.1)) == fingerprint_of(0.1)
+
+
 def test_mapping_order_does_not_matter() -> None:
     assert fingerprint_of({'a': 1, 'b': 2}) == fingerprint_of({'b': 2, 'a': 1})
 

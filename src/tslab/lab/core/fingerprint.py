@@ -175,7 +175,8 @@ def canonicalize(*, value: object) -> object:  # noqa: PLR0911
     if value is None or isinstance(value, bool | int | str):
         return value
     if isinstance(value, float):
-        return repr(value)
+        # why: the repr of a NumPy float is not the repr of the same number as a float
+        return repr(float(value))
     if isinstance(value, Path):
         return value.as_posix()
     if isinstance(value, CarriesFingerprint):

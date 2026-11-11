@@ -9,10 +9,13 @@ from torch._C._distributed_c10d import TCPStore
 __all__ = ['agree']
 
 _STORE: TCPStore | None = None
+_LOCAL_HOST = '127.0.0.1'
 
 
 def store_host(*, environment: Mapping[str, str]) -> str:
     """The host of the store: ``MASTER_ADDR`` when set, else the first node of the job.
+
+    Without any of them the job has one node, so the store runs on the local host.
 
     Args:
         environment: SLURM job and process variables.
@@ -23,7 +26,10 @@ def store_host(*, environment: Mapping[str, str]) -> str:
     master = environment.get('MASTER_ADDR', '')
     if master != '':
         return master
-    return SLURMEnvironment.resolve_root_node_address(environment['SLURM_JOB_NODELIST'])
+    nodes = environment.get('SLURM_JOB_NODELIST', '') or environment.get('SLURM_NODELIST', '')
+    if nodes == '':
+        return _LOCAL_HOST
+    return SLURMEnvironment.resolve_root_node_address(nodes)
 
 
 def agree(*, key: str, value: bool, environment: Mapping[str, str]) -> bool:
