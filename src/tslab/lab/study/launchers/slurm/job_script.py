@@ -10,6 +10,7 @@ from tslab.lab.jobs.slurm import (
     check_script_text,
     export_lines,
     node_local_tmp_lines,
+    RESTART_COUNT_VARIABLE,
     sbatch_directives,
     srun_command,
     wait_for_file_line,
@@ -27,11 +28,12 @@ _REQUEUE_OPTIONS: Mapping[RequeueMode, tuple[str, object]] = MappingProxyType(
         RequeueMode.EXPEDITE: ('requeue', 'expedite'),
     }
 )
+_RESTARTED_ATTEMPT = f'$((ATTEMPT + ${{{RESTART_COUNT_VARIABLE}:-0}}))'
 _REQUEUE_ATTEMPTS: Mapping[RequeueMode, str] = MappingProxyType(
     {
         RequeueMode.DISABLED: '${ATTEMPT}',
-        RequeueMode.ENABLED: '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))',
-        RequeueMode.EXPEDITE: '$((ATTEMPT + ${SLURM_RESTART_COUNT:-0}))',
+        RequeueMode.ENABLED: _RESTARTED_ATTEMPT,
+        RequeueMode.EXPEDITE: _RESTARTED_ATTEMPT,
     }
 )
 

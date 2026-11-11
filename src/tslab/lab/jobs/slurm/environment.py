@@ -2,7 +2,9 @@
 
 from collections.abc import Mapping
 
-__all__ = ['task_count']
+__all__ = ['RESTART_COUNT_VARIABLE', 'task_count']
+
+RESTART_COUNT_VARIABLE = 'SLURM_RESTART_COUNT'
 
 
 def task_count(*, environment: Mapping[str, str]) -> int:

@@ -1,6 +1,7 @@
 """Exit status for chained SLURM tasks after their run command completes."""
 
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 import dataclasses
 import logging
 import os
@@ -9,7 +10,7 @@ from types import MappingProxyType
 
 from tslab.lab.core.status import utc_now_iso
 from tslab.lab.enums import ChainedRetry, JobPhase, StudyState
-from tslab.lab.jobs.slurm import query_cluster_config, SlurmError
+from tslab.lab.jobs.slurm import query_cluster_config, RESTART_COUNT_VARIABLE, SlurmError
 from tslab.lab.study.commands.resubmit import may_retry
 from tslab.lab.study.context import Context
 from tslab.lab.study.definition import expand_runs
@@ -25,6 +26,7 @@ from tslab.lab.study.records import (
     JobRecord,
     read_jobs,
     submission_lock,
+    SubmissionLockTimeoutError,
     take_progress,
     TaskRecord,
 )
@@ -51,10 +53,16 @@ def chain_exit(*, context: Context, job_file: int, index: int) -> int:
         ``0`` when the run is ``DONE`` or was requeued in place; otherwise ``1``.
     """
     jobs_path = study_folder(machine=context.machine, study=context.study) / 'submissions.jsonl'
-    loaded = _load_report(context=context, jobs=context.jobs, job_file=job_file, index=index)
+    loaded = _load_report(
+        context=context, jobs=context.jobs, job_file=job_file, index=index, grace_wait=True
+    )
     if loaded is None:
         loaded = _load_report(
-            context=context, jobs=read_jobs(path=jobs_path), job_file=job_file, index=index
+            context=context,
+            jobs=read_jobs(path=jobs_path),
+            job_file=job_file,
+            index=index,
+            grace_wait=True,
         )
     if loaded is None:
         return 1
@@ -81,8 +89,12 @@ class _TaskReport:
     report: RunReport
 
 
+def _no_wait(_seconds: float) -> None:
+    """Skip the wait between two reads of a run folder."""
+
+
 def _load_report(
-    *, context: Context, jobs: Sequence[JobRecord], job_file: int, index: int
+    *, context: Context, jobs: Sequence[JobRecord], job_file: int, index: int, grace_wait: bool
 ) -> _TaskReport | None:
     """The report of one task from the given records, or ``None`` when it is unknown."""
     matches = _job_tasks_of(jobs=jobs, job_file=job_file, index=index)
@@ -107,6 +119,7 @@ def _load_report(
             flags=MappingProxyType({}),
             followup_live_job_ids=(),
         ),
+        **({} if grace_wait else {'sleep': _no_wait}),
     )
     return _TaskReport(matches=matches, report=reports[0])
 
@@ -129,30 +142,48 @@ def _requeued(
     """
     if context.machine.followup.chained_retry is not ChainedRetry.REQUEUE:
         return False
-    try:
-        with submission_lock(study_folder=jobs_path.parent, timeout_seconds=_LOCK_WAIT_SECONDS):
-            return _requeue_locked(
-                context=context,
-                job_file=job_file,
-                index=index,
-                jobs_path=jobs_path,
-                environment=environment,
+    # why: the scheduler query can take 30 s, so it runs before the lock is held
+    max_requeues = _max_batch_requeue()
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(
+                submission_lock(study_folder=jobs_path.parent, timeout_seconds=_LOCK_WAIT_SECONDS)
             )
-    except TimeoutError:
-        _LOGGER.warning(
-            'the submission lock stayed busy for %d s; skipping the requeue so the '
-            'follow-up resubmits the task',
-            _LOCK_WAIT_SECONDS,
+        except SubmissionLockTimeoutError:
+            _LOGGER.warning(
+                'the submission lock stayed busy for %d s; skipping the requeue so the '
+                'follow-up resubmits the task',
+                _LOCK_WAIT_SECONDS,
+            )
+            return False
+        return _requeue_locked(
+            context=context,
+            job_file=job_file,
+            index=index,
+            jobs_path=jobs_path,
+            environment=environment,
+            max_requeues=max_requeues,
         )
-        return False
 
 
-def _requeue_locked(
-    *, context: Context, job_file: int, index: int, jobs_path: Path, environment: Mapping[str, str]
+def _requeue_locked(  # noqa: PLR0913 # why: keyword-only private helper, one per fact of the requeue
+    *,
+    context: Context,
+    job_file: int,
+    index: int,
+    jobs_path: Path,
+    environment: Mapping[str, str],
+    max_requeues: int | None,
 ) -> bool:
     """Read the records again, decide and write the next attempt; the lock is held."""
+    # why: the grace wait for the run folder already ran before the lock; waiting again
+    # here could outlast the window between the time-limit signal and the kill
     loaded = _load_report(
-        context=context, jobs=read_jobs(path=jobs_path), job_file=job_file, index=index
+        context=context,
+        jobs=read_jobs(path=jobs_path),
+        job_file=job_file,
+        index=index,
+        grace_wait=False,
     )
     if loaded is None or loaded.report.state is not StudyState.INTERRUPTED:
         return False
@@ -162,7 +193,7 @@ def _requeue_locked(
     latest = report.task
     if latest is None or report.job_id is None:
         return False
-    restart_count = int(environment.get('SLURM_RESTART_COUNT', '0'))
+    restart_count = int(environment.get(RESTART_COUNT_VARIABLE, '0'))
     restarts = restarted_attempt(attempt=0, restart_count=restart_count)
     current = dataclasses.replace(
         latest,
@@ -172,7 +203,7 @@ def _requeue_locked(
     counted = dataclasses.replace(report, attempt=current.attempt, task=current)
     if not may_retry(report=counted, context=context):
         return False
-    if at_requeue_limit(restart_count=restart_count, max_requeues=_max_batch_requeue()):
+    if at_requeue_limit(restart_count=restart_count, max_requeues=max_requeues):
         _LOGGER.warning(
             '%s is at MaxBatchRequeue; ending the job so the follow-up resubmits it', report.job_id
         )

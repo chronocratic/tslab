@@ -184,6 +184,32 @@ def test_an_encoder_that_edits_its_inputs_does_not_change_the_targets(tmp_path: 
         assert torch.equal(edited.tensors[f'{split}_targets'], plain.tensors[f'{split}_targets'])
 
 
+class _InPlaceWindowEncoder(VectorEncoder):
+    """Zeroes the windows it encodes in place."""
+
+    @override
+    def encode(self, *, inputs: torch.Tensor) -> torch.Tensor:
+        encoded = super().encode(inputs=inputs)
+        inputs.zero_()
+        return encoded
+
+
+def test_a_window_encoder_that_edits_its_inputs_does_not_change_the_targets(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # why: with one series, reshaping the windows is a view of the series, not a copy
+    full_series = ToySeries.full_series
+    monkeypatch.setattr(ToySeries, 'full_series', lambda self: full_series(self)[:1])
+    with run_in(root=tmp_path / 'plain') as run:
+        plain = representations(run=run, model=VectorEncoder(), horizons=(2,), window_length=4)[2]
+    with run_in(root=tmp_path / 'edited') as run:
+        edited = representations(
+            run=run, model=_InPlaceWindowEncoder(), horizons=(2,), window_length=4
+        )[2]
+    for split in SLICES:
+        assert torch.equal(edited.tensors[f'{split}_targets'], plain.tensors[f'{split}_targets'])
+
+
 def test_a_replacement_series_is_encoded_but_targets_stay_clean(tmp_path: Path) -> None:
     clean = ToySeries().full_series()
     shifted = tslab.ml.Tensors(tensors={'series': clean + 1.0})

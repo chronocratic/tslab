@@ -26,6 +26,7 @@ __all__ = [
     'JobKind',
     'JobRecord',
     'ProgressSnapshot',
+    'SubmissionLockTimeoutError',
     'TaskRecord',
     'append_job',
     'latest_tasks',
@@ -80,17 +81,21 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
         run_directory: The run folder, e.g. ``<study dir>/<run path>``.
 
     Returns:
-        The snapshot; an unreadable or missing folder counts as no progress.
+        The snapshot; an unreadable or missing status file counts as no finished
+        instances, and the checkpoints are still searched.
     """
     try:
         snapshot = read_status(path=run_directory / STATUS_FILE)
     except (TypeError, ValueError, OSError):
         snapshot = None
-    if snapshot is None:
-        return ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None)
-    done = sum(1 for record in snapshot.instances.values() if record.state is InstanceState.DONE)
+    done = (
+        0
+        if snapshot is None
+        else sum(1 for record in snapshot.instances.values() if record.state is InstanceState.DONE)
+    )
     # why: a stage may keep its checkpoints anywhere below the run folder (for example
-    # a checkpoints folder of its own), so the whole run folder is searched
+    # a checkpoints folder of its own), so the whole run folder is searched, even
+    # when the status file is missing
     checkpoints = [
         path.stat().st_mtime for path in run_directory.rglob('last.ckpt') if path.is_file()
     ]
@@ -274,6 +279,10 @@ class JobRecord:
         )
 
 
+class SubmissionLockTimeoutError(TimeoutError):
+    """The submission lock stayed busy for the whole wait."""
+
+
 @contextmanager
 def submission_lock(*, study_folder: Path, timeout_seconds: float | None = None) -> Generator[None]:
     """Hold the submission lock of a study, so two submissions never interleave.
@@ -287,7 +296,7 @@ def submission_lock(*, study_folder: Path, timeout_seconds: float | None = None)
         timeout_seconds: The longest wait for a busy lock; ``None`` waits without limit.
 
     Raises:
-        TimeoutError: If the lock stayed busy for ``timeout_seconds``.
+        SubmissionLockTimeoutError: If the lock stayed busy for ``timeout_seconds``.
     """
     study_folder.mkdir(parents=True, exist_ok=True)
     with (study_folder / 'submit.lock').open(mode='a') as handle:
@@ -314,7 +323,7 @@ def _wait_for_lock(*, descriptor: int, timeout_seconds: float | None) -> None:
             return
         if time.monotonic() >= deadline:
             message = f'the submission lock stayed busy for {timeout_seconds} s'
-            raise TimeoutError(message)
+            raise SubmissionLockTimeoutError(message)
         time.sleep(_LOCK_POLL_SECONDS)
 
 

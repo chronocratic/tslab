@@ -89,6 +89,12 @@ def read_launch(*, study_folder: Path) -> LocalLaunch | None:
         document = read_json_object(path=path)
     except FileNotFoundError:
         return None
+    if isinstance(document.get('run_pids'), list):
+        message = (
+            f'{path} was written by an older build of TSLab; if that launch is no longer '
+            'running, remove the file'
+        )
+        raise LocalLaunchError(message)
     try:
         boot = document.get('boot')
         return LocalLaunch(

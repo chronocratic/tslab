@@ -112,8 +112,9 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
         ignore_after: Submit without dependency targets or the local dependency filter.
-        on_cancel: Called once with the job ids the first step cancels, the selected live
-            runs, the held ones and the waiting downstream ones; not called without any.
+        on_cancel: Called once with the job ids the first step cancelled, the selected live
+            runs, the held ones and the waiting downstream ones; not called without any,
+            on a dry run, or when the cancel failed.
 
     Returns:
         ``0`` when everything submitted, or nothing needed submitting;
@@ -419,8 +420,6 @@ def _before_resubmit(  # noqa: PLR0913 # why: keyword-only private helper, one p
     on_cancel: Callable[[Sequence[str]], None] | None,
 ) -> tuple[int | None, Callable[[], int]]:
     cancellable = backend.cancellable_job_ids(reports=live)
-    if cancellable and on_cancel is not None:
-        on_cancel(cancellable)
     if dry_run and cancellable:
         _LOGGER.info('would cancel %s', ', '.join(cancellable))
 
@@ -434,6 +433,8 @@ def _before_resubmit(  # noqa: PLR0913 # why: keyword-only private helper, one p
         )
         if code != 0:
             return code
+        if cancellable and on_cancel is not None:
+            on_cancel(cancellable)
         _remove_ended_locks(
             reports=selected,
             study_directory=context.study_directory,

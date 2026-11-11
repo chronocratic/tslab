@@ -166,6 +166,18 @@ def test_detach_leaves_the_code_snapshot_to_the_background_launch(
     assert not (project / 'runs' / '.tslab-code-snapshots').exists()
 
 
+def test_detach_fails_at_once_on_untracked_source_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fake_backend: FakeBackend
+) -> None:
+    project = git_project(tmp_path=tmp_path, monkeypatch=monkeypatch)
+    (project / 'src' / 'pkg' / 'new.py').write_text('NEW = 1\n', encoding='utf-8')
+
+    code = run_main('submit', 'study', '--machine', 'local', '--code-snapshot', '--detach')
+
+    assert code == 2
+    assert fake_backend.calls('detach') == []
+
+
 def test_cli_parses_ignore_after(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[bool] = []
 

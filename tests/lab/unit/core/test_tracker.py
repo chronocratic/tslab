@@ -48,6 +48,13 @@ def test_a_failed_rewrite_leaves_the_previous_metrics_file(
     assert path.read_bytes() == before
 
 
+def test_local_tracker_rejects_a_metric_named_step(tmp_path: Path) -> None:
+    tracker = LocalTracker()
+    tracker.start(run_directory=tmp_path, run_name='a')
+    with pytest.raises(ValueError, match=r"cannot be named 'step'"):
+        tracker.log_metrics(metrics={'step': 7.0}, step=1)
+
+
 def test_local_tracker_writes_metrics_and_params(tmp_path: Path) -> None:
     tracker = LocalTracker()
     tracker.start(run_directory=tmp_path, run_name='a')

@@ -179,11 +179,19 @@ def test_take_progress_finds_checkpoints_outside_the_stage_folders(tmp_path: Pat
     assert take_progress(run_directory=tmp_path).newest_checkpoint_mtime is not None
 
 
-def test_take_progress_counts_an_unreadable_status_as_no_progress(tmp_path: Path) -> None:
+def test_take_progress_counts_an_unreadable_status_as_no_finished_instances(tmp_path: Path) -> None:
     (tmp_path / 'status.json').write_text('{')
     progress = take_progress(run_directory=tmp_path)
     assert progress.done_instances == 0
     assert progress.newest_checkpoint_mtime is None
+
+
+def test_take_progress_finds_checkpoints_without_a_status_file(tmp_path: Path) -> None:
+    (tmp_path / 'checkpoints').mkdir()
+    (tmp_path / 'checkpoints' / 'last.ckpt').write_text('ckpt')
+    progress = take_progress(run_directory=tmp_path)
+    assert progress.done_instances == 0
+    assert progress.newest_checkpoint_mtime is not None
 
 
 def test_read_jobs_skips_a_line_missing_a_key(
