@@ -1,0 +1,1 @@
+Format versions are gone: no `format_version` key in `status.json`, `meta.json`, `checkpoint.json`, config files or `submissions.jsonl`, no `/1` suffix on JSON `schema` ids, no fingerprint format version. Fingerprints change, and old run folders, caches and checkpoints may not read. Produce them again.

@@ -61,7 +61,7 @@ class Doctor:
         if self.json:
             print_json(
                 document={
-                    'schema': 'tslab.doctor/1',
+                    'schema': 'tslab.doctor',
                     'machine': location.path.resolve().as_posix(),
                     'project_settings': _project_settings_document(
                         settings=request.settings, machine=self.machine

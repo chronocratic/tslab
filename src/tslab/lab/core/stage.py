@@ -29,12 +29,7 @@ from tslab.lab.core.artifact import (
     UnavailableReason,
 )
 from tslab.lab.core.files import atomic_write_json, atomic_write_text, replace_directory
-from tslab.lab.core.fingerprint import (
-    canonicalize,
-    compute_fingerprint,
-    FINGERPRINT_FORMAT_VERSION,
-    is_not_fingerprinted,
-)
+from tslab.lab.core.fingerprint import canonicalize, compute_fingerprint, is_not_fingerprinted
 from tslab.lab.core.meta.instance import (
     can_resume,
     identity_from_meta,
@@ -216,7 +211,6 @@ class Stage[Out: Artifact](ABC):
             document={
                 'stage': stage_name,
                 'stage_version': self.version,
-                'tslab_fingerprint_version': FINGERPRINT_FORMAT_VERSION,
                 'seed': run.seed,
                 'settings': settings,
                 'inputs': {key: value.tslab_fingerprint for key, value in inputs.items()},

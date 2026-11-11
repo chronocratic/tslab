@@ -22,7 +22,7 @@ class ResultsFormat(StrEnum):
 
     Attributes:
         CSV: One row per run, as CSV.
-        JSON: The rows in a versioned JSON document.
+        JSON: The rows in a JSON document.
     """
 
     CSV = 'csv'
@@ -34,7 +34,7 @@ class _Formatter(Protocol):
 
 
 def _format_json(*, rows: Sequence[ResultRow]) -> str:
-    return json.dumps({'schema': 'tslab.study-results/1', 'rows': rows}, indent=2)
+    return json.dumps({'schema': 'tslab.study-results', 'rows': rows}, indent=2)
 
 
 _FORMATTERS: Mapping[ResultsFormat, _Formatter] = {
@@ -51,7 +51,7 @@ def results(
     Args:
         context: The context of the command.
         out: The output file, or ``Path('-')`` for standard output.
-        results_format: ``CSV``, or ``JSON`` for rows in a versioned JSON document.
+        results_format: ``CSV``, or ``JSON`` for rows in a JSON document.
 
     Returns:
         ``0``.

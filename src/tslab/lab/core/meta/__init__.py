@@ -6,7 +6,6 @@ from tslab.lab.core.meta.instance import (
     describe_inputs,
     identity_from_meta,
     instance_meta_document,
-    INSTANCE_META_FORMAT_VERSION,
     read_instance_meta,
     stale_reason,
 )
@@ -19,7 +18,6 @@ from tslab.lab.core.meta.run import (
     collect_versions,
     collectors_generation,
     hostname,
-    META_FORMAT_VERSION,
     package_version,
     register_hardware,
     register_versions,
@@ -28,8 +26,6 @@ from tslab.lab.core.meta.run import (
 __all__ = [
     'CODE_SNAPSHOT_VARIABLE',
     'CODE_SNAPSHOT_VARIABLES',
-    'INSTANCE_META_FORMAT_VERSION',
-    'META_FORMAT_VERSION',
     'can_resume',
     'collect_code_snapshot',
     'collect_git_state',

@@ -78,7 +78,7 @@ class MachineList:
         _LOGGER.info('no machines: none in machines/ above this folder, none registered')
         _LOGGER.info('register one: tslab machine add <name> <profile.toml>')
         if self.json:
-            print_json(document={'schema': 'tslab.machine-list/1', 'machines': []})
+            print_json(document={'schema': 'tslab.machine-list', 'machines': []})
         return 0
 
     def run(self) -> int:
@@ -109,7 +109,7 @@ class MachineList:
                 }
                 for name, file in sorted(registered.items())
             )
-            print_json(document={'schema': 'tslab.machine-list/1', 'machines': machines})
+            print_json(document={'schema': 'tslab.machine-list', 'machines': machines})
             _LOGGER.info('use one: tslab study submit STUDY --machine <name>')
             return 0
         rows = [

@@ -99,7 +99,6 @@ def test_round_trip_defaults() -> None:
 
 def test_file_is_plain_yaml() -> None:
     document = yaml.safe_load(config_to_yaml(config=SAMPLE))
-    assert document['format_version'] == 1
     assert document['config_type'] == 'test_config.Config'
     assert document['config']['model'] == {
         '__type__': 'TSTCCLike',
@@ -157,7 +156,7 @@ def test_missing_keys_take_defaults() -> None:
 
 
 def test_python_tags_are_refused() -> None:
-    text = 'format_version: 1\nconfig: !!python/object/apply:os.system ["echo pwned"]\n'
+    text = 'config: !!python/object/apply:os.system ["echo pwned"]\n'
     with pytest.raises(yaml.YAMLError):
         config_from_yaml(config_class=Config, text=text)
 

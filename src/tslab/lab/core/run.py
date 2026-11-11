@@ -31,7 +31,6 @@ from tslab.lab.core.meta import (
     collect_versions,
     collectors_generation,
     hostname,
-    META_FORMAT_VERSION,
 )
 from tslab.lab.core.paths import (
     CONFIG_FILE,
@@ -553,7 +552,6 @@ class Run:
             )
             environment = self.environment()
             self._meta = {
-                'format_version': META_FORMAT_VERSION,
                 'relative_path': self._relative_path.as_posix(),
                 'seed': self._seed,
                 'config_hash': compute_fingerprint(document={'config': canonical_config}),

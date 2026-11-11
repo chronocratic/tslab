@@ -30,7 +30,7 @@ def test_save_writes_only_the_names(tmp_path: Path) -> None:
     write_files(directory=tmp_path, names=(BEST, 'last.ckpt'))
     Checkpoint(directory=tmp_path, best=BEST, last='last.ckpt').save(directory=tmp_path)
     document = json.loads((tmp_path / 'checkpoint.json').read_text(encoding='utf-8'))
-    assert document == {'best': BEST, 'format_version': 2, 'last': 'last.ckpt', 'trusted': True}
+    assert document == {'best': BEST, 'last': 'last.ckpt', 'trusted': True}
     loaded = Checkpoint.load(directory=tmp_path)
     assert loaded.best_path == tmp_path / BEST
     assert loaded.last_path == tmp_path / 'last.ckpt'
@@ -54,13 +54,6 @@ def test_load_requires_both_files(tmp_path: Path) -> None:
     Checkpoint(directory=tmp_path, best=BEST, last='last.ckpt').save(directory=tmp_path)
     (tmp_path / 'last.ckpt').unlink()
     with pytest.raises(FileNotFoundError, match=r'last\.ckpt'):
-        Checkpoint.load(directory=tmp_path)
-
-
-def test_load_rejects_an_unknown_format_version(tmp_path: Path) -> None:
-    document = {'best': BEST, 'format_version': 99, 'last': 'last.ckpt', 'trusted': True}
-    (tmp_path / 'checkpoint.json').write_text(json.dumps(document), encoding='utf-8')
-    with pytest.raises(ValueError, match='format_version'):
         Checkpoint.load(directory=tmp_path)
 
 
@@ -112,7 +105,7 @@ def test_untrusted_flag_survives_save_and_load(tmp_path: Path) -> None:
 
 def test_load_rejects_a_file_without_the_trust_flag(tmp_path: Path) -> None:
     write_files(directory=tmp_path, names=(BEST, 'last.ckpt'))
-    document = {'best': BEST, 'format_version': 2, 'last': 'last.ckpt'}
+    document = {'best': BEST, 'last': 'last.ckpt'}
     (tmp_path / 'checkpoint.json').write_text(json.dumps(document), encoding='utf-8')
     with pytest.raises(ValueError, match='trusted'):
         Checkpoint.load(directory=tmp_path)

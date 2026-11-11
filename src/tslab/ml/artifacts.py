@@ -1,5 +1,8 @@
 """Artifacts that hold tensors and training checkpoints."""
 
+# When the API is stable, version the checkpoint.json format (a format_version key checked on read)
+# so old files fail with a clear message.
+
 from collections.abc import Mapping
 from pathlib import Path
 import shutil
@@ -87,7 +90,6 @@ class Checkpoint(Artifact):
     """
 
     FILE_NAME: ClassVar[str] = 'checkpoint.json'
-    FORMAT_VERSION: ClassVar[int] = 2
 
     def __init__(self, *, directory: Path, best: str, last: str, trusted: bool = True) -> None:
         """Create the artifact.
@@ -131,12 +133,7 @@ class Checkpoint(Artifact):
             for name in sorted({self.best, self.last}):
                 shutil.copy2(self.directory / name, directory / name)
             self.directory = directory
-        document = {
-            'best': self.best,
-            'format_version': self.FORMAT_VERSION,
-            'last': self.last,
-            'trusted': self.trusted,
-        }
+        document = {'best': self.best, 'last': self.last, 'trusted': self.trusted}
         atomic_write_json(path=directory / self.FILE_NAME, document=document)
 
     @classmethod
@@ -145,17 +142,11 @@ class Checkpoint(Artifact):
         """Read ``checkpoint.json`` and check that both named files exist.
 
         Raises:
-            ValueError: If ``checkpoint.json`` has another format version or bad names.
+            ValueError: If ``checkpoint.json`` has bad names or a bad trust flag.
             FileNotFoundError: If a named checkpoint file is missing.
         """
         require_path(value=directory, parameter='directory')
         document = read_json_object(path=directory / cls.FILE_NAME)
-        if document.get('format_version') != cls.FORMAT_VERSION:
-            message = (
-                f'{(directory / cls.FILE_NAME).as_posix()}: expected format_version '
-                f'{cls.FORMAT_VERSION}'
-            )
-            raise ValueError(message)
         best = document.get('best')
         last = document.get('last')
         trusted = document.get('trusted')

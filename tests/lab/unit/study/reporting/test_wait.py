@@ -300,7 +300,7 @@ def test_wait_json_reports_timeout(
         )
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 124
-    assert document['schema'] == 'tslab.study-wait/1'
+    assert document['schema'] == 'tslab.study-wait'
     assert document['exit_code'] == 124
     assert document['timed_out'] is True
 

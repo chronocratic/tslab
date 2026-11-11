@@ -127,7 +127,7 @@ def test_status_json_has_expected_start(project: Path, fake_backend: FakeBackend
     document = status_document(context=ctx, exit_code=0, starts=starts)
     # why: status_document types the value as object; the runs list is a list of dicts
     runs = {run['run_path']: run for run in cast('list[dict[str, object]]', document['runs'])}
-    assert document['schema'] == 'tslab.study-status/1'
+    assert document['schema'] == 'tslab.study-status'
     assert runs['g/small/1']['expected_start'] == '2026-11-01T10:00:00'
     assert runs['g/small/1']['pending_reason'] is None
     assert runs['g/small/1']['pending_stuck'] is False

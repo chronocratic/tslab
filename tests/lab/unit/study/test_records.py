@@ -91,7 +91,6 @@ def test_append_and_read_round_trip(tmp_path: Path) -> None:
     )
     jobs = read_jobs(path=path)
     assert [record.job_id for record in jobs] == ['100', '101']
-    assert json.loads(path.read_text().splitlines()[0])['format_version'] == 1
     assert latest_tasks(jobs=jobs)[PurePosixPath('g/a/1')][1].attempt == 2
 
 
@@ -99,7 +98,7 @@ def test_partial_last_line_is_skipped(tmp_path: Path, caplog: pytest.LogCaptureF
     path = tmp_path / 'submissions.jsonl'
     append_job(path=path, record=job(job_id='100'))
     with path.open('a') as handle:
-        handle.write('{"format_version": 1, "kind": "ru')
+        handle.write('{"kind": "ru')
     with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         assert [record.job_id for record in read_jobs(path=path)] == ['100']
     assert 'line 2' in caplog.text
@@ -109,7 +108,7 @@ def test_append_after_torn_line_keeps_the_new_record_readable(tmp_path: Path) ->
     path = tmp_path / 'submissions.jsonl'
     append_job(path=path, record=job(job_id='100'))
     with path.open('a') as handle:
-        handle.write('{"format_version": 1, "kind": "ru')
+        handle.write('{"kind": "ru')
     append_job(path=path, record=job(job_id='101'))
     assert [record.job_id for record in read_jobs(path=path)] == ['100', '101']
 
@@ -133,14 +132,6 @@ def test_followups_are_not_latest_tasks(tmp_path: Path) -> None:
         job(job_id='2', kind='followup', tasks=()),
     ]
     assert latest_tasks(jobs=jobs)[PurePosixPath('g/a/1')][0].job_id == '1'
-
-
-def test_unknown_format_version_raises(tmp_path: Path) -> None:
-    path = tmp_path / 'submissions.jsonl'
-    with path.open('w') as handle:
-        handle.write(json.dumps({'format_version': 99}) + '\n')
-    with pytest.raises(ValueError, match='format_version'):
-        read_jobs(path=path)
 
 
 def test_take_progress(tmp_path: Path) -> None:

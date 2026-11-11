@@ -22,7 +22,6 @@ if TYPE_CHECKING:
     from tslab.lab.study.plan import JobGroup
 
 __all__ = [
-    'SUBMISSIONS_FORMAT_VERSION',
     'JobKind',
     'JobRecord',
     'ProgressSnapshot',
@@ -36,7 +35,8 @@ __all__ = [
     'take_progress',
 ]
 
-SUBMISSIONS_FORMAT_VERSION = 1
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -239,9 +239,8 @@ class JobRecord:
         )
 
     def to_json(self) -> dict[str, object]:
-        """The JSON form of the record, with the format version."""
+        """The JSON form of the record."""
         document: dict[str, object] = {
-            'format_version': SUBMISSIONS_FORMAT_VERSION,
             'kind': self.kind.value,
             'submission_id': self.submission_id,
             'time': self.time,
@@ -256,14 +255,7 @@ class JobRecord:
 
     @classmethod
     def from_json(cls, *, document: Mapping[str, Any]) -> 'JobRecord':
-        """A record from its JSON form, of the class of its launcher.
-
-        The format version must be known.
-        """
-        version = document.get('format_version')
-        if version != SUBMISSIONS_FORMAT_VERSION:
-            message = f'format_version {version!r} is not {SUBMISSIONS_FORMAT_VERSION}'
-            raise ValueError(message)
+        """A record from its JSON form, of the class of its launcher."""
         # why: the launchers package imports this module, so a module-level import would cycle
         from tslab.lab.study.launchers.tables import JOB_RECORDS  # noqa: PLC0415
 
@@ -271,7 +263,7 @@ class JobRecord:
 
     @classmethod
     def from_document(cls, *, document: Mapping[str, Any]) -> Self:
-        """A record of this class from its JSON form, without the version check."""
+        """A record of this class from its JSON form."""
         code_snapshot = document.get('code_snapshot')
         return cls(
             kind=JobKind(document['kind']),
@@ -395,9 +387,6 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
 
     Returns:
         The records, in file order.
-
-    Raises:
-        ValueError: If a line holds an unknown ``format_version``.
     """
     if not path.is_file():
         return []
@@ -410,13 +399,6 @@ def read_jobs(*, path: Path) -> list[JobRecord]:
         except json.JSONDecodeError as error:
             _LOGGER.warning('%s: skipping line %d: %s', path, line_number, error)
             continue
-        version = document.get('format_version') if isinstance(document, dict) else None
-        if version != SUBMISSIONS_FORMAT_VERSION:
-            message = (
-                f'{path}: line {line_number}: format_version {version!r} '
-                f'is not {SUBMISSIONS_FORMAT_VERSION}'
-            )
-            raise ValueError(message)
         try:
             records.append(JobRecord.from_json(document=document))
         except (ValueError, KeyError, TypeError) as error:

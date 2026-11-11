@@ -85,7 +85,7 @@ def status_document(
             ``pending_reason`` and ``pending_stuck`` fields for its job.
 
     Returns:
-        The versioned status document.
+        The status document.
     """
     counts: dict[str, dict[str, int]] = {}
     for grid in sorted({report.run.grid for report in context.reports}):
@@ -97,7 +97,7 @@ def status_document(
         counts[report.run.grid]['total'] += 1
         counts['all']['total'] += 1
     return {
-        'schema': 'tslab.study-status/1',
+        'schema': 'tslab.study-status',
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'study_directory': context.study_directory.resolve().as_posix(),
@@ -117,7 +117,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         study: The study definition to describe.
 
     Returns:
-        The versioned study-show document.
+        The study-show document.
     """
     runs = expand_runs(study=study)
     grids = [
@@ -134,7 +134,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         for name, grid in study.grids.items()
     ]
     return {
-        'schema': 'tslab.study-show/1',
+        'schema': 'tslab.study-show',
         'study': study.name,
         'settings': {
             path: _json_setting_value(value=value) for path, value in study.settings.items()
@@ -166,10 +166,10 @@ def cancel_document(
             jobs were cancelled or left untouched.
 
     Returns:
-        The versioned study-cancel document.
+        The study-cancel document.
     """
     return {
-        'schema': 'tslab.study-cancel/1',
+        'schema': 'tslab.study-cancel',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
         'signal': signal,
@@ -221,11 +221,11 @@ def launch_document(
         exit_code: The command exit code.
 
     Returns:
-        The versioned study-launch document.
+        The study-launch document.
     """
     jobs = _launch_jobs(report=report, groups=groups, dry_run=dry_run)
     return {
-        'schema': 'tslab.study-launch/1',
+        'schema': 'tslab.study-launch',
         'dry_run': dry_run,
         'jobs': jobs,
         'cancelled': list(cancelled),

@@ -23,7 +23,7 @@ class List:
         tslab study list
 
     Attributes:
-        json: Print a JSON document with schema tslab.study-list/1.
+        json: Print a JSON document with schema tslab.study-list.
     """
 
     json: bool = False
@@ -46,7 +46,7 @@ class List:
                 study = load_study(reference=reference)
             studies.append({'short_name': short_name, 'name': study.name})
         if self.json:
-            print_json(document={'schema': 'tslab.study-list/1', 'studies': studies})
+            print_json(document={'schema': 'tslab.study-list', 'studies': studies})
             return 0
         for study in studies:
             _LOGGER.info('%s  %s', study['short_name'], study['name'])

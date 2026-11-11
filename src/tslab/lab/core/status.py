@@ -1,8 +1,7 @@
 """The ``status.json`` file: run state plus one record per stage instance.
 
-``status.json`` is a public, versioned format (``format_version``). A future
-study layer reads it to decide which runs are complete, so its shape must only
-change together with ``STATUS_FORMAT_VERSION``.
+``status.json`` is a public format. A future study layer reads it to decide
+which runs are complete.
 """
 
 from collections.abc import Mapping
@@ -17,7 +16,6 @@ from tslab.lab.enums import InstanceState, RunState, ShownRunState
 
 __all__ = [
     'PAUSED_ERROR_PREFIXES',
-    'STATUS_FORMAT_VERSION',
     'TIME_LIMIT_ERROR_PREFIX',
     'TRAINING_PAUSED_ERROR_PREFIX',
     'InstanceRecord',
@@ -31,7 +29,8 @@ __all__ = [
     'write_status',
 ]
 
-STATUS_FORMAT_VERSION = 1
+# When the API is stable, version this format (a format_version key checked on read)
+# so old files fail with a clear message.
 
 # why: failures are saved as "ExceptionType: message"; these prefixes mark a run that stopped
 # on purpose to be resumed (a time limit signal or the share of the job given to training)
@@ -41,7 +40,7 @@ PAUSED_ERROR_PREFIXES = (TRAINING_PAUSED_ERROR_PREFIX, TIME_LIMIT_ERROR_PREFIX)
 
 
 class StatusFileError(JsonFileError):
-    """Raised when ``status.json`` is unreadable, malformed or of another format version."""
+    """Raised when ``status.json`` is unreadable or malformed."""
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -195,7 +194,7 @@ def read_status(*, path: Path) -> RunStatusSnapshot | None:
 
     Raises:
         StatusFileError: If the file is not a JSON object, lacks a required key,
-            has an unsupported ``format_version`` or holds a malformed record.
+            or holds a malformed record.
             The message names the file.
     """
     require_path(value=path, parameter='path')
@@ -211,12 +210,6 @@ def read_status(*, path: Path) -> RunStatusSnapshot | None:
 
 
 def _snapshot_from_document(*, path: Path, document: Mapping[str, object]) -> RunStatusSnapshot:
-    if document.get('format_version') != STATUS_FORMAT_VERSION:
-        message = (
-            f'{path.as_posix()} has format_version {document.get("format_version")!r}; '
-            f'this TSLab version reads only {STATUS_FORMAT_VERSION}'
-        )
-        raise StatusFileError(message)
     missing = [key for key in ('run_state', 'updated_at', 'instances') if key not in document]
     if missing:
         message = f'{path.as_posix()} is missing required keys: {missing}'
@@ -243,7 +236,6 @@ def write_status(*, path: Path, snapshot: RunStatusSnapshot) -> None:
         snapshot: The state to write.
     """
     document = {
-        'format_version': STATUS_FORMAT_VERSION,
         'run_state': snapshot.run_state.value,
         'updated_at': snapshot.updated_at,
         'instances': {

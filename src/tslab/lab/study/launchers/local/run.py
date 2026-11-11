@@ -251,7 +251,7 @@ class LocalLauncher:
                     name=f'run {task.resolved.run.run_path}',
                     usage_file=usage_file(log_file=task.log_file),
                     usage_document={
-                        'schema': 'tslab.local-usage/1',
+                        'schema': 'tslab.local-usage',
                         'attempt': task.attempt,
                         'job_id': job_id,
                         'timeout': timeout_seconds(local=self._local),
