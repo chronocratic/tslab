@@ -97,7 +97,7 @@ def status_document(
         counts[report.run.grid]['total'] += 1
         counts['all']['total'] += 1
     return {
-        'schema': 'tslab.lab.study-status/1',
+        'schema': 'tslab.study-status/1',
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
         'study_directory': context.study_directory.resolve().as_posix(),
@@ -134,7 +134,7 @@ def show_document(*, study: Study) -> dict[str, object]:
         for name, grid in study.grids.items()
     ]
     return {
-        'schema': 'tslab.lab.study-show/1',
+        'schema': 'tslab.study-show/1',
         'study': study.name,
         'settings': {
             path: _json_setting_value(value=value) for path, value in study.settings.items()
@@ -169,7 +169,7 @@ def cancel_document(
         The versioned study-cancel document.
     """
     return {
-        'schema': 'tslab.lab.study-cancel/1',
+        'schema': 'tslab.study-cancel/1',
         'cancelled': list(cancelled),
         'dry_run': dry_run,
         'signal': signal,
@@ -225,7 +225,7 @@ def launch_document(
     """
     jobs = _launch_jobs(report=report, groups=groups, dry_run=dry_run)
     return {
-        'schema': 'tslab.lab.study-launch/1',
+        'schema': 'tslab.study-launch/1',
         'dry_run': dry_run,
         'jobs': jobs,
         'cancelled': list(cancelled),

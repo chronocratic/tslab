@@ -10,6 +10,7 @@ import pytest
 
 import tslab.lab
 from tslab.lab.cli import main
+import tslab.lab.cli.status as status_module
 from tslab.lab.cli.status import Status
 
 
@@ -159,6 +160,40 @@ def test_folder_status_json_lists_instances(
     assert by_name['scale[f1]']['stage'] == 'scale'
     assert by_name['scale[f1]']['state'] == 'done'
     assert by_name['scale[f-1]']['error'] == 'ValueError: negative factor\nsecond line'
+
+
+def test_json_over_a_folder_reads_each_status_and_lock_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    make_run(root=tmp_path, relative_path=Path('b'), factors=(1,))
+    reads: list[Path] = []
+    locks: list[Path] = []
+    real_read = status_module.read_status
+    real_active = status_module.is_run_active
+
+    def counting_read(*, path: Path) -> object:
+        reads.append(path)
+        return real_read(path=path)
+
+    def counting_active(*, directory: Path) -> bool:
+        locks.append(directory)
+        return real_active(directory=directory)
+
+    monkeypatch.setattr(status_module, 'read_status', counting_read)
+    monkeypatch.setattr(status_module, 'is_run_active', counting_active)
+    assert Status(path=tmp_path, json=True, exit_code=True).run() == 0
+    capsys.readouterr()
+    assert [reads.count(tmp_path / name / 'status.json') for name in 'ab'] == [1, 1]
+    assert sorted(locks) == [tmp_path / 'a', tmp_path / 'b']
+
+
+def test_the_scan_does_not_descend_below_a_run(tmp_path: Path) -> None:
+    make_run(root=tmp_path, relative_path=Path('a'), factors=(1,))
+    nested = tmp_path / 'a' / 'scale' / 'inner'
+    nested.mkdir(parents=True, exist_ok=True)
+    (nested / 'status.json').write_text('not json', encoding='utf-8')
+    assert status_module._run_folders(root=tmp_path) == [tmp_path / 'a']  # noqa: SLF001 # why: the scan is the unit
 
 
 def test_folder_status_rejects_watch_with_json(tmp_path: Path) -> None:

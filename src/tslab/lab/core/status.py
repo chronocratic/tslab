@@ -27,6 +27,7 @@ __all__ = [
     'parse_instance_id',
     'read_status',
     'shown_run_state',
+    'shown_state_of',
     'utc_now_iso',
     'write_status',
 ]
@@ -264,6 +265,22 @@ def shown_run_state(*, directory: Path, snapshot: RunStatusSnapshot) -> ShownRun
     # imports core.meta, so a module-level import back would cycle
     from tslab.lab.core.lock import is_run_active  # noqa: PLC0415
 
-    if snapshot.run_state is RunState.RUNNING and not is_run_active(directory=directory):
+    return shown_state_of(
+        run_state=snapshot.run_state,
+        lock_live=snapshot.run_state is not RunState.RUNNING or is_run_active(directory=directory),
+    )
+
+
+def shown_state_of(*, run_state: RunState, lock_live: bool) -> ShownRunState:
+    """Return the run state to display from the saved state and the lock.
+
+    Args:
+        run_state: The state saved in ``status.json``.
+        lock_live: Whether the lock of the run folder has a recent heartbeat.
+
+    Returns:
+        ``interrupted`` for a ``running`` run without a live lock, else the saved state.
+    """
+    if run_state is RunState.RUNNING and not lock_live:
         return ShownRunState.INTERRUPTED
-    return ShownRunState(snapshot.run_state.value)
+    return ShownRunState(run_state.value)

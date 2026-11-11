@@ -59,7 +59,7 @@ def test_status_json_prints_only_json(
         root.setLevel(level)
     captured = capsys.readouterr()
     assert code == 0
-    assert json.loads(captured.out)['schema'] == 'tslab.lab.study-status/1'
+    assert json.loads(captured.out)['schema'] == 'tslab.study-status/1'
     assert 'nothing ran yet' in captured.err
 
 
@@ -144,7 +144,7 @@ def test_submit_dry_run_json_lists_jobs(
     document = json.loads(capsys.readouterr().out)
     jobs = cast('list[dict[str, object]]', document['jobs'])
     assert code == 0
-    assert document['schema'] == 'tslab.lab.study-launch/1'
+    assert document['schema'] == 'tslab.study-launch/1'
     assert jobs[0]['job_id'] is None
     assert sum(cast('int', job['runs']) for job in jobs) == 4
 
@@ -202,7 +202,7 @@ def test_local_submit_json_keeps_task_output_off_stdout(
     )
     captured = capsys.readouterr()
     assert code == 0
-    assert json.loads(captured.out)['schema'] == 'tslab.lab.study-launch/1'
+    assert json.loads(captured.out)['schema'] == 'tslab.study-launch/1'
     assert 'TASK-OUTPUT' in captured.err
 
 
@@ -237,7 +237,7 @@ def test_results_json_to_stdout(project: Path, capsys: pytest.CaptureFixture[str
         == 0
     )
     document = json.loads(capsys.readouterr().out)
-    assert document['schema'] == 'tslab.lab.study-results/1'
+    assert document['schema'] == 'tslab.study-results/1'
     assert len(document['rows']) == 4
 
 
@@ -252,7 +252,7 @@ def test_results_json_to_file(
         == 0
     )
     assert capsys.readouterr().out == ''
-    assert json.loads(out.read_text(encoding='utf-8'))['schema'] == 'tslab.lab.study-results/1'
+    assert json.loads(out.read_text(encoding='utf-8'))['schema'] == 'tslab.study-results/1'
 
 
 @pytest.mark.parametrize(

@@ -49,7 +49,7 @@ def usage_document(*, context: Context) -> dict[str, object]:
         for report, usage_item in selected
     ]
     return {
-        'schema': 'tslab.lab.study-usage/1',
+        'schema': 'tslab.study-usage/1',
         'launcher': context.machine.launcher,
         'study': context.reference or context.study.name,
         'machine': context.machine_path.resolve().as_posix(),
