@@ -89,16 +89,10 @@ def take_progress(*, run_directory: Path) -> ProgressSnapshot:
     if snapshot is None:
         return ProgressSnapshot(done_instances=0, newest_checkpoint_mtime=None)
     done = sum(1 for record in snapshot.instances.values() if record.state is InstanceState.DONE)
-    # why: only the folders of the stages in the status file; a walk of the whole run folder
-    # would visit every artifact file of the run
-    stage_folders = {
-        run_directory / instance_id.partition('[')[0] for instance_id in snapshot.instances
-    }
+    # why: a stage may keep its checkpoints anywhere below the run folder (for example
+    # a checkpoints folder of its own), so the whole run folder is searched
     checkpoints = [
-        path.stat().st_mtime
-        for folder in stage_folders
-        for path in folder.rglob('last.ckpt')
-        if path.is_file()
+        path.stat().st_mtime for path in run_directory.rglob('last.ckpt') if path.is_file()
     ]
     return ProgressSnapshot(
         done_instances=done, newest_checkpoint_mtime=max(checkpoints) if checkpoints else None
