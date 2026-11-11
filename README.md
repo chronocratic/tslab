@@ -48,9 +48,8 @@ It also ships:
 - experiment trackers (CSV always; Weights & Biases, MLflow and TensorBoard as extras);
 - typed command-line configs with presets;
 - adapters for the chronocratic model and dataset libraries;
-- `tslab new`, a project template; `tslab status`, an overview of runs;
-  `tslab study`, experiment grids on SLURM or locally; and `tslab wandb-sync`,
-  which uploads offline W&B runs.
+- a **CLI** (`tslab`): project templates, run overviews, and experiment
+  grids on SLURM or locally (see [CLI](#cli)).
 
 One distribution, three layers: `tslab.lab` (runs, stages, studies, jobs; no
 torch), `tslab.ml` (torch and Lightning) and `tslab.ts` (time series). The lab
@@ -79,18 +78,48 @@ uv add "tslab[full,wandb]"    # extras combine
 | `analysis` | pandas, SciPy, Matplotlib |
 | `full` | `ts`, both chronocratic adapters and `analysis` |
 
-## Start a project
+## Quick start
+
+Create a project from the template, then train and evaluate on toy data:
 
 ```bash
-uvx tslab new my-paper                  # the ts template; add --template lab for a bare project
+uvx tslab new my-paper                            # add --template lab for a bare project
 cd my-paper
 uv sync
-uv run python -m my_paper.toy_data data
+uv run python -m my_paper.toy_data data           # write small synthetic datasets
 uv run python -m my_paper.classify ts2vec-archive-split
-uv run tslab status runs
+uv run tslab status runs                          # see what ran and what was cached
 ```
 
-The generated `README.md` explains the rest.
+Run the `classify` line again: every stage loads instead of computing. The
+generated `README.md` explains the rest.
+
+## CLI
+
+TSLab ships with a CLI. Installing it puts a `tslab` command on your path
+(or run it without installing via `uvx tslab`). Your experiments stay plain
+Python scripts; the CLI creates projects, launches studies and shows what runs
+are doing.
+
+| Command | Does |
+|---|---|
+| `tslab new FOLDER` | Create a project from a template (`ts` by default, or `lab`). |
+| `tslab status PATH` | Show the instances of a run, or one line per run below a folder. |
+| `tslab study ...` | Run an experiment grid on SLURM or locally: `submit`, `status`, `wait`, `failures`, `logs`, `resubmit`, `results`. |
+| `tslab machine ...` | Register machine profiles (local, SLURM clusters): `add`, `list`, `remove`. |
+| `tslab doctor` | Check whether a machine, and optionally a study, is ready. |
+| `tslab wandb-sync` | Resync offline W&B runs that the server shows as crashed or failed. |
+
+A study, step by step:
+
+```bash
+tslab study submit STUDY --machine local --dry-run   # check the plan
+tslab study submit STUDY --machine local             # launch the runs
+tslab study status STUDY --machine local             # follow them
+tslab study results STUDY --machine local --out results.csv
+```
+
+`tslab --help` and `tslab COMMAND --help` list every option.
 
 ## Examples
 
