@@ -16,7 +16,8 @@ if TYPE_CHECKING:
     from pathlib import PurePosixPath
 
     from tslab.lab.study.definition.after import After
-    from tslab.lab.study.definition.definition import Study, StudyRun
+    from tslab.lab.study.definition.runs import StudyRun
+    from tslab.lab.study.definition.study import Study
     from tslab.lab.study.machine.profile import FollowupSettings
     from tslab.lab.study.reporting.state import RunReport
 

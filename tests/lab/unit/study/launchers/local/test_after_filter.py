@@ -11,7 +11,7 @@ from tslab.lab.core.status import InstanceRecord, RunStatusSnapshot, utc_now_iso
 from tslab.lab.enums import AfterCondition, InstanceState, RunState
 from tslab.lab.study import After, Grid, Study
 from tslab.lab.study.context import Context, context_for, Selection
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.launchers.local.after_filter import after_filter
 from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs
 from tslab.lab.study.plan_after import plan_targets

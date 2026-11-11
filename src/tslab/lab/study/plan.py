@@ -16,22 +16,17 @@ import tslab.lab
 from tslab.lab.enums import AfterCondition, Satisfy
 from tslab.lab.study.code_snapshot import CodeSnapshot
 from tslab.lab.study.definition.after import chained_grids, grid_order, match_axes, upstream_runs
-from tslab.lab.study.definition.definition import (
-    expand_runs,
-    Grid,
-    match_problems,
-    merge_overrides,
-    merge_settings,
-    Study,
-    StudyRun,
-)
 from tslab.lab.study.definition.expansion import expand_setting
+from tslab.lab.study.definition.grid import Grid
+from tslab.lab.study.definition.matching import match_problems
+from tslab.lab.study.definition.runs import expand_runs, merge_overrides, merge_settings, StudyRun
 from tslab.lab.study.definition.settings import (
     check_paths,
     non_machine_paths,
     settings_to_args,
     SettingValue,
 )
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.machine.profile import MachineOverride, MachineProfile
 from tslab.lab.study.paths import log_file_of, study_folder
 from tslab.lab.study.plan_after import merge_corr_groups

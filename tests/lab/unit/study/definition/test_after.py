@@ -14,7 +14,7 @@ import tslab.lab.study as study_api
 from tslab.lab.study import Grid, setting_axis, Study
 import tslab.lab.study.definition.after as definition_api
 from tslab.lab.study.definition.after import _visit_grid
-from tslab.lab.study.definition.definition import expand_runs, StudyRun
+from tslab.lab.study.definition.runs import expand_runs, StudyRun
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping

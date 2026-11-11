@@ -10,7 +10,7 @@ from typing import cast, TYPE_CHECKING
 
 from tslab.lab.enums import LauncherKind
 from tslab.lab.jobs.slurm import parse_slurm_duration, parse_slurm_memory
-from tslab.lab.study.definition.definition import matching_in_order
+from tslab.lab.study.definition.runs import matching_in_order
 from tslab.lab.study.machine.tables import (
     check_keys,
     check_range,

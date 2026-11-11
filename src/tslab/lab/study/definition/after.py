@@ -4,7 +4,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from tslab.lab.enums import AfterCondition, Satisfy
-from tslab.lab.study.definition.definition import expand_runs, Grid, Study, StudyRun
+from tslab.lab.study.definition.grid import Grid
+from tslab.lab.study.definition.runs import expand_runs, StudyRun
+from tslab.lab.study.definition.study import Study
 
 __all__ = ['After', 'after_problems', 'chained_grids', 'grid_order', 'match_axes', 'upstream_runs']
 

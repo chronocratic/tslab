@@ -14,7 +14,7 @@ from tests.lab.unit.study.configs import grid
 from tests.lab.unit.study.helpers import chained_study
 from tslab.lab.enums import AfterCondition, ChainedRetry, LauncherKind, Retry
 from tslab.lab.study import After, Grid, setting_axis, Study
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.machine import LocalSettings, SlurmSettings
 from tslab.lab.study.machine.profile import FollowupSettings, MachineOverride, MachineProfile
 from tslab.lab.study.plan import (

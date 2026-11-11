@@ -109,7 +109,12 @@ The doors of internal subpackages are empty, and a few doors are trimmed. Import
 | `tslab.lab.core.meta.hostname`, `collect_*`, `register_*` | `tslab.lab.core.meta.run` |
 | `tslab.lab.core.meta.can_resume`, `stale_reason`, ... | `tslab.lab.core.meta.instance` |
 | `tslab.lab.study.commands.submit`, `status`, `cancel`, ... | `tslab.lab.study.commands.submit.submit`, `status.status`, `cancel.cancel`, ... |
-| `tslab.lab.study.definition.Study`, `Grid`, `expand_runs`, ... | `tslab.lab.study.definition.definition` |
+| `tslab.lab.study.definition.Study` | `tslab.lab.study.definition.study` |
+| `tslab.lab.study.definition.Grid`, `Override`, `setting_axis` | `tslab.lab.study.definition.grid` |
+| `tslab.lab.study.definition.Match`, `run_matches`, `match_problems` | `tslab.lab.study.definition.matching` |
+| `tslab.lab.study.definition.StudyRun`, `expand_runs`, `select_runs`, `merge_settings` | `tslab.lab.study.definition.runs` |
+| `tslab.lab.study.definition.RETRY_JOB`, `WANDB_SYNC_JOB`, `followup_job_name`, `study_job_names` | `tslab.lab.study.definition.study` |
+| `tslab.lab.study.definition.DEFAULT_RUN_SETTINGS`, `RESERVED_AXIS_NAMES` | `tslab.lab.study.definition.grid` |
 | `tslab.lab.study.definition.After`, `chained_grids`, ... | `tslab.lab.study.definition.after` |
 | `tslab.lab.study.definition.Settings`, `from_presets`, ... | `tslab.lab.study.definition.settings` |
 | `tslab.lab.study.definition.load_study` | `tslab.lab.study.definition.loading.load_study` |

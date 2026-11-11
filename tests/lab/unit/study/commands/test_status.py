@@ -16,7 +16,8 @@ from tslab.lab.enums import InstanceState, JobFlag, JobPhase, RunState, StudySta
 from tslab.lab.study.commands.status import parse_states, status
 from tslab.lab.study.context import Context, context_for, expected_starts, Selection
 from tslab.lab.study.definition.after import After
-from tslab.lab.study.definition.definition import Grid, Study
+from tslab.lab.study.definition.grid import Grid
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.launchers.common.types import QueuedJob
 from tslab.lab.study.reporting.documents import status_document
 from tslab.lab.study.reporting.report import log_status

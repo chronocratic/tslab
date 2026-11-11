@@ -20,7 +20,7 @@ from tslab.lab.enums import (
     StudyState,
 )
 from tslab.lab.study import After, Grid, Study
-from tslab.lab.study.definition.definition import expand_runs, StudyRun
+from tslab.lab.study.definition.runs import expand_runs, StudyRun
 from tslab.lab.study.launchers.slurm.dependency import dependency_text
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.machine.profile import FollowupSettings, MachineProfile

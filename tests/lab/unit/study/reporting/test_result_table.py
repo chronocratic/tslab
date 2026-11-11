@@ -13,8 +13,8 @@ from tslab.lab.enums import InstanceState, RunState
 from tslab.lab.study import DEFAULT_RUN_SETTINGS, Grid, Study
 from tslab.lab.study.commands.submit import submit
 from tslab.lab.study.context import load_context, Selection
-from tslab.lab.study.definition.definition import expand_runs
 from tslab.lab.study.definition.loading import load_study
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.reporting.result_table import (
     collect_results,
     format_results_csv,

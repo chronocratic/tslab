@@ -5,7 +5,7 @@ import pytest
 from tests.lab.unit.study.configs import grid
 from tslab.lab.enums import LauncherKind
 from tslab.lab.study import Study
-from tslab.lab.study.definition.definition import expand_runs
+from tslab.lab.study.definition.runs import expand_runs
 from tslab.lab.study.definition.settings import SettingValue
 from tslab.lab.study.machine.profile import MachineProfile
 from tslab.lab.study.plan import pin_conflicts, plan_jobs, resolve_runs

@@ -10,7 +10,8 @@ from tslab.lab.core.status import TRAINING_PAUSED_ERROR_PREFIX
 from tslab.lab.core.text import format_index_ranges, log_table
 from tslab.lab.enums import JobFlag, StudyState
 from tslab.lab.study.context import Context
-from tslab.lab.study.definition.definition import expand_runs, Study
+from tslab.lab.study.definition.runs import expand_runs
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.launchers.common.types import (
     LaunchReport,
     QueuedJob,

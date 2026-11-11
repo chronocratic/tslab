@@ -4,7 +4,7 @@ import pytest
 
 from tests.lab.unit.study.configs import grid
 from tslab.lab.study import Override, Study
-from tslab.lab.study.definition.definition import match_problems, run_matches
+from tslab.lab.study.definition.matching import match_problems, run_matches
 
 
 def test_run_matches_lists_and_grid_key() -> None:

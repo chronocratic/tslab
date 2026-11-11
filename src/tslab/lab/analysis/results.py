@@ -21,7 +21,7 @@ from tslab.lab.study.definition.columns import (
     INSTANCE_STATE_COLUMN,
     SECONDS_COLUMN,
 )
-from tslab.lab.study.definition.definition import Study
+from tslab.lab.study.definition.study import Study
 from tslab.lab.study.reporting.result_table import METRIC_PREFIX
 
 __all__ = ['AnalysisMetric', 'against_baseline', 'load_results', 'method_matrix', 'missing_runs']
