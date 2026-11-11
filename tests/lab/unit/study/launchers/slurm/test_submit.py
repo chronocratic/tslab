@@ -50,7 +50,7 @@ def study() -> Study:
 
 def groups_of(study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     return plan_jobs(
         study=study,
         machine=machine,

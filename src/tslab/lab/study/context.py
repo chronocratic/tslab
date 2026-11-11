@@ -3,6 +3,7 @@
 from collections.abc import Mapping, Sequence
 import dataclasses
 from dataclasses import dataclass
+import os
 from pathlib import Path, PurePosixPath
 import time
 from types import MappingProxyType
@@ -181,7 +182,12 @@ def context_for(  # noqa: PLR0913 # why: keyword-only public API; each option is
     all_runs = expand_runs(study=study)
     runs = select_runs(study=study, runs=all_runs, grids=selection.grids, only=selection.only)
     resolved = resolve_runs(
-        study=study, machine=machine, runs=runs, warned=warned, local_cpus=local_cpus
+        study=study,
+        machine=machine,
+        runs=runs,
+        warned=warned,
+        local_cpus=local_cpus,
+        environment=environment,
     )
     jobs = read_jobs(path=study_folder(machine=machine, study=study) / 'submissions.jsonl')
     # why: the launcher door imports Context, so this import must wait until calls
@@ -430,7 +436,13 @@ def widen_context(*, context: Context, reports: Sequence[RunReport]) -> Context:
         return context
     runs = [report.run for report in new]
     resolved = resolve_runs(
-        study=context.study, machine=context.machine, runs=runs, local_cpus=available_cpus()
+        study=context.study,
+        machine=context.machine,
+        runs=runs,
+        local_cpus=available_cpus(),
+        # why: the context keeps no environment; widened runs are SLURM downstream runs,
+        # whose resources ignore it, and the CPU count above is read from the process too
+        environment=os.environ,
     )
     everything = study_reports(context=context)
     upstream_paths = _upstream_paths(study=context.study, runs=runs)

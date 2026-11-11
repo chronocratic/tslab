@@ -63,7 +63,7 @@ def test_local_machine_with_a_slurm_override_resolves_without_slurm(
         tmp_path, overrides=(MachineOverride(match={'recipe': ('cost-paper',)}, slurm={'gpus': 1}),)
     )
     resolved = resolve_runs(
-        study=study, machine=machine, runs=expand_runs(study=study), local_cpus=1
+        study=study, machine=machine, runs=expand_runs(study=study), local_cpus=1, environment={}
     )
     assert all(
         run.resources.describe() == 'local' and run.resources.max_tasks_per_job is None
@@ -75,7 +75,7 @@ def test_machine_setting_cannot_switch_a_choice(study: Study, tmp_path: Path) ->
     machine = _local(tmp_path, settings={'model': 'cost'})
     runs = expand_runs(study=study)
     with pytest.raises(ValueError, match=r'\[settings\] sets model'):
-        resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+        resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
 
 
 def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
@@ -89,7 +89,12 @@ def test_check_machine_raises_for_a_bad_path_and_warns_for_a_dead_override(
     with caplog.at_level(logging.WARNING, logger='tslab.lab.study'):
         check_machine(study=study, machine=machine, warned=warned)
         resolve_runs(
-            study=study, machine=machine, runs=expand_runs(study=study), warned=warned, local_cpus=1
+            study=study,
+            machine=machine,
+            runs=expand_runs(study=study),
+            warned=warned,
+            local_cpus=1,
+            environment={},
         )
     assert len([r for r in caplog.records if 'nope' in r.getMessage()]) == 1
 
@@ -129,7 +134,7 @@ def test_array_size_error_keeps_the_argument_error(study: Study, tmp_path: Path)
         slurm=SlurmSettings(partition='p', time='1:00:00', max_array_size=1),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -150,7 +155,7 @@ def test_validate_jobs_in_worker_processes_matches_one_process(
 ) -> None:
     machine = _local(tmp_path)
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     groups = plan_jobs(
         study=study,
         machine=machine,
@@ -187,7 +192,9 @@ def _accelerators_by_recipe(groups: list[JobGroup]) -> dict[str, str]:
 
 def _plan(study: Study, machine: MachineProfile, *, local_cpus: int = 1) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=local_cpus)
+    resolved = resolve_runs(
+        study=study, machine=machine, runs=runs, local_cpus=local_cpus, environment={}
+    )
     return plan_jobs(
         study=study,
         machine=machine,
@@ -226,7 +233,7 @@ def test_override_sbatch_extra_merges_key_by_key(study: Study, tmp_path: Path) -
         ),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     cost = next(run for run in resolved if run.run.values['recipe'] == 'cost-paper')
     assert isinstance(cost.resources, SlurmSettings)
     assert cost.resources.sbatch_extra == (('account', 'X'), ('constraint', 'a100'))
@@ -362,7 +369,7 @@ def test_after_placeholder_resolves_relative_output_root_from_project_root(
     study = _chained_study()
     machine = _local(tmp_path, output_root=Path('runs'))
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     groups = plan_jobs(
         study=study,
         machine=machine,

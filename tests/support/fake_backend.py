@@ -228,7 +228,7 @@ class FakeBackend:
         """A fake launch has no local pid file to block it."""
         return None
 
-    def resources(
+    def resources(  # noqa: PLR0913 # why: the Backend signature; one keyword per resource input
         self,
         *,
         machine: MachineProfile,
@@ -236,6 +236,7 @@ class FakeBackend:
         grid_name: str,
         values: Mapping[str, str],
         local_cpus: int,
+        environment: Mapping[str, str],
     ) -> Resources:
         """The resources the test set."""
         self._record(
@@ -245,6 +246,7 @@ class FakeBackend:
             grid_name=grid_name,
             values=values,
             local_cpus=local_cpus,
+            environment=environment,
         )
         return self.resources_answer
 

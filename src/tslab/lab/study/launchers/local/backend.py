@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 import functools
 import logging
-import os
 from pathlib import Path
 from types import MappingProxyType
 from typing import TextIO
@@ -84,14 +83,25 @@ class LocalResources:
         return None
 
 
-def _keep_lock() -> None:
-    """Release nothing: the caller gave no way to give the submission lock up."""
-
-
 @functools.cache
-def _auto_gpu_count() -> int:
-    """The number of visible GPUs, looked up once per process."""
-    return len(visible_gpus(environment=os.environ))
+def _auto_gpu_count(*, cuda_visible_devices: str | None) -> int | None:
+    """The number of visible GPUs, looked up once per value of ``CUDA_VISIBLE_DEVICES``.
+
+    Args:
+        cuda_visible_devices: The value of ``CUDA_VISIBLE_DEVICES``, or ``None`` when unset.
+            It is the cache key, so one process serving two environments stays correct.
+
+    Returns:
+        The GPU count, or ``None`` when the value holds a non-integer id (a UUID);
+        the launch reports that id, so a read-only command must not fail on it.
+    """
+    environment = (
+        {} if cuda_visible_devices is None else {'CUDA_VISIBLE_DEVICES': cuda_visible_devices}
+    )
+    try:
+        return len(visible_gpus(environment=environment))
+    except ValueError:
+        return None
 
 
 _PHASES: Mapping[LocalTaskState, JobPhase] = {
@@ -160,7 +170,7 @@ class LocalBackend:
             return str(error)
         return None
 
-    def resources(
+    def resources(  # noqa: PLR0913 # why: the Backend signature; one keyword per resource input
         self,
         *,
         machine: MachineProfile,
@@ -168,13 +178,15 @@ class LocalBackend:
         grid_name: str,  # noqa: ARG002 # why: the Backend signature
         values: Mapping[str, str],  # noqa: ARG002 # why: the Backend signature
         local_cpus: int,
+        environment: Mapping[str, str],
     ) -> Resources:
         """The CPUs of the machine; a local launch holds no array limit."""
         local = machine.local or LocalSettings()
         # ponytail: skip_busy_gpus is not applied here: fewer slots at launch only means each
         # run got a smaller share than it could have (safe direction)
         if local.gpus is GpuDiscovery.AUTO:
-            slots = _auto_gpu_count() * local.tasks_per_gpu or local.max_parallel
+            count = _auto_gpu_count(cuda_visible_devices=environment.get('CUDA_VISIBLE_DEVICES'))
+            slots = (count or 0) * local.tasks_per_gpu or local.max_parallel
         elif local.gpus:
             slots = len(local.gpus) * local.tasks_per_gpu
         else:
@@ -269,7 +281,8 @@ class LocalBackend:
             with hold_launch(
                 study_folder=folder, task_ids=task_ids, pid=pid, host=host, now=now()
             ) as on_task_state:
-                (release_submission_lock or _keep_lock)()
+                if release_submission_lock is not None:
+                    release_submission_lock()
                 return _launch_local_groups(
                     context=context,
                     groups=groups,

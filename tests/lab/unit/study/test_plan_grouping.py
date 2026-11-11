@@ -67,7 +67,7 @@ def test_groups_by_grid_and_resources(
     study: Study, machine: MachineProfile, tmp_path: Path
 ) -> None:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     indices = assign_indices(study=study, runs=runs, jobs=[])
     groups = plan_jobs(
         study=study,
@@ -98,7 +98,7 @@ def test_plan_jobs_splits_groups_by_code_snapshot(
 ) -> None:
     plain = dataclasses.replace(machine, overrides=())
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1, environment={})
     indices = assign_indices(study=study, runs=runs, jobs=[])
 
     def snapshot(folder: Path) -> CodeSnapshot:
@@ -134,7 +134,7 @@ def test_plan_jobs_without_code_snapshots_groups_as_before(
 ) -> None:
     plain = dataclasses.replace(machine, overrides=())
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=plain, runs=runs, local_cpus=1, environment={})
     indices = assign_indices(study=study, runs=runs, jobs=[])
     groups = plan_jobs(
         study=study,
@@ -179,7 +179,7 @@ def test_index_at_max_array_size_is_a_task_error(study: Study, machine: MachineP
         overrides=(),
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
         study=study,
@@ -209,7 +209,7 @@ def test_next_job_file(tmp_path: Path) -> None:
 
 def test_extra_args_and_attempts(study: Study, machine: MachineProfile) -> None:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     run_path = runs[0].run_path
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
@@ -247,7 +247,7 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
         },
     )
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     indices = {run.run_path: i for i, run in enumerate(runs)}
     groups = plan_jobs(
         study=study,
@@ -266,7 +266,7 @@ def test_validate_jobs_reports_run_path_and_message(machine: MachineProfile) -> 
 
 def _plan(*, study: Study, machine: MachineProfile) -> list[JobGroup]:
     runs = expand_runs(study=study)
-    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1)
+    resolved = resolve_runs(study=study, machine=machine, runs=runs, local_cpus=1, environment={})
     return plan_jobs(
         study=study,
         machine=machine,

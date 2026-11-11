@@ -227,7 +227,7 @@ class SlurmBackend:
         """A SLURM launch is never blocked here; always ``None``."""
         return None
 
-    def resources(
+    def resources(  # noqa: PLR0913 # why: the Backend signature; one keyword per resource input
         self,
         *,
         machine: MachineProfile,
@@ -235,6 +235,7 @@ class SlurmBackend:
         grid_name: str,
         values: Mapping[str, str],
         local_cpus: int,  # noqa: ARG002 # why: the Backend signature
+        environment: Mapping[str, str],  # noqa: ARG002 # why: the Backend signature
     ) -> Resources:
         """The resources of one grid on the machine, with its overrides applied."""
         settings = slurm_for(

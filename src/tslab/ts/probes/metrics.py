@@ -24,7 +24,8 @@ def classification_metrics(
     """Return accuracy, precision, recall and F1.
 
     Precision, recall and F1 use ``average='binary'`` when the problem has
-    exactly two classes, and ``'macro'`` otherwise. Classes with no predicted
+    exactly two classes (the larger label is the positive one), and ``'macro'``
+    otherwise. Classes with no predicted
     or true sample score 0 instead of warning.
 
     Args:
@@ -38,13 +39,24 @@ def classification_metrics(
         The metrics keyed ``accuracy``, ``precision``, ``recall``, ``f1``.
     """
     _require_same_shape(predictions=predictions, targets=targets)
-    class_count = len(np.unique(targets if classes is None else classes))
-    average = 'binary' if class_count == _BINARY_CLASS_COUNT else 'macro'
+    labels = np.unique(targets if classes is None else classes)
+    average = 'binary' if len(labels) == _BINARY_CLASS_COUNT else 'macro'
+    # why: the binary average scores the positive label, and the default 1 is
+    # missing from labels such as {0, 2} or strings; the larger label is positive; macro ignores it
+    pos_label = labels[-1] if average == 'binary' else 1
     scores = {'precision': precision_score, 'recall': recall_score, 'f1': f1_score}
     return {
         'accuracy': float(accuracy_score(y_true=targets, y_pred=predictions)),
         **{
-            name: float(score(y_true=targets, y_pred=predictions, average=average, zero_division=0))
+            name: float(
+                score(
+                    y_true=targets,
+                    y_pred=predictions,
+                    average=average,
+                    pos_label=pos_label,
+                    zero_division=0,
+                )
+            )
             for name, score in scores.items()
         },
     }

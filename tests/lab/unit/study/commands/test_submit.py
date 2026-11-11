@@ -28,6 +28,7 @@ from tslab.lab.enums import AfterCondition, JobPhase, StudyState
 from tslab.lab.study.code_snapshot import CodeSnapshot
 from tslab.lab.study.commands import submit, submit_runs
 from tslab.lab.study.context import Context, load_context, Selection
+import tslab.lab.study.launchers.local.backend as local_backend
 from tslab.lab.study.launchers.slurm.records import SlurmJobRecord
 from tslab.lab.study.records import JobKind, JobRecord, ProgressSnapshot, read_jobs, TaskRecord
 
@@ -949,7 +950,15 @@ def test_explicit_mps_runs_one_task_with_env_untouched(
 def test_keep_awake_helper_gets_launch_pid(
     project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    args = fake_caffeinate(tmp_path, monkeypatch)
+    fake_caffeinate(tmp_path, monkeypatch)
+    pids: list[int] = []
+    real_start = local_backend.start_keep_awake
+
+    def recording_start(*, pid: int, reason: str) -> subprocess.Popen[bytes] | None:
+        pids.append(pid)
+        return real_start(pid=pid, reason=reason)
+
+    monkeypatch.setattr(local_backend, 'start_keep_awake', recording_start)
     code = submit(
         context=context(project=project, machine_file='local.toml'),
         include_done=False,
@@ -958,7 +967,7 @@ def test_keep_awake_helper_gets_launch_pid(
         sleep=no_sleep,
     )
     assert code == 0
-    assert f'-w {os.getpid()}' in args.read_text()
+    assert pids == [os.getpid()]
 
 
 def test_keep_awake_missing_tool_still_runs(

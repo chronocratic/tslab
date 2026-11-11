@@ -279,13 +279,23 @@ def test_resources_applies_grid_overrides(*, project: Path, fake: FakeSlurm) -> 
     backend = SlurmBackend()
 
     base = backend.resources(
-        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=1
+        machine=ctx.machine, overrides=(), grid_name='g', values={}, local_cpus=1, environment={}
     )
     matched = backend.resources(
-        machine=ctx.machine, overrides=(override,), grid_name='g', values={}, local_cpus=1
+        machine=ctx.machine,
+        overrides=(override,),
+        grid_name='g',
+        values={},
+        local_cpus=1,
+        environment={},
     )
     unmatched = backend.resources(
-        machine=ctx.machine, overrides=(override,), grid_name='h', values={}, local_cpus=1
+        machine=ctx.machine,
+        overrides=(override,),
+        grid_name='h',
+        values={},
+        local_cpus=1,
+        environment={},
     )
 
     assert base.cpus == 1
@@ -301,7 +311,7 @@ def test_resources_rejects_profile_without_slurm_table(*, project: Path, fake: F
 
     with pytest.raises(MachineProfileError, match=r'a slurm launcher needs the \[slurm\] table'):
         SlurmBackend().resources(
-            machine=machine, overrides=(), grid_name='g', values={}, local_cpus=1
+            machine=machine, overrides=(), grid_name='g', values={}, local_cpus=1, environment={}
         )
 
 

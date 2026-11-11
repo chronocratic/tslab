@@ -97,7 +97,7 @@ class Backend(Protocol):
         """Why a new launch of this study cannot start now, or ``None``."""
         ...
 
-    def resources(
+    def resources(  # noqa: PLR0913 # why: the Backend signature; one keyword per resource input
         self,
         *,
         machine: MachineProfile,
@@ -105,6 +105,7 @@ class Backend(Protocol):
         grid_name: str,
         values: Mapping[str, str],
         local_cpus: int,
+        environment: Mapping[str, str],
     ) -> Resources:
         """The resources of one grid, with the machine overrides applied."""
         ...
