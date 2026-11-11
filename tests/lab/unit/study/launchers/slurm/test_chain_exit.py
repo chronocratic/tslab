@@ -1,5 +1,7 @@
 """Exit status used by chained SLURM jobs after their run command ends."""
 
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import replace
 import fcntl
 from importlib import import_module
@@ -608,24 +610,6 @@ def test_chain_exit_does_not_call_a_timeout_inside_the_lock_a_busy_lock(
     assert 'skipping the requeue' not in caplog.text
 
 
-def test_chain_exit_skips_the_scheduler_when_no_retry_is_possible(
-    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    del fake_backend
-    ctx = _requeue_context(project=project)
-    _interrupted(ctx=ctx, progress=False)
-    queries: list[int] = []
-
-    def query() -> dict[str, str]:
-        queries.append(1)
-        return {}
-
-    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'query_cluster_config', query)
-
-    assert chain_exit(context=ctx, job_file=3, index=17) == 1
-    assert queries == []
-
-
 def test_chain_exit_takes_the_progress_snapshot_before_the_lock(
     project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -644,3 +628,59 @@ def test_chain_exit_takes_the_progress_snapshot_before_the_lock(
 
     assert chain_exit(context=ctx, job_file=3, index=17) == 0
     assert held == [False]
+
+
+def test_chain_exit_walks_the_run_folder_once_outside_the_lock(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    held: list[bool] = []
+    original_lock = _CHAIN_EXIT_MODULE.submission_lock
+    state = {'held': False}
+
+    @contextmanager
+    def tracking(*, study_folder: Path, timeout_seconds: float) -> Generator[None]:
+        with original_lock(study_folder=study_folder, timeout_seconds=timeout_seconds):
+            state['held'] = True
+            try:
+                yield
+            finally:
+                state['held'] = False
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'submission_lock', tracking)
+    walks: list[Path] = []
+    resubmit_module = import_module('tslab.lab.study.commands.resubmit')
+    original = _CHAIN_EXIT_MODULE.take_progress
+
+    def counting(*, run_directory: Path) -> ProgressSnapshot:
+        walks.append(run_directory)
+        held.append(state['held'])
+        return original(run_directory=run_directory)
+
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, 'take_progress', counting)
+    monkeypatch.setattr(resubmit_module, 'take_progress', counting)
+    assert chain_exit(context=ctx, job_file=3, index=17) == 0
+    assert len(walks) == 1
+    assert held == [False]
+
+
+def test_chain_exit_at_requeue_limit_skips_the_run_folder_walk(
+    project: Path, fake_backend: FakeBackend, requeued: list[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    del fake_backend
+    ctx = _requeue_context(project=project)
+    _interrupted(ctx=ctx, progress=True)
+    monkeypatch.setattr(_CHAIN_EXIT_MODULE, '_max_batch_requeue', lambda: 1)
+    resubmit_module = import_module('tslab.lab.study.commands.resubmit')
+    walks: list[Path] = []
+    monkeypatch.setattr(
+        resubmit_module, 'take_progress', lambda *, run_directory: walks.append(run_directory)
+    )
+    monkeypatch.setattr(
+        _CHAIN_EXIT_MODULE, 'take_progress', lambda *, run_directory: walks.append(run_directory)
+    )
+    assert chain_exit(context=ctx, job_file=3, index=17) == 1
+    assert walks == []
+    assert requeued == []

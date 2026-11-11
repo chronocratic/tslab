@@ -161,7 +161,9 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     Returns:
         Targets per downstream run and the downstream runs that cannot be submitted.
     """
-    pending = set(submitting)
+    submitting_now = submitting
+    # why: the reports and the set of runs in this launch change only when a run is blocked
+    verdict_reports = _reports_for_launch(reports=reports, submitting=submitting_now)
     state = _TargetState(
         study=study,
         reports=reports,
@@ -174,23 +176,30 @@ def plan_targets(  # noqa: PLR0913 # why: public interface names each planning i
     blocked: set[PurePosixPath] = set()
     for run in order_runs(study=study, runs=runs):
         path = run.run_path
-        run_targets, is_blocked = _run_targets(state=state, run=run, submitting=frozenset(pending))
-        if is_blocked:
-            blocked.add(path)
-            pending.discard(path)
+        run_targets, is_blocked = _run_targets(
+            state=state, run=run, submitting=submitting_now, verdict_reports=verdict_reports
+        )
+        if not is_blocked:
+            targets[path] = run_targets
             continue
-        targets[path] = run_targets
+        blocked.add(path)
+        if path in submitting_now:
+            submitting_now -= {path}
+            verdict_reports = _reports_for_launch(reports=reports, submitting=submitting_now)
     return targets, frozenset(blocked)
 
 
 def _run_targets(
-    *, state: _TargetState, run: StudyRun, submitting: frozenset[PurePosixPath]
+    *,
+    state: _TargetState,
+    run: StudyRun,
+    submitting: frozenset[PurePosixPath],
+    verdict_reports: Mapping[PurePosixPath, RunReport],
 ) -> tuple[tuple[AfterTarget, ...], bool]:
     """Resolve the conditions of one run and invalidate targets for impossible work."""
     grid = state.study.grids[run.grid]
     if not grid.after:
         return (), False
-    verdict_reports = _reports_for_launch(reports=state.reports, submitting=submitting)
     verdict = after_verdict(
         study=state.study, run=run, reports=verdict_reports, followup=state.followup, now=state.now
     )

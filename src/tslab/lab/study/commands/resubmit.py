@@ -31,7 +31,7 @@ from tslab.lab.study.launchers.common.types import OnLaunch
 from tslab.lab.study.launchers.tables import backend_for
 from tslab.lab.study.machine.profile import FollowupSettings
 from tslab.lab.study.plan import assign_indices, plan_jobs, validate_jobs
-from tslab.lab.study.records import latest_tasks, take_progress
+from tslab.lab.study.records import latest_tasks, ProgressSnapshot, take_progress
 from tslab.lab.study.reporting.report import log_problems
 from tslab.lab.study.reporting.state import RunReport
 
@@ -549,15 +549,27 @@ def _with_progress(*, reports: Sequence[RunReport], context: Context) -> list[Ru
     return [report for report in reports if may_retry(report=report, context=context)]
 
 
-def may_retry(*, report: RunReport, context: Context) -> bool:
-    """Whether one report is under the cap and one step further on; logs why not."""
+def may_retry(
+    *, report: RunReport, context: Context, progress: ProgressSnapshot | None = None
+) -> bool:
+    """Whether one report is under the cap and one step further on; logs why not.
+
+    Args:
+        report: The report of the run.
+        context: The context of the study.
+        progress: The progress of the run folder when the caller already took it; the
+            folder is walked when omitted.
+
+    Returns:
+        Whether the run may be retried.
+    """
     if JobFlag.NOT_COUNTED in report.job_flags:
         return _under_uncounted_limit(report=report)
     counted = report.attempt - (report.task.uncounted_attempts if report.task else 0)
     if counted >= context.machine.followup.max_attempts:
         _LOGGER.info('gave up: %s after %d attempts', report.run.run_path, counted)
         return False
-    if not _made_progress(report=report, context=context):
+    if not _made_progress(report=report, context=context, progress=progress):
         _LOGGER.info('stuck: %s (attempt %d, no progress)', report.run.run_path, report.attempt)
         return False
     return True
@@ -575,13 +587,16 @@ def _under_uncounted_limit(*, report: RunReport) -> bool:
     return False
 
 
-def _made_progress(*, report: RunReport, context: Context) -> bool:
+def _made_progress(
+    *, report: RunReport, context: Context, progress: ProgressSnapshot | None
+) -> bool:
     """Whether the run moved since its latest submission.
 
     More done instances than the snapshot of the latest task, or a newer
     checkpoint than the one of the snapshot (a snapshot without one counts as old).
     """
-    progress = take_progress(run_directory=context.study_directory / report.run.run_path)
+    if progress is None:
+        progress = take_progress(run_directory=context.study_directory / report.run.run_path)
     before = report.task.progress if report.task is not None else None
     if before is None:
         return progress.done_instances > 0 or progress.newest_checkpoint_mtime is not None

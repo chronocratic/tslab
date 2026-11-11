@@ -27,6 +27,7 @@ from tslab.lab.study.machine import MachineProfile
 from tslab.lab.study.machine.profile import FollowupSettings
 from tslab.lab.study.plan import assign_indices, JobGroup, plan_jobs, ResolvedRun
 from tslab.lab.study.plan_after import (
+    _reports_for_launch,
     _TargetState,
     AfterTarget,
     local_after_problems,
@@ -680,3 +681,29 @@ def test_same_launch_aligned_groups_resolve_to_the_array_id(tmp_path: Path) -> N
     assert len(probe_groups) == 1
     upstream = {run.run_path: f'77_{position}' for position, run in enumerate(selected[:2])}
     assert dependency_text(after=probe_groups[0].after, upstream=upstream) == 'aftercorr:77'
+
+
+def test_reports_for_launch_are_built_once_for_all_downstream_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    study = _study()
+    runs = expand_runs(study=study)
+    downstream = [run for run in runs if run.grid == 'probe']
+    reports = {
+        run.run_path: _report(run=run, state=StudyState.DONE) for run in runs if run.grid != 'probe'
+    }
+    calls: list[int] = []
+
+    def counting(
+        *, reports: Mapping[PurePosixPath, RunReport], submitting: frozenset[PurePosixPath]
+    ) -> dict[PurePosixPath, RunReport]:
+        calls.append(1)
+        return _reports_for_launch(reports=reports, submitting=submitting)
+
+    monkeypatch.setattr('tslab.lab.study.plan_after._reports_for_launch', counting)
+    targets, blocked = plan_targets(
+        study=study, runs=downstream, reports=reports, submitting=frozenset(), jobs=()
+    )
+    assert len(targets) == len(downstream)
+    assert blocked == frozenset()
+    assert calls == [1]
