@@ -142,3 +142,16 @@ def test_long_package_name_passes_ruff(tmp_path: Path) -> None:
             check=False,
         )
         assert result.returncode == 0, f'ruff {" ".join(command)}:\n{result.stdout}'
+
+
+def test_ts_template_depends_on_the_full_install() -> None:
+    text = (TS_TEMPLATE.files / 'pyproject.toml').read_text(encoding='utf-8')
+
+    assert f'dependencies = ["tslab[full]{RELEASED_TSLAB}' in text
+
+
+def test_lab_template_pulls_no_ml_extras() -> None:
+    text = (LAB_TEMPLATE.files / 'pyproject.toml').read_text(encoding='utf-8')
+
+    assert f'dependencies = ["tslab{RELEASED_TSLAB}' in text
+    assert not any(word in text for word in ('torch', 'lightning', 'tslab['))
