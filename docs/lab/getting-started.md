@@ -13,6 +13,12 @@ uv run python -m my_experiments.experiment --scale 2.0
 `tslab new --template lab` copies a small project you own from then on. The
 default template is `ts` when torch is installed and `lab` otherwise (see [the ts getting started page](../ts/getting-started.md)).
 
+Inside an existing Python project (a `pyproject.toml` in a folder above), the new
+folder is also linked into it as a uv workspace member: the parent gains
+`[tool.uv.workspace]`, `[tool.uv.sources]` and a `dev` dependency, and the new
+project depends on the parent. Tables the parent already has are not edited; the
+lines to add are logged. `--layout standalone` skips the linking.
+
 | File | What it is |
 |---|---|
 | `src/my_experiments/stages.py` | an example stage, `measure`, that returns `Metrics` |

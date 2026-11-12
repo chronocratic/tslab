@@ -103,7 +103,7 @@ uv add "tslab[full,wandb]"    # extras combine
 Create a project from the template, then train and evaluate on toy data:
 
 ```bash
-uvx tslab new my-paper                            # add --template lab for a bare project
+uvx tslab new my-paper                            # add --template lab for a bare project; inside a project it joins its uv workspace
 cd my-paper
 uv sync
 uv run python -m my_paper.toy_data data           # write small synthetic datasets
@@ -125,7 +125,7 @@ are doing.
 
 | Command | Does |
 |---|---|
-| `tslab new FOLDER` | Create a project from a template (`ts` by default, or `lab`). |
+| `tslab new FOLDER` | Create a project from a template (`ts` by default, or `lab`); inside another Python project it becomes a uv workspace member of it. |
 | `tslab status PATH` | Show the instances of a run, or one line per run below a folder. |
 | `tslab study ...` | Run an experiment grid on SLURM or locally: `submit`, `status`, `wait`, `failures`, `logs`, `resubmit`, `results`. |
 | `tslab machine ...` | Register machine profiles (local, SLURM clusters): `add`, `list`, `remove`. |

@@ -26,7 +26,9 @@ uv run python -m my_paper.toy_data data
 ```
 
 `--template ts` is the default, so `tslab new my-paper` gives the same project.
-It copies a small project you own from then on:
+Inside an existing Python project it also joins that project as a uv workspace
+member (`--layout standalone` turns that off). It copies a small project you own
+from then on:
 
 | File | What it is |
 |---|---|
