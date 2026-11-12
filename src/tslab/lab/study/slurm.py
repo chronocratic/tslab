@@ -1,4 +1,4 @@
-"""Run one catalogue SLURM command for the jobs of a study, from a notebook."""
+"""Run one catalog SLURM command for the jobs of a study, from a notebook."""
 
 from collections.abc import Mapping
 from pathlib import Path
@@ -13,12 +13,12 @@ __all__ = ['slurm_output']
 
 
 def slurm_output(*, study: Study, machine: Path, name: str, environment: Mapping[str, str]) -> str:
-    """The output of one catalogue command, such as ``squeue-full-name``, for one study.
+    """The output of one catalog command, such as ``squeue-full-name``, for one study.
 
     Args:
         study: The study whose recorded SLURM jobs the command is about.
         machine: The machine profile file the study was submitted with.
-        name: The catalogue name, ``<tool>-<variant>``.
+        name: The catalog name, ``<tool>-<variant>``.
         environment: The process environment used to read the machine profile.
 
     Returns:

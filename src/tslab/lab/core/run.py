@@ -131,7 +131,7 @@ class Run:
             trackers: Experiment trackers; started on enter, finished on exit.
                 A ``LocalTracker`` (CSV and YAML files in the run folder) is added in
                 front of them unless one of them already is a ``LocalTracker``.
-            options: Run behaviour; defaults to ``config.run`` if it is a
+            options: Run behavior; defaults to ``config.run`` if it is a
                 ``RunOptions``, otherwise to ``RunOptions()``.
             seed: Seed for every random generator; defaults to ``config.seed``,
                 otherwise ``0`` with a warning.
@@ -170,7 +170,7 @@ class Run:
             signal.Handlers | Callable[[int, FrameType | None], object] | int | None
         ) = None
         self._sigusr2_installed = False
-        self._time_limit_signalled = False
+        self._time_limit_signaled = False
         self._executing = False
         self._called_single_rank = False
         self._lock_nonce: str | None = None
@@ -206,9 +206,9 @@ class Run:
         return self._writer and not self._options.dry_run
 
     @property
-    def time_limit_signalled(self) -> bool:
+    def time_limit_signaled(self) -> bool:
         """Whether this process received the SLURM time-limit signal."""
-        return self._time_limit_signalled
+        return self._time_limit_signaled
 
     def begin_execution(self) -> None:
         """Mark a stage executing, or stop if the signal arrived between stages.
@@ -217,7 +217,7 @@ class Run:
             JobTimeLimitSignal: If ``SIGUSR2`` arrived before this stage started.
         """
         self._executing = True
-        if self._time_limit_signalled:
+        if self._time_limit_signaled:
             message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
             raise JobTimeLimitSignal(message)
 
@@ -503,7 +503,7 @@ class Run:
 
     def _on_sigusr2(self, signal_number: int, frame: FrameType | None) -> None:
         del signal_number, frame
-        self._time_limit_signalled = True
+        self._time_limit_signaled = True
         if not self._writer:
             _LOGGER.info('SIGUSR2 received on a non-zero rank; rank 0 stops the run')
             return
@@ -513,7 +513,7 @@ class Run:
 
     def _on_sigterm(self, signal_number: int, frame: FrameType | None) -> None:
         del signal_number, frame
-        if self._time_limit_signalled:
+        if self._time_limit_signaled:
             _LOGGER.info('SIGTERM ignored while the run saves after SIGUSR2')
             return
         raise SystemExit(_SIGTERM_EXIT_CODE)

@@ -143,7 +143,7 @@ uv run tslab study results example --machine local --out - --json
 - Never pass `--include-done` to `study resubmit`; that command selects states
   with `--states` instead.
 - Never run `tslab study cancel` unless the researcher asks. With `--signal`,
-  it sends `USR2` to the running jobs instead of cancelling them: the runs
+  it sends `USR2` to the running jobs instead of canceling them: the runs
   save and end on their own.
 - Inspect failures before retrying them; change code or settings before using
   `--states failed`.

@@ -1,4 +1,4 @@
-"""An organised output tree for tables and figures.
+"""An organized output tree for tables and figures.
 
 The layout is enforced in code::
 

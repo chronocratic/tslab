@@ -198,7 +198,7 @@ def test_local_profile_rejects_chained_requeue(tmp_path: Path) -> None:
     ('text', 'location'),
     [
         ('[slurm]\ncpu_per_task = 2', 'slurm.cpu_per_task'),
-        ('colour = "red"', 'colour'),
+        ('color = "red"', 'color'),
         ('[slurm]\npartition = "p"\ngpus = "1"', 'slurm.gpus'),
         ('[slurm]\npartition = "p"\ngpus = true', 'slurm.gpus'),
         ('[[overrides]]\nslurm = { gpus = 1 }', 'overrides[0].match'),

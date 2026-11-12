@@ -56,7 +56,7 @@ def test_machine_profile_rejects_negative_signal_seconds(tmp_path: Path) -> None
         load_machine(path=write(tmp_path, BASE_SLURM + text))
 
 
-def test_sbatch_extra_table_is_read_and_normalised(tmp_path: Path) -> None:
+def test_sbatch_extra_table_is_read_and_normalized(tmp_path: Path) -> None:
     text = (
         BASE_SLURM
         + SLURM_TABLE

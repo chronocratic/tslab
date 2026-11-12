@@ -76,8 +76,8 @@ class _SignalStop(Callback):
         self._sigterm_filter_installed = False
 
     @property
-    def signalled(self) -> bool:
-        return self._signal_received or self._run.time_limit_signalled
+    def signaled(self) -> bool:
+        return self._signal_received or self._run.time_limit_signaled
 
     def request_stop(self) -> None:
         self._signal_received = True
@@ -95,7 +95,7 @@ class _SignalStop(Callback):
     def _install_sigterm_filter(self) -> None:
         if self._sigterm_filter_installed or getattr(signal, 'SIGUSR2', None) is None:
             return
-        self._sigterm_filter.enter_context(_deferred_sigterm(stopping=lambda: self.signalled))
+        self._sigterm_filter.enter_context(_deferred_sigterm(stopping=lambda: self.signaled))
         self._sigterm_filter_installed = True
 
     def restore_sigterm(self) -> None:
@@ -122,9 +122,7 @@ class _SignalStop(Callback):
 
     def _stop_at_safe_point(self, *, trainer: Trainer, check_deadline: bool = False) -> None:
         paused = check_deadline and self._deadline is not None and time.time() >= self._deadline
-        stop = trainer.strategy.reduce_boolean_decision(
-            decision=self.signalled or paused, all=False
-        )
+        stop = trainer.strategy.reduce_boolean_decision(decision=self.signaled or paused, all=False)
         if not stop:
             return
         _save_last(trainer=trainer, path=self._checkpoint_directory / 'last.ckpt')
@@ -134,7 +132,7 @@ class _SignalStop(Callback):
 
     def _pause_error(self) -> JobTimeLimitSignal | TrainingPaused:
         """The exception that ends a paused training on the process that writes the result."""
-        if self.signalled:
+        if self.signaled:
             signal_message = 'SIGUSR2 before the SLURM time limit; resubmit to resume'
             return JobTimeLimitSignal(signal_message)
         message = (

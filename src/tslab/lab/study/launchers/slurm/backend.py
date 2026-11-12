@@ -100,7 +100,7 @@ _FLAGS: Mapping[str, frozenset[JobFlag]] = MappingProxyType(
         'TIMEOUT': frozenset({JobFlag.TIME_LIMIT}),
         'PREEMPTED': frozenset({JobFlag.NOT_COUNTED}),
         'NODE_FAIL': frozenset({JobFlag.NOT_COUNTED}),
-        'CANCELLED': frozenset({JobFlag.CANCELLED}),
+        'CANCELLED': frozenset({JobFlag.CANCELED}),
     }
 )
 
@@ -337,15 +337,15 @@ class SlurmBackend:
             scancel(job_ids=job_ids, signal=signal)
         except SlurmError as error:
             raise LaunchError(str(error)) from error
-        _log_cancelled(job_ids=job_ids, signal=signal)
+        _log_canceled(job_ids=job_ids, signal=signal)
         return 0, job_ids
 
-    def cancellable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
+    def cancelable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
         """The job ids a cancel can reach: the queued and running runs."""
         return [
             report.job_id
             for report in reports
-            if _cancellable(report=report) and report.job_id is not None
+            if _cancelable(report=report) and report.job_id is not None
         ]
 
     def detach(
@@ -465,7 +465,7 @@ def _chain_check(*, context: Context, groups: Sequence[JobGroup]) -> tuple[str, 
 _CANCELLABLE_STATES = (StudyState.QUEUED, StudyState.WAITING, StudyState.RUNNING)
 
 
-def _cancellable(*, report: RunReport) -> bool:
+def _cancelable(*, report: RunReport) -> bool:
     """Whether the run holds a job a cancel can reach."""
     held = JobFlag.REQUEUE_HELD in report.job_flags
     return (report.state in _CANCELLABLE_STATES or held) and report.job_id is not None
@@ -492,7 +492,7 @@ def _warn_small_signal(*, context: Context, groups: Sequence[JobGroup]) -> None:
 
 
 def _live_reports(*, reports: Sequence[RunReport], signal: str | None) -> list[RunReport]:
-    live = [report for report in reports if _cancellable(report=report)]
+    live = [report for report in reports if _cancelable(report=report)]
     if signal is None:
         return live
     queued = [
@@ -519,10 +519,10 @@ def _dry_run_cancel(*, job_ids: Sequence[str], signal: str | None) -> tuple[int,
     return 0, list(job_ids)
 
 
-def _log_cancelled(*, job_ids: Sequence[str], signal: str | None) -> None:
+def _log_canceled(*, job_ids: Sequence[str], signal: str | None) -> None:
     if signal is None:
-        _LOGGER.info('cancelled %s', ', '.join(job_ids))
+        _LOGGER.info('canceled %s', ', '.join(job_ids))
         return
     _LOGGER.info(
-        'signalled %s with %s; the jobs save and end on their own', ', '.join(job_ids), signal
+        'signaled %s with %s; the jobs save and end on their own', ', '.join(job_ids), signal
     )

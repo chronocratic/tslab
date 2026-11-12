@@ -33,10 +33,10 @@ uv run tslab study submit example --json
 | `tslab.run-status` | `exit_code`, `runs`: `directory`, `state`, `instances` (`instance`, `stage`, `state`, `fingerprint`, `seconds`, `error`). |
 | `tslab.study-status` | `study`, `machine`, `study_directory`, `job_states_known`, `exit_code`, `counts`, `runs`. Counts include every state and `total` per grid and under `all`. Each run has `run_path`, `grid`, `values`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, and, when the scheduler reports a start for a queued job, `expected_start` (null when unknown), `pending_reason` (null when unknown) and `pending_stuck` (bool, false when no reason). |
 | `tslab.study-show` | `study`, `settings` (dotted path to value), `grids`, `total_runs`. Each grid has `name`, `short_name`, `job_name` (the template), `command`, `axes` (axis to value names), `excludes`, `overrides`, and `runs`. |
-| `tslab.study-launch` | `dry_run`, `jobs`, `cancelled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
+| `tslab.study-launch` | `dry_run`, `jobs`, `canceled`, `exit_code`. Each job has `job_name`, `job_id` (null on dry run), `runs`, `indices`, `resources`, `first_command`. Used by submit and resubmit. |
 | `tslab.study-wait` | The `tslab.study-status` fields without `expected_start`, `pending_reason` and `pending_stuck` on runs, plus `waited_seconds` and `timed_out`. |
 | `tslab.study-failures` | `runs`: `run_path`, `state`, `reason`, `job_id`, `job_state`, `attempt`, `directory`, `errors` (`instance`, `error_file`, `error`), `log_file`, `log_tail`, `run_log`, `run_log_tail`, `hint` (what the data suggests, or null), `exit_code` (the code SLURM recorded for the job, or null). |
-| `tslab.study-cancel` | `cancelled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
+| `tslab.study-cancel` | `canceled` (job ids), `dry_run`, `signal` (`USR2` when sent with `--signal`, else null), `exit_code`. |
 | `tslab.study-usage` | `study`, `machine`, `runs`, `groups`. Each run has `run_path`, `job_id`, `state`, `elapsed`, `time_limit`, `max_rss` and `requested_memory` (bytes), `total_cpu_seconds`, `alloc_cpus`, `gpus`, `paused`. Each group has `runs`, `slurm` (resource line), `suggested_time`, `suggested_mem_per_cpu`. |
 | `tslab.study-results` | `rows`, the same rows as the CSV. |
 | `tslab.doctor` | `machine`, `project_settings` (`path`, `values`: each key with `value` and `source` as `flag`, `file`, or `default`), `checks` (`name`, `status` as `ok`, `warn`, or `fail`, `message`), `exit_code`. |
@@ -184,7 +184,7 @@ uv run tslab study results "$STUDY" --machine "$MACHINE" --out - --json
 - Never run `tslab study cancel` unless the researcher asks. On a local machine
   it stops the whole launch, not a slice. Use `--dry-run` to
   inspect selected job ids first. With `--signal`, the command sends `USR2` to
-  the running jobs instead of cancelling them: the runs save and end on their
+  the running jobs instead of canceling them: the runs save and end on their
   own, so the command never stops a job hard.
 - Inspect failures before retrying them. Change code or settings before using
   `--states failed`.

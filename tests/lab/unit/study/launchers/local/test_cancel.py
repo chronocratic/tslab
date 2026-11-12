@@ -1,4 +1,4 @@
-"""Cancelling a live local study launch."""
+"""Canceling a live local study launch."""
 
 import contextlib
 import os
@@ -190,7 +190,7 @@ def test_local_cancel_dead_partial_selection_is_usage_error(
         run.wait()
 
 
-def test_cancel_dead_keeps_signalling_when_a_group_gone(
+def test_cancel_dead_keeps_signaling_when_a_group_gone(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     first = _run_group()

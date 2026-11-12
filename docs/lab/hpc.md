@@ -34,7 +34,7 @@ machine.
 ### Testing the timeout path
 
 `tslab study cancel STUDY --machine cluster --signal` sends `USR2` to the
-running jobs of the selected runs instead of cancelling them, so a run
+running jobs of the selected runs instead of canceling them, so a run
 reaches the save-and-end path of a real time limit without waiting for it.
 The runs save `last.ckpt` and end on their own as `interrupted`; queued jobs
 are skipped. See [Studies and HPC](studies.md#cancel-live-jobs).

@@ -1,6 +1,6 @@
 """SLURM helpers: submitting jobs and reading their states and timing."""
 
-from tslab.lab.jobs.slurm.catalogue import (
+from tslab.lab.jobs.slurm.catalog import (
     CommandOutput,
     CommandValues,
     run_slurm_command,

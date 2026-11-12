@@ -94,10 +94,10 @@ def test_never_started_run_with_failed_upstream_is_dependency_failed() -> None:
     assert updated.state is StudyState.DEPENDENCY_FAILED
 
 
-def test_cancelled_downstream_with_met_upstream_is_missing() -> None:
+def test_canceled_downstream_with_met_upstream_is_missing() -> None:
     study, upstream, downstream = _runs()
     report = _report(
-        run=downstream, state=StudyState.FAILED, job_flags=frozenset({JobFlag.CANCELLED})
+        run=downstream, state=StudyState.FAILED, job_flags=frozenset({JobFlag.CANCELED})
     )
     upstream_report = _report(run=upstream, state=StudyState.DONE)
 

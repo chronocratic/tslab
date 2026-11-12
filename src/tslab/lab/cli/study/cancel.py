@@ -33,8 +33,8 @@ class Cancel:
             [machine_by_host] in tslab.toml.
         grid: Keep only this grid.
         only: Keep only runs that match axis=value.
-        dry_run: Show job ids without cancelling them.
-        signal: Send USR2 to the running jobs instead of cancelling them, to test
+        dry_run: Show job ids without canceling them.
+        signal: Send USR2 to the running jobs instead of canceling them, to test
             that runs save and resubmit; the jobs then end on their own.
         json: Print one study-cancel JSON document.
     """
@@ -58,8 +58,8 @@ class Cancel:
         machine = cast('str', request.machine)
         context = _context_of(study=study, machine=machine, grid=self.grid, only=self.only)
         signal = 'USR2' if self.signal else None
-        code, cancelled = cancel(context=context, dry_run=self.dry_run, signal=signal)
-        if code == 0 and cancelled and not self.dry_run:
+        code, canceled = cancel(context=context, dry_run=self.dry_run, signal=signal)
+        if code == 0 and canceled and not self.dry_run:
             selection = _selection_args(
                 study=study, machine=machine, grid=self.grid, only=self.only
             )
@@ -67,7 +67,7 @@ class Cancel:
         if self.json:
             print_json(
                 document=cancel_document(
-                    cancelled=cancelled, dry_run=self.dry_run, exit_code=code, signal=signal
+                    canceled=canceled, dry_run=self.dry_run, exit_code=code, signal=signal
                 )
             )
         return code

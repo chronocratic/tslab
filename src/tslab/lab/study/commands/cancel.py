@@ -30,7 +30,7 @@ def _with_waiting_downstream(*, context: Context) -> Context:
     ]
     if not extra:
         return context
-    _LOGGER.info('also cancelled %d waiting downstream runs', len(extra))
+    _LOGGER.info('also canceled %d waiting downstream runs', len(extra))
     return widen_context(context=context, reports=extra)
 
 
@@ -42,13 +42,13 @@ def cancel(*, context: Context, dry_run: bool, signal: str | None = None) -> tup
 
     Args:
         context: The study context containing selected run reports.
-        dry_run: Log the job ids without cancelling or signalling them.
-        signal: Send this signal to the running jobs instead of cancelling
+        dry_run: Log the job ids without canceling or signaling them.
+        signal: Send this signal to the running jobs instead of canceling
             them, so the runs save and end on their own; queued runs are
             skipped because a pending job has no step to signal.
 
     Returns:
-        The process exit code and the job ids cancelled, signalled, or
+        The process exit code and the job ids canceled, signaled, or
         selected for either.
     """
     if signal is None:

@@ -69,7 +69,7 @@ def _defer_time_limit_signals(*, signal_stop: _SignalStop) -> Generator[None]:
         signal.signal(sigusr2, defer_sigusr2)
         # why: SIGUSR2 can arrive after the callback was built and before the handler above
         # is installed; only the run saw it then, and the callback reads the run for that
-        restore.enter_context(_deferred_sigterm(stopping=lambda: signal_stop.signalled))
+        restore.enter_context(_deferred_sigterm(stopping=lambda: signal_stop.signaled))
         restore.callback(signal_stop.restore_sigterm)
         yield
 

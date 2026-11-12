@@ -172,7 +172,7 @@ def test_write_slurm_file_returns_the_path(tmp_path: Path) -> None:
     assert write_slurm_file(study=STUDY, study_folder=folder) == folder / SLURM_FILE
 
 
-def test_submit_writes_catalogue_while_holding_submission_lock(
+def test_submit_writes_catalog_while_holding_submission_lock(
     project: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(

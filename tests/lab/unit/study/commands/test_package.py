@@ -149,7 +149,7 @@ def test_submit_dry_run_json_lists_jobs(
     assert sum(cast('int', job['runs']) for job in jobs) == 4
 
 
-def test_resubmit_json_lists_cancelled_ids(
+def test_resubmit_json_lists_canceled_ids(
     project: Path, fake_backend: FakeBackend, capsys: pytest.CaptureFixture[str]
 ) -> None:
     submit_study(project=project)
@@ -161,7 +161,7 @@ def test_resubmit_json_lists_cancelled_ids(
             'job-0_3': JobPhase.COMPLETED,
         }
     )
-    fake_backend.cancellable_answer = ['job-0_0', 'job-0_1']
+    fake_backend.cancelable_answer = ['job-0_0', 'job-0_1']
     fake_backend.cancel_answer = (0, ['job-0_0', 'job-0_1'])
     code = run_main(
         'resubmit',
@@ -175,7 +175,7 @@ def test_resubmit_json_lists_cancelled_ids(
     )
     document = json.loads(capsys.readouterr().out)
     assert code == 0
-    assert document['cancelled'] == ['job-0_0', 'job-0_1']
+    assert document['canceled'] == ['job-0_0', 'job-0_1']
     assert len(fake_backend.calls('cancel')) == 1
 
 

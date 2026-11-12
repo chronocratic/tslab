@@ -99,11 +99,11 @@ def _chain_report(
     )
     if verdict is AfterVerdict.NEVER:
         return replace(report, state=StudyState.DEPENDENCY_FAILED)
-    if _job_was_cancelled(report=report):
+    if _job_was_canceled(report=report):
         return replace(report, state=StudyState.MISSING)
     return report
 
 
-def _job_was_cancelled(*, report: RunReport) -> bool:
-    """Whether the backend reports a cancelled task."""
-    return JobFlag.CANCELLED in report.job_flags
+def _job_was_canceled(*, report: RunReport) -> bool:
+    """Whether the backend reports a canceled task."""
+    return JobFlag.CANCELED in report.job_flags

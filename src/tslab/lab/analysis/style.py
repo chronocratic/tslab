@@ -1,4 +1,4 @@
-"""Figure style for a paper page: widths, one font size and a text colour helper."""
+"""Figure style for a paper page: widths, one font size and a text color helper."""
 
 from collections.abc import Generator
 import contextlib
@@ -55,10 +55,10 @@ def paper_style(*, font_size: float = DEFAULT_FONT_SIZE) -> Generator[None]:
 
 
 def is_dark_cell(*, image: AxesImage, value: float) -> bool:
-    """Tell whether a heatmap cell is dark, to choose a light or dark text colour.
+    """Tell whether a heatmap cell is dark, to choose a light or dark text color.
 
     Args:
-        image: The heatmap image, whose colormap and norm give the cell colour.
+        image: The heatmap image, whose colormap and norm give the cell color.
         value: The cell value.
 
     Returns:

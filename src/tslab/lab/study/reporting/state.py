@@ -155,7 +155,7 @@ def study_state(
         RunState.RUNNING,
         RunState.CRASHED,
     )
-    # why: a job that ended out of memory or cancelled left a stale ``running`` file;
+    # why: a job that ended out of memory or canceled left a stale ``running`` file;
     # it failed, so the automatic retry must not restart it
     killed = stale_running and job_phase is JobPhase.FAILED and not time_limited
     interrupted = (stale_running and not killed) or job_phase is JobPhase.INTERRUPTED

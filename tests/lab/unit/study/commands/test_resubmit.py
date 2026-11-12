@@ -213,7 +213,7 @@ def live_cancel_setup(*, project: Path, fake_backend: FakeBackend) -> None:
     for model, seed in (('small', 2), ('large', 1), ('large', 2)):
         finish_run(project=project, model=model, seed=seed)
     # why: the live run of job-0 is what a cancel can reach, as on a real scheduler
-    fake_backend.cancellable_answer = ['job-0_0']
+    fake_backend.cancelable_answer = ['job-0_0']
 
 
 def test_dry_run_with_cancel_live_cancels_and_unlocks_nothing(
@@ -775,11 +775,11 @@ def test_resubmit_upstream_pulls_in_waiting_downstream(
         },
         grids=('pretrain',),
     )
-    fake_backend.cancellable_answer = ['job-1']
+    fake_backend.cancelable_answer = ['job-1']
     assert resubmit(context=ctx, sleep=no_sleep) == 0
     (cancel_call,) = fake_backend.calls('cancel')
-    cancelled = cast('Context', cancel_call['context']).reports
-    assert {r.run.grid for r in cancelled} == {'probe'}
+    canceled = cast('Context', cancel_call['context']).reports
+    assert {r.run.grid for r in canceled} == {'probe'}
     runs = _launched_runs(fake_backend=fake_backend)
     assert 'pretrain/a' in runs
     assert any(run.startswith('probe/a/') for run in runs)
@@ -851,7 +851,7 @@ def test_auto_resubmits_time_limited_upstream_and_its_probe(
     folder = project / 'runs' / 'chain' / 'pretrain/a'
     (folder / 'train').mkdir(parents=True, exist_ok=True)
     (folder / 'train' / 'last.ckpt').write_text('x')
-    fake_backend.cancellable_answer = ['job-1']
+    fake_backend.cancelable_answer = ['job-1']
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     runs = _launched_runs(fake_backend=fake_backend)
     assert 'pretrain/a' in runs
@@ -944,13 +944,13 @@ def test_resubmit_cancels_held_job_then_resubmits(project: Path, fake_backend: F
     fake_backend.set_states(
         phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
     )
-    fake_backend.cancellable_answer = ['job-0']
+    fake_backend.cancelable_answer = ['job-0']
     ctx = context(project=project, machine_file='cluster.toml')
     assert ctx.reports[0].state is StudyState.INTERRUPTED
     assert resubmit(context=ctx, sleep=no_sleep) == 0
     (cancel_call,) = fake_backend.calls('cancel')
-    cancelled = cast('Context', cancel_call['context']).reports
-    assert [r.run.run_path.as_posix() for r in cancelled] == ['g/small/1']
+    canceled = cast('Context', cancel_call['context']).reports
+    assert [r.run.run_path.as_posix() for r in canceled] == ['g/small/1']
     assert 'g/small/1' in _launched_runs(fake_backend=fake_backend)
 
 
@@ -961,40 +961,40 @@ def test_resubmit_reports_the_job_ids_it_cancels_including_held_ones(
     fake_backend.set_states(
         phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
     )
-    fake_backend.cancellable_answer = ['job-0']
+    fake_backend.cancelable_answer = ['job-0']
     ctx = context(project=project, machine_file='cluster.toml')
-    cancelled: list[str] = []
-    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=cancelled.extend) == 0
-    assert cancelled == ['job-0']
+    canceled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=canceled.extend) == 0
+    assert canceled == ['job-0']
 
 
-def test_resubmit_dry_run_reports_no_cancelled_jobs(
+def test_resubmit_dry_run_reports_no_canceled_jobs(
     project: Path, fake_backend: FakeBackend
 ) -> None:
     submit_study(project=project)
     fake_backend.set_states(
         phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
     )
-    fake_backend.cancellable_answer = ['job-0']
+    fake_backend.cancelable_answer = ['job-0']
     ctx = context(project=project, machine_file='cluster.toml')
-    cancelled: list[str] = []
-    assert resubmit(context=ctx, sleep=no_sleep, dry_run=True, on_cancel=cancelled.extend) == 0
-    assert cancelled == []
+    canceled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, dry_run=True, on_cancel=canceled.extend) == 0
+    assert canceled == []
 
 
-def test_resubmit_reports_no_cancelled_jobs_when_the_cancel_fails(
+def test_resubmit_reports_no_canceled_jobs_when_the_cancel_fails(
     project: Path, fake_backend: FakeBackend
 ) -> None:
     submit_study(project=project)
     fake_backend.set_states(
         phases={'job-0_0': JobPhase.QUEUED}, flags={'job-0_0': frozenset({JobFlag.REQUEUE_HELD})}
     )
-    fake_backend.cancellable_answer = ['job-0']
+    fake_backend.cancelable_answer = ['job-0']
     fake_backend.cancel_answer = (1, [])
     ctx = context(project=project, machine_file='cluster.toml')
-    cancelled: list[str] = []
-    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=cancelled.extend) != 0
-    assert cancelled == []
+    canceled: list[str] = []
+    assert resubmit(context=ctx, sleep=no_sleep, on_cancel=canceled.extend) != 0
+    assert canceled == []
 
 
 def _time_limited(*, project: Path, run_path: str) -> None:
@@ -1057,7 +1057,7 @@ def test_auto_resubmit_cancels_and_resubmits_a_held_chained_job(
     _chain_submitted(project=project, fake_backend=fake_backend)
     enable_retry(project=project, text='chained_retry = "requeue"\n')
     _time_limited(project=project, run_path='pretrain/a')
-    fake_backend.cancellable_answer = ['job-0_0']
+    fake_backend.cancelable_answer = ['job-0_0']
     ctx = _chain_states(
         project=project,
         fake_backend=fake_backend,
@@ -1068,8 +1068,8 @@ def test_auto_resubmit_cancels_and_resubmits_a_held_chained_job(
     assert report.state is StudyState.INTERRUPTED
     assert resubmit(context=ctx, auto=True, sleep=no_sleep) == 0
     (cancel_call,) = fake_backend.calls('cancel')
-    cancelled = cast('Context', cancel_call['context']).reports
-    assert 'pretrain/a' in [r.run.run_path.as_posix() for r in cancelled]
+    canceled = cast('Context', cancel_call['context']).reports
+    assert 'pretrain/a' in [r.run.run_path.as_posix() for r in canceled]
     assert 'pretrain/a' in _launched_runs(fake_backend=fake_backend)
 
 
@@ -1078,12 +1078,10 @@ def jobs_of_chain(*, project: Path) -> list[JobRecord]:
     return read_jobs(path=project / 'runs' / 'chain' / '.study' / 'submissions.jsonl')
 
 
-def _cancelled_chain(
-    *, project: Path, fake_backend: FakeBackend, grids: tuple[str, ...]
-) -> Context:
-    """The chain after ``study cancel``: pretrain/a cancelled while running, the rest queued."""
+def _canceled_chain(*, project: Path, fake_backend: FakeBackend, grids: tuple[str, ...]) -> Context:
+    """The chain after ``study cancel``: pretrain/a canceled while running, the rest queued."""
     _chain_submitted(project=project, fake_backend=fake_backend)
-    # why: the cancelled run left a stale running status in its folder
+    # why: the canceled run left a stale running status in its folder
     write_status(
         path=project / 'runs' / 'chain' / 'pretrain' / 'a' / 'status.json',
         snapshot=RunStatusSnapshot(
@@ -1097,16 +1095,16 @@ def _cancelled_chain(
         project=project,
         fake_backend=fake_backend,
         phases=dict.fromkeys(task_ids, JobPhase.FAILED),
-        flags=dict.fromkeys(task_ids, frozenset({JobFlag.CANCELLED})),
+        flags=dict.fromkeys(task_ids, frozenset({JobFlag.CANCELED})),
         grids=grids,
     )
 
 
 @pytest.mark.parametrize('grids', [(), ('probe',)])
-def test_default_resubmit_pulls_in_cancelled_upstream_of_dependency_failed(
+def test_default_resubmit_pulls_in_canceled_upstream_of_dependency_failed(
     project: Path, fake_backend: FakeBackend, grids: tuple[str, ...]
 ) -> None:
-    ctx = _cancelled_chain(project=project, fake_backend=fake_backend, grids=grids)
+    ctx = _canceled_chain(project=project, fake_backend=fake_backend, grids=grids)
     states = {
         report.run.run_path.as_posix(): report.state
         for report in study_reports(context=ctx).values()

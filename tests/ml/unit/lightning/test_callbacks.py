@@ -152,7 +152,7 @@ def test_sigterm_is_ignored_when_only_the_run_saw_sigusr2(
     with _defer_time_limit_signals(signal_stop=signal_stop):
         handler = signal.getsignal(signal.SIGTERM)
         assert callable(handler)
-        monkeypatch.setattr(Run, 'time_limit_signalled', property(lambda _run: True))
+        monkeypatch.setattr(Run, 'time_limit_signaled', property(lambda _run: True))
         handler(signal.SIGTERM, None)
 
 
@@ -161,9 +161,9 @@ def test_signal_stop_reports_a_signal_that_only_the_run_saw(
 ) -> None:
     run = Run(config=LightningTrainerConfig(), root=tmp_path, relative_path=Path('run'))
     signal_stop = _SignalStop(run=run, checkpoint_directory=tmp_path, deadline=None)
-    assert not signal_stop.signalled
-    monkeypatch.setattr(Run, 'time_limit_signalled', property(lambda _run: True))
-    assert signal_stop.signalled
+    assert not signal_stop.signaled
+    monkeypatch.setattr(Run, 'time_limit_signaled', property(lambda _run: True))
+    assert signal_stop.signaled
 
 
 def test_defer_time_limit_signals_is_safe_without_sigusr2(

@@ -568,13 +568,13 @@ Two states belong to chained runs:
 
 - `waiting`: the job is queued behind an upstream job.
 - `dependency_failed`: the run never started because an upstream condition can
-  not be met, or the upstream job was cancelled.
+  not be met, or the upstream job was canceled.
 
 `resubmit` takes `dependency_failed` runs by default. Resubmitting an upstream run
 also cancels and resubmits the `waiting` and `dependency_failed` runs behind it,
 with dependencies on the new job ids. `cancel` of upstream runs also cancels
-the `waiting` runs behind them. A cancelled upstream run reads `failed`; when
-`resubmit` takes a `dependency_failed` run behind it, it resubmits the cancelled
+the `waiting` runs behind them. A canceled upstream run reads `failed`; when
+`resubmit` takes a `dependency_failed` run behind it, it resubmits the canceled
 upstream run too, so cancel then `resubmit` brings the whole chain back. `submit` and `resubmit` take `--ignore-after` to
 submit without dependencies.
 
@@ -586,7 +586,7 @@ With `[followup] chained_retry = "requeue"` (SLURM only), a chained job is submi
 `interrupted`, it is under `max_attempts` and it made progress. If they hold, the job runs
 `scontrol requeue <array job id>_<task id>` on itself, so SLURM starts it again with the same
 job id and the downstream jobs keep waiting. Otherwise the job ends non-zero, the downstream
-jobs are cancelled by `--kill-on-invalid-dep=yes`, and the follow-up job recovers them.
+jobs are canceled by `--kill-on-invalid-dep=yes`, and the follow-up job recovers them.
 
 SLURM documents that `afterok` stays valid across a requeue, but this is implied by the
 documentation and not confirmed on a cluster. If a cluster drops the dependency, the downstream
@@ -787,7 +787,7 @@ train for the whole allocation.
 `tslab study usage` reads the accounting of the selected runs from `sacct`
 and shows what each run used: the state, the elapsed time against the time
 limit, the peak memory against the requested memory, the CPU time, and the
-GPUs. Runs that ended paused or signalled are marked `paused: needs more than
+GPUs. Runs that ended paused or signaled are marked `paused: needs more than
 one job`; they use their share of the time limit by design and are left out
 of the time suggestion, their memory still counting.
 
@@ -806,7 +806,7 @@ uv run tslab study usage example --machine cluster
 
 `tslab study cancel` cancels queued and running SLURM jobs in the selected
 slice. Use `--dry-run` to inspect job ids first. `--signal` sends `USR2` to
-the running jobs instead of cancelling them; the runs save a checkpoint and
+the running jobs instead of canceling them; the runs save a checkpoint and
 end on their own, and read as `interrupted`. It is a way to test the timeout
 path without waiting for the time limit; queued runs are skipped, because a
 pending job has no step to signal. See [HPC and SLURM](hpc.md#time-limits)

@@ -161,7 +161,7 @@ def test_job_states_gives_reasons_and_flags(*, project: Path, fake: FakeSlurm) -
     assert states.flags == {
         '1000_0': frozenset({JobFlag.TIME_LIMIT}),
         '1000_1': frozenset({JobFlag.NOT_COUNTED}),
-        '1000_3': frozenset({JobFlag.CANCELLED}),
+        '1000_3': frozenset({JobFlag.CANCELED}),
         '1000_4': frozenset({JobFlag.NOT_COUNTED}),
     }
     assert states.states['1000_5'] == 'unknown'
@@ -195,7 +195,7 @@ def test_job_states_flags_dependency_reasons(*, project: Path, fake: FakeSlurm) 
     )
 
     assert states.flags['1000_0'] == frozenset({JobFlag.DEPENDENCY_PENDING})
-    assert states.flags['1000_1'] == frozenset({JobFlag.CANCELLED, JobFlag.DEPENDENCY_NEVER})
+    assert states.flags['1000_1'] == frozenset({JobFlag.CANCELED, JobFlag.DEPENDENCY_NEVER})
     assert fake.calls('squeue')[-1][-1] == '--format=%i|%r'
 
 
@@ -317,13 +317,13 @@ def test_resources_rejects_profile_without_slurm_table(*, project: Path, fake: F
         )
 
 
-def test_cancellable_job_ids_returns_live_runs(*, project: Path, fake: FakeSlurm) -> None:
+def test_cancelable_job_ids_returns_live_runs(*, project: Path, fake: FakeSlurm) -> None:
     submit_study(project=project)
     fake.set_answers('squeue', [{'exit': 0, 'stdout': '1000_0|RUNNING\n1000_1|PENDING\n'}])
     fake.set_answers('sacct', [{'exit': 0, 'stdout': '1000_2|COMPLETED\n1000_3|COMPLETED\n'}])
     ctx = context(project=project, machine_file='cluster.toml')
 
-    assert SlurmBackend().cancellable_job_ids(reports=ctx.reports) == ['1000_0', '1000_1']
+    assert SlurmBackend().cancelable_job_ids(reports=ctx.reports) == ['1000_0', '1000_1']
 
 
 def test_detach_rejects_slurm_machine(*, project: Path, fake: FakeSlurm) -> None:
@@ -447,9 +447,9 @@ def _context_with_live_runs(*, project: Path, fake: FakeSlurm) -> Context:
 
 def test_cancel_scancels_live_runs_only(project: Path, fake: FakeSlurm) -> None:
     ctx = _context_with_live_runs(project=project, fake=fake)
-    code, cancelled = cancel(context=ctx, dry_run=False)
+    code, canceled = cancel(context=ctx, dry_run=False)
     assert code == 0
-    assert cancelled == ['1000_0', '1000_1']
+    assert canceled == ['1000_0', '1000_1']
     assert fake.calls('scancel') == [['1000_0', '1000_1']]
 
 
@@ -468,17 +468,17 @@ def test_cancel_failure_logs_and_returns_error_code(
     ctx = _context_with_live_runs(project=project, fake=fake)
     fake.set_answers('scancel', [{'exit': 1, 'stderr': 'slurm_load_jobs error: Invalid job id'}])
     with caplog.at_level(logging.ERROR):
-        code, cancelled = cancel(context=ctx, dry_run=False)
+        code, canceled = cancel(context=ctx, dry_run=False)
     assert code == 1
-    assert cancelled == []
+    assert canceled == []
     assert any(record.levelno == logging.ERROR for record in caplog.records)
 
 
 def test_cancel_dry_run_calls_nothing(project: Path, fake: FakeSlurm) -> None:
     ctx = _context_with_live_runs(project=project, fake=fake)
-    code, cancelled = cancel(context=ctx, dry_run=True)
+    code, canceled = cancel(context=ctx, dry_run=True)
     assert code == 0
-    assert cancelled == ['1000_0', '1000_1']
+    assert canceled == ['1000_0', '1000_1']
     assert fake.calls('scancel') == []
 
 
@@ -524,7 +524,7 @@ def test_cancel_signal_cli_json_has_signal(
     document = json.loads(capsys.readouterr().out)
     assert raised.value.code == 0
     assert document['signal'] == 'USR2'
-    assert document['cancelled'] == ['1000_0']
+    assert document['canceled'] == ['1000_0']
 
 
 def test_cancel_respects_only_selection(project: Path, fake: FakeSlurm) -> None:
@@ -565,7 +565,7 @@ def test_cancel_json_shape(
     assert raised.value.code == 0
     assert document == {
         'schema': 'tslab.study-cancel',
-        'cancelled': ['1000_0', '1000_1'],
+        'canceled': ['1000_0', '1000_1'],
         'dry_run': True,
         'signal': None,
         'exit_code': 0,

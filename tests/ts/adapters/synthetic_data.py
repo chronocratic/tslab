@@ -17,8 +17,8 @@ FORECASTING_FILE = 'toy_hourly.csv.gz'
 _LENGTH = 286
 _TRAIN_COUNTS = (14, 14)
 _TEST_COUNTS = (15, 13)
-_SHARED_BUMPS = ((0.15, 0.04, 1.0), (0.5, 0.08, 0.6), (0.85, 0.05, 0.8))  # centre, width, height
-_CLASS_BUMP_CENTRES = (0.35, 0.65)
+_SHARED_BUMPS = ((0.15, 0.04, 1.0), (0.5, 0.08, 0.6), (0.85, 0.05, 0.8))  # center, width, height
+_CLASS_BUMP_CENTERS = (0.35, 0.65)
 
 _HOURS = 14_400
 _START = np.datetime64('2016-07-01T00:00')
@@ -36,10 +36,10 @@ _OIL_TEMPERATURE = (13.3, 8.6)
 
 def _spectrum(*, rng: np.random.Generator, label: int) -> np.ndarray:
     position = np.linspace(start=0.0, stop=1.0, num=_LENGTH)
-    bumps = [*_SHARED_BUMPS, (_CLASS_BUMP_CENTRES[label], 0.05, 1.2)]
+    bumps = [*_SHARED_BUMPS, (_CLASS_BUMP_CENTERS[label], 0.05, 1.2)]
     row = np.zeros(_LENGTH)
-    for centre, width, height in bumps:
-        shifted = centre + rng.normal(loc=0.0, scale=0.01)
+    for center, width, height in bumps:
+        shifted = center + rng.normal(loc=0.0, scale=0.01)
         wide = width * rng.uniform(low=0.9, high=1.1)
         row += height * np.exp(-0.5 * ((position - shifted) / wide) ** 2)
     row += rng.normal(loc=0.0, scale=0.02, size=_LENGTH)

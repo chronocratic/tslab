@@ -173,7 +173,7 @@ class Submit:
             report, groups = launches[0] if launches else (None, ())
             print_json(
                 document=launch_document(
-                    report=report, groups=groups, dry_run=self.dry_run, cancelled=(), exit_code=code
+                    report=report, groups=groups, dry_run=self.dry_run, canceled=(), exit_code=code
                 )
             )
         return code

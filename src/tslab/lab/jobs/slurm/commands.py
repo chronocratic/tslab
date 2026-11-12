@@ -222,7 +222,7 @@ def scancel(*, job_ids: Sequence[str], signal: str | None = None) -> None:
     Args:
         job_ids: The job ids to cancel; nothing is called for an empty list.
         signal: Send this signal (such as ``USR2``) to the steps of the jobs
-            instead of cancelling them, like ``--signal=USR2`` without ``B:``.
+            instead of canceling them, like ``--signal=USR2`` without ``B:``.
 
     Returns:
         None.

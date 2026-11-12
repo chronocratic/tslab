@@ -32,7 +32,7 @@ DELTA_COLUMN = 'delta'
 
 @dataclass(frozen=True, kw_only=True)
 class AnalysisMetric:
-    """A metric to analyse: which results column, how to label it, which direction is better.
+    """A metric to analyze: which results column, how to label it, which direction is better.
 
     Attributes:
         name: The metric name as the study writes it (the part after ``metric/``).

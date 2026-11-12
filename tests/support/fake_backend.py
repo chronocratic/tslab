@@ -120,7 +120,7 @@ class FakeBackend:
         expected_starts_answer: The starts ``expected_starts`` returns.
         after_submit_code: The exit code ``after_submit`` returns.
         cancel_answer: The exit code and ids ``cancel`` returns.
-        cancellable_answer: The ids ``cancellable_job_ids`` returns.
+        cancelable_answer: The ids ``cancelable_job_ids`` returns.
         detach_code: The exit code ``detach`` returns.
         usage_answer: The usage ``usage`` returns.
         gpu_ids_answer: The GPU ids ``usage`` returns.
@@ -142,7 +142,7 @@ class FakeBackend:
         self.expected_starts_answer: dict[str, QueuedJob] | None = None
         self.after_submit_code: int = 0
         self.cancel_answer: tuple[int, list[str]] = (0, [])
-        self.cancellable_answer: list[str] = []
+        self.cancelable_answer: list[str] = []
         self.detach_code: int = 0
         self.usage_answer: Mapping[str, JobUsage] = {}
         self.gpu_ids_answer: Mapping[str, str | None] = {}
@@ -348,10 +348,10 @@ class FakeBackend:
         self._record(method='cancel', context=context, dry_run=dry_run, signal=signal)
         return self.cancel_answer[0], list(self.cancel_answer[1])
 
-    def cancellable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
+    def cancelable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
         """The ids the test set, as a copy."""
-        self._record(method='cancellable_job_ids', reports=reports)
-        return list(self.cancellable_answer)
+        self._record(method='cancelable_job_ids', reports=reports)
+        return list(self.cancelable_answer)
 
     def detach(self, *, context: Context, arguments: Sequence[str], wait_command: str) -> int:
         """The exit code the test set."""

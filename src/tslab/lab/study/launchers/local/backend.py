@@ -334,7 +334,7 @@ class LocalBackend:
 
         return cancel_local(context=context, dry_run=dry_run, signal=signal)
 
-    def cancellable_job_ids(
+    def cancelable_job_ids(
         self,
         *,
         reports: Sequence[RunReport],  # noqa: ARG002 # why: the Backend signature

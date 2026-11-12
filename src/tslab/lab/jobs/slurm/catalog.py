@@ -1,4 +1,4 @@
-"""A catalogue of read-only SLURM commands, scoped to the jobs of one study.
+"""A catalog of read-only SLURM commands, scoped to the jobs of one study.
 
 Each entry is data: a tool, its arguments with placeholders, and which job ids it
 takes. Callers render it to a shell file or run it directly.
@@ -44,7 +44,7 @@ class IdScope(StrEnum):
 
 @dataclass(frozen=True, kw_only=True)
 class SlurmCommand:
-    """One catalogue entry.
+    """One catalog entry.
 
     Attributes:
         name: ``<tool>-<variant>``.
@@ -206,7 +206,7 @@ SLURM_COMMANDS: tuple[SlurmCommand, ...] = (
 
 
 def slurm_command(*, name: str) -> SlurmCommand:
-    """The catalogue entry called ``name``; ``KeyError`` lists the valid names."""
+    """The catalog entry called ``name``; ``KeyError`` lists the valid names."""
     for command in SLURM_COMMANDS:
         if command.name == name:
             return command
@@ -293,14 +293,14 @@ def _command_error(
 
 
 def run_slurm_command(*, command: SlurmCommand, values: CommandValues) -> CommandOutput:
-    """Run a catalogue command for the jobs of a study; outputs are joined in order."""
+    """Run a catalog command for the jobs of a study; outputs are joined in order."""
     ids, fell_back = select_ids(scope=command.scope, job_ids=values.job_ids)
     returncode = 0
     stdout: list[str] = []
     stderr: list[str] = [_FALLBACK_NOTE] if fell_back else []
     for line in command_lines(command=command, ids=ids, values=values):
         try:
-            # why: fixed scheduler tool on PATH from the catalogue
+            # why: fixed scheduler tool on PATH from the catalog
             process = _run(command=line, timeout=QUERY_TIMEOUT_SECONDS)
         except SlurmError as error:
             return _command_error(error=error, command=command, stdout=stdout)

@@ -1,4 +1,4 @@
-"""Post-hoc analysis of study results: tests, diagrams, numbers and an organised output tree.
+"""Post-hoc analysis of study results: tests, diagrams, numbers and an organized output tree.
 
 Needs the ``analysis`` extra.
 """

@@ -385,7 +385,7 @@ def test_usr2_on_a_non_zero_rank_only_logs(
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
         signal.raise_signal(signal.SIGUSR2)
         signal.raise_signal(signal.SIGTERM)
-        assert run.time_limit_signalled
+        assert run.time_limit_signaled
     assert 'SIGUSR2' in caplog.text
 
 
@@ -419,7 +419,7 @@ def test_usr2_handler_is_reset_when_the_previous_one_is_unreadable(
 def test_run_works_without_sigusr2_support(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delattr(signal, 'SIGUSR2', raising=False)
     with Run(config=Config(), root=tmp_path, relative_path=Path('a')) as run:
-        assert not run.time_limit_signalled
+        assert not run.time_limit_signaled
 
 
 def test_logger_levels_are_restored(tmp_path: Path) -> None:

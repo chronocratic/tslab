@@ -176,7 +176,7 @@ class Backend(Protocol):
         """Cancel the live jobs; the exit code and the touched job ids."""
         ...
 
-    def cancellable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
+    def cancelable_job_ids(self, *, reports: Sequence[RunReport]) -> list[str]:
         """The job ids a cancel can reach for the reports."""
         ...
 

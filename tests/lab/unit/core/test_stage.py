@@ -338,7 +338,7 @@ def test_var_positional_is_reported_by_name() -> None:
         )
 
 
-def test_usr2_in_a_stage_fails_it_as_signalled_and_exits(tmp_path: Path) -> None:
+def test_usr2_in_a_stage_fails_it_as_signaled_and_exits(tmp_path: Path) -> None:
     assert hasattr(tslab.lab, 'JobTimeLimitSignal')
 
     @tslab.lab.stage(name='slow', output=tslab.lab.Json)
@@ -356,7 +356,7 @@ def test_usr2_in_a_stage_fails_it_as_signalled_and_exits(tmp_path: Path) -> None
     assert 'JobTimeLimitSignal' in (tmp_path / 'r' / 'slow' / 'default' / 'error.txt').read_text()
 
 
-def test_usr2_between_stages_fails_the_next_stage_as_signalled(tmp_path: Path) -> None:
+def test_usr2_between_stages_fails_the_next_stage_as_signaled(tmp_path: Path) -> None:
     assert hasattr(tslab.lab, 'JobTimeLimitSignal')
 
     @tslab.lab.stage(name='first', output=tslab.lab.Json)

@@ -45,7 +45,7 @@ __all__ = ['may_retry', 'resubmit', 'run_one']
 # why: a selection error lists this many run paths before counting the rest
 _SELECTION_SHOWN = 20
 
-# why: a cancelled job leaves its lock until the heartbeat is stale; the restart
+# why: a canceled job leaves its lock until the heartbeat is stale; the restart
 # waits the stale-lock limit of the run engine plus a minute
 _RESTART_DELAY_SECONDS = int(STALE_AFTER_SECONDS) + 60
 
@@ -79,8 +79,8 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
 
     Queued and running runs are never selected by state. With
     ``cancel_live``, the queued and running runs that hold a SLURM job id
-    are cancelled first and submitted a little later, so they restart on a
-    fresh machine. The cancelling happens after the plan is validated, and
+    are canceled first and submitted a little later, so they restart on a
+    fresh machine. The canceling happens after the plan is validated, and
     never on a dry run.
 
     Every run resubmits from the code snapshot of its latest job; a run
@@ -93,7 +93,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         context: The context to resubmit from.
         states: The states to resubmit; interrupted, missing and dependency failed
             by default. Waiting runs that depend on a selected run come along, and
-            their jobs are cancelled first.
+            their jobs are canceled first.
         cancel_live: Cancel the live runs of the selection first.
         dry_run: Write the job files and print the plan, submit nothing.
         extra_args: The pass-through arguments; taken from the last
@@ -113,7 +113,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
         on_launch: Called once with the launch result and groups, including dry runs.
         task_stream: Stream for task output on a local machine.
         ignore_after: Submit without dependency targets or the local dependency filter.
-        on_cancel: Called once with the job ids the first step cancelled, the selected live
+        on_cancel: Called once with the job ids the first step canceled, the selected live
             runs, the held ones and the waiting downstream ones; not called without any,
             on a dry run, or when the cancel failed.
 
@@ -141,7 +141,7 @@ def resubmit(  # noqa: PLR0913 # why: keyword-only public API; each option is do
     if auto:
         selected = _auto_selection(reports=selected, context=context)
     else:
-        context, selected = _with_cancelled_upstream(context=context, selected=selected)
+        context, selected = _with_canceled_upstream(context=context, selected=selected)
     live = _live_reports(reports=context.reports, cancel_live=cancel_live)
     selected += live
     # why: SLURM holds a job at MaxBatchRequeue; it shows interrupted but is still queued
@@ -273,12 +273,12 @@ def _with_downstream(
     return context, [*selected, *failed], waiting
 
 
-def _with_cancelled_upstream(
+def _with_canceled_upstream(
     *, context: Context, selected: list[RunReport]
 ) -> tuple[Context, list[RunReport]]:
-    """Add the cancelled upstream runs that keep selected runs ``dependency_failed``.
+    """Add the canceled upstream runs that keep selected runs ``dependency_failed``.
 
-    A run cancelled by the user (``study cancel``, ``scancel``) reads ``failed``, so the
+    A run canceled by the user (``study cancel``, ``scancel``) reads ``failed``, so the
     default states leave it out, and its downstream runs could never be submitted.
 
     Returns:
@@ -290,7 +290,7 @@ def _with_cancelled_upstream(
     chosen = {report.run.run_path: report for report in selected}
     pending = [report for report in selected if report.state is StudyState.DEPENDENCY_FAILED]
     while pending:
-        found = _cancelled_upstream(
+        found = _canceled_upstream(
             context=context, report=pending.pop(), everything=everything, chosen=chosen
         )
         chosen.update({report.run.run_path: report for report in found})
@@ -300,18 +300,18 @@ def _with_cancelled_upstream(
     if not extra:
         return context, selected
     for report in extra:
-        _LOGGER.info('also resubmitting %s: it was cancelled', report.run.run_path)
+        _LOGGER.info('also resubmitting %s: it was canceled', report.run.run_path)
     return widen_context(context=context, reports=extra), [*selected, *extra]
 
 
-def _cancelled_upstream(
+def _canceled_upstream(
     *,
     context: Context,
     report: RunReport,
     everything: Mapping[PurePosixPath, RunReport],
     chosen: Mapping[PurePosixPath, RunReport],
 ) -> list[RunReport]:
-    """The cancelled upstream runs of one report that are not chosen yet."""
+    """The canceled upstream runs of one report that are not chosen yet."""
     paths = dict.fromkeys(
         upstream.run_path
         for after in context.study.grids[report.run.grid].after
@@ -321,13 +321,13 @@ def _cancelled_upstream(
     return [
         everything[path]
         for path in paths
-        if path in everything and _cancelled(report=everything[path])
+        if path in everything and _canceled(report=everything[path])
     ]
 
 
-def _cancelled(*, report: RunReport) -> bool:
-    """Whether a failed run ended because its job was cancelled."""
-    return report.state is StudyState.FAILED and JobFlag.CANCELLED in report.job_flags
+def _canceled(*, report: RunReport) -> bool:
+    """Whether a failed run ended because its job was canceled."""
+    return report.state is StudyState.FAILED and JobFlag.CANCELED in report.job_flags
 
 
 def _code_snapshots_of(
@@ -420,22 +420,22 @@ def _before_resubmit(  # noqa: PLR0913 # why: keyword-only private helper, one p
     dry_run: bool,
     on_cancel: Callable[[Sequence[str]], None] | None,
 ) -> tuple[int | None, Callable[[], int]]:
-    cancellable = backend.cancellable_job_ids(reports=live)
-    if dry_run and cancellable:
-        _LOGGER.info('would cancel %s', ', '.join(cancellable))
+    cancelable = backend.cancelable_job_ids(reports=live)
+    if dry_run and cancelable:
+        _LOGGER.info('would cancel %s', ', '.join(cancelable))
 
     def before_launch() -> int:
         code = (
             backend.cancel(
                 context=dataclasses.replace(context, reports=list(live)), dry_run=False, signal=None
             )[0]
-            if cancellable
+            if cancelable
             else 0
         )
         if code != 0:
             return code
-        if cancellable and on_cancel is not None:
-            on_cancel(cancellable)
+        if cancelable and on_cancel is not None:
+            on_cancel(cancelable)
         _remove_ended_locks(
             reports=selected,
             study_directory=context.study_directory,
@@ -443,7 +443,7 @@ def _before_resubmit(  # noqa: PLR0913 # why: keyword-only private helper, one p
         )
         return 0
 
-    delay = _RESTART_DELAY_SECONDS if cancellable else None
+    delay = _RESTART_DELAY_SECONDS if cancelable else None
     return delay, before_launch
 
 

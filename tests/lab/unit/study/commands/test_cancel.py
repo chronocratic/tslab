@@ -38,4 +38,4 @@ def test_cancel_upstream_cancels_waiting_downstream(
     (call,) = fake_backend.calls('cancel')
     seen = cast('Context', call['context'])
     assert {r.run.grid for r in seen.reports} == {'pretrain', 'probe'}
-    assert 'also cancelled 4 waiting downstream runs' in caplog.text
+    assert 'also canceled 4 waiting downstream runs' in caplog.text

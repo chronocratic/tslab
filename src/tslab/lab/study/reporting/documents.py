@@ -157,16 +157,16 @@ def _json_setting_value(*, value: SettingValue) -> object:
 
 
 def cancel_document(
-    *, cancelled: Sequence[str], dry_run: bool, exit_code: int, signal: str | None = None
+    *, canceled: Sequence[str], dry_run: bool, exit_code: int, signal: str | None = None
 ) -> dict[str, object]:
     """The JSON document for a study cancellation.
 
     Args:
-        cancelled: The job ids cancelled or selected for cancellation.
+        canceled: The job ids canceled or selected for cancellation.
         dry_run: Whether cancellation was only previewed.
         exit_code: The command exit code.
         signal: The signal sent to the running jobs, or ``None`` when the
-            jobs were cancelled or left untouched.
+            jobs were canceled or left untouched.
 
     Returns:
         The study-cancel document.
@@ -174,7 +174,7 @@ def cancel_document(
     return {
         # When API is stable: version this id (tslab.study-cancel/1); bump on a breaking change.
         'schema': 'tslab.study-cancel',
-        'cancelled': list(cancelled),
+        'canceled': list(canceled),
         'dry_run': dry_run,
         'signal': signal,
         'exit_code': exit_code,
@@ -212,7 +212,7 @@ def launch_document(
     report: LaunchReport | None,
     groups: Sequence[JobGroup],
     dry_run: bool,
-    cancelled: Sequence[str],
+    canceled: Sequence[str],
     exit_code: int,
 ) -> dict[str, object]:
     """The JSON document for a submit or resubmit launch.
@@ -221,7 +221,7 @@ def launch_document(
         report: The result of the launch, or ``None`` when nothing was launched.
         groups: The groups planned for this launch.
         dry_run: Whether the launch only wrote its plan.
-        cancelled: The cancelled job ids, for resubmit.
+        canceled: The canceled job ids, for resubmit.
         exit_code: The command exit code.
 
     Returns:
@@ -233,7 +233,7 @@ def launch_document(
         'schema': 'tslab.study-launch',
         'dry_run': dry_run,
         'jobs': jobs,
-        'cancelled': list(cancelled),
+        'canceled': list(canceled),
         'exit_code': exit_code,
     }
 

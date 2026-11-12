@@ -1,7 +1,7 @@
-# Analyse study results
+# Analyze study results
 
 `tslab.lab.analysis` turns the results of a study into tests, a critical-difference diagram, a
-numbers file for a paper and an organised folder of tables and figures. It needs the
+numbers file for a paper and an organized folder of tables and figures. It needs the
 `analysis` extra:
 
 ```bash

@@ -1,4 +1,4 @@
-"""The catalogue of read-only SLURM commands and its live id selection."""
+"""The catalog of read-only SLURM commands and its live id selection."""
 
 from pathlib import Path
 import re
@@ -7,8 +7,8 @@ import subprocess
 import pytest
 
 from tests.lab.unit.jobs.slurm.fake_slurm import FakeSlurm, install_fake_slurm
-from tslab.lab.jobs.slurm import catalogue, SlurmError
-from tslab.lab.jobs.slurm.catalogue import (
+from tslab.lab.jobs.slurm import catalog, SlurmError
+from tslab.lab.jobs.slurm.catalog import (
     command_lines,
     CommandOutput,
     CommandValues,
@@ -101,7 +101,7 @@ def test_unknown_name_lists_valid_names() -> None:
         slurm_command(name='squeue')
 
 
-def test_docs_table_matches_catalogue() -> None:
+def test_docs_table_matches_catalog() -> None:
     repo = Path(__file__).resolve().parents[5]
     text = (repo / 'docs' / 'lab' / 'hpc.md').read_text(encoding='utf-8')
     names = re.findall(r'^\| `([a-z]+-[a-z-]+)` \|', text, re.MULTILINE)
@@ -123,13 +123,13 @@ def test_fallback_tolerates_purged_ids_for_every_live_tool(fake: FakeSlurm) -> N
 
 def test_a_hung_tool_times_out(fake: FakeSlurm, monkeypatch: pytest.MonkeyPatch) -> None:
     fake.set_answers('seff', [{'sleep': 3}])
-    monkeypatch.setattr('tslab.lab.jobs.slurm.catalogue.QUERY_TIMEOUT_SECONDS', 0.3)
+    monkeypatch.setattr('tslab.lab.jobs.slurm.catalog.QUERY_TIMEOUT_SECONDS', 0.3)
     output = run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
     assert output.returncode == 124
     assert 'seff did not answer within' in output.stderr
 
 
-def test_timeout_from_shared_runner_keeps_catalogue_timeout_code(
+def test_timeout_from_shared_runner_keeps_catalog_timeout_code(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     def timed_out_runner(*, command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
@@ -138,10 +138,10 @@ def test_timeout_from_shared_runner_keeps_catalogue_timeout_code(
         raise SlurmError(message) from error
 
     monkeypatch.setenv('PATH', str(tmp_path))
-    monkeypatch.setattr(catalogue, 'QUERY_TIMEOUT_SECONDS', 0.3)
-    monkeypatch.setattr(catalogue, '_run', timed_out_runner)
+    monkeypatch.setattr(catalog, 'QUERY_TIMEOUT_SECONDS', 0.3)
+    monkeypatch.setattr(catalog, '_run', timed_out_runner)
 
-    output = catalogue.run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
+    output = catalog.run_slurm_command(command=slurm_command(name='seff-all'), values=VALUES)
 
     assert output == CommandOutput(
         returncode=124, stdout='', stderr='seff did not answer within 0.3 seconds\n'

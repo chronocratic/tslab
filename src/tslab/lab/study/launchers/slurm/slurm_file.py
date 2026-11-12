@@ -1,4 +1,4 @@
-"""The ``slurm.sh`` file of a study: the SLURM command catalogue as bash functions."""
+"""The ``slurm.sh`` file of a study: the SLURM command catalog as bash functions."""
 
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -140,7 +140,7 @@ def _function(*, command: SlurmCommand, values: CommandValues) -> str:
 
 
 def slurm_file_text(*, study: Study, values: CommandValues) -> str:
-    """The bash text of ``slurm.sh``: one function per catalogue command.
+    """The bash text of ``slurm.sh``: one function per catalog command.
 
     Args:
         study: The study the file is for.

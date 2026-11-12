@@ -1,4 +1,4 @@
-"""Cancelling a live local launch."""
+"""Canceling a live local launch."""
 
 import logging
 import os
@@ -35,7 +35,7 @@ def cancel_local(*, context: Context, dry_run: bool, signal: str | None) -> tupl
     ]
     if missed:
         _LOGGER.error(
-            'a local launch is cancelled as one unit; the selection misses its tasks: %s',
+            'a local launch is canceled as one unit; the selection misses its tasks: %s',
             ', '.join(missed),
         )
         return 2, []

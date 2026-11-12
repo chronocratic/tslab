@@ -208,7 +208,7 @@ class Resubmit:
         def remember_launch(*, report: LaunchReport, groups: Sequence[JobGroup]) -> None:
             launches.append((report, groups))
 
-        cancelled: list[str] = []
+        canceled: list[str] = []
         try:
             code = resubmit(
                 context=context,
@@ -220,7 +220,7 @@ class Resubmit:
                 new_code_snapshot=code_snapshot,
                 drop_code_snapshot=self.no_code_snapshot,
                 ignore_after=self.ignore_after,
-                on_cancel=cancelled.extend,
+                on_cancel=canceled.extend,
                 on_launch=remember_launch if self.json else None,
                 task_stream=sys.stderr if self.json else None,
             )
@@ -240,7 +240,7 @@ class Resubmit:
                     report=report,
                     groups=groups,
                     dry_run=self.dry_run,
-                    cancelled=cancelled,
+                    canceled=canceled,
                     exit_code=code,
                 )
             )
