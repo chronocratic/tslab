@@ -3,8 +3,8 @@
 from tslab import __version__
 
 project = 'TSLab'
-author = 'The Chronocratic Developers'
-copyright = '2026, The Chronocratic Developers'  # noqa: A001  # why: the name Sphinx reads
+author = 'Chronocratic'
+copyright = '2026, Chronocratic'  # noqa: A001  # why: the name Sphinx reads
 release = __version__
 version = __version__
 

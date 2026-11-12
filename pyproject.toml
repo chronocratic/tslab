@@ -10,7 +10,7 @@ readme = "README.md"
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
-authors = [{ name = "The Chronocratic Developers", email = "github@users.noreply.github.com" }]
+authors = [{ name = "Chronocratic", email = "github@users.noreply.github.com" }]
 keywords = ["time series", "representation learning", "pytorch", "lightning", "experiments"]
 classifiers = [
     "Development Status :: 3 - Alpha",

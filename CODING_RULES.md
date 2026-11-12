@@ -337,7 +337,7 @@ they have to read.
 35. Nothing personal or site-specific lands in the repository: no cluster
     partition or QOS names, no personal paths, no W&B entities, no personal
     names. Examples use placeholders such as `CHANGE_ME`. Authorship is
-    "The Chronocratic Developers".
+    "Chronocratic".
 
 ## 10. Tests
 
