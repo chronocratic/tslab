@@ -1,1 +1,0 @@
-Documentation on Read the Docs (user guide and API reference), `examples/minimal` (core only) and `examples/advanced` (a user transform stage with a failing instance, frozen covariates and nested instance names).

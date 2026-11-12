@@ -1,1 +1,0 @@
-A chained job requeued in place now records the next attempt and a fresh progress snapshot in `submissions.jsonl`, so `status`, the progress rule and the follow-up count requeues toward `max_attempts`; restarts SLURM makes on its own (preemption, node failure) do not count.

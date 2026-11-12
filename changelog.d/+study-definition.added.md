@@ -1,1 +1,0 @@
-`tslab.study`: define a round of experiments as grids of runs with typed settings (`Study`, `Grid`, `Override`, `setting_axis`, `from_presets`); `ucr_datasets` and `uea_datasets` in the chronocratic datasets adapter.

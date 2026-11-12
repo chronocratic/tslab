@@ -1,1 +1,0 @@
-Machine profiles now configure extra SLURM options with `[slurm.sbatch_extra]`, a table keyed by long option names. Entries replace matching TSLab options, and `false` removes an option. The old list form is rejected with a table-form example.

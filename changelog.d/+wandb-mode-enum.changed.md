@@ -1,1 +1,0 @@
-The W&B mode is now a `tslab.WandbMode` member (`ONLINE`, `OFFLINE`, `DISABLED`) instead of a string. `TrackingOptions.wandb_mode` and `WandbTracker(mode=...)` take it; the config file and the flag `--tracking.wandb-mode` keep the same text.

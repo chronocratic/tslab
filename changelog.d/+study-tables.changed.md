@@ -1,1 +1,0 @@
-On a terminal, `tslab status`, `tslab study status`, the `submit --dry-run` plan and the submit result print Rich tables with state colors; log files and pipes keep the plain aligned lines. The text helpers that only the study commands and the CLI use moved from `tslab.core.text` to `tslab.helpers.text`.

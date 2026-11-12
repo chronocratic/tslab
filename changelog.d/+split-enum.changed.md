@@ -1,1 +1,0 @@
-`Split` is now a `StrEnum` (`Split.TRAIN`, `Split.VAL`, `Split.TEST`) imported from `tslab.enums`, no longer a `Literal` in `tslab.interfaces`. The members equal the old text, so a data source that still uses `'train'` keeps working at run time; type checkers want the members.

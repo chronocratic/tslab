@@ -1,1 +1,0 @@
-The in-place requeue of a chained SLURM task waits at most 30 seconds for the submission lock, then leaves the run to the follow-up, and reads and writes the job records under the lock so a concurrent resubmit cannot create the same attempt twice.

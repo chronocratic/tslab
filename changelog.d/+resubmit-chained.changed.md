@@ -1,1 +1,0 @@
-`study resubmit` selects `dependency_failed` runs by default, and brings along the waiting and dependency failed runs behind the resubmitted ones. `study cancel` also cancels the waiting runs behind the cancelled ones. `resubmit --auto` follows `retry` for grids that are not chained and `chained_retry` for chained grids.

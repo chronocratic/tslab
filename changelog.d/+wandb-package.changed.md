@@ -1,1 +1,0 @@
-The W&B code moved into `tslab.tracking.wandb`: `tslab.tracking.wandb_tracker` is now `tslab.tracking.wandb.tracker`, `tslab.tracking.wandb_log` is now `tslab.tracking.wandb.log`, and the resync logic of `tslab wandb-sync` moved from `tslab.cli.wandb_sync` to `tslab.tracking.wandb.sync`. The command and the public API of `tslab.tracking` are unchanged.

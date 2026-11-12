@@ -1,1 +1,0 @@
-The atomic file helpers moved from `tslab.core.paths` to `tslab.core.files`; import `JsonFileError`, `atomic_write_text`, `atomic_write_json`, `read_json_object` and `replace_directory` from `tslab.core.files`.

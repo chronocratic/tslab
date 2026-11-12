@@ -1,1 +1,0 @@
-When `followup.wandb_sync` is set on SLURM and `wandb` is not installed in the submitting environment, queuing the follow-up jobs (submit, resubmit and automatic retry) now logs a warning instead of blocking the submit; the sync job needs `tslab[wandb]` or the lighter `tslab[wandb-sync]` in the environment that runs it. `tslab wandb-sync` no longer imports torch.

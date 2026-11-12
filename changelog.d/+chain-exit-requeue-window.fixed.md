@@ -1,1 +1,0 @@
-`chain_exit` asks the scheduler for `MaxBatchRequeue` and searches the run folder for checkpoints before it takes the submission lock, and only when a retry is possible, skips the folder grace wait under the lock, and reports only a busy lock as a busy lock.

@@ -1,1 +1,0 @@
-`tslab.enums.OutputFormat` (`TEXT`, `JSON`) says how a command prints to the terminal, and `tslab.study.commands.results.ResultsFormat` (`CSV`, `JSON`) says the file format of the results table; the `--json` flag and the printed output are unchanged.
