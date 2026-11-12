@@ -10,7 +10,7 @@ studies = "my_paper.studies"
 runs = "runs"
 
 [machine_by_host]
-"login*.cluster.example" = "cluster"
+"login*.hpc.example" = "hpc"
 "*" = "local"
 ```
 

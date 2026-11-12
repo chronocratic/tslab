@@ -1,6 +1,6 @@
 """The ``tslab machine`` subcommands: the register of machine names.
 
-``--machine cluster`` finds ``machines/cluster.toml`` above the working
+``--machine hpc`` finds ``machines/hpc.toml`` above the working
 directory, and otherwise looks the name up in the register these commands edit.
 """
 

@@ -71,9 +71,9 @@ uncomment it and drop `--machine` from every command.
 after `--` go to every run. Add `--code-snapshot` to a `submit` so the jobs
 run the copy of `src/` taken at submit time; the resubmits then keep that
 code. Slurm: copy `machines/slurm.example.toml` to
-`machines/cluster.toml` and fill in the values of your cluster. `--machine cluster`
+`machines/hpc.toml` and fill in the values of your cluster. `--machine hpc`
 finds it from this folder or any folder below. To use the name from any folder, run
-`uv run tslab machine add cluster machines/cluster.toml`. The full guide:
+`uv run tslab machine add hpc machines/hpc.toml`. The full guide:
 the [Studies page](https://tslab.readthedocs.io/en/latest/studies.html) of the
 TSLab docs. The profile example uses `retry` for grids that are not chained
 and `chained_retry` for chained grids.

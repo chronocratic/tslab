@@ -81,7 +81,7 @@ class Usage:
     """Show what each run used, and the sizes to suggest for the next jobs.
 
     For example:
-        tslab study usage example --machine cluster
+        tslab study usage example --machine hpc
 
     Attributes:
         study: The short study name or full module:attribute reference. A short name expands

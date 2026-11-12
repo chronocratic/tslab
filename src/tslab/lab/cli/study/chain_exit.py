@@ -19,7 +19,7 @@ class ChainExit:
     """Return non-zero when one chained run did not finish successfully.
 
     For example:
-        tslab study chain-exit example:study --machine machines/cluster.toml --job-file 3 --index 4
+        tslab study chain-exit example:study --machine machines/hpc.toml --job-file 3 --index 4
 
     Attributes:
         study: The full module:attribute reference of the study.

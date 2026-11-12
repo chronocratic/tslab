@@ -29,7 +29,7 @@ class Doctor:
 
     For example:
         tslab doctor --machine local
-        tslab doctor --machine cluster example
+        tslab doctor --machine hpc example
 
     Attributes:
         machine: A machine name or profile path. Default: from

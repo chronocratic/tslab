@@ -54,7 +54,7 @@ class RunOne:
     train for the whole allocation.
 
     For example:
-        tslab study run example --machine cluster --only model=small,seed=1
+        tslab study run example --machine hpc --only model=small,seed=1
 
     Attributes:
         study: The short study name or full module:attribute reference. A short name expands

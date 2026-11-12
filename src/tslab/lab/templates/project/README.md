@@ -31,7 +31,7 @@ uv run tslab study results example --machine local --out results.csv
 ```
 
 `machines/local.toml` runs the tasks on this machine. Copy
-`machines/slurm.example.toml` to `machines/cluster.toml` and fill in the
+`machines/slurm.example.toml` to `machines/hpc.toml` and fill in the
 `CHANGE_ME` values to run on a SLURM cluster.
 
 ## Where to change things

@@ -320,10 +320,10 @@ Writing a study:
   parsed at submit, so typos fail before anything runs.
 
 For a SLURM cluster, copy `machines/slurm.example.toml` to
-`machines/cluster.toml` and fill every `CHANGE_ME`. `--machine cluster` finds
-`machines/cluster.toml` from the working directory or any folder above it; to use
+`machines/hpc.toml` and fill every `CHANGE_ME`. `--machine hpc` finds
+`machines/hpc.toml` from the working directory or any folder above it; to use
 the name from any folder, register it once with
-`uv run tslab machine add cluster machines/cluster.toml` (`tslab machine list`
+`uv run tslab machine add hpc machines/hpc.toml` (`tslab machine list`
 and `tslab machine remove cluster` manage the register). Details:
 the "Studies and HPC" page of the TSLab docs.
 

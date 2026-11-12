@@ -24,7 +24,7 @@ class Cancel:
     """Cancel queued and running SLURM jobs, or stop the live local launch.
 
     For example:
-        tslab study cancel example --machine cluster
+        tslab study cancel example --machine hpc
 
     Attributes:
         study: The short study name or full module:attribute reference. A short name expands

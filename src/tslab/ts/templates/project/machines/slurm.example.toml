@@ -1,6 +1,6 @@
 # Example SLURM machine profile.
 #
-# Copy this file to machines/cluster.toml, fill in the values of the cluster
+# Copy this file to machines/hpc.toml, fill in the values of the cluster
 # (partition, limits, paths) and commit that file. Nothing here is
 # cluster-specific except what says CHANGE_ME.
 launcher = "slurm"

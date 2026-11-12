@@ -33,7 +33,7 @@ machine.
 
 ### Testing the timeout path
 
-`tslab study cancel STUDY --machine cluster --signal` sends `USR2` to the
+`tslab study cancel STUDY --machine hpc --signal` sends `USR2` to the
 running jobs of the selected runs instead of canceling them, so a run
 reaches the save-and-end path of a real time limit without waiting for it.
 The runs save `last.ckpt` and end on their own as `interrupted`; queued jobs
@@ -43,7 +43,7 @@ To test the pause path, submit one run with a tiny share; the training then
 pauses with `TrainingPaused` after one batch:
 
 ```bash
-uv run tslab study submit example --machine cluster \
+uv run tslab study submit example --machine hpc \
     --grid sweep --only dataset=small --only seed=42 \
     -- --trainer.job-time-share 0.01
 ```

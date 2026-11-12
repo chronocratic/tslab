@@ -10,10 +10,10 @@ For an agent workflow with JSON documents and exit codes, see the
 [Agent guide](agents.md).
 
 ```bash
-uv run tslab study submit example --machine cluster
-uv run tslab study status   example --machine cluster
-uv run tslab study resubmit example --machine cluster
-uv run tslab study results  example --machine cluster \
+uv run tslab study submit example --machine hpc
+uv run tslab study status   example --machine hpc
+uv run tslab study resubmit example --machine hpc
+uv run tslab study results  example --machine hpc \
     --out results.csv
 ```
 
@@ -162,7 +162,7 @@ and results no longer find the old runs.
 
 ## Machine profiles
 
-One TOML file per machine, committed by the user (`machines/cluster.toml`,
+One TOML file per machine, committed by the user (`machines/hpc.toml`,
 `machines/laptop.toml`). `${VAR}` in string values expands **on that
 machine**, so no personal path has to be hard-coded. The template ships a
 runnable `machines/local.toml` and a fully commented
@@ -186,7 +186,7 @@ registered names. A registered name whose file is gone fails with its own
 message.
 
 ```bash
-uv run tslab machine add cluster /home/me/lab/experiments/machines/cluster.toml
+uv run tslab machine add hpc /home/me/lab/experiments/machines/hpc.toml
 uv run tslab machine list
 uv run tslab machine remove cluster
 ```
@@ -337,7 +337,7 @@ steps. A run stopped by `max_training_time` logs a warning.
 ## Submit
 
 ```bash
-uv run tslab study submit example --machine cluster \
+uv run tslab study submit example --machine hpc \
     [--grid NAME] [--only AXIS=V1,V2] [--include-done] [--dry-run] [-- extra args]
 ```
 
@@ -402,7 +402,7 @@ the logs of earlier attempts stay under the old one. Each array is one
 ## Status
 
 ```bash
-uv run tslab study status example --machine cluster \
+uv run tslab study status example --machine hpc \
     [--grid NAME] [--only AXIS=V1,V2] [--states STATE]
 ```
 
@@ -437,7 +437,7 @@ status report is not a failure.
 ## Resubmit
 
 ```bash
-uv run tslab study resubmit example --machine cluster \
+uv run tslab study resubmit example --machine hpc \
     [--states failed,interrupted,missing] [--cancel-live] [--dry-run] [-- extra args]
 ```
 
@@ -464,7 +464,7 @@ jobs import that copy, so later edits never change queued or resubmitted
 runs. It is opt-in and off by default.
 
 ```bash
-uv run tslab study submit example --machine cluster --code-snapshot
+uv run tslab study submit example --machine hpc --code-snapshot
 ```
 
 `code_snapshot = true` in [tslab.toml](project-settings.md) turns it on for
@@ -675,7 +675,7 @@ no network (see below).
 ## Results
 
 ```bash
-uv run tslab study results example --machine cluster \
+uv run tslab study results example --machine hpc \
     --out results.csv
 ```
 
@@ -695,8 +695,8 @@ Use `--out -` to write CSV to standard output. Add `--json` to write the
 `tslab.study-results` document to a file or standard output:
 
 ```bash
-uv run tslab study results example --machine cluster --out -
-uv run tslab study results example --machine cluster --out - --json
+uv run tslab study results example --machine hpc --out -
+uv run tslab study results example --machine hpc --out - --json
 ```
 
 ## Show a study
@@ -721,7 +721,7 @@ stops, even after failures. It works in a background shell and supports
 `--json`. See the [Agent guide](agents.md) for exit-code actions.
 
 ```bash
-uv run tslab study wait example --machine cluster --json
+uv run tslab study wait example --machine hpc --json
 ```
 
 ## Inspect failures
@@ -739,7 +739,7 @@ and `--lines` to change the selection and tail size. The command only reads
 data. See the [Agent guide](agents.md).
 
 ```bash
-uv run tslab study failures example --machine cluster --json
+uv run tslab study failures example --machine hpc --json
 ```
 
 ## Read the log of a run
@@ -774,7 +774,7 @@ those are reused. The command starts one process; for a multi-GPU job it says
 how many tasks the job would start.
 
 ```bash
-uv run tslab study run example --machine cluster \
+uv run tslab study run example --machine hpc \
     --grid sweep --only dataset=small --only seed=42
 ```
 
@@ -799,7 +799,7 @@ it reads the usage files of the tasks instead of `sacct` (see
 [Local machines](#local-machines)).
 
 ```bash
-uv run tslab study usage example --machine cluster
+uv run tslab study usage example --machine hpc
 ```
 
 ## Cancel live jobs
@@ -815,7 +815,7 @@ for the test. On a local machine it stops the live local launch (see
 [Agent guide](agents.md).
 
 ```bash
-uv run tslab study cancel example --machine cluster --dry-run --json
+uv run tslab study cancel example --machine hpc --dry-run --json
 ```
 
 ## Check a machine
@@ -830,7 +830,7 @@ check. It does not verify that a real cluster job succeeds. See the [Agent
 guide](agents.md).
 
 ```bash
-uv run tslab doctor --machine cluster example --json
+uv run tslab doctor --machine hpc example --json
 ```
 
 ## HPC environment notes

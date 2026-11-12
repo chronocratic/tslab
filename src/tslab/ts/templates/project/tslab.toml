@@ -19,5 +19,5 @@ runs = "runs"
 # Pick the machine by host, so the study commands need no --machine. Commented
 # out on purpose: a new project should never pick a machine on its own.
 # [machine_by_host]
-# "login*.cluster.example" = "cluster"
+# "login*.hpc.example" = "hpc"
 # "*" = "local"
