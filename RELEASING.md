@@ -36,7 +36,7 @@ Add a trusted publisher on PyPI (for a new project: *Your projects → Publishin
 | Field | Value |
 |-------|-------|
 | PyPI project name | `tslab` |
-| Owner | `chronocratic` |
+| Owner | `Chronocratic` |
 | Repository | `tslab` |
 | Workflow | `pypi-publish.yml` |
 | Environment | `pypi` |
