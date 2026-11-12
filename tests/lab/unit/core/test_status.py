@@ -18,7 +18,7 @@ from tslab.lab.enums import InstanceState, RunState
 
 def test_round_trip(tmp_path: Path) -> None:
     snapshot = RunStatusSnapshot(run_state=RunState.RUNNING, updated_at='t').with_instance(
-        instance_id='transform[smooth]',
+        instance_id='scale[sma]',
         record=InstanceRecord(state=InstanceState.DONE, fingerprint='f' * 16),
     )
     write_status(path=tmp_path / 'status.json', snapshot=snapshot)
@@ -26,7 +26,7 @@ def test_round_trip(tmp_path: Path) -> None:
     assert loaded is not None
     assert loaded.instances == snapshot.instances
     document = json.loads((tmp_path / 'status.json').read_text(encoding='utf-8'))
-    assert document['instances']['transform[smooth]'] == {'state': 'done', 'fingerprint': 'f' * 16}
+    assert document['instances']['scale[sma]'] == {'state': 'done', 'fingerprint': 'f' * 16}
 
 
 def test_missing_file_reads_as_none(tmp_path: Path) -> None:
@@ -34,14 +34,14 @@ def test_missing_file_reads_as_none(tmp_path: Path) -> None:
 
 
 def test_instance_id_format() -> None:
-    assert format_instance_id(stage_name='transform', name_parts=('forecasting', 'h24', 'smooth')) == (
-        'transform[forecasting/h24/smooth]'
+    assert format_instance_id(stage_name='scale', name_parts=('forecasting', 'h24', 'sma')) == (
+        'scale[forecasting/h24/sma]'
     )
 
 
 def test_parse_instance_id_inverts_format_instance_id() -> None:
-    instance_id = format_instance_id(stage_name='transform', name_parts=('forecasting', 'h24', 'smooth'))
-    assert parse_instance_id(instance_id=instance_id) == ('transform', ('forecasting', 'h24', 'smooth'))
+    instance_id = format_instance_id(stage_name='scale', name_parts=('forecasting', 'h24', 'sma'))
+    assert parse_instance_id(instance_id=instance_id) == ('scale', ('forecasting', 'h24', 'sma'))
     assert parse_instance_id(instance_id='encode[default]') == ('encode', ('default',))
 
 

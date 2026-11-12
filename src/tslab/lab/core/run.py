@@ -75,7 +75,7 @@ class RunOptions:
             does not call are left alone.
         rerun_from: A stage name. Every instance of this stage, and of every
             stage called after it, runs again.
-        rerun: Instance ids to run again, for example transform[sma] or transform[h24/sma].
+        rerun: Instance ids to run again, for example transform[smooth] or transform[h24/smooth].
         fail_fast: Re-raise the first stage error instead of continuing.
         dry_run: Print the plan (load, run, skip) without executing or writing anything.
         log_level: Level of the log output of TSLab.

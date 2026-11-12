@@ -34,11 +34,11 @@ def test_minimal_example_runs_then_reloads(tmp_path: Path) -> None:
 
 @pytest.mark.slow
 @pytest.mark.chronocratic
-def test_advanced_example_skips_the_broken_transform_then_reruns_only_it(tmp_path: Path) -> None:
+def test_advanced_example_skips_the_broken_smoothing_then_reruns_only_it(tmp_path: Path) -> None:
     one_epoch = ('--trainer.max-epochs', '1')
     first = run_example(*one_epoch, example='advanced', cwd=tmp_path)
     assert first.returncode == 0, first.stderr
-    assert 'smooth-small/h24: mse' in first.stdout
+    assert 'smooth-3/h24: mse' in first.stdout
     assert 'smooth-broken' not in first.stdout
     assert 'failed  transform[forecasting/smooth-broken]' in first.stderr
     assert 'skipped evaluate[forecasting/smooth-broken/h24]' in first.stderr
@@ -47,5 +47,5 @@ def test_advanced_example_skips_the_broken_transform_then_reruns_only_it(tmp_pat
     assert fixed.returncode == 0, fixed.stderr
     assert 'smooth-broken/h24: mse' in fixed.stdout
     assert 'done transform[forecasting/smooth-broken]' in fixed.stderr
-    assert 'load transform[forecasting/smooth-small]' in fixed.stderr
+    assert 'load transform[forecasting/smooth-3]' in fixed.stderr
     assert 'load evaluate[forecasting/clean/h24]' in fixed.stderr

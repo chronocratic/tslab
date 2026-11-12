@@ -645,7 +645,7 @@ def stage[**P, Out: Artifact](
 
         @tslab.lab.stage(name='transform', output=tslab.lab.Json)
         def transform(*, run: tslab.lab.Run, name: tslab.lab.InstanceName | None = None,
-                   scores: tslab.lab.Json, epsilon: float) -> tslab.lab.Json:
+                   scores: tslab.lab.Json, window: int) -> tslab.lab.Json:
             ...
 
     Args:

@@ -75,10 +75,10 @@ def test_fresh_artifact_cannot_be_fingerprinted() -> None:
 
 def test_unavailable_artifact_raises_on_use() -> None:
     placeholder = UnavailableArtifact(
-        instance_id='transform[sma]', reason=UnavailableReason.FAILED, detail='boom'
+        instance_id='transform[smooth]', reason=UnavailableReason.FAILED, detail='boom'
     )
     assert not is_available(artifact=placeholder)
-    with pytest.raises(UnavailableArtifactError, match=r'transform\[sma\] is unavailable'):
+    with pytest.raises(UnavailableArtifactError, match=r'transform\[smooth\] is unavailable'):
         _ = placeholder.tensors
 
 

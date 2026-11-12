@@ -428,8 +428,8 @@ def forecasting_representations[M](  # noqa: PLR0913 # why: keyword-only public 
         name: Prefix of the instance names, for several forecasting setups
             in one run.
         series: Encoded instead of ``data.full_series()``; a ``Tensors`` with
-            the key ``series`` and the same shape, for example from an transform
-            or corruption stage. Targets still come from ``data``, so the
+            the key ``series`` and the same shape, for example from a smoothing
+            or other transform stage. Targets still come from ``data``, so the
             changed input is scored against the true future. For another
             series with its own ground truth, pass another ``data``. If the
             stage that made it failed, every result is skipped.
