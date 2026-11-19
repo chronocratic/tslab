@@ -14,10 +14,12 @@ def blobs(*, per_class: int, classes: int, seed: int) -> tuple[torch.Tensor, tor
     return centers + 0.3 * torch.randn(len(labels), 4, generator=generator), labels
 
 
-def fitted_svm(*, train: int, val: int, classes: int = 2, **settings: int) -> SVMProbe:
+def fitted_svm(
+    *, train: int, val: int, classes: int = 2, fixed_c: float | None = None, **settings: int
+) -> SVMProbe:
     train_inputs, train_targets = blobs(per_class=train, classes=classes, seed=0)
     val_inputs, val_targets = blobs(per_class=val, classes=classes, seed=1)
-    probe = SVMProbe(n_jobs=1, **settings)
+    probe = SVMProbe(n_jobs=1, fixed_c=fixed_c, **settings)
     probe.fit(
         train_inputs=train_inputs,
         train_targets=train_targets,

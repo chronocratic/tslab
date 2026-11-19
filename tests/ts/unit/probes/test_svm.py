@@ -1,4 +1,8 @@
+import logging
+import math
+
 import numpy as np
+import pytest
 from sklearn.metrics import f1_score
 import torch
 
@@ -6,11 +10,47 @@ from tests.ts.unit.probes.helpers import blobs, fitted_svm
 from tslab.ts.probes import SVMProbe
 
 
-def test_small_datasets_use_a_near_hard_margin_svc() -> None:
+def test_small_datasets_use_a_hard_margin_svc() -> None:
     probe = fitted_svm(train=3, val=1, classes=3)
     svc = probe.pipeline.named_steps['svc']
-    assert svc.C == 1e6
+    assert math.isinf(svc.C)
     assert svc.shape_fit_[0] == 12
+
+
+def test_a_fixed_c_skips_the_search_and_fits_on_train_and_validation() -> None:
+    probe = fitted_svm(train=30, val=10, fixed_c=0.37)
+    svc = probe.pipeline.named_steps['svc']
+    assert svc.C == 0.37
+    assert svc.shape_fit_[0] == 80
+
+
+def test_a_fixed_c_also_applies_to_small_datasets() -> None:
+    probe = fitted_svm(train=3, val=1, classes=3, fixed_c=0.37)
+    assert probe.pipeline.named_steps['svc'].C == 0.37
+
+
+def test_a_hard_margin_falls_back_to_a_finite_c_when_the_coefficients_diverge(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    # Two overlapping one-dimensional classes: libsvm reports non-finite dual coefficients.
+    inputs = torch.from_numpy(np.random.default_rng(seed=12).normal(size=(60, 1)))
+    labels = torch.arange(2).repeat_interleave(30)
+    probe = SVMProbe(fixed_c=math.inf, n_jobs=1)
+    with caplog.at_level(logging.WARNING):
+        probe.fit(
+            train_inputs=inputs[:54],
+            train_targets=labels[:54],
+            val_inputs=inputs[54:],
+            val_targets=labels[54:],
+        )
+    svc = probe.pipeline.named_steps['svc']
+    assert svc.C == 1e6
+    assert svc.shape_fit_[0] == 60
+    assert 'not finite' in caplog.text
+
+
+def test_the_default_settings_have_no_fixed_c() -> None:
+    assert SVMProbe().fingerprint_settings().fixed_c is None
 
 
 def test_larger_datasets_search_c_and_refit_on_train_and_validation() -> None:
