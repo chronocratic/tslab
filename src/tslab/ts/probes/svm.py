@@ -1,6 +1,8 @@
 """The SVM classification probe of TS2Vec."""
 
 from dataclasses import dataclass
+import logging
+import math
 from typing import override
 
 import numpy as np
@@ -24,6 +26,7 @@ from tslab.ts.probes.sklearn_probe import (
 
 __all__ = ['SVMProbe', 'SVMProbeSettings']
 
+_LOGGER = logging.getLogger(__name__)
 # Below these sizes the C search is skipped (see SVMProbe).
 _MIN_SAMPLES_PER_CLASS = 5
 _MIN_SAMPLES = 50
@@ -32,6 +35,8 @@ _MIN_CLASSES = 2
 # overlap; a finite C keeps them bounded.
 _HARD_MARGIN_C = 1e6
 _C_GRID: tuple[float, ...] = (0.0001, 0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000, _HARD_MARGIN_C)
+# In the ValueError that scikit-learn raises when the dual coefficients diverge.
+_NOT_FINITE = 'not finite'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,9 +45,11 @@ class SVMProbeSettings:
 
     Attributes:
         max_train_samples: The most training rows used in the fit; ``None`` uses all of them.
+        fixed_c: The C fitted on every dataset without a search; ``None`` searches C.
     """
 
     max_train_samples: int | None
+    fixed_c: float | None
 
 
 class SVMProbe(SklearnProbe[SVMProbeSettings]):
@@ -52,22 +59,31 @@ class SVMProbe(SklearnProbe[SVMProbeSettings]):
     chosen from ``{1e-4, ..., 1e4, 1e6}`` on the validation split, then the
     best model is refitted on train and validation together. With fewer than
     5 samples per class on average or fewer than 50 samples, the search is skipped and
-    ``C=1e6`` is fitted on train and validation: a tiny validation split ties
-    every C, and the search would keep the smallest one, a constant predictor.
+    ``C=inf`` is fitted on train and validation (``C=1e6`` if its coefficients diverge):
+    a tiny validation split ties every C, and the search would keep the smallest one, a
+    constant predictor. ``fixed_c`` skips the search on every dataset.
     """
 
     _label = 'SVMProbe'
 
-    def __init__(self, *, max_train_samples: int | None = 10_000, n_jobs: int = -1) -> None:
+    def __init__(
+        self,
+        *,
+        max_train_samples: int | None = 10_000,
+        fixed_c: float | None = None,
+        n_jobs: int = -1,
+    ) -> None:
         """Configure the probe.
 
         Args:
             max_train_samples: Fit on a stratified random subset of at most
                 this many training rows; ``None`` uses all of them.
+            fixed_c: Fit this C on train and validation without a search, on every
+                dataset (``math.inf``: a hard margin); ``None`` searches C.
             n_jobs: Parallel jobs of the C search (``-1``: all cores).
         """
         super().__init__(n_jobs=n_jobs)
-        self._settings = SVMProbeSettings(max_train_samples=max_train_samples)
+        self._settings = SVMProbeSettings(max_train_samples=max_train_samples, fixed_c=fixed_c)
 
     @override
     def fit(
@@ -116,24 +132,33 @@ class SVMProbe(SklearnProbe[SVMProbeSettings]):
         if len(np.unique(labels)) < _MIN_CLASSES:
             message = f'SVMProbe needs at least 2 classes, but the labels hold {np.unique(labels)}'
             raise ValueError(message)
-        if (
+        if self._settings.fixed_c is not None:
+            c = self._settings.fixed_c
+        elif (
             len(labels) // len(np.unique(labels)) < _MIN_SAMPLES_PER_CLASS
             or len(labels) < _MIN_SAMPLES
         ):
-            pipeline.set_params(svc__C=_HARD_MARGIN_C)
-            features = np.concatenate([train_features, val_features], axis=0)
-            self._pipeline = pipeline.fit(X=features, y=labels)
+            c = math.inf
+        else:
+            self._pipeline = fit_on_predefined_split(
+                pipeline=pipeline,
+                param_grid={'svc__C': _C_GRID},
+                train_features=train_features,
+                train_labels=train_labels,
+                val_features=val_features,
+                val_labels=val_labels,
+                scoring=None,
+                n_jobs=self._n_jobs,
+            )
             return
-        self._pipeline = fit_on_predefined_split(
-            pipeline=pipeline,
-            param_grid={'svc__C': _C_GRID},
-            train_features=train_features,
-            train_labels=train_labels,
-            val_features=val_features,
-            val_labels=val_labels,
-            scoring=None,
-            n_jobs=self._n_jobs,
-        )
+        features = np.concatenate([train_features, val_features], axis=0)
+        try:
+            self._pipeline = pipeline.set_params(svc__C=c).fit(X=features, y=labels)
+        except ValueError as error:
+            if math.isfinite(c) or _NOT_FINITE not in str(error):
+                raise
+            _LOGGER.warning('SVMProbe C=inf failed (%s); fitting C=%s', error, _HARD_MARGIN_C)
+            self._pipeline = pipeline.set_params(svc__C=_HARD_MARGIN_C).fit(X=features, y=labels)
 
     @override
     def default_metrics(
